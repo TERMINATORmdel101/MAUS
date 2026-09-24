@@ -14,6 +14,12 @@ public sealed class AuditContext
 
     public ISystemParametersReader SystemParameters { get; init; } = new Win32SystemParametersReader();
 
+    public IEventLogReader EventLogs { get; init; } = new WindowsEventLogReader();
+
+    public IPackageInventory Packages { get; init; } = new WinRtPackageInventory();
+
+    public IFileSystemReader Files { get; init; } = new LocalFileSystemReader();
+
     public required WindowsInfo Windows { get; init; }
 
     public required HardwareProfile Hardware { get; init; }

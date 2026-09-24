@@ -140,6 +140,104 @@ public sealed class FakeCommands : ICommandRunner
     }
 }
 
+/// <summary>Journaux simulés : événements ajoutés par journal, filtrés comme le vrai lecteur.</summary>
+public sealed class FakeEventLogs : IEventLogReader
+{
+    private readonly List<(string Log, EventRecordInfo Record)> _events = [];
+    private readonly HashSet<string> _denied = new(StringComparer.OrdinalIgnoreCase);
+
+    public FakeEventLogs Add(string logName, string provider, int id, DateTime timeCreated, Dictionary<string, string>? data = null)
+    {
+        _events.Add((logName, new EventRecordInfo(id, provider, timeCreated, data ?? [])));
+        return this;
+    }
+
+    public FakeEventLogs Deny(string logName)
+    {
+        _denied.Add(logName);
+        return this;
+    }
+
+    public IReadOnlyList<EventRecordInfo> Query(string logName, string? provider, IReadOnlyCollection<int> eventIds, DateTime since, int maxEvents = 200, bool includeMessage = false)
+    {
+        if (_denied.Contains(logName))
+        {
+            throw new MausAccessDeniedException("refusé");
+        }
+
+        return _events
+            .Where(e => e.Log.Equals(logName, StringComparison.OrdinalIgnoreCase))
+            .Select(e => e.Record)
+            .Where(r => provider is null || r.Provider.Equals(provider, StringComparison.OrdinalIgnoreCase))
+            .Where(r => eventIds.Count == 0 || eventIds.Contains(r.Id))
+            .Where(r => r.TimeCreated >= since)
+            .OrderByDescending(r => r.TimeCreated)
+            .Take(maxEvents)
+            .ToList();
+    }
+}
+
+public sealed class FakePackages : IPackageInventory
+{
+    public List<InstalledPackage> Packages { get; } = [];
+
+    public FakePackages Add(string name, string version = "1.0.0.0")
+    {
+        Packages.Add(new InstalledPackage(name, $"{name}_8wekyb3d8bbwe", version, "CN=Microsoft Corporation"));
+        return this;
+    }
+
+    public IReadOnlyList<InstalledPackage> GetUserPackages() => Packages;
+}
+
+/// <summary>Système de fichiers en mémoire (chemins insensibles à la casse).</summary>
+public sealed class FakeFiles : IFileSystemReader
+{
+    private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string? Company, string? Product, string? Version)> _versions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (long, long)> _drives = new(StringComparer.OrdinalIgnoreCase);
+
+    public FakeFiles AddFile(string path, string content = "")
+    {
+        _files[path] = content;
+        return this;
+    }
+
+    public FakeFiles SetVersionInfo(string path, string? company, string? product = null, string? version = null)
+    {
+        _versions[path] = (company, product, version);
+        return this;
+    }
+
+    public FakeFiles SetDrive(string root, long freeBytes, long totalBytes)
+    {
+        _drives[root] = (freeBytes, totalBytes);
+        return this;
+    }
+
+    public bool FileExists(string path) => _files.ContainsKey(path);
+
+    public bool DirectoryExists(string path) => _files.Keys.Any(f => f.StartsWith(path.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
+
+    public string ReadAllText(string path) => _files.TryGetValue(path, out var content) ? content : throw new FileNotFoundException(path);
+
+    public IReadOnlyList<string> EnumerateFiles(string directory, string searchPattern = "*")
+    {
+        var prefix = directory.TrimEnd('\\') + "\\";
+        var extension = searchPattern.StartsWith("*.", StringComparison.Ordinal) ? searchPattern[1..] : null;
+        return _files.Keys
+            .Where(f => f.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !f[prefix.Length..].Contains('\\'))
+            .Where(f => extension is null || f.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    public (string? Company, string? Product, string? Version) GetVersionInfo(string path) =>
+        _versions.TryGetValue(path, out var info) ? info : (null, null, null);
+
+    public (long FreeBytes, long TotalBytes)? GetDriveSpace(string root) =>
+        _drives.TryGetValue(root, out var space) ? space : null;
+}
+
 public static class TestContext
 {
     public static AuditContext Create(
@@ -150,12 +248,18 @@ public static class TestContext
         HardwareProfile? hardware = null,
         WindowsInfo? windows = null,
         bool elevated = true,
-        DateTimeOffset? now = null) => new()
+        DateTimeOffset? now = null,
+        FakeEventLogs? eventLogs = null,
+        FakePackages? packages = null,
+        FakeFiles? files = null) => new()
     {
         Registry = registry ?? new FakeRegistry(),
         Cim = cim ?? new FakeCim(),
         Commands = commands ?? new FakeCommands(),
         SystemParameters = parameters ?? new FakeSystemParameters(),
+        EventLogs = eventLogs ?? new FakeEventLogs(),
+        Packages = packages ?? new FakePackages(),
+        Files = files ?? new FakeFiles(),
         Hardware = hardware ?? new HardwareProfile { FormFactor = FormFactor.Desktop },
         Windows = windows ?? new WindowsInfo("Windows 11 Pro", "Professional", "25H2", 26200, 1000),
         IsElevated = elevated,
