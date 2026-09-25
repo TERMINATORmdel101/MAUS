@@ -67,6 +67,7 @@ public sealed record SettingKey
     };
 
     /// <summary>Identité du réglage, pour repérer deux écritures sur la même valeur.</summary>
+    [JsonIgnore]
     public string Identity => Describe().ToUpperInvariant();
 
     public override string ToString() => Describe();
