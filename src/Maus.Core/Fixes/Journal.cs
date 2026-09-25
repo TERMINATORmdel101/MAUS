@@ -46,6 +46,9 @@ public sealed class JournalEntry
     public DateTimeOffset? RevertedAt { get; set; }
 
     public string? Error { get; set; }
+
+    /// <summary>Effet constaté par le nouvel audit (par exemple « sans effet sur votre édition »).</summary>
+    public string? EffectNote { get; set; }
 }
 
 /// <summary>Point de restauration créé avant une série de corrections.</summary>

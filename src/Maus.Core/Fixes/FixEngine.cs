@@ -109,7 +109,30 @@ public sealed class FixEngine
         return new ApplyResult(session, outcomes, restorePoint);
     }
 
-    public RevertResult Revert(string sessionId, bool force = false)
+    /// <summary>Note dans le journal l'effet réel de chaque correction, vu par le nouvel audit.</summary>
+    public void RecordVerification(string sessionId, IReadOnlyList<VerifiedOutcome> verified)
+    {
+        var session = _context.Journal.Load(sessionId);
+        if (session is null)
+        {
+            return;
+        }
+
+        foreach (var item in verified.Where(v => v.Check is EffectCheck.NoEffect or EffectCheck.PendingRestart))
+        {
+            foreach (var entry in session.Entries.Where(e => e.ChangeId == item.Outcome.ChangeId && e.State == EntryState.Applied))
+            {
+                entry.EffectNote = item.Message;
+            }
+        }
+
+        _context.Journal.Save(session);
+    }
+
+    /// <summary>
+    /// Remet les valeurs d'origine d'une séance entière, ou d'une seule de ses corrections (<paramref name="changeId"/>).
+    /// </summary>
+    public RevertResult Revert(string sessionId, bool force = false, string? changeId = null)
     {
         if (!_context.Audit.IsElevated)
         {
@@ -123,7 +146,15 @@ public sealed class FixEngine
         }
 
         var outcomes = new List<RevertOutcome>();
-        foreach (var entry in Enumerable.Reverse(session.Entries).Where(e => e.State == EntryState.Applied))
+        var targets = Enumerable.Reverse(session.Entries)
+            .Where(e => e.State == EntryState.Applied && (changeId is null || e.ChangeId == changeId))
+            .ToList();
+        if (changeId is not null && targets.Count == 0)
+        {
+            return new RevertResult(session, [], $"La correction {changeId} n'a rien à annuler dans cette séance.");
+        }
+
+        foreach (var entry in targets)
         {
             outcomes.Add(RevertOne(entry, force));
         }
