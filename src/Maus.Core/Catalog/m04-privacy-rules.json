@@ -14,7 +14,8 @@
     "expectedLabel": "non transmise (1)",
     "severity": "Low",
     "explanation": "Par défaut, Windows indique aux sites web la liste de vos langues pour leur permettre d'afficher un contenu local. Ce détail aide aussi à vous reconnaître d'un site à l'autre.",
-    "advice": "Couper « Permettre aux sites web d'accéder à ma liste de langues » dans Paramètres > Confidentialité et sécurité > Recommandations et offres."
+    "advice": "Couper « Permettre aux sites web d'accéder à ma liste de langues » dans Paramètres > Confidentialité et sécurité > Recommandations et offres.",
+    "fix": {}
   },
   {
     "id": "M04.app-launch-tracking",
@@ -28,7 +29,8 @@
     "expectedLabel": "désactivé (0)",
     "severity": "Low",
     "explanation": "Windows note les applications que vous lancez pour personnaliser le menu Démarrer et la recherche. Le couper n'enlève rien d'essentiel ; seule la liste « Les plus utilisées » ne se remplit plus.",
-    "advice": "Couper « Améliorer les résultats de Démarrer et de la recherche en suivant les lancements d'applications » dans les paramètres de confidentialité."
+    "advice": "Couper « Améliorer les résultats de Démarrer et de la recherche en suivant les lancements d'applications » dans les paramètres de confidentialité.",
+    "fix": {}
   },
   {
     "id": "M04.online-speech",
@@ -43,7 +45,8 @@
     "expectedLabel": "désactivée (0 ou absente)",
     "severity": "Low",
     "explanation": "La reconnaissance vocale en ligne envoie votre voix aux serveurs de Microsoft pour la transcrire. La reconnaissance intégrée à Windows, hors ligne, reste disponible.",
-    "advice": "Couper « Reconnaissance vocale en ligne » dans Paramètres > Confidentialité et sécurité > Voix."
+    "advice": "Couper « Reconnaissance vocale en ligne » dans Paramètres > Confidentialité et sécurité > Voix.",
+    "fix": {}
   },
   {
     "id": "M04.implicit-text",
@@ -57,7 +60,8 @@
     "expectedLabel": "limitée (1)",
     "severity": "Low",
     "explanation": "Windows peut mémoriser les mots que vous tapez pour enrichir son dictionnaire personnel et ses suggestions. Le limiter réduit ce qui est conservé sur vos habitudes de saisie.",
-    "advice": "Couper « Dictionnaire personnel pour l'écriture manuscrite et la saisie » dans Paramètres > Confidentialité et sécurité > Personnalisation de l'écriture manuscrite et de la saisie."
+    "advice": "Couper « Dictionnaire personnel pour l'écriture manuscrite et la saisie » dans Paramètres > Confidentialité et sécurité > Personnalisation de l'écriture manuscrite et de la saisie.",
+    "fix": {}
   },
   {
     "id": "M04.implicit-ink",
@@ -71,6 +75,7 @@
     "expectedLabel": "limitée (1)",
     "severity": "Low",
     "explanation": "Windows peut analyser votre écriture au stylet pour mieux la reconnaître. Sans stylet, ce réglage ne sert à rien ; le limiter réduit ce qui est conservé.",
-    "advice": "Couper « Dictionnaire personnel pour l'écriture manuscrite et la saisie » dans Paramètres > Confidentialité et sécurité > Personnalisation de l'écriture manuscrite et de la saisie."
+    "advice": "Couper « Dictionnaire personnel pour l'écriture manuscrite et la saisie » dans Paramètres > Confidentialité et sécurité > Personnalisation de l'écriture manuscrite et de la saisie.",
+    "fix": {}
   }
 ]

@@ -1,3 +1,4 @@
+using Maus.Core.Fixes;
 using Maus.Core.Rules;
 
 namespace Maus.Core.Modules.M04Privacy;
@@ -7,7 +8,7 @@ namespace Maus.Core.Modules.M04Privacy;
 /// (« Requises » sur Famille et Pro, 0 sur Entreprise et Éducation) et signale publicités, suggestions et fonctions d'IA.
 /// Ce sont des choix, pas des dangers : aucun constat ne dépasse « optimisation possible ».
 /// </summary>
-public sealed class PrivacyModule : IAuditModule
+public sealed class PrivacyModule : IFixableModule
 {
     private static readonly Lazy<IReadOnlyList<RegistryRule>> Rules = new(() => EmbeddedCatalog.LoadRegistryRules("m04-privacy-rules.json"));
 
@@ -60,4 +61,7 @@ public sealed class PrivacyModule : IAuditModule
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
+
+    public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings) =>
+        [.. PrivacyPlanner.Plan(Id, context, findings), .. RegistryRulePlanner.Plan(Id, Rules.Value, findings)];
 }
