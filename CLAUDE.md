@@ -120,7 +120,7 @@ SDK : `apt-get install -y dotnet-sdk-10.0` (dépôt Ubuntu ; `dot.net/v1/dotnet-
 Reste à faire V0.2 (écritures d'autres natures, non commencées) : services via l'API (DiagTrack), tâches planifiées (CEIP, UpdateOrchestrator, tâches d'ouverture de session M12), Defender (exclusions), pare-feu local, BCD (DEP, signature des pilotes), fichier hosts, proxy WinHTTP, fichier d'échange, Copilot/Recall, réinstallation Game Bar (winget), modes secteur/batterie (M05, fonctions non documentées), retrait des valeurs de `Registry.pol`, bouton « Valeurs Windows » (défauts) du M06.
 
 Reste à faire / points connus :
-- [ ] Fichier `LICENSE` (texte officiel GPL-3.0 de gnu.org) : le porteur n'a pas encore autorisé le téléchargement.
+- [x] Fichier `LICENSE` : texte officiel GPL-3.0 (accord du porteur le 25/09/2026 ; gnu.org bloqué par le proxy, copie Debian `/usr/share/common-licenses/GPL-3`, SHA-256 `3972dc97…986` identique à gpl-3.0.txt).
 - [ ] Relecture juridique de `TRADEMARKS.md` et des mentions légales avant publication publique.
 - [ ] **Question ouverte au porteur** : un pilote (PawnIO, utilisé par LibreHardwareMonitor) permettrait de lire la tension et la vraie température du processeur, le SPD des barrettes et la marque des puces de la carte graphique. Sans son accord, MAUS reste sans pilote noyau et le dit.
 - [ ] Module 14 : contrôle « écran branché sur la carte mère » par comparaison d'adaptateur, sans le drapeau D3D12 UMA.
