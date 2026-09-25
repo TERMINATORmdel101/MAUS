@@ -2,8 +2,11 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Maus.Core;
+using Maus.Core.Engine;
 using Maus.Core.Localization;
 using Maus.Core.Preferences;
+using Maus.Core.Workshop;
 
 namespace Maus.App;
 
@@ -19,6 +22,78 @@ public partial class App : Application
         ThemeMode = ThemeMode.System;
 #pragma warning restore WPF0001
         base.OnStartup(e);
+
+        if (e.Args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase))
+        {
+            // Audit planifié : pas de fenêtre, sauf si un problème rouge mérite d'être signalé.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = RunScheduledAuditAsync();
+            return;
+        }
+
+        ShowMainWindow();
+    }
+
+    private static void ShowMainWindow()
+    {
+        var window = new MainWindow();
+        Current.MainWindow = window;
+        window.Show();
+    }
+
+    /// <summary>
+    /// Audit hebdomadaire lancé par le Planificateur de tâches : lecture seule, score gardé dans l'historique, notification
+    /// seulement s'il y a un problème rouge. Rien n'est envoyé.
+    /// </summary>
+    private async Task RunScheduledAuditAsync()
+    {
+        try
+        {
+            var context = await Task.Run(AuditContext.CreateDefault);
+            var results = await AuditEngine.CreateWithBuiltInModules().RunAsync(context);
+            await Task.Run(() =>
+            {
+                try
+                {
+                    BenchmarkHistory.CreateHealth().Add(ScoreTrends.HealthEntry(results, DateTimeOffset.Now));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Historique non écrit : sans conséquence pour l'audit.
+                }
+            });
+
+            var problems = ScheduledAudit.WorthNotifying(results);
+            if (problems.Count == 0)
+            {
+                Shutdown(0);
+                return;
+            }
+
+            var notification = new Views.NotificationWindow(ScheduledAudit.NotificationText(problems));
+            notification.Closed += (_, _) =>
+            {
+                if (notification.OpenRequested)
+                {
+                    ShutdownMode = ShutdownMode.OnLastWindowClose;
+                    ShowMainWindow();
+                    if (Current.MainWindow?.DataContext is ViewModels.MainViewModel model && model.RunAuditCommand.CanExecute(null))
+                    {
+                        model.RunAuditCommand.Execute(null);
+                    }
+                }
+                else
+                {
+                    Shutdown(0);
+                }
+            };
+            notification.Show();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            WriteCrashLog(ex);
+            Shutdown(1);
+        }
     }
 
     /// <summary>Active la langue choisie (ou celle de Windows), y compris pour les dates et les nombres.</summary>

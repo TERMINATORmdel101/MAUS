@@ -163,6 +163,14 @@ public static class Ui
 
     public static string ScoreHistoryIntro => T("Chaque test réussi est gardé sur ce PC (rien n'est envoyé) : la courbe montre l'effet d'un réglage, d'un nettoyage ou d'une mise à jour. Un écart de quelques pour cent d'un passage à l'autre est normal.");
 
+    public static string WeeklyAudit => T("Audit automatique :");
+
+    public static string WeeklyAuditTip => T("Un audit en lecture seule chaque semaine, sans fenêtre ; MAUS ne se montre que s'il trouve un problème rouge. Rien n'est envoyé.");
+
+    public static string NotificationTitle => T("MAUS a trouvé un problème");
+
+    public static string OpenMaus => T("Ouvrir MAUS");
+
     public static string HelpTitle => T("Demander de l'aide");
 
     public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");

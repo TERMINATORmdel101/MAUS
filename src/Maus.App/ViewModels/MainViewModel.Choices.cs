@@ -119,6 +119,8 @@ public sealed partial class MainViewModel
         {
             _loadingChoices = false;
         }
+
+        _ = LoadScheduleAsync();
     }
 
     private async Task ChangeGameBarAsync(ChoiceOption<int?> previous, ChoiceOption<int?> chosen)
