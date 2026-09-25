@@ -1,0 +1,29 @@
+// Seuils de sécurité de l'atelier matériel (Module 16). Chaque ligne cite sa source.
+// Les seuils « élevée » et « dangereuse » de la RAM sont des valeurs prudentes de MAUS, à vérifier et à sourcer.
+{
+  "memoryVoltage": [
+    {
+      "generation": 4,
+      "nominalMv": 1200,
+      "elevatedAboveMv": 1400,
+      "dangerAboveMv": 1550,
+      "source": "JEDEC DDR4 : 1,2 V nominal ; profils XMP courants : 1,35 V. Seuils de MAUS (à vérifier)."
+    },
+    {
+      "generation": 5,
+      "nominalMv": 1100,
+      "elevatedAboveMv": 1400,
+      "dangerAboveMv": 1500,
+      "source": "JEDEC DDR5 : 1,1 V nominal ; profils XMP/EXPO courants : 1,25 à 1,40 V. Seuils de MAUS (à vérifier)."
+    }
+  ],
+  "cpuMaxTemperature": [
+    { "pattern": "Ryzen [579] [79]\\d00X3D", "maxC": 89, "source": "Fiches AMD des Ryzen 7000X3D (à vérifier)" },
+    { "pattern": "Ryzen [3579] 9\\d{3}", "maxC": 95, "source": "Fiches AMD des Ryzen 9000 (à vérifier)" },
+    { "pattern": "Ryzen [3579] 7\\d{3}", "maxC": 95, "source": "Fiches AMD des Ryzen 7000 (à vérifier)" },
+    { "pattern": "Ryzen [3579] 5\\d{3}", "maxC": 90, "source": "Fiches AMD des Ryzen 5000 (à vérifier)" },
+    { "pattern": "(1[2-4]th Gen Intel|Core\\(TM\\) Ultra)", "maxC": 100, "source": "Fiches Intel (TJUNCTION), Core 12e à 14e génération et Core Ultra (à vérifier)" }
+  ],
+  "batteryWornBelowPercent": 80,
+  "gpuIdleHotMarginC": 15
+}
