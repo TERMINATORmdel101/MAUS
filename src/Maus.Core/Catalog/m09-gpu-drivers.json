@@ -1,0 +1,110 @@
+{
+  // Dernières versions officielles connues, par fabricant et par branche. Vérifié sur les pages officielles le 24/09/2026.
+  // Les branches sont testées dans l'ordre : la première dont le motif correspond au nom du GPU l'emporte.
+  "checkedOn": "2026-09-24",
+  "significantGapDays": 90,
+  "maxDriverAgeDays": 183,
+  "branches": [
+    {
+      "id": "nvidia-r580-legacy",
+      "vendor": "Nvidia",
+      "label": "branche 580 de maintenance (Maxwell, Pascal, Volta)",
+      "namePattern": "GTX\\s*(745|750|8[56]0M|9\\d\\d)|GTX\\s*10[5-8]0|GT\\s*1030|GeForce\\s*9[2-4]0MX?\\b|MX\\s*[123]\\d0\\b|TITAN\\s*(X|Xp|V)\\b|Quadro\\s*(M|P|GV)\\d",
+      "scheme": "NvidiaMarketing",
+      "latestVersion": "582.66",
+      "releasedOn": "2026-06-17",
+      "downloadUrl": "https://www.nvidia.com/fr-fr/drivers/",
+      "note": "Mises à jour de sécurité trimestrielles seulement, sans optimisation pour les nouveaux jeux."
+    },
+    {
+      "id": "nvidia-game-ready",
+      "vendor": "Nvidia",
+      "label": "GeForce Game Ready",
+      "namePattern": "RTX|GTX\\s*16\\d0|MX\\s*[45]\\d0\\b|\\bT\\d{3,4}\\b",
+      "scheme": "NvidiaMarketing",
+      "latestVersion": "617.14",
+      "releasedOn": "2026-09-22",
+      "downloadUrl": "https://www.nvidia.com/fr-fr/drivers/",
+      "note": "Aussi disponible dans l'application NVIDIA App."
+    },
+    {
+      "id": "amd-polaris-vega",
+      "vendor": "Amd",
+      "label": "Adrenalin pour Polaris et Vega",
+      "namePattern": "RX\\s*(4[6-8]0|5[4-9]0)X?\\b|RX\\s*Vega|Radeon\\s*VII\\b|Radeon\\s*(Pro\\s*)?Duo",
+      "scheme": "AmdSoftware",
+      "latestVersion": "26.5.2",
+      "latestDriverVersion": "32.0.21043.10005",
+      "releasedOn": "2026-05-21",
+      "downloadUrl": "https://www.amd.com/fr/support/download/drivers.html"
+    },
+    {
+      "id": "amd-adrenalin-rdna1-2",
+      "vendor": "Amd",
+      "label": "Adrenalin, branche RX 5000 et RX 6000",
+      "namePattern": "RX\\s*(5[5-7]00|6[4-9]\\d0)|Radeon\\S*\\s*(610|6[6-8]0)M\\b",
+      "scheme": "AmdSoftware",
+      "latestVersion": "26.9.1",
+      "releasedOn": "2026-09-03",
+      "downloadUrl": "https://www.amd.com/fr/support/download/drivers.html"
+    },
+    {
+      "id": "amd-adrenalin",
+      "vendor": "Amd",
+      "label": "Adrenalin",
+      "namePattern": "RX\\s*(7[6-9]\\d0|9\\d{3})|Radeon\\S*\\s*(7[4-8]0M|8[4-9]0M|80[4-6]0S)\\b",
+      "scheme": "AmdSoftware",
+      "latestVersion": "26.9.1",
+      "latestDriverVersion": "32.0.21045.9003",
+      "releasedOn": "2026-09-03",
+      "downloadUrl": "https://www.amd.com/fr/support/download/drivers.html"
+    },
+    {
+      "id": "intel-arc",
+      "vendor": "Intel",
+      "label": "Intel Arc et Core Ultra",
+      "namePattern": "\\bArc\\b|^Intel\\(R\\)\\s*Graphics$",
+      "scheme": "WindowsDriver",
+      "latestVersion": "32.0.101.9033",
+      "latestDriverVersion": "32.0.101.9033",
+      "releasedOn": "2026-09-24",
+      "downloadUrl": "https://www.intel.com/content/www/us/en/download/785597/intel-arc-graphics-windows.html",
+      "note": "Aussi disponible dans l'application Intel Graphics Software."
+    },
+    {
+      "id": "intel-11-14",
+      "vendor": "Intel",
+      "label": "Intel 11e à 14e génération (maintenance trimestrielle)",
+      "namePattern": "Iris\\(R\\)\\s*Xe|Iris\\s*Xe|UHD\\s*Graphics\\s*(7[1-7]0|P7\\d0)",
+      "scheme": "WindowsDriver",
+      "latestVersion": "32.0.101.7088",
+      "latestDriverVersion": "32.0.101.7088",
+      "releasedOn": "2026-06-22",
+      "downloadUrl": "https://www.intel.com/content/www/us/en/download/864990/intel-11th-14th-gen-processor-graphics-windows.html"
+    },
+    {
+      "id": "intel-7-10",
+      "vendor": "Intel",
+      "label": "Intel 7e à 10e génération (maintenance)",
+      "namePattern": "UHD\\s*Graphics\\s*(6[0-3]\\d|P6[0-3]\\d)|HD\\s*Graphics\\s*(5[0-9]\\d|6[0-9]\\d|P6\\d\\d)|Iris\\(R\\)\\s*(Plus|Pro)\\s*Graphics|Iris\\(R\\)\\s*Graphics\\s*6\\d\\d",
+      "scheme": "WindowsDriver",
+      "latestVersion": "31.0.101.2145",
+      "latestDriverVersion": "31.0.101.2145",
+      "releasedOn": "2026-09-22",
+      "downloadUrl": "https://www.intel.com/content/www/us/en/download/776137/intel-7th-10th-gen-processor-graphics-windows.html"
+    }
+  ],
+  "vendorDownloads": {
+    "Nvidia": "https://www.nvidia.com/fr-fr/drivers/",
+    "Amd": "https://www.amd.com/fr/support/download/drivers.html",
+    "Intel": "https://www.intel.com/content/www/us/en/support/detect.html"
+  },
+  // GPU dédiés qui savent exploiter Resizable BAR (Smart Access Memory chez AMD).
+  "resizableBarCapable": {
+    "Nvidia": "RTX\\s*(30[5-9]0|40[5-9]0|50[5-9]0)|RTX\\s*A\\d{3,4}\\b|RTX\\s*\\d{4}\\s*Ada|RTX\\s*PRO",
+    "Amd": "RX\\s*(6[4-9]\\d0|7[6-9]\\d0|9\\d{3})",
+    "Intel": "Arc(\\(TM\\))?\\s*(Pro\\s*)?[AB]\\d{2,3}"
+  },
+  // GPU dont DLSS Frame Generation exige la planification GPU accélérée par le matériel (HAGS).
+  "frameGenerationPattern": "RTX\\s*(40[5-9]0|50[5-9]0)"
+}
