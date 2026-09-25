@@ -83,6 +83,12 @@ public sealed class WmiCimReader : ICimReader
         {
             throw new DataSourceUnavailableException($"Source WMI absente ({scope}).", ex);
         }
+        catch (ManagementException ex) when (ex.ErrorCode is ManagementStatus.InvalidQuery or ManagementStatus.InvalidProperty
+                                                 or ManagementStatus.NotSupported or ManagementStatus.InvalidMethod or ManagementStatus.ProviderLoadFailure)
+        {
+            // Propriété ou méthode absente sur cette version de Windows : la donnée est indisponible, pas une erreur du module.
+            throw new DataSourceUnavailableException($"Requête WMI non prise en charge ({scope}) : {ex.ErrorCode}.", ex);
+        }
         catch (UnauthorizedAccessException ex)
         {
             throw new MausAccessDeniedException($"Accès WMI refusé ({scope}).", ex);

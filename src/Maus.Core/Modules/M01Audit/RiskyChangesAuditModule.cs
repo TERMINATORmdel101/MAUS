@@ -49,7 +49,7 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
 
     public async Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
-        var managed = ManagedPcDetector.IsManaged(context);
+        var managed = context.Hardware.IsManaged;
         var findings = new List<Finding>();
         if (managed)
         {

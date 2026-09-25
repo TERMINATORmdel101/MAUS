@@ -26,4 +26,5 @@ public static class CimScopes
     public const string StandardCimv2 = @"root\StandardCimv2";
     public const string SecurityCenter2 = @"root\SecurityCenter2";
     public const string BitLocker = @"root\cimv2\Security\MicrosoftVolumeEncryption";
+    public const string TaskScheduler = @"root\Microsoft\Windows\TaskScheduler";
 }

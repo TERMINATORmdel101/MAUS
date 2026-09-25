@@ -20,7 +20,7 @@ public sealed class StartupAppsModule : IAuditModule
     internal const string StoreTasksPath = @"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData";
     internal const string ServicesQuery = "SELECT Name, DisplayName, PathName, StartMode FROM Win32_Service WHERE StartMode = 'Auto'";
     internal const string PerformanceLog = "Microsoft-Windows-Diagnostics-Performance/Operational";
-    internal const string TaskSchedulerScope = @"root\Microsoft\Windows\TaskScheduler";
+    internal const string TaskSchedulerScope = CimScopes.TaskScheduler;
     internal const string TasksQuery = "SELECT TaskName, TaskPath, State, Triggers, Actions FROM MSFT_ScheduledTask";
 
     private const string SummaryCategory = "Vue d'ensemble";

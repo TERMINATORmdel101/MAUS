@@ -54,7 +54,7 @@ internal static class PrivacyKeys
 
     // Requêtes WMI en lecture seule.
     public const string DiagTrackQuery = "SELECT Name, StartMode, State FROM Win32_Service WHERE Name = 'DiagTrack'";
-    public const string TaskSchedulerScope = @"root\Microsoft\Windows\TaskScheduler";
+    public const string TaskSchedulerScope = Platform.CimScopes.TaskScheduler;
     public const string CeipTasksQuery = @"SELECT TaskName, TaskPath, State FROM MSFT_ScheduledTask WHERE TaskPath = '\\Microsoft\\Windows\\Customer Experience Improvement Program\\'";
     public const string DeliveryOptimizationScope = @"root\Microsoft\Windows\DeliveryOptimization";
     public const string DeliveryOptimizationQuery = "SELECT DownloadMode, DownloadModeProvider FROM MSFT_DeliveryOptimizationConfig";

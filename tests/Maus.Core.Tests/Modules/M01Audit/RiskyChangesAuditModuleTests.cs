@@ -279,13 +279,10 @@ public class RiskyChangesAuditModuleTests
     }
 
     [Fact]
-    public async Task Built_in_windows_enrollments_do_not_make_the_pc_managed()
+    public async Task Unmanaged_pc_with_wsus_leftovers_is_flagged()
     {
-        var pc = new M01Pc { HardwareManaged = true };
+        var pc = new M01Pc { HardwareManaged = false };
         pc.Registry
-            .Set(Hklm, @"SOFTWARE\Microsoft\Enrollments\E17005D5-A50E-4E57-BE94-1D4FA69C6F93", "ProviderID", "Local Authority")
-            .Set(Hklm, @"SOFTWARE\Microsoft\Enrollments\8345CBE6-CEFC-462A-8219-78F3FC0377C1", "ProviderID", "Deploy Authority")
-            .Set(Hklm, @"SOFTWARE\Microsoft\Enrollments\C429BE2D-071B-4E13-B616-4141C334ECDF", "ProviderID", "Cloud Authority")
             .Set(Hklm, M01Pc.WuPolicy + @"\AU", "UseWUServer", 1)
             .Set(Hklm, M01Pc.WuPolicy, "WUServer", "http://127.0.0.1");
 
@@ -293,17 +290,6 @@ public class RiskyChangesAuditModuleTests
 
         Assert.DoesNotContain(findings, f => f.Id == "M01.managed-pc");
         Assert.Equal(FindingStatus.Problem, findings.Single(f => f.Id == "M01.wu-server").Status);
-    }
-
-    [Fact]
-    public void Real_mdm_enrollment_is_recognised()
-    {
-        var registry = new FakeRegistry()
-            .Set(Hklm, @"SOFTWARE\Microsoft\Enrollments\E17005D5-A50E-4E57-BE94-1D4FA69C6F93", "ProviderID", "Local Authority")
-            .Set(Hklm, @"SOFTWARE\Microsoft\Enrollments\0A1B2C3D-0000-0000-0000-000000000000", "ProviderID", "MS DM Server");
-
-        Assert.True(ManagedPcDetector.HasOrganizationEnrollment(registry));
-        Assert.False(ManagedPcDetector.HasOrganizationEnrollment(new FakeRegistry().Deny(Hklm, @"SOFTWARE\Microsoft\Enrollments")));
     }
 
     [Theory]

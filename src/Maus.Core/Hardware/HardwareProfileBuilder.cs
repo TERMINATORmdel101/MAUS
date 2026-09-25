@@ -25,7 +25,7 @@ public static class HardwareProfileBuilder
             BoardProduct = board?.GetString("Product")?.Trim() ?? string.Empty,
             Cpu = ReadCpu(cim),
             Gpus = ReadGpus(cim),
-            IsManaged = system?.GetBool("PartOfDomain") == true || HasMdmEnrollment(registry),
+            IsManaged = system?.GetBool("PartOfDomain") == true || HasOrganizationEnrollment(registry),
         };
     }
 
@@ -58,19 +58,52 @@ public static class HardwareProfileBuilder
             })
             .ToList();
 
-    /// <summary>Une inscription MDM active laisse un <c>ProviderID</c> sous <c>HKLM\SOFTWARE\Microsoft\Enrollments</c>.</summary>
-    private static bool HasMdmEnrollment(IRegistryReader registry)
+    private const string EnrollmentsKey = @"SOFTWARE\Microsoft\Enrollments";
+
+    /// <summary>
+    /// Pseudo-inscriptions que Windows 11 crée de lui-même sur tout PC personnel : elles ne signifient
+    /// aucune gestion par une organisation.
+    /// </summary>
+    private static readonly HashSet<string> BuiltInEnrollmentProviders = new(StringComparer.OrdinalIgnoreCase)
     {
-        const string enrollments = @"SOFTWARE\Microsoft\Enrollments";
+        "Local Authority",
+        "Deploy Authority",
+        "Cloud Authority",
+    };
+
+    /// <summary>
+    /// Vrai si une inscription sous <c>HKLM\SOFTWARE\Microsoft\Enrollments</c> porte le <c>ProviderID</c>
+    /// d'un vrai service de gestion (Intune « MS DM Server » ou autre MDM).
+    /// </summary>
+    internal static bool HasOrganizationEnrollment(IRegistryReader registry)
+    {
+        IReadOnlyList<string> enrollments;
         try
         {
-            return registry.GetSubKeyNames(RegistryHive.LocalMachine, enrollments)
-                .Any(id => !string.IsNullOrWhiteSpace(registry.GetString(RegistryHive.LocalMachine, $@"{enrollments}\{id}", "ProviderID")));
+            enrollments = registry.GetSubKeyNames(RegistryHive.LocalMachine, EnrollmentsKey);
         }
         catch (MausAccessDeniedException)
         {
             return false;
         }
+
+        foreach (var id in enrollments)
+        {
+            try
+            {
+                var provider = registry.GetString(RegistryHive.LocalMachine, $@"{EnrollmentsKey}\{id}", "ProviderID")?.Trim();
+                if (!string.IsNullOrEmpty(provider) && !BuiltInEnrollmentProviders.Contains(provider))
+                {
+                    return true;
+                }
+            }
+            catch (MausAccessDeniedException)
+            {
+                // Inscription illisible : ignorée.
+            }
+        }
+
+        return false;
     }
 
     private static CimRow? TryFirst(ICimReader cim, string wql)
