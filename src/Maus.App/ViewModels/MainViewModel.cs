@@ -141,6 +141,7 @@ public sealed partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(SelectedModule));
 
             _lastContext = context;
+            await RebindAcknowledgementsAsync(findings);
             OnPropertyChanged(nameof(HasAudit));
             LoadChoices(context);
             var fixContext = await Task.Run(() => FixContext.CreateDefault(context));

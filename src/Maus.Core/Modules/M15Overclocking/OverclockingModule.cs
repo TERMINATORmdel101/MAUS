@@ -114,7 +114,7 @@ public sealed class OverclockingModule : IAuditModule
             + "étape. Téléchargez les outils uniquement sur le site officiel. Ces réglages se font hors de l'utilitaire, sous votre contrôle : "
             + "il ne peut pas en garantir le résultat. MAUS n'overclocke rien : il indique l'outil officiel adapté à votre matériel."),
         Advice = T("Avant de commencer : 1) BIOS à jour (Module 8) ; 2) pilote graphique à jour (Module 9) ; 3) mesure de performance de "
-            + "référence (Module 11, le test intégré arrive en V0.3) ; 4) aucune erreur matérielle WHEA dans le journal (Module 2)."),
+            + "référence (test du processeur dans l'Atelier) ; 4) aucune erreur matérielle WHEA dans le journal (Module 2)."),
     };
 
     private static Finding DetectCpu(HardwareProfile hardware, List<InstalledTool> tools)

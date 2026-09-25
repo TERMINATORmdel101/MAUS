@@ -325,7 +325,7 @@ public class WindowsHealthModuleTests
 
         Assert.Equal(FindingStatus.Warning, broken.Status);
         Assert.True(broken.Fixable);
-        Assert.Contains("V0.2", broken.Advice, StringComparison.Ordinal);
+        Assert.Contains("prochaine version", broken.Advice, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Warning, empty.Status);
     }
 

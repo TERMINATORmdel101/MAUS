@@ -31,7 +31,7 @@ public class HardwareHealthModuleTests
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.free-space"));
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.firmware-throttling"));
         Assert.Equal(FindingStatus.Info, Status(findings, "M11.benchmark"));
-        Assert.Contains("V0.3", findings.Single(f => f.Id == "M11.benchmark").Title, StringComparison.Ordinal);
+        Assert.Contains("Atelier", findings.Single(f => f.Id == "M11.benchmark").Title, StringComparison.Ordinal);
         Assert.Equal("sain · SSD NVMe · 465,8 Go", findings.Single(f => f.Id == "M11.disk-0-health").Current);
         Assert.DoesNotContain(findings, f => f.Status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Unknown);
     }

@@ -173,7 +173,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             if (release.EnablementPackage is { } package && channel is ServicingChannel.HomePro or ServicingChannel.EnterpriseEducation)
             {
                 advice = T("{0} Passez à {1} par le package d'activation {2} : un seul redémarrage, "
-                    + "applications, fichiers et réglages conservés. Il apparaît dans Paramètres > Windows Update ; MAUS le proposera en V0.2.", status, release.EnablementTarget, package);
+                    + "applications, fichiers et réglages conservés. Il apparaît dans Paramètres > Windows Update ; MAUS le proposera dans une prochaine version.", status, release.EnablementTarget, package);
                 if (release.EnablementMinimumUbr is { } minimum && windows.Ubr < minimum)
                 {
                     advice += T(" Installez d'abord les mises à jour cumulatives en attente (révision {0}.{1} requise, "
@@ -266,7 +266,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Advice = details.Count == 0
                 ? null
                 : T("Si un outil tiers a désactivé ces services, annulez ce réglage dans cet outil. "
-                    + "La remise en service avec le démarrage d'origine sera proposée en V0.2."),
+                    + "La remise en service avec le démarrage d'origine sera proposée dans une prochaine version."),
             Fixable = disabled.Count > 0,
         };
     }
@@ -434,7 +434,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 + (definitionsNote is null ? string.Empty : T(" ; en plus, {0}", definitionsNote)),
             Expected = T("aucune"),
             Explanation = explanation,
-            Advice = T("Installez-les depuis Paramètres > Windows Update ; MAUS les installera en V0.2. Aucun pilote n'est installé ici. "
+            Advice = T("Installez-les depuis Paramètres > Windows Update ; MAUS les installera dans une prochaine version. Aucun pilote n'est installé ici. "
                 + "Aucun gain de performance n'est attendu : ces mises à jour servent la sécurité et la stabilité."),
             Fixable = true,
         };
@@ -513,7 +513,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 + "installé depuis plus de {0} jours, Windows Update est en pause, bloqué ou en panne.", MaxInstallAgeDays),
             Advice = stale
                 ? T("Lancez une recherche dans Paramètres > Windows Update. Si l'installation échoue en boucle, "
-                    + "la réparation des composants de Windows Update (Module 2) sera proposée en V0.2.")
+                    + "la réparation des composants de Windows Update (Module 2) sera proposée dans une prochaine version.")
                 : null,
         };
     }
@@ -543,7 +543,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 + "vieille de plus de deux semaines signale un Windows Update bloqué."),
             Advice = stale
                 ? T("Ouvrez Paramètres > Windows Update et cliquez sur « Rechercher des mises à jour ». En cas d'échec répété, "
-                    + "la réparation de Windows Update (Module 2) sera proposée en V0.2.")
+                    + "la réparation de Windows Update (Module 2) sera proposée dans une prochaine version.")
                 : null,
         };
     }
@@ -612,7 +612,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 + "Des définitions anciennes laissent passer les logiciels malveillants récents."),
             Advice = stale
                 ? T("Ouvrez Sécurité Windows > Protection contre les virus et menaces > Mises à jour de la protection > Rechercher des mises à jour. "
-                    + "MAUS lancera cette mise à jour en V0.2.")
+                    + "MAUS lancera cette mise à jour dans une prochaine version.")
                 : null,
             Fixable = stale,
         };

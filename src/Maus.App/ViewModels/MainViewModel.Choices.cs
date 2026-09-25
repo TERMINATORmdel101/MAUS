@@ -175,6 +175,25 @@ public sealed partial class MainViewModel
         await UpdatePreferencesAsync(p => acknowledge ? p.Acknowledge(finding, now) : p.Unacknowledge(finding.Id), moduleId);
     }
 
+    /// <summary>Après un changement de langue, les marques « voulu » sont réécrites dans la nouvelle langue.</summary>
+    private async Task RebindAcknowledgementsAsync(IEnumerable<Finding> findings)
+    {
+        if (_lastContext is not { } context || context.Preferences.RebindLanguage(findings) is not { } rebound || ReferenceEquals(rebound, context.Preferences))
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() => PreferencesStore.Save(rebound));
+            _lastContext = context.WithPreferences(rebound);
+        }
+        catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
+        {
+            // Les marques restent valables telles quelles ; elles seront réécrites au prochain audit.
+        }
+    }
+
     private async Task UpdatePreferencesAsync(Func<UserPreferences, UserPreferences> change, params string[] moduleIds)
     {
         var updated = change(_lastContext?.Preferences ?? PreferencesStore.Load());

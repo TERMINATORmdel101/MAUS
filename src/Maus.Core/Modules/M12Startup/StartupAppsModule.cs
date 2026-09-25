@@ -397,9 +397,9 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Explanation = T("Chaque application lancée au démarrage retarde l'ouverture de session, occupe de la mémoire et parfois le processeur "
                 + "en arrière-plan. Au-delà des réglages Windows, c'est ici que se gagne la performance au quotidien, surtout avec 8 Go de "
                 + "mémoire ou un disque dur. Désactiver une entrée ne désinstalle rien : l'application se lance toujours quand vous l'ouvrez. "
-                + "En V0.1, MAUS indique l'éditeur et le chemin de chaque programme ; la vérification de la signature numérique viendra ensuite."),
+                + "MAUS indique l'éditeur et le chemin de chaque programme ; les programmes non signés sont signalés par le Module 1."),
             Advice = T("Pour désactiver une entrée : Paramètres > Applications > Démarrage, ou Gestionnaire des tâches > Applications de démarrage. "
-                + "Rien n'est supprimé et tout se réactive en un clic. La V0.2 le proposera directement, familles « sans problème » pré-cochées."),
+                + "Rien n'est supprimé et tout se réactive en un clic. MAUS le propose aussi dans l'onglet Corrections, familles « sans problème » pré-cochées."),
         };
     }
 
@@ -503,7 +503,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 + "pas dans le Gestionnaire des tâches. Les tâches de Windows (dossier Microsoft) sont exclues ; sans droits administrateur, "
                 + "les tâches d'autres comptes peuvent manquer.")
                 + (found.Count == 0 ? string.Empty : T(" Tâches trouvées : ") + string.Join(" ; ", found) + "."),
-            Advice = found.Count == 0 ? null : T("Affichage seul pour l'instant : la V0.2 proposera de désactiver une tâche, avec votre accord."),
+            Advice = found.Count == 0 ? null : T("Affichage seul pour l'instant : une prochaine version proposera de désactiver une tâche, avec votre accord."),
             Fixable = found.Count > 0,
         };
     }

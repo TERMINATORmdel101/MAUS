@@ -404,7 +404,7 @@ public sealed class WindowsHealthModule : IAuditModule
             Explanation = DiskExplanation,
             Advice = T("Sauvegardez vos données importantes, puis vérifiez la santé du disque avec le Module 11. "
                 + "Un disque externe ou une clé USB mal branchés produisent aussi ces erreurs.")
-                + (ntfs.Events.Count > 0 ? T(" La vérification du système de fichiers (chkdsk) sera proposée en V0.2.") : string.Empty),
+                + (ntfs.Events.Count > 0 ? T(" La vérification du système de fichiers (chkdsk) sera proposée dans une prochaine version.") : string.Empty),
             Fixable = ntfs.Events.Count > 0,
         };
     }
@@ -459,7 +459,7 @@ public sealed class WindowsHealthModule : IAuditModule
             Explanation = T("Windows marque un volume « à vérifier » (dirty bit) quand il détecte une incohérence du système de fichiers "
                 + "ou un arrêt brutal pendant une écriture. Une vérification chkdsk est alors lancée au démarrage."),
             Advice = dirty.Value
-                ? T("Redémarrez pour laisser Windows vérifier le disque ; la réparation hors ligne (chkdsk /spotfix) sera proposée en V0.2.")
+                ? T("Redémarrez pour laisser Windows vérifier le disque ; la réparation hors ligne (chkdsk /spotfix) sera proposée dans une prochaine version.")
                 : null,
             Fixable = dirty.Value,
         };
@@ -651,7 +651,7 @@ public sealed class WindowsHealthModule : IAuditModule
                 + "Un dépôt WMI abîmé fausse les diagnostics et bloque certains outils."),
             Advice = problem is null
                 ? null
-                : T("La vérification puis la récupération du dépôt WMI (winmgmt /verifyrepository, /salvagerepository) seront proposées en V0.2."),
+                : T("La vérification puis la récupération du dépôt WMI (winmgmt /verifyrepository, /salvagerepository) seront proposées dans une prochaine version."),
             Fixable = problem is not null,
         };
     }

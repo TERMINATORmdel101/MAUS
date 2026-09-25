@@ -331,7 +331,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Advice = enabled || !hasSsd
                 ? null
                 : T("Réactiver TRIM (commande fsutil behavior set DisableDeleteNotify 0), puis lancer une optimisation du lecteur. "
-                    + "La V0.2 le proposera, avec retour arrière possible."),
+                    + "Une prochaine version le proposera, avec retour arrière possible."),
             Fixable = !enabled && hasSsd,
         };
     }
@@ -421,7 +421,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = FindingStatus.Info,
             Current = $"{gigabytesPerSecond.ToString("0.0", French)} Go/s",
             Explanation = T("Calcul : {0} canal(aux){1} × {2} MT/s × 8 octets. {3}. "
-                + "C'est un plafond théorique : le mini-benchmark de la V0.3 mesurera le débit réel et le comparera à cette valeur.", channels, (estimated ? T(" (estimation)") : string.Empty), mts, description),
+                + "C'est un plafond théorique : le test de la mémoire vive de l'Atelier mesure le débit réel, à comparer à cette valeur.", channels, (estimated ? T(" (estimation)") : string.Empty), mts, description),
             Advice = T("Nombre de canaux et profil XMP/EXPO : voir Module 10."),
         };
     }
@@ -470,14 +470,14 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding BenchmarkNotice() => new()
     {
         Id = "M11.benchmark",
-        Title = T("Mini-benchmark actif : prévu en V0.3"),
+        Title = T("Tests actifs : dans l'Atelier"),
         Category = BenchmarkCategory,
         Status = FindingStatus.Info,
         Current = T("non lancé (audit seul)"),
         Explanation = T("« Ce test ne rend pas votre PC plus rapide : il vérifie qu'il fonctionne comme prévu. » "
-            + "À partir de la V0.3, un test d'environ 2 min 30 s mesurera le processeur, la mémoire, la carte graphique et le stockage, "
-            + "et gardera les résultats pour comparer avant et après optimisation. Cette version se limite aux indicateurs passifs ci-dessus. "
-            + "La température du processeur n'est pas lue : elle exige un pilote noyau, que MAUS n'installe pas."),
+            + "Les tests du processeur et de la mémoire vive se lancent depuis l'Atelier (onglet Tests), avec arrêt automatique en cas de surchauffe, "
+            + "et leurs résultats sont gardés pour comparer avant et après optimisation. L'audit se limite aux indicateurs passifs ci-dessus. "
+            + "La température interne du processeur n'est pas lue : elle exige un pilote noyau, que MAUS n'installe pas."),
         Advice = T("En attendant, les causes de lenteur les plus fréquentes sont vérifiées par les Modules 5 (alimentation), 10 (mémoire) et 12 (démarrage)."),
     };
 
