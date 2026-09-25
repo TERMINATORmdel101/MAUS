@@ -417,7 +417,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             LoadDrives();
         }
 
-        var live = (IsActive && Section == SectionLive) || IsTesting || IsDiagnosing;
+        var live = (IsActive && Section == SectionLive) || IsTesting || IsDiagnosing || IsRecording;
         if (live && !_liveTimer.IsEnabled)
         {
             _liveTimer.Start();
@@ -476,6 +476,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             _sensors ??= await Task.Run(CreateSensors);
             var snapshot = await Task.Run(_sensors.Sample);
             Live.Add(snapshot);
+            OnRecordedSample(snapshot);
         }
         catch (Exception ex)
         {
