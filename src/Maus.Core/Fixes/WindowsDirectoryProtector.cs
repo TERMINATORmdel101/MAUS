@@ -44,6 +44,26 @@ public sealed class WindowsDirectoryProtector : IDirectoryProtector
         }
     }
 
+    public void ProtectFile(string file)
+    {
+        try
+        {
+            var info = new FileInfo(file);
+            var security = info.GetAccessControl();
+            if (security.GetOwner(typeof(SecurityIdentifier)) is SecurityIdentifier owner && (owner.Equals(System) || owner.Equals(Administrators)))
+            {
+                return;
+            }
+
+            security.SetOwner(Administrators);
+            info.SetAccessControl(security);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or PrivilegeNotHeldException or InvalidOperationException)
+        {
+            throw new JournalUnsafeException($"Impossible de protéger le fichier du journal ({file}) : {ex.Message}", ex);
+        }
+    }
+
     private static void Protect(string directory)
     {
         var info = new DirectoryInfo(directory);

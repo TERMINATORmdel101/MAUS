@@ -18,6 +18,10 @@ public sealed class JournalStoreTests : IDisposable
         }
 
         public bool IsTrusted(string file) => trusted;
+
+        public void ProtectFile(string file)
+        {
+        }
     }
 
     public void Dispose()

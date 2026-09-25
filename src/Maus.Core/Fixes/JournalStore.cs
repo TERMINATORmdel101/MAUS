@@ -28,6 +28,12 @@ public interface IDirectoryProtector
 
     /// <summary>Le fichier appartient-il à SYSTEM ou aux Administrateurs ?</summary>
     bool IsTrusted(string file);
+
+    /// <summary>
+    /// Donne le fichier aux Administrateurs, quel que soit le réglage « propriétaire par défaut des objets créés
+    /// par les administrateurs » : sans cela, <see cref="IsTrusted"/> pourrait écarter une séance légitime.
+    /// </summary>
+    void ProtectFile(string file);
 }
 
 /// <summary>Journal JSON, un fichier par séance, sous <c>%ProgramData%\MAUS\journal</c>.</summary>
@@ -54,6 +60,7 @@ public sealed class FileJournalStore(string directory, IDirectoryProtector prote
         var path = PathOf(session.Id);
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(session, JsonOptions));
+        protector.ProtectFile(temporary);
         File.Move(temporary, path, overwrite: true);
     }
 
