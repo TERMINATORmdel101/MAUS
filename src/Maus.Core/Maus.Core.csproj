@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Catalog\*.json" LogicalName="Maus.Core.Catalog.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Localization\i18n\*.json" LogicalName="Maus.Core.Localization.i18n.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

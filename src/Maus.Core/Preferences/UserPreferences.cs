@@ -32,6 +32,9 @@ public sealed record UserPreferences
 
     public LaptopPowerChoice LaptopPower { get; init; }
 
+    /// <summary>Langue de MAUS (« fr », « en », « es ») ; <c>null</c> = langue de Windows.</summary>
+    public string? Language { get; init; }
+
     public IReadOnlyList<Acknowledgement> Acknowledged { get; init; } = [];
 
     /// <summary>Marque « voulu » la valeur actuelle du constat (remplace une marque précédente).</summary>
