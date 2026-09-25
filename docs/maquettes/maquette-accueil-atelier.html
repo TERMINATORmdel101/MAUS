@@ -1,0 +1,110 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Maquette MAUS</title>
+<style>
+:root{--bg:#e9eaec;--panel:#f6f7f8;--card:#fff;--line:#d9dce1;--fg:#1c1f25;--muted:#5f6673;--blue:#1f4fbf;--red:#c8102e;--green:#0a9a5b;--gold:#d49a1e;--grey:#8a8f9c}
+.dark{--bg:#17191d;--panel:#1d2025;--card:#24272d;--line:#33373f;--fg:#e9ebef;--muted:#a3a9b6}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:#888}
+.win{width:1180px;height:760px;margin:18px auto;background:var(--bg);color:var(--fg);display:flex;border-radius:10px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+nav{width:212px;background:var(--panel);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:4px}
+nav img{width:180px;margin:0 6px 12px}
+.item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--muted);font-weight:600}
+.item.on{background:var(--card);color:var(--fg);box-shadow:inset 3px 0 0 var(--blue)}
+.tile{width:26px;height:26px;border-radius:5px;display:grid;place-items:center;color:#fff;font:800 14px "Segoe UI";position:relative}
+.tile:before,.tile:after{content:"";position:absolute;width:3px;height:3px;border-radius:50%;background:#e8c46a;top:3px}
+.tile:before{left:3px}.tile:after{right:3px}
+.b{background:var(--blue)}.r{background:var(--red)}.g{background:var(--green)}.o{background:var(--gold)}.k{background:#5f6673}
+nav .sp{flex:1}.lang{margin:0 6px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:13px}
+main{flex:1;padding:22px 26px;overflow:hidden}
+h1{margin:0 0 2px;font-size:24px}.sub{color:var(--muted);margin:0 0 16px}
+.row{display:flex;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;position:relative}
+.rivet:before,.rivet:after{content:"";position:absolute;top:8px;width:5px;height:5px;border-radius:50%;background:var(--line)}
+.rivet:before{left:8px}.rivet:after{right:8px}
+.score{width:280px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ring{width:170px;height:170px;border-radius:50%;background:conic-gradient(var(--green) 0 78%,var(--line) 78% 100%);display:grid;place-items:center}
+.ring div{width:140px;height:140px;border-radius:50%;background:var(--card);display:grid;place-items:center;text-align:center}
+.ring b{font-size:44px;display:block;line-height:1}.ring span{color:var(--muted);font-size:12px}
+.btn{background:var(--blue);color:#fff;border-radius:8px;padding:10px 18px;font-weight:600;display:inline-block}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.letters{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.letter{display:flex;gap:12px;align-items:flex-start}.letter .tile{width:44px;height:44px;font-size:24px;flex:none}
+.letter h3{margin:0;font-size:15px}.letter p{margin:2px 0 6px;color:var(--muted);font-size:12.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{font-size:12px;padding:2px 8px;border-radius:99px;color:#fff;font-weight:600}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.action h3{margin:6px 0 2px;font-size:15px}.action p{margin:0;color:var(--muted);font-size:12.5px}
+.ico{font-size:22px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}.tab{padding:6px 14px;border-radius:99px;border:1px solid var(--line);color:var(--muted);font-weight:600}.tab.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.metric h4{margin:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.metric .v{font-size:26px;font-weight:700}.metric .v small{font-size:14px;color:var(--muted);font-weight:500}
+svg.spark{width:100%;height:54px;display:block;margin-top:6px}
+.gauge{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--green) 0 60%,var(--gold) 60% 85%,var(--red) 85%);position:relative;margin-top:10px}
+.gauge i{position:absolute;top:-4px;width:3px;height:16px;background:var(--fg);border-radius:2px}
+.lim{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line)}tr.sel td{background:rgba(31,79,191,.08)}
+.badge{font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid;font-weight:600}
+.bw{color:var(--blue);border-color:var(--blue)}.bi{color:var(--green);border-color:var(--green)}.bu{color:var(--gold);border-color:var(--gold)}
+.bar{display:inline-block;height:6px;border-radius:3px;background:var(--blue);vertical-align:middle;margin-right:6px}
+.detail h3{margin:0 0 4px}.detail p{margin:6px 0;color:var(--muted)}
+.alert{border-left:4px solid var(--gold);padding:8px 12px;background:rgba(212,154,30,.1);border-radius:6px;margin-bottom:12px;font-weight:600}
+</style></head><body>
+<div class="win" id="w1">
+<nav><img src="../../src/Maus.App/Assets/maus-banner.png" alt="MAUS">
+<div class="item on"><div class="tile b">⌂</div>Accueil</div>
+<div class="item"><div class="tile r">A</div>Constats</div>
+<div class="item"><div class="tile g">✓</div>Corrections</div>
+<div class="item"><div class="tile o">⚙</div>Atelier</div>
+<div class="item"><div class="tile k">↺</div>Historique</div>
+<div class="sp"></div><div class="lang">🌐 Français ▾</div></nav>
+<main><h1>Bonjour 👋</h1><p class="sub">Windows 11 Pro 25H2 · PC fixe · AMD Ryzen 7 7800X3D · NVIDIA GeForce RTX 4070 · dernier audit il y a 2 min</p>
+<div class="row">
+<div class="card rivet score"><div class="ring"><div><b>78</b><span>santé du PC<br>sur 100</span></div></div>
+<div style="color:var(--muted);font-size:12.5px;text-align:center">1 problème · 3 à surveiller · 12 optimisations</div>
+<div class="btn">▶ Relancer l'audit</div></div>
+<div class="card rivet letters">
+<div class="letter"><div class="tile b">M</div><div><h3>Maintenance</h3><p>Démarrage, santé du matériel, effets visuels, alimentation</p><div class="chips"><span class="chip" style="background:var(--blue)">8 optimisations</span><span class="chip" style="background:var(--gold)">1 à surveiller</span></div></div></div>
+<div class="letter"><div class="tile r">A</div><div><h3>Audit</h3><p>Modifications risquées faites par des scripts ou des logiciels</p><div class="chips"><span class="chip" style="background:var(--red)">1 problème</span></div></div></div>
+<div class="letter"><div class="tile g">U</div><div><h3>Mises à jour</h3><p>Windows Update, pilote graphique, BIOS et microcode</p><div class="chips"><span class="chip" style="background:var(--green)">tout est à jour</span></div></div></div>
+<div class="letter"><div class="tile o">S</div><div><h3>Sécurité</h3><p>Protections du processeur, intégrité de la mémoire, confidentialité</p><div class="chips"><span class="chip" style="background:var(--blue)">4 optimisations</span><span class="chip" style="background:var(--gold)">2 à surveiller</span></div></div></div>
+</div></div>
+<div class="actions">
+<div class="card action"><div class="ico">🐢</div><h3>Pourquoi mon PC est lent ?</h3><p>Une minute de mesures, puis les 3 causes principales et comment les corriger.</p></div>
+<div class="card action"><div class="ico">🧪</div><h3>Tester mon PC</h3><p>Stabilité du processeur et de la RAM, avec arrêt automatique en cas de surchauffe.</p></div>
+<div class="card action"><div class="ico">🛠️</div><h3>Corriger en un clic</h3><p>12 corrections recommandées, réversibles, avec point de restauration vérifié.</p></div>
+</div></main></div>
+
+<div class="win dark" id="w2">
+<nav><img src="../../src/Maus.App/Assets/maus-banner.png" alt="MAUS">
+<div class="item"><div class="tile b">⌂</div>Accueil</div>
+<div class="item"><div class="tile r">A</div>Constats</div>
+<div class="item"><div class="tile g">✓</div>Corrections</div>
+<div class="item on"><div class="tile o">⚙</div>Atelier</div>
+<div class="item"><div class="tile k">↺</div>Historique</div>
+<div class="sp"></div><div class="lang">🌐 Français ▾</div></nav>
+<main><h1>Atelier</h1><p class="sub">Votre matériel, en direct, comparé à ses limites de sécurité</p>
+<div class="tabs"><span class="tab">Mon PC</span><span class="tab on">En direct</span><span class="tab">Processus</span><span class="tab">Tests</span></div>
+<div class="alert">⚠ NVIDIA GeForce RTX 4070 approche de son seuil de ralentissement (85 °C sur 90 °C).</div>
+<div class="grid3">
+<div class="card metric"><h4>Processeur</h4><div class="v">37 % <small>· 4,9 GHz</small></div>
+<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#1f4fbf" stroke-width="1.5" points="0,22 8,20 16,24 24,15 32,18 40,12 48,16 56,10 64,14 72,9 80,13 88,11 100,12"/></svg></div>
+<div class="card metric"><h4>Mémoire vive</h4><div class="v">18,4 <small>/ 32 Go</small></div>
+<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#0a9a5b" stroke-width="1.5" points="0,14 20,14 40,13 60,13 80,12 100,12"/></svg></div>
+<div class="card metric"><h4>Carte graphique</h4><div class="v">96 % <small>· 205 W</small></div>
+<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#c8102e" stroke-width="1.5" points="0,26 10,25 20,8 30,4 40,3 50,3 60,2 70,3 80,2 90,2 100,2"/></svg></div>
+<div class="card metric"><h4>Température GPU</h4><div class="v">85 °C</div><div class="gauge"><i style="left:78%"></i></div><div class="lim"><span>30 °C</span><span>ralentit à 90 °C</span><span>s'éteint à 95 °C</span></div></div>
+<div class="card metric"><h4>Tension RAM (DDR5)</h4><div class="v">1,35 V</div><div class="gauge"><i style="left:52%"></i></div><div class="lim"><span>1,10 V nominal</span><span>élevée &gt; 1,40 V</span><span>danger &gt; 1,50 V</span></div></div>
+<div class="card metric"><h4>Disque</h4><div class="v">4 % <small>· 12 Mo/s</small></div>
+<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline fill="none" stroke="#d49a1e" stroke-width="1.5" points="0,28 10,27 20,28 30,20 40,27 50,28 60,28 70,26 80,28 90,28 100,27"/></svg></div>
+</div>
+<div class="row" style="margin-top:14px">
+<div class="card" style="flex:1.5"><table><tr><th>Processus</th><th>Processeur</th><th>Mémoire</th><th>GPU</th><th>Confiance</th></tr>
+<tr class="sel"><td><b>Cyberpunk2077.exe</b></td><td><span class="bar" style="width:40px"></span>31 %</td><td>9,2 Go</td><td>94 %</td><td><span class="badge bi">Programme installé</span></td></tr>
+<tr><td>Discord.exe</td><td><span class="bar" style="width:6px"></span>2 %</td><td>480 Mo</td><td>1 %</td><td><span class="badge bw">Votre compte</span></td></tr>
+<tr><td>svchost.exe</td><td><span class="bar" style="width:3px"></span>1 %</td><td>60 Mo</td><td>—</td><td><span class="badge bi">Windows</span></td></tr>
+<tr><td>a1b2c3.exe</td><td><span class="bar" style="width:12px"></span>6 %</td><td>35 Mo</td><td>—</td><td><span class="badge bu">Emplacement inhabituel</span></td></tr></table></div>
+<div class="card detail" style="flex:1"><h3>a1b2c3.exe</h3><span class="badge bu">Emplacement inhabituel : à vérifier</span>
+<p>Ce programme ne figure pas dans le catalogue de MAUS. Regardez son éditeur et son emplacement, ou lancez une recherche web sur son nom exact.</p>
+<p style="font-family:Consolas;font-size:12px">C:\Users\…\AppData\Local\Temp\x9\a1b2c3.exe</p>
+<div class="row" style="gap:8px"><span class="btn ghost">🔎 Rechercher sur le web</span><span class="btn" style="background:var(--red)">Arrêter</span></div></div>
+</div></main></div>
+</body></html>
