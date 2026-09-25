@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Espaces de travail Git parallèles
 .worktrees/
+
+# Version compilée pour les tests
+publish/
