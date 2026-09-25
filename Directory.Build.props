@@ -11,5 +11,7 @@
     <Version>0.1.0</Version>
     <NeutralLanguage>fr-FR</NeutralLanguage>
     <SatelliteResourceLanguages>fr;en</SatelliteResourceLanguages>
+    <!-- Permet de compiler depuis Linux (sessions cloud) ; sans effet sous Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 </Project>
