@@ -3,7 +3,7 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.Core.Platform;
 
 /// <summary>Application empaquetée (Microsoft Store, MSIX) installée pour l'utilisateur courant.</summary>
-public sealed record InstalledPackage(string Name, string FamilyName, string Version, string Publisher);
+public sealed record InstalledPackage(string Name, string FamilyName, string Version, string Publisher, string? InstallPath = null);
 
 /// <summary>Inventaire des applications empaquetées (Game Bar, app Xbox, Copilot, utilitaires constructeur…).</summary>
 public interface IPackageInventory
@@ -35,12 +35,26 @@ public sealed class WinRtPackageInventory : IPackageInventory
                     p.Id.Name,
                     p.Id.FamilyName,
                     $"{p.Id.Version.Major}.{p.Id.Version.Minor}.{p.Id.Version.Build}.{p.Id.Version.Revision}",
-                    p.Id.Publisher))
+                    p.Id.Publisher,
+                    InstallPathOf(p)))
                 .ToList();
         }
         catch (UnauthorizedAccessException ex)
         {
             throw new MausAccessDeniedException(T("Inventaire des applications refusé."), ex);
+        }
+    }
+
+    /// <summary>Dossier d'installation ; un paquet abîmé peut refuser de le donner.</summary>
+    private static string? InstallPathOf(Windows.ApplicationModel.Package package)
+    {
+        try
+        {
+            return package.InstalledPath;
+        }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or FileNotFoundException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 }

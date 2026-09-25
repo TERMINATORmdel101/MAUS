@@ -117,6 +117,18 @@ public static class Ui
 
     public static string NetTestIntro => T("MAUS envoie des « ping » à votre box et à deux serveurs publics très utilisés (Cloudflare 1.1.1.1 et Google 8.8.8.8), pendant une quinzaine de secondes. Aucune donnée personnelle n'est transmise et aucun réglage n'est modifié. Le résultat dit si un souci vient du Wi-Fi ou de la box, ou bien de la ligne.");
 
+    public static string UpdateSoftware => T("Mettre à jour les logiciels");
+
+    public static string UpdateSoftwareTip => T("Liste les logiciels dont une version plus récente existe (winget, l'outil de Microsoft), puis met à jour ceux que vous cochez, dans une fenêtre visible.");
+
+    public static string SoftwareTitle => T("Logiciels à mettre à jour");
+
+    public static string SoftwareIntro => T("Cochez les logiciels à mettre à jour, puis fermez-les (navigateur, lecteur PDF…). winget télécharge chaque mise à jour depuis la source de l'éditeur et l'installe dans une fenêtre visible, où vous acceptez vous-même leurs conditions. Les mises à jour corrigent surtout des failles et des bugs : elles n'accélèrent pas le PC.");
+
+    public static string SoftwareUpdateSelected => T("Mettre à jour la sélection");
+
+    public static string Cancel => T("Annuler");
+
     public static string HelpTitle => T("Demander de l'aide");
 
     public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");

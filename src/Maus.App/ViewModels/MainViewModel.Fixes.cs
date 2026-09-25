@@ -5,6 +5,7 @@ using System.Text;
 using System.Windows.Input;
 using Maus.Core;
 using Maus.Core.Fixes;
+using Maus.Core.Modules.M20Software;
 using Maus.Core.Platform;
 using Maus.Core.Reporting;
 using static Maus.Core.Localization.Texts;
@@ -253,6 +254,60 @@ public sealed partial class MainViewModel
     });
 
     private ICommand? _repairWindows;
+    private ICommand? _updateSoftware;
+
+    /// <summary>Choix des logiciels à mettre à jour ; <c>null</c> si l'utilisateur renonce. Remplaçable pour les tests.</summary>
+    public Func<IReadOnlyList<SoftwareUpdate>, IReadOnlyList<SoftwareUpdate>?> PickSoftwareUpdates { get; init; } = updates =>
+    {
+        var window = new Views.SoftwareUpdatesWindow(updates) { Owner = System.Windows.Application.Current?.MainWindow };
+        return window.ShowDialog() == true ? window.Selected : null;
+    };
+
+    /// <summary>« Mettre à jour les logiciels » : liste winget (lecture seule), choix de l'utilisateur, puis console visible.</summary>
+    public ICommand UpdateSoftwareCommand => _updateSoftware ??= new AsyncCommand(UpdateSoftwareAsync);
+
+    private void AddToFixReport(string text) =>
+        FixReport = (FixReport.Length > 0 ? FixReport + Environment.NewLine + Environment.NewLine : string.Empty) + text;
+
+    private async Task UpdateSoftwareAsync()
+    {
+        StatusText = T("Recherche des mises à jour des logiciels (winget), jusqu'à une minute…");
+        IReadOnlyList<SoftwareUpdate> updates;
+        string? winget;
+        try
+        {
+            var context = _lastContext ?? await Task.Run(AuditContext.CreateDefault);
+            winget = await Task.Run(() => Winget.Locate(context.Packages, context.Files));
+            if (winget is null)
+            {
+                StatusText = T("winget est absent : réinstallez « Programme d'installation d'application » depuis le Microsoft Store.");
+                return;
+            }
+
+            updates = await Winget.ListUpgradesAsync(context.Commands, winget, TimeSpan.FromSeconds(90), CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is DataSourceUnavailableException or MausAccessDeniedException or InvalidOperationException)
+        {
+            StatusText = T("La liste des mises à jour n'a pas pu être lue : {0}", ex.Message);
+            return;
+        }
+
+        if (updates.Count == 0)
+        {
+            StatusText = T("Tous les logiciels suivis par winget sont à jour.");
+            return;
+        }
+
+        StatusText = T("{0} logiciel(s) peuvent être mis à jour.", updates.Count);
+        if (PickSoftwareUpdates(updates) is not { Count: > 0 } chosen)
+        {
+            return;
+        }
+
+        AddToFixReport(ShellLauncher.RunConsole(Winget.UpgradeConsoleArguments(winget, chosen))
+            ? T("Mise à jour de {0} logiciel(s) lancée dans une fenêtre de commande. Quand elle est terminée, relancez l'audit.", chosen.Count)
+            : T("La fenêtre de commande n'a pas pu s'ouvrir."));
+    }
 
     private async Task RestartExplorerAsync()
     {

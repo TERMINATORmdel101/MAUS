@@ -73,6 +73,6 @@ public class AuditEngineTests
 
         Assert.NotEmpty(modules);
         Assert.Equal(modules.Count, modules.Select(m => m.Id).Distinct().Count());
-        Assert.All(modules, m => Assert.Matches(@"^M(0[1-9]|1[0-9])$", m.Id));
+        Assert.All(modules, m => Assert.Matches(@"^M(0[1-9]|1[0-9]|20)$", m.Id));
     }
 }

@@ -22,13 +22,18 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         ["manage-bde.exe"] = ["-status"],
         ["netsh.exe"] = ["winhttp"],
         ["nvidia-smi.exe"] = ["--query-gpu", "-q", "--help"],
+        ["winget.exe"] = ["upgrade"],
     };
+
+    /// <summary>winget : la liste seule, argument par argument (« --all » ou un identifiant installeraient des mises à jour).</summary>
+    private static readonly HashSet<string> WingetListArguments = new(StringComparer.OrdinalIgnoreCase) { "upgrade", "--source", "winget", "--disable-interactivity" };
 
     /// <summary>Contraintes supplémentaires sur le reste de la ligne de commande.</summary>
     private static readonly Dictionary<string, Func<IReadOnlyList<string>, bool>> ExtraChecks = new(StringComparer.OrdinalIgnoreCase)
     {
         ["fsutil.exe"] = args => args.Count >= 2 && args[1].Equals("query", StringComparison.OrdinalIgnoreCase),
         ["netsh.exe"] = args => args.Count >= 2 && args[1].Equals("show", StringComparison.OrdinalIgnoreCase),
+        ["winget.exe"] = args => args.All(WingetListArguments.Contains),
     };
 
     static ReadOnlyCommandRunner()
@@ -38,7 +43,7 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
 
     public static bool IsAllowed(string executable, IReadOnlyList<string> arguments)
     {
-        var name = Path.GetFileName(executable);
+        var name = FileName(executable);
         if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
         {
             name += ".exe";
@@ -59,6 +64,20 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         return !ExtraChecks.TryGetValue(name, out var check) || check(arguments);
     }
 
+    /// <summary>Nom du fichier d'un chemin Windows (découpé sur « \ » ou « / », quel que soit le système qui compile).</summary>
+    private static string FileName(string path) => path[(path.LastIndexOfAny(['\\', '/']) + 1)..];
+
+    /// <summary>Vrai si le chemin est dans <c>Program Files\WindowsApps</c>, dossier des paquets que seul Windows peut modifier.</summary>
+    public static bool IsInProtectedAppsFolder(string path, string programFiles)
+    {
+        if (string.IsNullOrEmpty(programFiles) || path.Contains("..", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return path.StartsWith(programFiles.TrimEnd('\\') + @"\WindowsApps\", StringComparison.OrdinalIgnoreCase);
+    }
+
     public async Task<CommandResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken)
     {
         if (!IsAllowed(executable, arguments))
@@ -67,7 +86,15 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         }
 
         var path = ResolveSystemExecutable(executable);
-        var oem = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
+        var isWinget = FileName(path).Equals("winget.exe", StringComparison.OrdinalIgnoreCase);
+        if (isWinget && !IsInProtectedAppsFolder(path, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)))
+        {
+            // Un winget.exe hors du dossier protégé des paquets pourrait avoir été remplacé : jamais lancé avec les droits de MAUS.
+            throw new InvalidOperationException(T("Commande refusée : winget doit être celui du dossier protégé des applications ({0}).", path));
+        }
+
+        // winget écrit en UTF-8 quand sa sortie est redirigée (à vérifier) ; les outils classiques, dans la page de code OEM.
+        var oem = isWinget ? new UTF8Encoding(false) : Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
         var startInfo = new ProcessStartInfo(path)
         {
             UseShellExecute = false,
