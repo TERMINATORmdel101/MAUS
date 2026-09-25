@@ -27,8 +27,8 @@ Tension du processeur (Vcore) et de ses cœurs, température réelle du processe
 
 Catalogue JSON `hw-safety-limits.json`, une ligne par famille de composant, avec sa source. Chaque valeur lue est classée **normale / élevée / dangereuse**, et MAUS explique pourquoi.
 
-- RAM : tension nominale JEDEC 1,2 V (DDR4) et 1,1 V (DDR5). Au-delà du profil XMP/EXPO courant, MAUS signale « élevée », puis « dangereuse » au-dessus d'un seuil prudent (seuils maison, à vérifier et à sourcer).
-- Processeur : température maximale (TjMax) par famille, depuis les fiches officielles d'Intel et d'AMD (à vérifier). Intel Core 13e/14e génération : Intel limite les demandes de tension au-dessus de 1,55 V depuis le microcode 0x129 (Module 8).
+- RAM (relevé du 25/09/2026, sources dans le catalogue) : DDR4 1,2 V nominal, « élevée » au-delà de 1,45 V (dégradation rapportée par le guide MemTestHelper), « dangereuse » au-delà de 1,50 V (maximum absolu de la norme JEDEC JESD79-4). DDR5 1,1 V nominal, « élevée » au-delà de 1,4 V (maximum en continu selon Samsung, cité par Tom's Hardware) ; aucun seuil « dangereux » publié, donc MAUS n'en fixe pas. **Pas de source = pas de seuil.**
+- Processeur : avec PawnIO, la limite lue dans la puce elle-même (Intel : « Distance to TjMax » + température). Sinon, une ligne par modèle vérifié (fiches AMD / Intel ARK, presse) : Ryzen 7800X3D / 7900X3D / 7950X3D 89 °C, Ryzen 7000 sans 3D V-Cache et Ryzen 9000 (9800X3D compris) 95 °C, 5600X 95 °C, 5700X/5800X/5800X3D/5950X 90 °C, Core Ultra 9 285K 105 °C, i7-13700K 100 °C. Modèle inconnu = aucune jauge ni alarme de température (plus de limite par défaut à 100 °C). Intel Core 13e/14e génération : Intel limite les demandes de tension au-dessus de 1,55 V depuis le microcode 0x129 (Module 8).
 - Carte graphique NVIDIA : seuils lus dans la carte (NVML) ; limite de puissance au-dessus de la valeur par défaut = carte surcadencée, signalée.
 
 ### Gestionnaire des tâches à la MAUS

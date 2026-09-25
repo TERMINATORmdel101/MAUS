@@ -2,6 +2,8 @@
 
 Ce fichier est la mémoire de Claude entre les sessions (sur le PC du porteur du projet comme dans le cloud). Lis-le en entier avant de travailler, et mets-le à jour à la fin de chaque session importante (section « État » et « Journal »).
 
+**Reprise sur le PC après les sessions cloud : lis aussi [`REPRISE.md`](REPRISE.md)** (branche à récupérer, ordre de validation sur Windows, demandes non terminées).
+
 ## Le porteur du projet
 
 - Francophone, **non-développeur**, dicte souvent à la voix (fautes de frappe fréquentes : « lesse le chois » = « laisse le choix »). Réponds **en français**, simplement, sans jargon inutile, en expliquant le « pourquoi ».
@@ -21,6 +23,7 @@ Principes non négociables :
 4. **Rien de dangereux en automatique** : BIOS, XMP/EXPO, overclocking sont guidés (liens officiels, tutoriels), jamais exécutés.
 5. **Aucune télémétrie** de l'outil.
 6. **Honnêteté sur les gains** (demande du porteur, 25/09/2026) : n'annoncer que des optimisations reconnues comme utiles, avec des gains réalistes (« quelques pour cent », « gain faible », « aucun gain de performance »), jamais +10 % ; ne jamais retirer une fonction importante de Windows ni une protection pour un gain de performance.
+7. **Aucune donnée inventée** (demande du porteur, 25/09/2026, version 0.3.2-alpha) : chaque seuil, limite, décalage de registre ou affirmation technique vient d'une source publiée (citée dans le catalogue, le commentaire ou la fiche). **Pas de source = pas de seuil ni d'alarme** ; une valeur non vérifiée s'affiche comme telle, jamais comme un fait.
 
 Décisions prises (24-25/09/2026) :
 - Windows 11 uniquement, à partir de 23H2 (build 22631). Windows 10 hors périmètre.
@@ -89,11 +92,11 @@ dotnet publish src/Maus.App -c Release -o publish/MAUS
 
 SDK : `apt-get install -y dotnet-sdk-10.0` (dépôt Ubuntu ; `dot.net/v1/dotnet-install.sh` est bloqué par le proxy). Les sessions cloud tournent sous Linux : l'application WPF et les API Windows (registre, WMI, P/Invoke) n'y fonctionnent pas. `EnableWindowsTargeting` est activé dans `Directory.Build.props` pour permettre la **compilation**. Les tests qui appellent de vraies API Windows échoueront sous Linux : écrire le code et les tests avec les faux, puis faire valider sur le PC Windows (build, tests, `maus` en lecture seule).
 
-## État (25/09/2026, fin de la 3e session cloud)
+## État (25/09/2026, version 0.3.2-alpha, fin de la 3e session cloud)
 
 **V0.1 terminée** : les 15 premiers modules détectent en lecture seule ; application WPF testée (audit complet sans plantage en ~15 s). Depuis : 20 modules d'audit (M17 périphériques en erreur, M18 réseau, M19 sauvegardes, M20 logiciels à mettre à jour).
 
-**Tout ce qui suit est codé sous Linux, compilé (0 avertissement) et testé avec les faux, mais JAMAIS exécuté sur un vrai Windows.** Tests : 1 162, dont 12 échecs **attendus sous Linux** (vraies API Windows, chemins) ; sous Windows, tout doit être vert.
+**Tout ce qui suit est codé sous Linux, compilé (0 avertissement) et testé avec les faux, mais JAMAIS exécuté sur un vrai Windows.** Tests : 1 185, dont 12 échecs **attendus sous Linux** (vraies API Windows, chemins) ; sous Windows, tout doit être vert.
 
 - **V0.2 — corrections réversibles** : journal protégé sous `%ProgramData%\MAUS\journal`, point de restauration vérifié, blocage sur PC géré / sans droits admin / élévation par un autre compte, corrections tout ou rien, Annuler par séance **ou par correction**, correction « écrite mais sans effet » signalée (relecture par un nouvel audit), redémarrage de l'Explorateur proposé. Modules corrigeables : M01, M04, M05, M06, M07 (profil Game Bar 1/2/3 au choix), M09, M12, M13. CLI : `--plan`, `--apply`, `--apply-recommended`, `--journal`, `--revert SEANCE [--change ID] [--force]`, `--restart-explorer`, `--ack/--unack`, `--set`, `--prefs`, `--html`.
 - **Choix de l'utilisateur** : constat marqué « voulu » (il revient si la valeur change), profil Game Bar, question au premier lancement sur un portable, langue, moteur de recherche.
@@ -112,7 +115,8 @@ SDK : `apt-get install -y dotnet-sdk-10.0` (dépôt Ubuntu ; `dot.net/v1/dotnet-
 - **Test de connexion** (Atelier, Tests) : pings parallèles box + Cloudflare + Google, médiane, gigue, pertes ; verdict « réseau local » ou « ligne ».
 - **Honnêteté des gains** (principe 6) : panneau « Ce que vous pouvez vraiment gagner » dans Corrections ; textes XMP / ReBAR ramenés aux gains mesurés (quelques pour cent).
 - **Nouvelle interface** aux couleurs du logo (maquette : `docs/maquettes/maquette-accueil-atelier.png`).
-- **Trois langues** : français, anglais, espagnol (choix dans la fenêtre ; CLI `--lang`), 2 807 textes traduits.
+- **Trois langues** : français, anglais, espagnol (choix dans la fenêtre ; CLI `--lang`), 2 810 textes traduits.
+- **Version 0.3.2-alpha** (`Directory.Build.props`, `AppVersion.Display` dans « À propos », les rapports et `maus --version`, `CHANGELOG.md`). Nettoyage « aucune donnée inventée » : limites de température par modèle vérifié ou lues dans la puce (TjMax), plus de limite par défaut ; tensions DDR4/DDR5 sourcées ; décodeur SPD corrigé (EXPO 2, CL XMP 2.0, XMP 3.0, CRC des profils) ; encodage de winget choisi d'après les octets (`ReadOnlyCommandRunner.DecodeOutput`).
 
 À valider en priorité dans **Windows Sandbox** (puis sur le PC du porteur, en lecture seule) :
 1. L'interface se lance (nouvelle fenêtre jamais ouverte !) : Accueil (8 cartes, fenêtre « Demander de l'aide » et copie), Constats, Corrections, Atelier (5 onglets dont Stockage), Historique, changement de langue.
@@ -128,9 +132,10 @@ Reste à faire V0.2 (écritures d'autres natures, non commencées) : services vi
 Reste à faire / points connus :
 - [x] Fichier `LICENSE` : texte officiel GPL-3.0 (accord du porteur le 25/09/2026 ; gnu.org bloqué par le proxy, copie Debian `/usr/share/common-licenses/GPL-3`, SHA-256 `3972dc97…986` identique à gpl-3.0.txt).
 - [ ] Relecture juridique de `TRADEMARKS.md` et des mentions légales avant publication publique.
-- [x] **PawnIO** (accord du porteur le 25/09/2026) : `LibreHardwareMonitorLib` 0.9.6 (MPL-2.0, modules PawnIO signés inclus, voir `THIRD-PARTY-NOTICES.md`) ; ouvert seulement si PawnIO est installé (clé `Uninstall\PawnIO`) et MAUS administrateur ; installation / retrait par winget (`namazso.PawnIO`) dans une console visible, jamais automatique. À valider sur Windows : lecture réelle des capteurs, compatibilité intégrité de la mémoire et anti-triche. Pas encore fait : SPD des barrettes, puces mémoire de la carte graphique.
+- [x] **PawnIO** (accord du porteur le 25/09/2026) : `LibreHardwareMonitorLib` 0.9.6 (MPL-2.0, modules PawnIO signés inclus, voir `THIRD-PARTY-NOTICES.md`) ; ouvert seulement si PawnIO est installé (clé `Uninstall\PawnIO`) et MAUS administrateur ; installation / retrait par winget (`namazso.PawnIO`) dans une console visible, jamais automatique. À valider sur Windows : lecture réelle des capteurs, compatibilité intégrité de la mémoire et anti-triche. SPD des barrettes : fait (fiche mémoire). Pas encore fait : tensions réelles VDD/VDDQ des barrettes DDR5 (PMIC), puces mémoire de la carte graphique.
 - [ ] Module 14 : contrôle « écran branché sur la carte mère » par comparaison d'adaptateur, sans le drapeau D3D12 UMA.
-- [ ] Module 9 : versions du catalogue `m09-gpu-drivers.json` à revérifier chaque mois ; Module 15 : URLs NVIDIA App / AMD / Intel Arc à revérifier ; `hw-safety-limits.json` et `processes.json` à relire.
+- [ ] Module 9 : versions du catalogue `m09-gpu-drivers.json` à revérifier chaque mois (dernière vérification : 25/09/2026) ; Module 15 : URLs NVIDIA App / AMD / Intel Arc à revérifier. `hw-safety-limits.json` sourcé et `processes.json` relu le 25/09/2026.
+- [ ] **Demandes du porteur non terminées** (détail dans `REPRISE.md`) : vraies tensions VDD/VDDQ des barrettes DDR5 (PMIC, lecture seule, carte des registres à sourcer d'abord) ; comparer deux fiches mémoire.
 - [ ] Traductions anglaises et espagnoles écrites par l'IA : à faire relire par des locuteurs natifs avant publication.
 - [x] Cas « élévation par un autre compte administrateur » : détecté (`SessionUser`), réglages HKCU/SPI ignorés avec message (à valider sur Windows).
 - [ ] Les nombreux « (à vérifier) » de la fiche technique.
@@ -147,4 +152,4 @@ Reste à faire / points connus :
 - 25/09/2026 : 14 autres modules codés par des agents en parallèle (worktrees Git), intégration, correction du plantage WPF au démarrage (liaison TwoWay sur propriété en lecture seule), correction « PC géré » (pseudo-inscriptions Windows ignorées). Dépôt poussé sur GitHub.
 - 25/09/2026 (cloud, branche `claude/keen-wozniak-93as1n`) : V0.2 codée (socle des corrections, 8 modules corrigeables, CLI, interface). SDK .NET installé par `apt-get install dotnet-sdk-10.0` (le script dotnet-install est bloqué par le proxy). Chemins Winlogon du M01 découpés explicitement sur `\` pour passer sous Linux.
 - 25/09/2026 (cloud, 2e session, même branche) : suggestions du porteur (écrite sans effet, profil Game Bar, annuler une correction, redémarrer l'Explorateur, constat « voulu », rapport HTML, choix portable), Atelier matériel M16 complet sans pilote, logo intégré (`assets/logo`), refonte graphique (navigation à gauche, tableau de bord), trois langues (outil de transformation en `T(…)` appliqué à tout le code, 1 850 textes traduits). Textes « prévu en V0.2/V0.3 » remplacés par « prochaine version » ou un renvoi vers l'Atelier.
-- 25/09/2026 (cloud, 3e session) : demandes « plein de fonctions utiles, gains honnêtes, casser la charge pour le Curve Optimizer ». Test cœur par cœur, modules M17-M20, stockage et test de disque, résumé « Demander de l'aide », réparation DISM/SFC, mises à jour des logiciels (winget), test de connexion, panneau d'honnêteté, principe 6. Puis, avec l'accord du porteur : LICENSE (GPL-3.0), PawnIO (capteurs avancés), fiche mémoire complète, relevé de partie, historique des scores, audit hebdomadaire.
+- 25/09/2026 (cloud, 3e session) : demandes « plein de fonctions utiles, gains honnêtes, casser la charge pour le Curve Optimizer ». Test cœur par cœur, modules M17-M20, stockage et test de disque, résumé « Demander de l'aide », réparation DISM/SFC, mises à jour des logiciels (winget), test de connexion, panneau d'honnêteté, principe 6. Puis, avec l'accord du porteur : LICENSE (GPL-3.0), PawnIO (capteurs avancés), fiche mémoire complète, relevé de partie, historique des scores, audit hebdomadaire. Enfin, version **0.3.2-alpha** : nettoyage « aucune donnée inventée » (sources vérifiées sur le web pour chaque seuil, pilote et texte), fichiers obsolètes supprimés, `CHANGELOG.md`, `REPRISE.md` pour repasser en local.

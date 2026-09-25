@@ -8,7 +8,7 @@ namespace Maus.Core.Modules.M11Health;
 /// <summary>
 /// Module 11 — Mini-benchmark santé. En V0.1, lecture passive uniquement : santé et usure des disques, TRIM,
 /// espace libre, type du disque système, débit mémoire théorique et bridage signalé par le firmware.
-/// Le test actif (processeur, mémoire, carte graphique, stockage) arrive en V0.3.
+/// Les tests actifs (processeur, mémoire, mémoire vidéo, disque) sont dans l'Atelier (Workshop).
 /// </summary>
 public sealed class HardwareHealthModule : IAuditModule
 {

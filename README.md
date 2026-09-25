@@ -32,11 +32,16 @@
 
 ## État du projet
 
+Version actuelle : **0.3.2-alpha** (voir [CHANGELOG.md](CHANGELOG.md)). *Alpha* veut dire : tout est codé et testé avec des simulations, mais pas encore validé sur un vrai PC Windows. À ne pas utiliser sur un PC important avant cette validation.
+
 | Version | Contenu | État |
 |---|---|---|
 | V0.1 | Socle, profil matériel, mode « audit seul » des modules | Terminée |
 | V0.2 | Corrections réversibles (journal, point de restauration, Annuler), atelier matériel, nouvelle interface, trois langues | Codée : à valider sur Windows |
+| 0.3.2-alpha | Capteurs avancés (PawnIO), fiche mémoire complète, relevé de partie, historique des scores, audit hebdomadaire, nettoyage « aucune donnée inventée » | Codée : à valider sur Windows |
 | V0.3 | Écran et HDR, publication sur le Microsoft Store | À venir |
+
+**Aucune donnée inventée.** Chaque seuil (température, tension) cite sa source publiée dans `src/Maus.Core/Catalog/hw-safety-limits.json`. Sans source, MAUS n'affiche pas de seuil et ne déclenche pas d'alarme.
 
 Configuration requise : Windows 11 23H2 (build 22631) ou plus récent.
 
@@ -55,6 +60,7 @@ Audit en ligne de commande (lecture seule, aucun droit particulier requis ; cert
 dotnet run --project src/Maus.Cli -- --module M06
 dotnet run --project src/Maus.Cli -- --lang en --html rapport.html
 dotnet run --project src/Maus.Cli -- --summary
+dotnet run --project src/Maus.Cli -- --version
 ```
 
 Corrections en ligne de commande (V0.2, invite de commandes **administrateur**) : `--plan` affiche les corrections proposées sans rien modifier, `--apply ID...` ou `--apply-recommended` les applique après confirmation (point de restauration vérifié d'abord), `--journal` liste les séances et `--revert SEANCE` remet les valeurs d'origine. À tester d'abord dans Windows Sandbox.

@@ -27,7 +27,7 @@ public sealed record AuditReport(
 
     public static AuditReport Create(AuditContext context, IReadOnlyList<ModuleResult> modules) => new(
         context.Now,
-        typeof(AuditReport).Assembly.GetName().Version?.ToString(3) ?? "0.0.0",
+        AppVersion.Display,
         context.Windows,
         context.Hardware,
         context.IsElevated,

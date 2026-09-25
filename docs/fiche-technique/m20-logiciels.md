@@ -4,7 +4,7 @@ Demande du 25/09/2026 (« des fonctions vraiment utiles, que les gens aiment »)
 
 **Détection (lecture seule) :**
 - Emplacement de winget : dossier du paquet `Microsoft.DesktopAppInstaller` (`Package.InstalledPath`), qui doit se trouver dans `%ProgramFiles%\WindowsApps\` (dossier que seul Windows peut modifier). L'alias `%LOCALAPPDATA%\Microsoft\WindowsApps\winget.exe` n'est **jamais** lancé : il est modifiable sans droits administrateur, et MAUS tourne en administrateur (risque d'élévation de privilèges). Le lanceur de commandes refuse aussi tout winget.exe hors de ce dossier.
-- Commande : `winget upgrade --source winget --disable-interactivity`, rien d'autre (liste blanche argument par argument : `--all`, un identifiant ou `--accept-*` sont refusés). Sortie lue en UTF-8 (à vérifier).
+- Commande : `winget upgrade --source winget --disable-interactivity`, rien d'autre (liste blanche argument par argument : `--all`, un identifiant ou `--accept-*` sont refusés). L'encodage de la sortie redirigée de winget n'est pas documenté : MAUS lit les octets puis choisit (UTF-16 si marqueur, UTF-8 s'il est valide, sinon page de code OEM).
 - Lecture du tableau par positions de colonnes (en-têtes traduits selon la langue de Windows), premier tableau seulement (le second liste les logiciels épinglés). Codes « rien à mettre à jour » : `0x8A150014`, `0x8A15002B` (à vérifier).
 - Verdict : à jour = vert ; mise à jour d'un logiciel exposé (navigateurs, lecteurs PDF, compression, lecteurs vidéo, messageries, Java, suites bureautiques) = orange ; autres = bleu. winget absent ou en échec = gris, jamais rouge.
 

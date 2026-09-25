@@ -5,6 +5,7 @@
   "      Risque : {0}": "      Riesgo: {0}",
   "  --lang fr|en|es                         langue des textes (par défaut : celle de l'application, sinon de Windows)": "  --lang fr|en|es                         idioma de los textos (por defecto: el de la aplicación, si no el de Windows)",
   "  --summary                               résumé à coller sur un forum pour demander de l'aide (sans données personnelles)": "  --summary                               resumen para pegar en un foro y pedir ayuda (sin datos personales)",
+  "  --version                               version de MAUS": "  --version                               versión de MAUS",
   "  maus --ack ID | --unack ID              marque un constat « voulu » (ou retire la marque)": "  maus --ack ID | --unack ID              marca un hallazgo como «intencionado» (o retira la marca)",
   "  maus --apply ID [ID...]                 applique les corrections choisies, après confirmation": "  maus --apply ID [ID...]                 aplica las correcciones elegidas, tras confirmación",
   "  maus --apply-recommended [--module Mxx] applique les corrections recommandées": "  maus --apply-recommended [--module Mxx] aplica las correcciones recomendadas",

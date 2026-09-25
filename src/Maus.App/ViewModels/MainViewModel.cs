@@ -108,7 +108,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public string About { get; } = T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur · Logiciel libre sous licence GPL-3.0 · version {0}",
-        typeof(AuditEngine).Assembly.GetName().Version?.ToString(3));
+        AppVersion.Display);
 
     private async Task RunAuditAsync()
     {

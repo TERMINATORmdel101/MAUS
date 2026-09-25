@@ -48,12 +48,19 @@ var only = args
     .Select(x => args[x.index + 1])
     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+if (Has("--version"))
+{
+    Console.WriteLine("MAUS " + Maus.Core.AppVersion.Display);
+    return 0;
+}
+
 if (args.Any(a => a is "-h" or "--help" or "/?"))
 {
     Console.WriteLine(T("Usage : maus [--json | --html FICHIER] [--module Mxx]..."));
     Console.WriteLine(T("Audit en lecture seule : MAUS ne modifie rien sur ce PC."));
     Console.WriteLine(T("  --lang fr|en|es                         langue des textes (par défaut : celle de l'application, sinon de Windows)"));
     Console.WriteLine(T("  --summary                               résumé à coller sur un forum pour demander de l'aide (sans données personnelles)"));
+    Console.WriteLine(T("  --version                               version de MAUS"));
     Console.WriteLine();
     Console.WriteLine(T("Corrections (droits administrateur requis pour appliquer ou annuler) :"));
     Console.WriteLine(T("  maus --plan [--module Mxx]              corrections proposées, sans rien modifier"));
