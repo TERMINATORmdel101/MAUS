@@ -9,7 +9,7 @@ namespace Maus.Core.Modules.M13Security;
 /// et ce qui en réduit le coût. Signale en rouge les atténuations CPU coupées et la liste de blocage des pilotes désactivée.
 /// Aucun constat ne propose de couper une protection : l'option experte reste désactivée par défaut.
 /// </summary>
-public sealed class SecurityTradeoffModule : IAuditModule
+public sealed class SecurityTradeoffModule : Fixes.IFixableModule
 {
     internal const string DeviceGuardQuery =
         "SELECT AvailableSecurityProperties, SecurityServicesConfigured, SecurityServicesRunning, VirtualizationBasedSecurityStatus FROM Win32_DeviceGuard";
@@ -76,6 +76,54 @@ public sealed class SecurityTradeoffModule : IAuditModule
             DescribeHypervisorFeatures(features, featuresDenied, ReadHypervisorPresent(context.Cim)),
         ];
         return Task.FromResult(findings);
+    }
+
+    /// <summary>
+    /// Corrections : uniquement le retour des protections (atténuations CPU, liste de blocage des pilotes).
+    /// MAUS ne propose jamais de couper une atténuation ; l'intégrité de la mémoire reste guidée dans Sécurité Windows.
+    /// </summary>
+    public IReadOnlyList<Fixes.PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
+    {
+        var changes = new List<Fixes.PlannedChange>();
+        foreach (var finding in findings.Where(f => f.Fixable && f.Status is FindingStatus.Problem or FindingStatus.Warning))
+        {
+            switch (finding.Id)
+            {
+                case "M13.cpu-mitigations":
+                    changes.Add(new Fixes.PlannedChange
+                    {
+                        Id = finding.Id,
+                        ModuleId = Id,
+                        Title = "Réactiver les atténuations Spectre et Meltdown",
+                        Description = "Supprime FeatureSettingsOverride et FeatureSettingsOverrideMask : Windows reprend ses protections par défaut.",
+                        Category = finding.Category,
+                        Gain = "Le PC redevient protégé contre la lecture de la mémoire du noyau par un programme malveillant.",
+                        Risk = "Quelques pour cent de performance en moins sur certains processeurs anciens.",
+                        Effect = Fixes.ChangeEffect.Restart,
+                        Writes =
+                        [
+                            new Fixes.SettingWrite(Fixes.SettingKey.Registry("HKLM", MemoryManagementKey, "FeatureSettingsOverride"), null),
+                            new Fixes.SettingWrite(Fixes.SettingKey.Registry("HKLM", MemoryManagementKey, "FeatureSettingsOverrideMask"), null),
+                        ],
+                    });
+                    break;
+                case "M13.driver-blocklist":
+                    changes.Add(new Fixes.PlannedChange
+                    {
+                        Id = finding.Id,
+                        ModuleId = Id,
+                        Title = "Réactiver la liste de blocage des pilotes vulnérables",
+                        Description = "Windows refuse de nouveau de charger les pilotes connus pour leurs failles.",
+                        Category = finding.Category,
+                        Risk = "Un ancien outil qui dépend d'un pilote vulnérable (certains utilitaires de ventilation ou d'overclocking) peut ne plus démarrer.",
+                        Effect = Fixes.ChangeEffect.Restart,
+                        Writes = [new Fixes.SettingWrite(Fixes.SettingKey.Registry("HKLM", CodeIntegrityConfigKey, "VulnerableDriverBlocklistEnable"), Fixes.SettingValue.Dword(1))],
+                    });
+                    break;
+            }
+        }
+
+        return changes;
     }
 
     private static Finding EvaluateCpuMitigations(IRegistryReader registry)
