@@ -3,6 +3,7 @@ using System.Management;
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M03Updates;
 
@@ -40,8 +41,8 @@ public sealed class WindowsUpdateModule : IAuditModule
     internal static readonly (string Name, string Label)[] UpdateServices =
     [
         ("wuauserv", "Windows Update"),
-        ("UsoSvc", "Orchestrateur de mises à jour"),
-        ("BITS", "Transfert intelligent en arrière-plan (BITS)"),
+        ("UsoSvc", T("Orchestrateur de mises à jour")),
+        ("BITS", T("Transfert intelligent en arrière-plan (BITS)")),
         ("WaaSMedicSvc", "Windows Update Medic"),
     ];
 
@@ -75,7 +76,7 @@ public sealed class WindowsUpdateModule : IAuditModule
 
     public string Id => "M03";
 
-    public string Title => "Mises à jour Windows (hors pilotes)";
+    public string Title => T("Mises à jour Windows (hors pilotes)");
 
     public int Order => 30;
 
@@ -109,14 +110,14 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectSupport(WindowsInfo windows, DateOnly today)
     {
         const string id = "M03.windows-support";
-        const string title = "Prise en charge de la version de Windows";
-        const string explanation = "Chaque version de Windows 11 reçoit des correctifs de sécurité pendant une durée limitée : "
+        var title = T("Prise en charge de la version de Windows");
+        var explanation = T("Chaque version de Windows 11 reçoit des correctifs de sécurité pendant une durée limitée : "
             + "24 mois en Famille et Pro, 36 mois en Entreprise et Éducation. Passé cette date, Windows Update ne corrige plus "
-            + "les failles découvertes dans cette version.";
+            + "les failles découvertes dans cette version.");
         var catalog = Catalog.Value;
         if (windows.Build <= 0)
         {
-            return Finding.Unknown(id, title, "Numéro de version de Windows illisible dans le registre.", VersionCategory);
+            return Finding.Unknown(id, title, T("Numéro de version de Windows illisible dans le registre."), VersionCategory);
         }
 
         if (!windows.IsWindows11)
@@ -128,12 +129,12 @@ public sealed class WindowsUpdateModule : IAuditModule
                 Category = VersionCategory,
                 Status = FindingStatusExtensions.ForDeviation(Severity.High),
                 Severity = Severity.High,
-                Current = $"Windows 10 (build {windows.FullBuild}) : support terminé le {LongDate(catalog.Windows10EndOfSupport)}",
-                Expected = "Windows 11 23H2 ou plus récent",
-                Explanation = "MAUS vise Windows 11 uniquement : Windows 10 est hors périmètre. Sans correctifs de sécurité, "
-                    + "le PC reste exposé aux failles découvertes depuis la fin du support.",
-                Advice = "Passez à Windows 11 si le PC est compatible. Sinon, le programme de mises à jour de sécurité étendues (ESU) "
-                    + "prolonge les correctifs pour une durée limitée.",
+                Current = T("Windows 10 (build {0}) : support terminé le {1}", windows.FullBuild, LongDate(catalog.Windows10EndOfSupport)),
+                Expected = T("Windows 11 23H2 ou plus récent"),
+                Explanation = T("MAUS vise Windows 11 uniquement : Windows 10 est hors périmètre. Sans correctifs de sécurité, "
+                    + "le PC reste exposé aux failles découvertes depuis la fin du support."),
+                Advice = T("Passez à Windows 11 si le PC est compatible. Sinon, le programme de mises à jour de sécurité étendues (ESU) "
+                    + "prolonge les correctifs pour une durée limitée."),
             };
         }
 
@@ -148,8 +149,8 @@ public sealed class WindowsUpdateModule : IAuditModule
                 Status = FindingStatus.Info,
                 Current = $"build {windows.FullBuild}{(windows.DisplayVersion.Length > 0 ? $" ({windows.DisplayVersion})" : string.Empty)}",
                 Explanation = windows.Build > catalog.NewestBuild
-                    ? "Cette version est plus récente que le catalogue de MAUS (préversion Windows Insider ou nouvelle version) : sa date de fin de maintenance n'est pas connue."
-                    : "Cette version ne figure pas dans le catalogue de MAUS (préversion Windows Insider ?) : sa date de fin de maintenance n'est pas connue.",
+                    ? T("Cette version est plus récente que le catalogue de MAUS (préversion Windows Insider ou nouvelle version) : sa date de fin de maintenance n'est pas connue.")
+                    : T("Cette version ne figure pas dans le catalogue de MAUS (préversion Windows Insider ?) : sa date de fin de maintenance n'est pas connue."),
             };
         }
 
@@ -159,36 +160,36 @@ public sealed class WindowsUpdateModule : IAuditModule
         var severity = daysLeft < 0 ? Severity.High : daysLeft < WarningDaysBeforeEndOfService ? Severity.Medium : Severity.Info;
         var channelLabel = WindowsLifecycleCatalog.Describe(channel);
         var current = daysLeft < 0
-            ? $"Windows 11 {release.Version} ({channelLabel}) : correctifs arrêtés depuis le {ShortDate(end)}"
-            : $"Windows 11 {release.Version} ({channelLabel}) : correctifs jusqu'au {ShortDate(end)}, dans {Plural(daysLeft, "jour", "jours")}";
+            ? T("Windows 11 {0} ({1}) : correctifs arrêtés depuis le {2}", release.Version, channelLabel, ShortDate(end))
+            : T("Windows 11 {0} ({1}) : correctifs jusqu'au {2}, dans {3}", release.Version, channelLabel, ShortDate(end), Plural(daysLeft, "jour", "jours"));
 
         string? advice = null;
         var fixable = false;
         if (severity != Severity.Info)
         {
             var status = daysLeft < 0
-                ? $"Windows 11 {release.Version} ne reçoit plus de correctifs de sécurité depuis le {LongDate(end)}."
-                : $"Windows 11 {release.Version} ne recevra plus de correctifs de sécurité après le {LongDate(end)}.";
+                ? T("Windows 11 {0} ne reçoit plus de correctifs de sécurité depuis le {1}.", release.Version, LongDate(end))
+                : T("Windows 11 {0} ne recevra plus de correctifs de sécurité après le {1}.", release.Version, LongDate(end));
             if (release.EnablementPackage is { } package && channel is ServicingChannel.HomePro or ServicingChannel.EnterpriseEducation)
             {
-                advice = $"{status} Passez à {release.EnablementTarget} par le package d'activation {package} : un seul redémarrage, "
-                    + "applications, fichiers et réglages conservés. Il apparaît dans Paramètres > Windows Update ; MAUS le proposera en V0.2.";
+                advice = T("{0} Passez à {1} par le package d'activation {2} : un seul redémarrage, "
+                    + "applications, fichiers et réglages conservés. Il apparaît dans Paramètres > Windows Update ; MAUS le proposera en V0.2.", status, release.EnablementTarget, package);
                 if (release.EnablementMinimumUbr is { } minimum && windows.Ubr < minimum)
                 {
-                    advice += $" Installez d'abord les mises à jour cumulatives en attente (révision {release.Build}.{minimum} requise, "
-                        + $"{windows.FullBuild} installée).";
+                    advice += T(" Installez d'abord les mises à jour cumulatives en attente (révision {0}.{1} requise, "
+                        + "{2} installée).", release.Build, minimum, windows.FullBuild);
                 }
 
                 fixable = true;
             }
             else if (catalog.Releases.Where(r => !r.NewDevicesOnly && r.Build > release.Build).MaxBy(r => r.Build) is { } target)
             {
-                advice = $"{status} Installez la mise à jour de fonctionnalité vers Windows 11 {target.Version} depuis Paramètres > Windows Update, "
-                    + "ou avec l'Assistant d'installation de Windows 11. Sauvegardez vos données avant.";
+                advice = T("{0} Installez la mise à jour de fonctionnalité vers Windows 11 {1} depuis Paramètres > Windows Update, "
+                    + "ou avec l'Assistant d'installation de Windows 11. Sauvegardez vos données avant.", status, target.Version);
             }
             else
             {
-                advice = $"{status} Installez la version suivante de Windows 11 dès qu'elle est proposée dans Paramètres > Windows Update.";
+                advice = T("{0} Installez la version suivante de Windows 11 dès qu'elle est proposée dans Paramètres > Windows Update.", status);
             }
         }
 
@@ -200,7 +201,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Status = severity == Severity.Info ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(severity),
             Severity = severity == Severity.Info ? Severity.High : severity,
             Current = current,
-            Expected = $"version maintenue encore au moins {WarningDaysBeforeEndOfService} jours",
+            Expected = T("version maintenue encore au moins {0} jours", WarningDaysBeforeEndOfService),
             Explanation = explanation,
             Advice = advice,
             Fixable = fixable,
@@ -243,7 +244,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         var details = new List<string>();
         if (disabled.Count > 0)
         {
-            details.Add("désactivés : " + string.Join(", ", disabled));
+            details.Add(T("désactivés : ") + string.Join(", ", disabled));
         }
 
         if (missing.Count > 0)
@@ -258,14 +259,14 @@ public sealed class WindowsUpdateModule : IAuditModule
             Category = UpdateCategory,
             Status = severity == Severity.Info ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(severity),
             Severity = severity == Severity.Info ? Severity.High : severity,
-            Current = details.Count == 0 ? "aucun service désactivé" : string.Join(" ; ", details),
-            Expected = "aucun service désactivé",
-            Explanation = "Windows Update s'appuie sur plusieurs services (Windows Update, Orchestrateur, BITS, Medic). "
-                + "Certains outils d'« optimisation » les désactivent : le PC ne reçoit alors plus aucun correctif de sécurité.",
+            Current = details.Count == 0 ? T("aucun service désactivé") : string.Join(" ; ", details),
+            Expected = T("aucun service désactivé"),
+            Explanation = T("Windows Update s'appuie sur plusieurs services (Windows Update, Orchestrateur, BITS, Medic). "
+                + "Certains outils d'« optimisation » les désactivent : le PC ne reçoit alors plus aucun correctif de sécurité."),
             Advice = details.Count == 0
                 ? null
-                : "Si un outil tiers a désactivé ces services, annulez ce réglage dans cet outil. "
-                    + "La remise en service avec le démarrage d'origine sera proposée en V0.2.",
+                : T("Si un outil tiers a désactivé ces services, annulez ce réglage dans cet outil. "
+                    + "La remise en service avec le démarrage d'origine sera proposée en V0.2."),
             Fixable = disabled.Count > 0,
         };
     }
@@ -273,25 +274,26 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectAutomaticUpdates(IRegistryReader registry, DateTimeOffset now, bool isManaged)
     {
         const string id = "M03.automatic-updates";
-        const string title = "Installation automatique des mises à jour";
+        var title = T("Installation automatique des mises à jour");
         var reasons = new List<string>();
+        var paused = false;
         var byPolicy = false;
         try
         {
             if (registry.GetDword(RegistryHive.LocalMachine, AuPolicyKey, "NoAutoUpdate") == 1)
             {
-                reasons.Add("désactivée par une stratégie (NoAutoUpdate)");
+                reasons.Add(T("désactivée par une stratégie (NoAutoUpdate)"));
                 byPolicy = true;
             }
             else if (registry.GetDword(RegistryHive.LocalMachine, AuPolicyKey, "AUOptions") == 2)
             {
-                reasons.Add("simple notification, sans téléchargement (stratégie AUOptions = 2)");
+                reasons.Add(T("simple notification, sans téléchargement (stratégie AUOptions = 2)"));
                 byPolicy = true;
             }
 
             if (registry.GetDword(RegistryHive.LocalMachine, PolicyKey, "DisableWindowsUpdateAccess") == 1)
             {
-                reasons.Add("accès à Windows Update bloqué par une stratégie (DisableWindowsUpdateAccess)");
+                reasons.Add(T("accès à Windows Update bloqué par une stratégie (DisableWindowsUpdateAccess)"));
                 byPolicy = true;
             }
 
@@ -303,7 +305,8 @@ public sealed class WindowsUpdateModule : IAuditModule
                 .Max();
             if (pausedUntil != default)
             {
-                reasons.Add($"en pause jusqu'au {ShortDate(DateOnly.FromDateTime(pausedUntil.LocalDateTime))}");
+                paused = true;
+                reasons.Add(T("en pause jusqu'au {0}", ShortDate(DateOnly.FromDateTime(pausedUntil.LocalDateTime))));
             }
         }
         catch (MausAccessDeniedException)
@@ -312,16 +315,16 @@ public sealed class WindowsUpdateModule : IAuditModule
         }
 
         var advice = new List<string>();
-        if (reasons.Any(r => r.StartsWith("en pause", StringComparison.Ordinal)))
+        if (paused)
         {
-            advice.Add("Reprenez les mises à jour : Paramètres > Windows Update > Reprendre les mises à jour.");
+            advice.Add(T("Reprenez les mises à jour : Paramètres > Windows Update > Reprendre les mises à jour."));
         }
 
         if (byPolicy)
         {
             advice.Add(isManaged
-                ? "Ce PC est géré par une organisation : ces stratégies relèvent de son service informatique."
-                : "Une stratégie bloque l'installation automatique : si vous ne l'avez pas voulue, supprimez-la (gpedit.msc ou l'outil qui l'a posée).");
+                ? T("Ce PC est géré par une organisation : ces stratégies relèvent de son service informatique.")
+                : T("Une stratégie bloque l'installation automatique : si vous ne l'avez pas voulue, supprimez-la (gpedit.msc ou l'outil qui l'a posée)."));
         }
 
         return new Finding
@@ -331,10 +334,10 @@ public sealed class WindowsUpdateModule : IAuditModule
             Category = UpdateCategory,
             Status = reasons.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
-            Current = reasons.Count == 0 ? "active" : string.Join(" ; ", reasons),
-            Expected = "active, sans pause",
-            Explanation = "Windows installe seul les correctifs de sécurité publiés chaque mois. Une pause ou une stratégie qui "
-                + "bloque cette installation laisse le PC exposé aux failles connues.",
+            Current = reasons.Count == 0 ? T("active") : string.Join(" ; ", reasons),
+            Expected = T("active, sans pause"),
+            Explanation = T("Windows installe seul les correctifs de sécurité publiés chaque mois. Une pause ou une stratégie qui "
+                + "bloque cette installation laisse le PC exposé aux failles connues."),
             Advice = advice.Count == 0 ? null : string.Join(' ', advice),
         };
     }
@@ -360,7 +363,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         }
         catch (TimeoutException)
         {
-            return new SearchOutcome(null, $"aucune réponse en {_searchTimeout.TotalSeconds.ToString("0", CultureInfo.InvariantCulture)} s (connexion lente ou serveur surchargé)");
+            return new SearchOutcome(null, T("aucune réponse en {0} s (connexion lente ou serveur surchargé)", _searchTimeout.TotalSeconds.ToString("0", CultureInfo.InvariantCulture)));
         }
         catch (COMException ex)
         {
@@ -368,7 +371,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or MausAccessDeniedException)
         {
-            return new SearchOutcome(null, "accès refusé");
+            return new SearchOutcome(null, T("accès refusé"));
         }
         catch (Exception ex) when (ex is InvalidOperationException or DataSourceUnavailableException)
         {
@@ -379,7 +382,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectPendingUpdates(SearchOutcome search)
     {
         const string id = "M03.pending-updates";
-        const string title = "Mises à jour Windows en attente (hors pilotes)";
+        var title = T("Mises à jour Windows en attente (hors pilotes)");
         if (search.Updates is null)
         {
             return Finding.Unknown(id, title, $"Recherche Windows Update impossible : {search.Error}.", UpdateCategory);
@@ -388,11 +391,11 @@ public sealed class WindowsUpdateModule : IAuditModule
         var security = search.Updates.Where(u => UpdateParsers.Classify(u) == PendingUpdateKind.Security).ToList();
         var other = search.Updates.Where(u => UpdateParsers.Classify(u) == PendingUpdateKind.Other).ToList();
         var definitions = search.Updates.Count(u => UpdateParsers.Classify(u) == PendingUpdateKind.Definitions);
-        const string explanation = "Windows Update propose des mises à jour de Windows pas encore installées : correctifs de sécurité, "
-            + ".NET, outil de suppression de logiciels malveillants, définitions Defender. Les pilotes sont exclus : ils relèvent du Module 9.";
+        var explanation = T("Windows Update propose des mises à jour de Windows pas encore installées : correctifs de sécurité, "
+            + ".NET, outil de suppression de logiciels malveillants, définitions Defender. Les pilotes sont exclus : ils relèvent du Module 9.");
         var definitionsNote = definitions == 0
             ? null
-            : $"{Plural(definitions, "mise à jour", "mises à jour")} de définitions Defender en cours (installées automatiquement plusieurs fois par jour)";
+            : T("{0} de définitions Defender en cours (installées automatiquement plusieurs fois par jour)", Plural(definitions, T("mise à jour"), T("mises à jour")));
         if (security.Count == 0 && other.Count == 0)
         {
             return new Finding
@@ -402,8 +405,8 @@ public sealed class WindowsUpdateModule : IAuditModule
                 Category = UpdateCategory,
                 Status = FindingStatus.Ok,
                 Severity = Severity.Medium,
-                Current = definitionsNote is null ? "aucune" : $"aucune en dehors de : {definitionsNote}",
-                Expected = "aucune",
+                Current = definitionsNote is null ? T("aucune") : T("aucune en dehors de : {0}", definitionsNote),
+                Expected = T("aucune"),
                 Explanation = explanation,
             };
         }
@@ -412,7 +415,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         var counts = new List<string>();
         if (security.Count > 0)
         {
-            counts.Add($"{security.Count.ToString(CultureInfo.InvariantCulture)} de sécurité");
+            counts.Add(T("{0} de sécurité", security.Count.ToString(CultureInfo.InvariantCulture)));
         }
 
         if (other.Count > 0)
@@ -428,11 +431,11 @@ public sealed class WindowsUpdateModule : IAuditModule
             Status = FindingStatusExtensions.ForDeviation(severity),
             Severity = severity,
             Current = $"{string.Join(" et ", counts)} : {TitleList([.. security, .. other])}"
-                + (definitionsNote is null ? string.Empty : $" ; en plus, {definitionsNote}"),
-            Expected = "aucune",
+                + (definitionsNote is null ? string.Empty : T(" ; en plus, {0}", definitionsNote)),
+            Expected = T("aucune"),
             Explanation = explanation,
-            Advice = "Installez-les depuis Paramètres > Windows Update ; MAUS les installera en V0.2. Aucun pilote n'est installé ici. "
-                + "Aucun gain de performance n'est attendu : ces mises à jour servent la sécurité et la stabilité.",
+            Advice = T("Installez-les depuis Paramètres > Windows Update ; MAUS les installera en V0.2. Aucun pilote n'est installé ici. "
+                + "Aucun gain de performance n'est attendu : ces mises à jour servent la sécurité et la stabilité."),
             Fixable = true,
         };
     }
@@ -440,7 +443,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectOptionalUpdates(SearchOutcome search)
     {
         const string id = "M03.optional-updates";
-        const string title = "Mises à jour facultatives disponibles";
+        var title = T("Mises à jour facultatives disponibles");
         if (search.Updates is null)
         {
             return Finding.Unknown(id, title, $"Recherche Windows Update impossible : {search.Error}.", UpdateCategory);
@@ -453,12 +456,12 @@ public sealed class WindowsUpdateModule : IAuditModule
             Title = title,
             Category = UpdateCategory,
             Status = FindingStatus.Info,
-            Current = optional.Count == 0 ? "aucune" : $"{Plural(optional.Count, "facultative", "facultatives")} : {TitleList(optional)}",
-            Explanation = "Les mises à jour facultatives, comme l'aperçu non sécuritaire publié le quatrième mardi du mois, "
-                + "corrigent des bugs plus tôt. Leur contenu arrive de toute façon dans le correctif du mois suivant.",
+            Current = optional.Count == 0 ? T("aucune") : $"{Plural(optional.Count, "facultative", "facultatives")} : {TitleList(optional)}",
+            Explanation = T("Les mises à jour facultatives, comme l'aperçu non sécuritaire publié le quatrième mardi du mois, "
+                + "corrigent des bugs plus tôt. Leur contenu arrive de toute façon dans le correctif du mois suivant."),
             Advice = optional.Count == 0
                 ? null
-                : "Les aperçus corrigent des bugs plus tôt mais peuvent en introduire. Installez-les seulement si un correctif précis vous concerne.",
+                : T("Les aperçus corrigent des bugs plus tôt mais peuvent en introduire. Installez-les seulement si un correctif précis vous concerne."),
             Fixable = optional.Count > 0,
         };
     }
@@ -466,7 +469,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectLastInstall(ICimReader cim, DateOnly today)
     {
         const string id = "M03.last-install";
-        const string title = "Dernier correctif Windows installé";
+        var title = T("Dernier correctif Windows installé");
         IReadOnlyList<CimRow> rows;
         try
         {
@@ -478,7 +481,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         }
         catch (Exception ex) when (ex is DataSourceUnavailableException or ManagementException or COMException)
         {
-            return Finding.Unknown(id, title, "Liste des correctifs installés illisible par WMI.", UpdateCategory);
+            return Finding.Unknown(id, title, T("Liste des correctifs installés illisible par WMI."), UpdateCategory);
         }
 
         var dated = rows
@@ -489,7 +492,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         // MaxBy lève une exception sur une liste vide de tuples : le cas « aucune date » est traité avant.
         if (dated.Count == 0)
         {
-            return Finding.Unknown(id, title, "Windows n'indique aucune date d'installation de correctif.", UpdateCategory);
+            return Finding.Unknown(id, title, T("Windows n'indique aucune date d'installation de correctif."), UpdateCategory);
         }
 
         var latest = dated.MaxBy(entry => entry.Date);
@@ -504,13 +507,13 @@ public sealed class WindowsUpdateModule : IAuditModule
             Category = UpdateCategory,
             Status = stale ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
-            Current = $"{latest.HotFix ?? "correctif"} installé le {ShortDate(date)} ({Ago(age)})",
-            Expected = $"moins de {MaxInstallAgeDays} jours",
-            Explanation = "Microsoft publie un correctif cumulatif de sécurité le deuxième mardi de chaque mois. Si aucun n'a été "
-                + $"installé depuis plus de {MaxInstallAgeDays} jours, Windows Update est en pause, bloqué ou en panne.",
+            Current = T("{0} installé le {1} ({2})", latest.HotFix ?? "correctif", ShortDate(date), Ago(age)),
+            Expected = T("moins de {0} jours", MaxInstallAgeDays),
+            Explanation = T("Microsoft publie un correctif cumulatif de sécurité le deuxième mardi de chaque mois. Si aucun n'a été "
+                + "installé depuis plus de {0} jours, Windows Update est en pause, bloqué ou en panne.", MaxInstallAgeDays),
             Advice = stale
-                ? "Lancez une recherche dans Paramètres > Windows Update. Si l'installation échoue en boucle, "
-                    + "la réparation des composants de Windows Update (Module 2) sera proposée en V0.2."
+                ? T("Lancez une recherche dans Paramètres > Windows Update. Si l'installation échoue en boucle, "
+                    + "la réparation des composants de Windows Update (Module 2) sera proposée en V0.2.")
                 : null,
         };
     }
@@ -518,10 +521,10 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectLastSearch(AutomaticUpdatesResults? results, DateTimeOffset now)
     {
         const string id = "M03.last-search";
-        const string title = "Dernière recherche automatique de mises à jour";
+        var title = T("Dernière recherche automatique de mises à jour");
         if (results?.LastSearchSuccess is not { } last)
         {
-            return Finding.Unknown(id, title, "Windows n'indique pas la date de sa dernière recherche réussie de mises à jour.", UpdateCategory);
+            return Finding.Unknown(id, title, T("Windows n'indique pas la date de sa dernière recherche réussie de mises à jour."), UpdateCategory);
         }
 
         var lastUtc = DateTime.SpecifyKind(last, DateTimeKind.Utc);
@@ -535,12 +538,12 @@ public sealed class WindowsUpdateModule : IAuditModule
             Status = stale ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
             Current = $"le {ShortDate(DateOnly.FromDateTime(lastUtc.ToLocalTime()))} ({Ago(age)})",
-            Expected = $"moins de {MaxSearchAgeDays} jours",
-            Explanation = "Windows cherche seul de nouvelles mises à jour environ une fois par jour. Une dernière recherche réussie "
-                + "vieille de plus de deux semaines signale un Windows Update bloqué.",
+            Expected = T("moins de {0} jours", MaxSearchAgeDays),
+            Explanation = T("Windows cherche seul de nouvelles mises à jour environ une fois par jour. Une dernière recherche réussie "
+                + "vieille de plus de deux semaines signale un Windows Update bloqué."),
             Advice = stale
-                ? "Ouvrez Paramètres > Windows Update et cliquez sur « Rechercher des mises à jour ». En cas d'échec répété, "
-                    + "la réparation de Windows Update (Module 2) sera proposée en V0.2."
+                ? T("Ouvrez Paramètres > Windows Update et cliquez sur « Rechercher des mises à jour ». En cas d'échec répété, "
+                    + "la réparation de Windows Update (Module 2) sera proposée en V0.2.")
                 : null,
         };
     }
@@ -548,7 +551,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectDefenderSignatures(ICimReader cim)
     {
         const string id = "M03.defender-signatures";
-        const string title = "Définitions antivirus de Microsoft Defender";
+        var title = T("Définitions antivirus de Microsoft Defender");
         var thirdParty = ReadThirdPartyAntivirus(cim);
         IReadOnlyList<CimRow> rows;
         try
@@ -569,7 +572,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         {
             return thirdParty is not null
                 ? DefenderNotActive(id, title, thirdParty, null)
-                : Finding.Unknown(id, title, "Microsoft Defender ne répond pas (désinstallé, ou remplacé par un autre antivirus).", DefenderCategory);
+                : Finding.Unknown(id, title, T("Microsoft Defender ne répond pas (désinstallé, ou remplacé par un autre antivirus)."), DefenderCategory);
         }
 
         var mode = row.GetString("AMRunningMode");
@@ -581,11 +584,11 @@ public sealed class WindowsUpdateModule : IAuditModule
 
         if (row.GetInt64("AntivirusSignatureAge") is not { } age)
         {
-            return Finding.Unknown(id, title, "Defender n'indique pas l'âge de ses définitions.", DefenderCategory);
+            return Finding.Unknown(id, title, T("Defender n'indique pas l'âge de ses définitions."), DefenderCategory);
         }
 
         var stale = age > MaxSignatureAgeDays;
-        var current = age == 0 ? "à jour (moins d'un jour)" : $"âge : {Plural((int)Math.Min(age, int.MaxValue), "jour", "jours")}";
+        var current = age == 0 ? T("à jour (moins d'un jour)") : T("âge : {0}", Plural((int)Math.Min(age, int.MaxValue), "jour", "jours"));
         if (row.GetString("AntivirusSignatureVersion") is { Length: > 0 } version)
         {
             current += $", version {version}";
@@ -604,12 +607,12 @@ public sealed class WindowsUpdateModule : IAuditModule
             Status = stale ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
             Current = current,
-            Expected = $"{MaxSignatureAgeDays} jours au plus",
-            Explanation = "Defender reçoit de nouvelles définitions de menaces plusieurs fois par jour. "
-                + "Des définitions anciennes laissent passer les logiciels malveillants récents.",
+            Expected = T("{0} jours au plus", MaxSignatureAgeDays),
+            Explanation = T("Defender reçoit de nouvelles définitions de menaces plusieurs fois par jour. "
+                + "Des définitions anciennes laissent passer les logiciels malveillants récents."),
             Advice = stale
-                ? "Ouvrez Sécurité Windows > Protection contre les virus et menaces > Mises à jour de la protection > Rechercher des mises à jour. "
-                    + "MAUS lancera cette mise à jour en V0.2."
+                ? T("Ouvrez Sécurité Windows > Protection contre les virus et menaces > Mises à jour de la protection > Rechercher des mises à jour. "
+                    + "MAUS lancera cette mise à jour en V0.2.")
                 : null,
             Fixable = stale,
         };
@@ -639,16 +642,16 @@ public sealed class WindowsUpdateModule : IAuditModule
         Category = DefenderCategory,
         Status = FindingStatus.Info,
         Current = thirdParty is not null
-            ? $"antivirus actif : {thirdParty}"
-            : $"Defender n'est pas l'antivirus actif{(string.IsNullOrEmpty(mode) ? string.Empty : $" (mode : {mode})")}",
-        Explanation = "Les définitions de Defender ne sont vérifiées que lorsqu'il est l'antivirus actif. "
-            + "Un autre antivirus gère ses propres mises à jour.",
+            ? T("antivirus actif : {0}", thirdParty)
+            : T("Defender n'est pas l'antivirus actif{0}", (string.IsNullOrEmpty(mode) ? string.Empty : $" (mode : {mode})")),
+        Explanation = T("Les définitions de Defender ne sont vérifiées que lorsqu'il est l'antivirus actif. "
+            + "Un autre antivirus gère ses propres mises à jour."),
     };
 
     private static Finding DetectLatestUpdatesToggle(IRegistryReader registry)
     {
         const string id = "M03.latest-updates-toggle";
-        const string title = "Option « Obtenir les dernières mises à jour dès qu'elles sont disponibles »";
+        var title = T("Option « Obtenir les dernières mises à jour dès qu'elles sont disponibles »");
         int? optedIn;
         int? policy;
         try
@@ -661,10 +664,10 @@ public sealed class WindowsUpdateModule : IAuditModule
             return Finding.AdminRequired(id, title, UpdateCategory);
         }
 
-        var current = optedIn == 1 ? "activée" : "désactivée";
+        var current = optedIn == 1 ? T("activée") : T("désactivée");
         if (policy is { } value)
         {
-            current += $" (stratégie AllowOptionalContent = {value.ToString(CultureInfo.InvariantCulture)})";
+            current += T(" (stratégie AllowOptionalContent = {0})", value.ToString(CultureInfo.InvariantCulture));
         }
 
         return new Finding
@@ -674,16 +677,16 @@ public sealed class WindowsUpdateModule : IAuditModule
             Category = UpdateCategory,
             Status = FindingStatus.Info,
             Current = current,
-            Explanation = "Cette option installe plus tôt les nouveautés et les aperçus, sans changer le rythme des correctifs "
-                + "de sécurité, avec davantage de redémarrages. MAUS la lit sans la modifier.",
-            Advice = "Réglable dans Paramètres > Windows Update (ms-settings:windowsupdate).",
+            Explanation = T("Cette option installe plus tôt les nouveautés et les aperçus, sans changer le rythme des correctifs "
+                + "de sécurité, avec davantage de redémarrages. MAUS la lit sans la modifier."),
+            Advice = T("Réglable dans Paramètres > Windows Update (ms-settings:windowsupdate)."),
         };
     }
 
     private static Finding DetectUpdateSource(IRegistryReader registry)
     {
         const string id = "M03.update-source";
-        const string title = "Source des mises à jour";
+        var title = T("Source des mises à jour");
         string? server;
         try
         {
@@ -702,9 +705,9 @@ public sealed class WindowsUpdateModule : IAuditModule
             Title = title,
             Category = UpdateCategory,
             Status = FindingStatus.Info,
-            Current = string.IsNullOrWhiteSpace(server) ? "Windows Update (serveurs Microsoft)" : $"serveur de l'organisation (WSUS) : {server}",
-            Explanation = "Les mises à jour viennent des serveurs de Microsoft, ou d'un serveur interne (WSUS) sur les PC d'entreprise. "
-                + "Dans ce cas, l'organisation choisit les mises à jour publiées.",
+            Current = string.IsNullOrWhiteSpace(server) ? "Windows Update (serveurs Microsoft)" : T("serveur de l'organisation (WSUS) : {0}", server),
+            Explanation = T("Les mises à jour viennent des serveurs de Microsoft, ou d'un serveur interne (WSUS) sur les PC d'entreprise. "
+                + "Dans ce cas, l'organisation choisit les mises à jour publiées."),
         };
     }
 
@@ -712,7 +715,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     {
         var titles = string.Join(" ; ", updates.Take(MaxListedTitles).Select(u => u.Title));
         return updates.Count > MaxListedTitles
-            ? $"{titles} (et {(updates.Count - MaxListedTitles).ToString(CultureInfo.InvariantCulture)} de plus)"
+            ? T("{0} (et {1} de plus)", titles, (updates.Count - MaxListedTitles).ToString(CultureInfo.InvariantCulture))
             : titles;
     }
 
@@ -720,7 +723,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     {
         0 => "aujourd'hui",
         1 => "hier",
-        _ => $"il y a {days.ToString(CultureInfo.InvariantCulture)} jours",
+        _ => T("il y a {0} jours", days.ToString(CultureInfo.InvariantCulture)),
     };
 
     private static string Plural(int count, string singular, string plural) =>

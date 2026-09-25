@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Reporting;
 
 /// <summary>Libellés français affichés à l'utilisateur.</summary>
@@ -8,16 +10,16 @@ public static class Labels
         FindingStatus.Ok => "Conforme",
         FindingStatus.Info => "Info",
         FindingStatus.Improvable => "Optimisation possible",
-        FindingStatus.Warning => "À surveiller",
-        FindingStatus.Problem => "Problème",
-        _ => "Indéterminé",
+        FindingStatus.Warning => T("À surveiller"),
+        FindingStatus.Problem => T("Problème"),
+        _ => T("Indéterminé"),
     };
 
     public static string Of(Severity severity) => severity switch
     {
-        Severity.Low => "Faible",
+        Severity.Low => T("Faible"),
         Severity.Medium => "Moyen",
-        Severity.High => "Élevé",
+        Severity.High => T("Élevé"),
         Severity.Critical => "Critique",
         _ => "Info",
     };
@@ -26,29 +28,29 @@ public static class Labels
     {
         Hardware.FormFactor.Desktop => "PC fixe",
         Hardware.FormFactor.Laptop => "PC portable",
-        _ => "Type de PC inconnu",
+        _ => T("Type de PC inconnu"),
     };
 
     public static string Of(Fixes.ChangeEffect effect) => effect switch
     {
-        Fixes.ChangeEffect.ExplorerRestart => "effet complet après redémarrage de l'Explorateur",
-        Fixes.ChangeEffect.SignOut => "effet à la prochaine ouverture de session",
-        Fixes.ChangeEffect.Restart => "effet après redémarrage du PC",
-        _ => "effet immédiat",
+        Fixes.ChangeEffect.ExplorerRestart => T("effet complet après redémarrage de l'Explorateur"),
+        Fixes.ChangeEffect.SignOut => T("effet à la prochaine ouverture de session"),
+        Fixes.ChangeEffect.Restart => T("effet après redémarrage du PC"),
+        _ => T("effet immédiat"),
     };
 
     public static string Of(Fixes.ChangeStatus status) => status switch
     {
-        Fixes.ChangeStatus.Applied => "Appliqué",
-        Fixes.ChangeStatus.Skipped => "Ignoré",
-        _ => "Échec",
+        Fixes.ChangeStatus.Applied => T("Appliqué"),
+        Fixes.ChangeStatus.Skipped => T("Ignoré"),
+        _ => T("Échec"),
     };
 
     public static string Of(Fixes.RevertStatus status) => status switch
     {
-        Fixes.RevertStatus.Reverted => "Restauré",
-        Fixes.RevertStatus.ChangedSince => "Modifié depuis",
-        Fixes.RevertStatus.Skipped => "Ignoré",
-        _ => "Échec",
+        Fixes.RevertStatus.Reverted => T("Restauré"),
+        Fixes.RevertStatus.ChangedSince => T("Modifié depuis"),
+        Fixes.RevertStatus.Skipped => T("Ignoré"),
+        _ => T("Échec"),
     };
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Maus.Core.Localization;
 
 namespace Maus.Core.Rules;
 
@@ -22,7 +23,7 @@ public static class EmbeddedCatalog
     {
         var resourceName = $"Maus.Core.Catalog.{fileName}";
         using var stream = typeof(EmbeddedCatalog).Assembly.GetManifestResourceStream(resourceName)
-            ?? throw new FileNotFoundException($"Catalogue embarqué introuvable : {resourceName}");
+            ?? throw new FileNotFoundException(Texts.T("Catalogue embarqué introuvable : {0}", resourceName));
         return JsonSerializer.Deserialize<T>(stream, JsonOptions)
             ?? throw new InvalidDataException($"Catalogue vide : {resourceName}");
     }

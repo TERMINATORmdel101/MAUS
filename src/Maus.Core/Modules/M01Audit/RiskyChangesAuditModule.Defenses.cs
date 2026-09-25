@@ -1,16 +1,17 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
 /// <summary>Catégorie « Défenses » : invite de l'UAC et pare-feu (SmartScreen et EnableLUA sont dans le catalogue JSON).</summary>
 public sealed partial class RiskyChangesAuditModule
 {
-    private const string DefensesCategory = "Défenses";
+    private static string DefensesCategory => T("Défenses");
     private const string UacKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
     private const string FirewallPolicyKey = @"SOFTWARE\Policies\Microsoft\WindowsFirewall\";
     internal const string FirewallProfileQuery = "SELECT Name, Enabled FROM MSFT_NetFirewallProfile";
 
-    private static readonly Check UacPromptCheck = new("M01.uac-prompt", "Demande de confirmation de l'UAC", DefensesCategory, Severity.High, Fixable: true);
+    private static Check UacPromptCheck => new("M01.uac-prompt", T("Demande de confirmation de l'UAC"), DefensesCategory, Severity.High, Fixable: true);
 
     private static readonly Check FirewallCheck = new("M01.firewall", "Pare-feu Windows", DefensesCategory, Severity.Critical, Fixable: true);
 
@@ -18,28 +19,27 @@ public sealed partial class RiskyChangesAuditModule
     private static readonly (string Key, string Label)[] FirewallPolicyProfiles =
     [
         ("DomainProfile", "domaine"),
-        ("PrivateProfile", "privé"),
-        ("StandardProfile", "privé"),
+        ("PrivateProfile", T("privé")),
+        ("StandardProfile", T("privé")),
         ("PublicProfile", "public"),
     ];
 
     private static Finding DetectUacPrompt(IRegistryReader registry)
     {
-        const string explanation =
-            "Quand un programme demande les droits administrateur, l'UAC affiche une fenêtre de confirmation sur un bureau sécurisé (écran assombri), " +
-            "qu'aucun autre programme ne peut valider à votre place.";
-        const string expected = "confirmation sur bureau sécurisé (5 et 1)";
-        const string advice = "Remettre ConsentPromptBehaviorAdmin à 5 et PromptOnSecureDesktop à 1 (curseur de l'UAC sur le niveau par défaut).";
+        var explanation = T("Quand un programme demande les droits administrateur, l'UAC affiche une fenêtre de confirmation sur un bureau sécurisé (écran assombri), " +
+            "qu'aucun autre programme ne peut valider à votre place.");
+        var expected = T("confirmation sur bureau sécurisé (5 et 1)");
+        var advice = T("Remettre ConsentPromptBehaviorAdmin à 5 et PromptOnSecureDesktop à 1 (curseur de l'UAC sur le niveau par défaut).");
         var consent = registry.GetDword(Hklm, UacKey, "ConsentPromptBehaviorAdmin");
         var secureDesktop = registry.GetDword(Hklm, UacKey, "PromptOnSecureDesktop");
-        var current = $"{ConsentLabel(consent)} ; bureau sécurisé : {(secureDesktop == 0 ? "non" : "oui")}";
+        var current = T("{0} ; bureau sécurisé : {1}", ConsentLabel(consent), (secureDesktop == 0 ? T("non") : T("oui")));
 
         if (consent == 0)
         {
             return UacPromptCheck.Deviation(
                 current,
                 expected,
-                "Les programmes obtiennent les droits administrateur sans rien vous demander : un logiciel malveillant peut modifier Windows en silence. " + explanation,
+                T("Les programmes obtiennent les droits administrateur sans rien vous demander : un logiciel malveillant peut modifier Windows en silence. ") + explanation,
                 advice);
         }
 
@@ -48,7 +48,7 @@ public sealed partial class RiskyChangesAuditModule
             return UacPromptCheck.Deviation(
                 current,
                 expected,
-                "La fenêtre de confirmation s'affiche sans assombrir l'écran : un programme malveillant déjà présent pourrait la valider à votre place. " + explanation,
+                T("La fenêtre de confirmation s'affiche sans assombrir l'écran : un programme malveillant déjà présent pourrait la valider à votre place. ") + explanation,
                 advice,
                 Severity.Medium);
         }
@@ -58,21 +58,20 @@ public sealed partial class RiskyChangesAuditModule
 
     private static string ConsentLabel(int? consent) => consent switch
     {
-        0 => "élévation sans aucune demande",
-        1 => "mot de passe demandé (bureau sécurisé)",
-        2 => "confirmation à chaque changement",
-        3 => "mot de passe demandé",
-        4 => "confirmation demandée",
-        null or 5 => "confirmation pour les programmes (défaut)",
-        _ => "réglage inconnu",
+        0 => T("élévation sans aucune demande"),
+        1 => T("mot de passe demandé (bureau sécurisé)"),
+        2 => T("confirmation à chaque changement"),
+        3 => T("mot de passe demandé"),
+        4 => T("confirmation demandée"),
+        null or 5 => T("confirmation pour les programmes (défaut)"),
+        _ => T("réglage inconnu"),
     };
 
     private static Finding DetectFirewall(AuditContext context, IReadOnlyList<SecurityProduct>? firewalls)
     {
-        const string explanation =
-            "Le pare-feu filtre les connexions entrantes : il empêche un autre appareil du réseau (Wi-Fi public, box, PC infecté) " +
-            "de joindre directement les services de votre PC.";
-        const string expected = "activé sur les 3 profils";
+        var explanation = T("Le pare-feu filtre les connexions entrantes : il empêche un autre appareil du réseau (Wi-Fi public, box, PC infecté) " +
+            "de joindre directement les services de votre PC.");
+        var expected = T("activé sur les 3 profils");
 
         var off = new SortedSet<string>(StringComparer.Ordinal);
         var byPolicy = false;
@@ -99,36 +98,35 @@ public sealed partial class RiskyChangesAuditModule
         {
             if (profiles.Rows is not { Count: > 0 })
             {
-                return profiles.AccessDenied ? FirewallCheck.AdminRequired() : FirewallCheck.Unknown("État du pare-feu illisible sur ce PC.");
+                return profiles.AccessDenied ? FirewallCheck.AdminRequired() : FirewallCheck.Unknown(T("État du pare-feu illisible sur ce PC."));
             }
 
-            return FirewallCheck.Compliant("activé sur les 3 profils", expected, explanation);
+            return FirewallCheck.Compliant(T("activé sur les 3 profils"), expected, explanation);
         }
 
-        var current = $"coupé sur le(s) profil(s) : {string.Join(", ", off)}{(byPolicy ? " (par une stratégie)" : string.Empty)}";
+        var current = T("coupé sur le(s) profil(s) : {0}{1}", string.Join(", ", off), (byPolicy ? T(" (par une stratégie)") : string.Empty));
         if (SecurityProduct.ActiveThirdParty(firewalls) is { } thirdParty)
         {
             return FirewallCheck.Neutral(
                 $"{current} ; {thirdParty.Name} actif",
                 expected,
-                $"Un autre pare-feu ({thirdParty.Name}) protège ce PC : le pare-feu Windows peut alors être coupé. C'est un fonctionnement normal.");
+                T("Un autre pare-feu ({0}) protège ce PC : le pare-feu Windows peut alors être coupé. C'est un fonctionnement normal.", thirdParty.Name));
         }
 
-        const string advice =
-            "Supprimer les stratégies EnableFirewall éventuelles, puis réactiver le pare-feu pour tous les profils dans Sécurité Windows > Pare-feu et protection du réseau.";
+        var advice = T("Supprimer les stratégies EnableFirewall éventuelles, puis réactiver le pare-feu pour tous les profils dans Sécurité Windows > Pare-feu et protection du réseau.");
 
         // Le profil « domaine » ne sert que sur un réseau d'entreprise : coupé seul sur un PC personnel, le risque est limité.
         var onlyDomain = off.Count == 1 && off.Contains("domaine");
         return onlyDomain && !context.Hardware.IsManaged
-            ? FirewallCheck.Deviation(current, expected, "Le profil « domaine » ne sert que sur un réseau d'entreprise, mais sa désactivation trahit souvent un script de « nettoyage ». " + explanation, advice, Severity.Medium)
+            ? FirewallCheck.Deviation(current, expected, T("Le profil « domaine » ne sert que sur un réseau d'entreprise, mais sa désactivation trahit souvent un script de « nettoyage ». ") + explanation, advice, Severity.Medium)
             : FirewallCheck.Deviation(current, expected, explanation, advice);
     }
 
     private static string FirewallProfileLabel(string? name) => name?.Trim().ToUpperInvariant() switch
     {
         "DOMAIN" => "domaine",
-        "PRIVATE" => "privé",
+        "PRIVATE" => T("privé"),
         "PUBLIC" => "public",
-        _ => name ?? "inconnu",
+        _ => name ?? T("inconnu"),
     };
 }

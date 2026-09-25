@@ -1,6 +1,7 @@
 using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Maus.Core.Rules;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
@@ -40,7 +41,7 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
         var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
         var registry = context.Registry;
         var policyFileNote = HasLocalPolicyFile(context)
-            ? "Une stratégie locale (Registry.pol) existe sur ce PC : si elle contient ce réglage, Windows peut le réécrire. MAUS le verra au prochain audit."
+            ? T("Une stratégie locale (Registry.pol) existe sur ce PC : si elle contient ce réglage, Windows peut le réécrire. MAUS le verra au prochain audit.")
             : null;
         var changes = new List<PlannedChange>();
 
@@ -64,7 +65,7 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 Title = title,
                 Description = description,
                 Category = finding.Category,
-                Gain = "Retour au réglage d'origine de Windows : sécurité et mises à jour rétablies.",
+                Gain = T("Retour au réglage d'origine de Windows : sécurité et mises à jour rétablies."),
                 Risk = risk ?? (isPolicy ? policyFileNote : null),
                 Warning = warning,
                 Effect = effect,
@@ -86,23 +87,23 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
 
         if (Deviates("M01.defender-realtime", out var realtime) && Read(registry, RealtimePolicyKey, "DisableRealtimeMonitoring") is not null)
         {
-            Add(realtime, "Supprimer la stratégie qui coupe la protection en temps réel",
-                "Rend la main à Sécurité Windows. Si la protection reste coupée ensuite, réactivez-la dans Sécurité Windows > Protection contre les virus et menaces.",
+            Add(realtime, T("Supprimer la stratégie qui coupe la protection en temps réel"),
+                T("Rend la main à Sécurité Windows. Si la protection reste coupée ensuite, réactivez-la dans Sécurité Windows > Protection contre les virus et menaces."),
                 [Delete(RealtimePolicyKey, "DisableRealtimeMonitoring")],
-                risk: "La protection contre les falsifications peut refuser l'écriture : MAUS le signalera sans rien casser.");
+                risk: T("La protection contre les falsifications peut refuser l'écriture : MAUS le signalera sans rien casser."));
         }
 
         if (Deviates("M01.uac-prompt", out var uacPrompt))
         {
-            Add(uacPrompt, "Remettre la demande de confirmation de l'UAC par défaut",
-                "Curseur de l'UAC sur le niveau par défaut : confirmation sur le bureau sécurisé.",
+            Add(uacPrompt, T("Remettre la demande de confirmation de l'UAC par défaut"),
+                T("Curseur de l'UAC sur le niveau par défaut : confirmation sur le bureau sécurisé."),
                 [Set(UacKey, "ConsentPromptBehaviorAdmin", 5), Set(UacKey, "PromptOnSecureDesktop", 1)]);
         }
 
         if (Deviates("M01.firewall", out var firewall))
         {
-            Add(firewall, "Supprimer les stratégies qui coupent le pare-feu",
-                "Rend la main à Sécurité Windows. Si un profil reste coupé ensuite, réactivez-le dans Sécurité Windows > Pare-feu et protection du réseau.",
+            Add(firewall, T("Supprimer les stratégies qui coupent le pare-feu"),
+                T("Rend la main à Sécurité Windows. Si un profil reste coupé ensuite, réactivez-le dans Sécurité Windows > Pare-feu et protection du réseau."),
                 FirewallPolicyProfiles.Select(p => p.Key).Distinct(StringComparer.Ordinal)
                     .Where(key => registry.GetDword(Microsoft.Win32.RegistryHive.LocalMachine, FirewallPolicyKey + key, "EnableFirewall") == 0)
                     .Select(key => Delete(FirewallPolicyKey + key, "EnableFirewall")),
@@ -111,8 +112,8 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
 
         if (Deviates("M01.wu-server", out var wsus))
         {
-            Add(wsus, "Revenir aux serveurs de mises à jour de Microsoft",
-                "Supprime le serveur de mises à jour imposé et les valeurs qui l'accompagnent.",
+            Add(wsus, T("Revenir aux serveurs de mises à jour de Microsoft"),
+                T("Supprime le serveur de mises à jour imposé et les valeurs qui l'accompagnent."),
                 [
                     Delete(WuPolicyKey, "WUServer"), Delete(WuPolicyKey, "WUStatusServer"),
                     Delete(WuPolicyKey, "DoNotConnectToWindowsUpdateInternetLocations"), Delete(WuAuPolicyKey, "UseWUServer"),
@@ -121,15 +122,15 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
 
         if (Deviates("M01.wu-target-version", out var target))
         {
-            Add(target, "Ne plus figer la version de Windows",
-                "Windows suit de nouveau les versions prises en charge.",
+            Add(target, T("Ne plus figer la version de Windows"),
+                T("Windows suit de nouveau les versions prises en charge."),
                 [Delete(WuPolicyKey, "TargetReleaseVersion"), Delete(WuPolicyKey, "TargetReleaseVersionInfo"), Delete(WuPolicyKey, "ProductVersion")]);
         }
 
         if (Deviates("M01.wu-pause", out var pause))
         {
-            Add(pause, "Reprendre les mises à jour",
-                "Supprime la pause en cours et la durée de pause allongée. Noms des valeurs relevés sur Windows 11 (à vérifier selon les builds).",
+            Add(pause, T("Reprendre les mises à jour"),
+                T("Supprime la pause en cours et la durée de pause allongée. Noms des valeurs relevés sur Windows 11 (à vérifier selon les builds)."),
                 PauseValues.Select(name => Delete(WuUxSettingsKey, name)));
         }
 
@@ -145,13 +146,13 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 var state = ServiceStart.Read(registry, name);
                 if (state.IsDisabled && DefaultServiceStart.TryGetValue(name, out var start))
                 {
-                    Add(services, $"Réactiver le service {name} ({ServiceStart.Label(start)})",
-                        $"Remet le type de démarrage d'origine du service {name}.",
+                    Add(services, T("Réactiver le service {0} ({1})", name, ServiceStart.Label(start)),
+                        T("Remet le type de démarrage d'origine du service {0}.", name),
                         [Set(@"SYSTEM\CurrentControlSet\Services\" + name, "Start", start)],
                         id: $"{check}.{name}",
                         effect: ChangeEffect.Restart,
                         risk: name is "WinDefend" or "mpssvc" or "WaaSMedicSvc"
-                            ? "Windows protège ce service : l'écriture peut être refusée même en administrateur. MAUS le signalera sans rien casser."
+                            ? T("Windows protège ce service : l'écriture peut être refusée même en administrateur. MAUS le signalera sans rien casser.")
                             : null);
                 }
             }
@@ -178,10 +179,10 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 writes.Add(new SettingWrite(SettingKey.Registry("HKLM", WinlogonKey, "Userinit"), SettingValue.Text(_windowsDirectory + @"\system32\userinit.exe,")));
             }
 
-            Add(winlogon, "Remettre Shell et Userinit par défaut",
-                "Seuls le Bureau (explorer.exe) et userinit.exe démarrent de nouveau à l'ouverture de session.",
+            Add(winlogon, T("Remettre Shell et Userinit par défaut"),
+                T("Seuls le Bureau (explorer.exe) et userinit.exe démarrent de nouveau à l'ouverture de session."),
                 writes, effect: ChangeEffect.SignOut,
-                warning: "Lancez aussi une analyse antivirus complète : un programme ajouté à ces valeurs est souvent malveillant.");
+                warning: T("Lancez aussi une analyse antivirus complète : un programme ajouté à ces valeurs est souvent malveillant."));
         }
 
         if (Deviates("M01.appinit", out var appInit))
@@ -193,9 +194,9 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 writes.Add(Set(key, "LoadAppInit_DLLs", 0));
             }
 
-            Add(appInit, "Vider AppInit_DLLs", "Plus aucune bibliothèque n'est injectée dans tous les programmes.", writes,
+            Add(appInit, "Vider AppInit_DLLs", T("Plus aucune bibliothèque n'est injectée dans tous les programmes."), writes,
                 effect: ChangeEffect.Restart,
-                warning: "Lancez aussi une analyse antivirus complète.");
+                warning: T("Lancez aussi une analyse antivirus complète."));
         }
 
         if (Deviates("M01.ifeo-debugger", out var ifeo))
@@ -217,11 +218,11 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
 
                     if (IsSet(debugger))
                     {
-                        Add(ifeo, $"Supprimer le détournement de {program}",
-                            $"{program} est actuellement remplacé par : {debugger}.",
+                        Add(ifeo, T("Supprimer le détournement de {0}", program),
+                            T("{0} est actuellement remplacé par : {1}.", program, debugger),
                             [Delete(path, "Debugger")],
                             id: $"M01.ifeo-debugger.{program.ToLowerInvariant()}",
-                            warning: "Vérifiez d'abord : certains outils légitimes (Process Explorer qui remplace le Gestionnaire des tâches) utilisent ce mécanisme.");
+                            warning: T("Vérifiez d'abord : certains outils légitimes (Process Explorer qui remplace le Gestionnaire des tâches) utilisent ce mécanisme."));
                         changes[^1] = changes[^1] with { Recommended = false };
                     }
                 }

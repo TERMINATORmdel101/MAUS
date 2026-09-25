@@ -1,4 +1,5 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -10,26 +11,25 @@ public sealed record ExplorerRestartResult(bool Succeeded, string Message);
 /// </summary>
 public sealed class ExplorerRestart(IShellProcesses shell, Func<TimeSpan, CancellationToken, Task>? delay = null)
 {
-    private const string Manual =
-        "Pour le relancer vous-même : Ctrl+Maj+Échap, puis « Exécuter une nouvelle tâche », tapez explorer et validez. Ou fermez puis rouvrez votre session.";
+    private static string Manual => T("Pour le relancer vous-même : Ctrl+Maj+Échap, puis « Exécuter une nouvelle tâche », tapez explorer et validez. Ou fermez puis rouvrez votre session.");
 
     private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
 
     public static string Warning =>
-        "La barre des tâches et le Bureau vont disparaître quelques secondes, et les fenêtres de dossiers ouvertes seront fermées. " +
-        "Vos documents et applications ne sont pas touchés.";
+        T("La barre des tâches et le Bureau vont disparaître quelques secondes, et les fenêtres de dossiers ouvertes seront fermées. " +
+        "Vos documents et applications ne sont pas touchés.");
 
     public async Task<ExplorerRestartResult> RunAsync(CancellationToken cancellationToken = default)
     {
         if (!shell.AutoRestartEnabled())
         {
-            return new(false, "Windows est réglé pour ne pas relancer l'Explorateur automatiquement (AutoRestartShell = 0) : MAUS ne l'arrête pas. " +
-                              "Fermez puis rouvrez votre session pour appliquer les corrections.");
+            return new(false, T("Windows est réglé pour ne pas relancer l'Explorateur automatiquement (AutoRestartShell = 0) : MAUS ne l'arrête pas. " +
+                              "Fermez puis rouvrez votre session pour appliquer les corrections."));
         }
 
         if (shell.Count() == 0)
         {
-            return new(false, "L'Explorateur ne tourne pas dans cette session. " + Manual);
+            return new(false, T("L'Explorateur ne tourne pas dans cette session. ") + Manual);
         }
 
         shell.StopShell();
@@ -38,10 +38,10 @@ public sealed class ExplorerRestart(IShellProcesses shell, Func<TimeSpan, Cancel
             await _delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
             if (shell.Count() > 0)
             {
-                return new(true, "L'Explorateur a redémarré : les corrections de la barre des tâches sont appliquées.");
+                return new(true, T("L'Explorateur a redémarré : les corrections de la barre des tâches sont appliquées."));
             }
         }
 
-        return new(false, "L'Explorateur n'est pas revenu tout seul. " + Manual);
+        return new(false, T("L'Explorateur n'est pas revenu tout seul. ") + Manual);
     }
 }

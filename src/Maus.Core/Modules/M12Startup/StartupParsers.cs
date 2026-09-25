@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M12Startup;
 
@@ -127,29 +128,29 @@ internal static partial class StartupParsers
 
         if (TempFolder().IsMatch(all))
         {
-            return "le programme est lancé depuis un dossier temporaire, emplacement habituel des logiciels malveillants";
+            return T("le programme est lancé depuis un dossier temporaire, emplacement habituel des logiciels malveillants");
         }
 
         if (ScriptHosts.Contains(fileName, StringComparer.OrdinalIgnoreCase))
         {
-            return "un script est lancé en arrière-plan par l'hôte de scripts de Windows";
+            return T("un script est lancé en arrière-plan par l'hôte de scripts de Windows");
         }
 
         if (PowerShellHosts.Contains(fileName, StringComparer.OrdinalIgnoreCase) && HiddenPowerShell().IsMatch(arguments))
         {
-            return "une commande PowerShell est lancée cachée ou encodée";
+            return T("une commande PowerShell est lancée cachée ou encodée");
         }
 
         if (ScriptExtensions.Any(e => path.EndsWith(e, StringComparison.OrdinalIgnoreCase)))
         {
-            return "un script (.vbs, .js, .ps1…) est lancé directement au démarrage";
+            return T("un script (.vbs, .js, .ps1…) est lancé directement au démarrage");
         }
 
         if (string.IsNullOrWhiteSpace(company)
             && path.Contains(@"\AppData\", StringComparison.OrdinalIgnoreCase)
             && LooksRandom(fileName))
         {
-            return "un programme au nom aléatoire, sans éditeur, est lancé depuis le dossier AppData";
+            return T("un programme au nom aléatoire, sans éditeur, est lancé depuis le dossier AppData");
         }
 
         return null;

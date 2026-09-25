@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Fixes;
 
 /// <summary>
@@ -13,23 +15,23 @@ public sealed record FixProfile(string Id, string Name, string Description, Func
 
     public static FixProfile Recommended { get; } = new(
         "recommended",
-        "Recommandé",
-        "Les corrections pré-cochées par MAUS : sans risque connu, réversibles.",
+        T("Recommandé"),
+        T("Les corrections pré-cochées par MAUS : sans risque connu, réversibles."),
         c => c.Recommended && !c.Advanced);
 
     public static FixProfile Gamer { get; } = new(
         "gamer",
         "Joueur",
-        "Sécurité rétablie, effets visuels allégés, Game Bar et carte graphique réglées pour le jeu.",
+        T("Sécurité rétablie, effets visuels allégés, Game Bar et carte graphique réglées pour le jeu."),
         c => c.Recommended && !c.Advanced && (SecurityModules.Contains(c.ModuleId) || GamingModules.Contains(c.ModuleId)));
 
     public static FixProfile PrivacyMax { get; } = new(
         "privacy",
-        "Confidentialité max",
-        "Toutes les corrections de confidentialité, y compris les lignes avancées, plus la sécurité recommandée.",
+        T("Confidentialité max"),
+        T("Toutes les corrections de confidentialité, y compris les lignes avancées, plus la sécurité recommandée."),
         c => c.ModuleId == "M04" || c.Recommended && !c.Advanced && SecurityModules.Contains(c.ModuleId));
 
-    public static FixProfile None { get; } = new("none", "Tout décocher", "Aucune correction sélectionnée.", _ => false);
+    public static FixProfile None { get; } = new("none", T("Tout décocher"), T("Aucune correction sélectionnée."), _ => false);
 
     public static IReadOnlyList<FixProfile> All { get; } = [Recommended, Gamer, PrivacyMax, None];
 }

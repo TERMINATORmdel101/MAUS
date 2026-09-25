@@ -1,4 +1,5 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Rules;
 
@@ -27,7 +28,7 @@ public static class RegistryRuleEvaluator
             Category = rule.Category,
             Status = compliant ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(rule.Severity),
             Severity = rule.Severity,
-            Current = current ?? "absente",
+            Current = current ?? T("absente"),
             Expected = rule.ExpectedLabel ?? DescribeExpectation(rule),
             Explanation = rule.Explanation,
             Advice = compliant ? null : rule.Advice,
@@ -49,9 +50,9 @@ public static class RegistryRuleEvaluator
 
     private static string DescribeExpectation(RegistryRule rule) => rule.Expect switch
     {
-        RuleExpectation.Absent => "absente",
-        RuleExpectation.EqualTo => rule.AbsentIsOk ? $"{rule.Value} ou absente" : rule.Value ?? "?",
-        RuleExpectation.NotEqualTo => $"différente de {rule.Value}",
+        RuleExpectation.Absent => T("absente"),
+        RuleExpectation.EqualTo => rule.AbsentIsOk ? T("{0} ou absente", rule.Value) : rule.Value ?? "?",
+        RuleExpectation.NotEqualTo => T("différente de {0}", rule.Value),
         RuleExpectation.OneOf => string.Join(" ou ", rule.Values),
         _ => "?",
     };

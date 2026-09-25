@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core;
 
 /// <summary>Un constat produit par un module : ce qui a été vu, ce qui est attendu, et pourquoi cela compte.</summary>
@@ -44,5 +46,5 @@ public sealed record Finding
     };
 
     public static Finding AdminRequired(string id, string title, string? category = null) =>
-        Unknown(id, title, "Lecture impossible sans droits administrateur. Relancez MAUS en tant qu'administrateur.", category);
+        Unknown(id, title, T("Lecture impossible sans droits administrateur. Relancez MAUS en tant qu'administrateur."), category);
 }

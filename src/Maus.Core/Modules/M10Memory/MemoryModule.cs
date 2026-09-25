@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Maus.Core.Hardware;
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M10Memory;
 
@@ -15,20 +16,19 @@ public sealed partial class MemoryModule : IAuditModule
         "SELECT Capacity, Speed, ConfiguredClockSpeed, PartNumber, Manufacturer, DeviceLocator, BankLabel, SMBIOSMemoryType FROM Win32_PhysicalMemory";
 
     private const string SpeedCategory = "Vitesse (XMP / EXPO)";
-    private const string LayoutCategory = "Barrettes et canaux";
+    private static string LayoutCategory => T("Barrettes et canaux");
     private const string SpeedId = "M10.xmp";
-    private const string SpeedTitle = "Mémoire à sa vitesse annoncée (XMP / EXPO)";
+    private static string SpeedTitle => T("Mémoire à sa vitesse annoncée (XMP / EXPO)");
     private const string ChannelId = "M10.dual-channel";
-    private const string ChannelTitle = "Mémoire en double canal (dual channel)";
+    private static string ChannelTitle => T("Mémoire en double canal (dual channel)");
 
-    private const string StabilityAdvice =
-        "En cas de plantages ou d'écrans bleus : BIOS récent (Module 8), test de la mémoire avec MemTest86, TestMem5 ou OCCT, puis profil plus lent.";
+    private static string StabilityAdvice => T("En cas de plantages ou d'écrans bleus : BIOS récent (Module 8), test de la mémoire avec MemTest86, TestMem5 ou OCCT, puis profil plus lent.");
 
     private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
 
     public string Id => "M10";
 
-    public string Title => "RAM : XMP / EXPO et dual channel";
+    public string Title => T("RAM : XMP / EXPO et dual channel");
 
     public int Order => 100;
 
@@ -80,14 +80,14 @@ public sealed partial class MemoryModule : IAuditModule
         var configuredSpeeds = dimms.Select(d => d.ConfiguredSpeed).OfType<int>().ToList();
         if (configuredSpeeds.Count == 0)
         {
-            return Finding.Unknown(SpeedId, SpeedTitle, "Le BIOS ne publie pas la vitesse appliquée à la mémoire (ConfiguredClockSpeed).", SpeedCategory);
+            return Finding.Unknown(SpeedId, SpeedTitle, T("Le BIOS ne publie pas la vitesse appliquée à la mémoire (ConfiguredClockSpeed)."), SpeedCategory);
         }
 
         var configured = configuredSpeeds.Min();
         if (dimms.Any(d => MemorySpeeds.IsLowPower(d.SmbiosType)))
         {
-            return Speed(FindingStatus.Info, Severity.Info, $"{configured} MT/s (mémoire soudée)", null,
-                "Mémoire LPDDR soudée à la carte mère : sa vitesse est fixée par le fabricant du PC, sans profil XMP ni EXPO à activer.");
+            return Speed(FindingStatus.Info, Severity.Info, T("{0} MT/s (mémoire soudée)", configured), null,
+                T("Mémoire LPDDR soudée à la carte mère : sa vitesse est fixée par le fabricant du PC, sans profil XMP ni EXPO à activer."));
         }
 
         var generation = dimms.Select(d => d.Generation).FirstOrDefault(g => g is not null) ?? MemorySpeeds.GuessGeneration(configured);
@@ -105,27 +105,27 @@ public sealed partial class MemoryModule : IAuditModule
                 Category = SpeedCategory,
                 Status = aboveJedec ? FindingStatus.Ok : FindingStatus.Unknown,
                 Current = $"{configured} MT/s",
-                Expected = "vitesse annoncée par la référence",
+                Expected = T("vitesse annoncée par la référence"),
                 Explanation = aboveJedec
-                    ? $"La mémoire tourne au-delà de la vitesse standard JEDEC maximale ({maxJedec} MT/s en DDR{generation}) : " +
-                      "un profil XMP/EXPO ou un réglage manuel est donc actif."
-                    : $"Référence non reconnue ({Quote(unknownParts)}) : impossible de connaître la vitesse annoncée. " +
-                      "MAUS ne conclut jamais que XMP/EXPO est désactivé sans la connaître.",
-                Advice = aboveJedec ? null : "Comparez avec la vitesse inscrite sur l'étiquette de la barrette ou sur la facture (par exemple DDR4-3200 ou DDR5-6000).",
+                    ? T("La mémoire tourne au-delà de la vitesse standard JEDEC maximale ({0} MT/s en DDR{1}) : " +
+                      "un profil XMP/EXPO ou un réglage manuel est donc actif.", maxJedec, generation)
+                    : T("Référence non reconnue ({0}) : impossible de connaître la vitesse annoncée. " +
+                      "MAUS ne conclut jamais que XMP/EXPO est désactivé sans la connaître.", Quote(unknownParts)),
+                Advice = aboveJedec ? null : T("Comparez avec la vitesse inscrite sur l'étiquette de la barrette ou sur la facture (par exemple DDR4-3200 ou DDR5-6000)."),
             };
         }
 
         var slowest = decoded.MinBy(d => d.Part!.RatedSpeed)!;
         var rated = slowest.Part!.RatedSpeed;
         var allJedec = decoded.All(d => d.Part!.IsJedec);
-        var partial = unknownParts.Count > 0 ? $" Référence non reconnue pour une partie des barrettes ({Quote(unknownParts)})." : string.Empty;
-        var expected = $"{rated} MT/s (référence {slowest.PartNumber})";
+        var partial = unknownParts.Count > 0 ? T(" Référence non reconnue pour une partie des barrettes ({0}).", Quote(unknownParts)) : string.Empty;
+        var expected = T("{0} MT/s (référence {1})", rated, slowest.PartNumber);
 
         if (configured > rated + MemorySpeeds.Tolerance)
         {
             return Speed(FindingStatus.Info, Severity.Info, $"{configured} MT/s", expected,
-                "La mémoire tourne plus vite que la vitesse annoncée par sa référence : réglage manuel (overclocking) ou profil plus rapide. " +
-                "Rien d'anormal si le PC est stable." + partial,
+                T("La mémoire tourne plus vite que la vitesse annoncée par sa référence : réglage manuel (overclocking) ou profil plus rapide. " +
+                "Rien d'anormal si le PC est stable.") + partial,
                 StabilityAdvice);
         }
 
@@ -133,42 +133,42 @@ public sealed partial class MemoryModule : IAuditModule
         {
             return Speed(FindingStatus.Ok, Severity.Low, $"{configured} MT/s", expected,
                 (allJedec
-                    ? "Barrettes standard (JEDEC) : elles tournent à leur vitesse nominale sans profil à activer."
-                    : "La mémoire tourne à la vitesse annoncée : le profil XMP/EXPO est actif.") + partial);
+                    ? T("Barrettes standard (JEDEC) : elles tournent à leur vitesse nominale sans profil à activer.")
+                    : T("La mémoire tourne à la vitesse annoncée : le profil XMP/EXPO est actif.")) + partial);
         }
 
         if (allJedec)
         {
             return Speed(FindingStatus.Info, Severity.Info, $"{configured} MT/s", expected,
-                "Barrettes standard (JEDEC), qui n'ont pas de profil XMP/EXPO : le processeur ou la carte mère limite probablement leur vitesse. " +
-                "C'est normal." + partial);
+                T("Barrettes standard (JEDEC), qui n'ont pas de profil XMP/EXPO : le processeur ou la carte mère limite probablement leur vitesse. " +
+                "C'est normal.") + partial);
         }
 
         if (!MemorySpeeds.IsJedecSpeed(generation, configured))
         {
             return Speed(FindingStatus.Info, Severity.Info, $"{configured} MT/s", expected,
-                "La mémoire tourne en dessous de la vitesse annoncée, à une vitesse non standard : réglage manuel ou profil plus lent, " +
-                "parfois choisi pour la stabilité." + partial);
+                T("La mémoire tourne en dessous de la vitesse annoncée, à une vitesse non standard : réglage manuel ou profil plus lent, " +
+                "parfois choisi pour la stabilité.") + partial);
         }
 
         if (hardware.IsLaptop)
         {
             return Speed(FindingStatus.Info, Severity.Info, $"{configured} MT/s", expected,
-                "La mémoire tourne à la vitesse standard JEDEC, en dessous de la vitesse annoncée. Sur un portable, le BIOS propose rarement " +
-                "XMP et la vitesse est souvent fixée par le fabricant : rien à régler en général." + partial);
+                T("La mémoire tourne à la vitesse standard JEDEC, en dessous de la vitesse annoncée. Sur un portable, le BIOS propose rarement " +
+                "XMP et la vitesse est souvent fixée par le fabricant : rien à régler en général.") + partial);
         }
 
         return new Finding
         {
             Id = SpeedId,
-            Title = "XMP / EXPO probablement désactivé",
+            Title = T("XMP / EXPO probablement désactivé"),
             Category = SpeedCategory,
             Status = FindingStatusExtensions.ForDeviation(Severity.Low),
             Severity = Severity.Low,
-            Current = $"{configured} MT/s (vitesse standard JEDEC)",
+            Current = T("{0} MT/s (vitesse standard JEDEC)", configured),
             Expected = expected,
-            Explanation = $"Votre mémoire est vendue pour {rated} MT/s mais fonctionne à {configured} MT/s : sans profil XMP ou EXPO, " +
-                "elle démarre à sa vitesse standard. Le gain d'un profil varie selon les jeux et les applications." + partial,
+            Explanation = T("Votre mémoire est vendue pour {0} MT/s mais fonctionne à {1} MT/s : sans profil XMP ou EXPO, " +
+                "elle démarre à sa vitesse standard. Le gain d'un profil varie selon les jeux et les applications.", rated, configured) + partial,
             Advice = ProfileAdvice(hardware, generation),
         };
     }
@@ -176,16 +176,16 @@ public sealed partial class MemoryModule : IAuditModule
     private static string ProfileAdvice(HardwareProfile hardware, int generation)
     {
         var amd = hardware.Cpu.Vendor == HardwareVendor.Amd;
-        var advice = $"Activez le profil {ProfileName(hardware, generation)} dans le BIOS (emplacement du menu : voir le manuel de la carte mère).";
+        var advice = T("Activez le profil {0} dans le BIOS (emplacement du menu : voir le manuel de la carte mère).", ProfileName(hardware, generation));
         if (amd && generation == 5)
         {
-            advice += " Sur AMD AM5, le premier démarrage peut rester plusieurs minutes sur un écran noir pendant l'entraînement mémoire : " +
+            advice += T(" Sur AMD AM5, le premier démarrage peut rester plusieurs minutes sur un écran noir pendant l'entraînement mémoire : " +
                 "n'éteignez pas le PC. L'option « Memory Context Restore » évite ensuite de le refaire à chaque démarrage ; " +
-                "désactivez-la si l'instabilité persiste.";
+                "désactivez-la si l'instabilité persiste.");
         }
 
-        advice += " Ce profil est un overclocking de la mémoire et peut annuler la garantie du processeur (Intel le précise pour XMP). " +
-            "Sur certaines cartes mères d'entrée de gamme, la vitesse reste bridée même avec le profil. " + StabilityAdvice;
+        advice += T(" Ce profil est un overclocking de la mémoire et peut annuler la garantie du processeur (Intel le précise pour XMP). " +
+            "Sur certaines cartes mères d'entrée de gamme, la vitesse reste bridée même avec le profil. ") + StabilityAdvice;
         return advice;
     }
 
@@ -204,7 +204,7 @@ public sealed partial class MemoryModule : IAuditModule
 
         if (generation >= 5)
         {
-            return "EXPO (certaines cartes proposent aussi XMP)";
+            return T("EXPO (certaines cartes proposent aussi XMP)");
         }
 
         var board = hardware.BoardManufacturer;
@@ -215,31 +215,30 @@ public sealed partial class MemoryModule : IAuditModule
 
         return board.Contains("Micro-Star", StringComparison.OrdinalIgnoreCase) || board.Contains("MSI", StringComparison.OrdinalIgnoreCase)
             ? "A-XMP"
-            : "XMP (appelé DOCP chez ASUS et A-XMP chez MSI)";
+            : T("XMP (appelé DOCP chez ASUS et A-XMP chez MSI)");
     }
 
     private static Finding DetectChannels(List<Dimm> dimms, HardwareProfile hardware)
     {
-        const string explanation =
-            "Le processeur lit la mémoire par deux canaux en parallèle. Avec une seule barrette, ou deux sur le même canal, la bande passante " +
-            "est divisée par deux : c'est très pénalisant pour une puce graphique intégrée (iGPU ou APU) et sensible dans les jeux.";
+        var explanation = T("Le processeur lit la mémoire par deux canaux en parallèle. Avec une seule barrette, ou deux sur le même canal, la bande passante " +
+            "est divisée par deux : c'est très pénalisant pour une puce graphique intégrée (iGPU ou APU) et sensible dans les jeux.");
         var slots = string.Join(", ", dimms.Select(d => d.Slot));
         if (dimms.Any(d => MemorySpeeds.IsLowPower(d.SmbiosType)))
         {
-            return Channel(FindingStatus.Info, Severity.Info, $"mémoire soudée ({dimms.Count} puce(s) déclarée(s))", null,
-                "Mémoire LPDDR soudée : sa répartition entre canaux est fixée par le fabricant du PC.");
+            return Channel(FindingStatus.Info, Severity.Info, T("mémoire soudée ({0} puce(s) déclarée(s))", dimms.Count), null,
+                T("Mémoire LPDDR soudée : sa répartition entre canaux est fixée par le fabricant du PC."));
         }
 
         if (dimms.Count == 1)
         {
-            var integrated = hardware.HasDedicatedGpu ? string.Empty : " Ce PC semble utiliser une puce graphique intégrée : l'effet est encore plus marqué.";
-            return Channel(FindingStatus.Warning, Severity.Medium, $"1 barrette ({slots}) : simple canal", "2 barrettes, une par canal",
+            var integrated = hardware.HasDedicatedGpu ? string.Empty : T(" Ce PC semble utiliser une puce graphique intégrée : l'effet est encore plus marqué.");
+            return Channel(FindingStatus.Warning, Severity.Medium, T("1 barrette ({0}) : simple canal", slots), T("2 barrettes, une par canal"),
                 explanation + integrated,
                 hardware.IsLaptop
-                    ? "Si le portable a un emplacement libre, ajoutez une seconde barrette identique (même référence et même capacité). " +
-                      "Sur certains portables, une partie de la mémoire est soudée : vérifiez la fiche du fabricant."
-                    : "Ajoutez une seconde barrette identique (idéalement un kit de 2) dans l'emplacement indiqué par le manuel de la carte mère " +
-                      "(souvent A2 et B2).");
+                    ? T("Si le portable a un emplacement libre, ajoutez une seconde barrette identique (même référence et même capacité). " +
+                      "Sur certains portables, une partie de la mémoire est soudée : vérifiez la fiche du fabricant.")
+                    : T("Ajoutez une seconde barrette identique (idéalement un kit de 2) dans l'emplacement indiqué par le manuel de la carte mère " +
+                      "(souvent A2 et B2)."));
         }
 
         var channels = dimms.Select(d => d.Channel).ToList();
@@ -252,27 +251,27 @@ public sealed partial class MemoryModule : IAuditModule
                 Category = LayoutCategory,
                 Status = FindingStatus.Unknown,
                 Current = $"{dimms.Count} barrettes ({slots})",
-                Expected = "réparties sur deux canaux",
-                Explanation = "Le nom des emplacements publié par le BIOS ne permet pas de savoir sur quel canal se trouve chaque barrette.",
+                Expected = T("réparties sur deux canaux"),
+                Explanation = T("Le nom des emplacements publié par le BIOS ne permet pas de savoir sur quel canal se trouve chaque barrette."),
             };
         }
 
         var distinct = channels.Distinct(StringComparer.Ordinal).Count();
         if (distinct == 1)
         {
-            return Channel(FindingStatus.Warning, Severity.Medium, $"{dimms.Count} barrettes sur le même canal ({slots})", "réparties sur deux canaux",
+            return Channel(FindingStatus.Warning, Severity.Medium, T("{0} barrettes sur le même canal ({1})", dimms.Count, slots), T("réparties sur deux canaux"),
                 explanation,
-                "Déplacez une barrette vers l'autre canal en suivant le manuel de la carte mère (en général les emplacements A2 et B2, " +
-                "soit le 2e et le 4e en partant du processeur). Éteignez et débranchez le PC avant de manipuler la mémoire.");
+                T("Déplacez une barrette vers l'autre canal en suivant le manuel de la carte mère (en général les emplacements A2 et B2, " +
+                "soit le 2e et le 4e en partant du processeur). Éteignez et débranchez le PC avant de manipuler la mémoire."));
         }
 
         if (dimms.Count % 2 == 1)
         {
-            return Channel(FindingStatus.Info, Severity.Info, $"{dimms.Count} barrettes sur {distinct} canaux ({slots})", "nombre pair de barrettes",
-                "Avec un nombre impair de barrettes, une partie de la mémoire fonctionne en simple canal.");
+            return Channel(FindingStatus.Info, Severity.Info, T("{0} barrettes sur {1} canaux ({2})", dimms.Count, distinct, slots), T("nombre pair de barrettes"),
+                T("Avec un nombre impair de barrettes, une partie de la mémoire fonctionne en simple canal."));
         }
 
-        return Channel(FindingStatus.Ok, Severity.Medium, $"{dimms.Count} barrettes sur {distinct} canaux ({slots})", "réparties sur deux canaux", explanation);
+        return Channel(FindingStatus.Ok, Severity.Medium, T("{0} barrettes sur {1} canaux ({2})", dimms.Count, distinct, slots), T("réparties sur deux canaux"), explanation);
     }
 
     private static Finding? DetectMixedKit(List<Dimm> dimms)
@@ -295,21 +294,21 @@ public sealed partial class MemoryModule : IAuditModule
                 Title = title,
                 Category = LayoutCategory,
                 Status = FindingStatus.Ok,
-                Current = parts.Count == 1 ? $"même référence ({parts[0]})" : "mêmes capacités (références non publiées)",
-                Expected = "barrettes identiques",
-                Explanation = "Des barrettes identiques, idéalement vendues ensemble en kit, supportent le mieux les profils XMP/EXPO.",
+                Current = parts.Count == 1 ? T("même référence ({0})", parts[0]) : T("mêmes capacités (références non publiées)"),
+                Expected = T("barrettes identiques"),
+                Explanation = T("Des barrettes identiques, idéalement vendues ensemble en kit, supportent le mieux les profils XMP/EXPO."),
             };
         }
 
         var details = new List<string>();
         if (parts.Count > 1)
         {
-            details.Add($"références {string.Join(", ", parts)}");
+            details.Add(T("références {0}", string.Join(", ", parts)));
         }
 
         if (capacities.Count > 1)
         {
-            details.Add($"capacités {string.Join(", ", capacities.Select(FormatCapacity))}");
+            details.Add(T("capacités {0}", string.Join(", ", capacities.Select(FormatCapacity))));
         }
 
         return new Finding
@@ -318,10 +317,10 @@ public sealed partial class MemoryModule : IAuditModule
             Title = title,
             Category = LayoutCategory,
             Status = FindingStatus.Info,
-            Current = $"kit mixte : {string.Join(" ; ", details)}",
-            Expected = "barrettes identiques",
-            Explanation = "Des barrettes différentes fonctionnent ensemble, mais un kit mixte est plus exposé à l'instabilité avec un profil XMP/EXPO.",
-            Advice = "Si le PC plante avec le profil actif, essayez un profil plus lent. " + StabilityAdvice,
+            Current = T("kit mixte : {0}", string.Join(" ; ", details)),
+            Expected = T("barrettes identiques"),
+            Explanation = T("Des barrettes différentes fonctionnent ensemble, mais un kit mixte est plus exposé à l'instabilité avec un profil XMP/EXPO."),
+            Advice = T("Si le PC plante avec le profil actif, essayez un profil plus lent. ") + StabilityAdvice,
         };
     }
 
@@ -335,11 +334,11 @@ public sealed partial class MemoryModule : IAuditModule
         return new Finding
         {
             Id = "M10.capacity",
-            Title = "Quantité et type de mémoire",
+            Title = T("Quantité et type de mémoire"),
             Category = LayoutCategory,
             Status = FindingStatus.Info,
-            Current = $"{FormatCapacity(total)} au total ({string.Join(" + ", groups)}), {string.Join(" / ", types)}",
-            Explanation = "Type lu dans SMBIOS (SMBIOSMemoryType) : DDR4 et DDR5 en barrettes, LPDDR5 soudée sur les portables récents.",
+            Current = T("{0} au total ({1}), {2}", FormatCapacity(total), string.Join(" + ", groups), string.Join(" / ", types)),
+            Explanation = T("Type lu dans SMBIOS (SMBIOSMemoryType) : DDR4 et DDR5 en barrettes, LPDDR5 soudée sur les portables récents."),
         };
     }
 
@@ -347,19 +346,19 @@ public sealed partial class MemoryModule : IAuditModule
     {
         var parts = new List<string>
         {
-            dimm.CapacityBytes is { } bytes ? FormatCapacity(bytes) : "capacité inconnue",
+            dimm.CapacityBytes is { } bytes ? FormatCapacity(bytes) : T("capacité inconnue"),
             dimm.TypeLabel,
         };
         if (dimm.PartNumber is { } partNumber)
         {
             parts.Add(dimm.Part is { } part
-                ? $"référence {partNumber} ({part.Brand}, {part.RatedSpeed} MT/s annoncés{(part.CasLatency is { } cl ? $" CL{cl}" : string.Empty)}{(part.IsJedec ? ", standard JEDEC" : string.Empty)})"
-                : $"référence {partNumber} (non reconnue)");
+                ? T("référence {0} ({1}, {2} MT/s annoncés{3}{4})", partNumber, part.Brand, part.RatedSpeed, (part.CasLatency is { } cl ? $" CL{cl}" : string.Empty), (part.IsJedec ? ", standard JEDEC" : string.Empty))
+                : T("référence {0} (non reconnue)", partNumber));
         }
 
         if (dimm.ConfiguredSpeed is { } configured)
         {
-            parts.Add($"{configured} MT/s appliqués");
+            parts.Add(T("{0} MT/s appliqués", configured));
         }
 
         var details = new List<string>();
@@ -370,12 +369,12 @@ public sealed partial class MemoryModule : IAuditModule
 
         if (dimm.Manufacturer is { } manufacturer)
         {
-            details.Add(JedecCode().IsMatch(manufacturer) ? $"fabricant : code JEDEC {manufacturer}" : $"fabricant : {manufacturer}");
+            details.Add(JedecCode().IsMatch(manufacturer) ? T("fabricant : code JEDEC {0}", manufacturer) : $"fabricant : {manufacturer}");
         }
 
         if (dimm.MaxSpeed is { } max)
         {
-            details.Add($"vitesse maximale SMBIOS : {max} MT/s (informative)");
+            details.Add(T("vitesse maximale SMBIOS : {0} MT/s (informative)", max));
         }
 
         return new Finding
@@ -385,7 +384,7 @@ public sealed partial class MemoryModule : IAuditModule
             Category = LayoutCategory,
             Status = FindingStatus.Info,
             Current = string.Join(", ", parts),
-            Explanation = "Informations publiées par le BIOS (Win32_PhysicalMemory)" + (details.Count > 0 ? $" ; {string.Join(" ; ", details)}." : "."),
+            Explanation = T("Informations publiées par le BIOS (Win32_PhysicalMemory)") + (details.Count > 0 ? $" ; {string.Join(" ; ", details)}." : "."),
         };
     }
 
@@ -416,7 +415,7 @@ public sealed partial class MemoryModule : IAuditModule
     };
 
     private static Finding NoData(string id, string title, string category) =>
-        Finding.Unknown(id, title, "Aucune barrette décrite par le BIOS (Win32_PhysicalMemory vide ou indisponible, fréquent en machine virtuelle).", category);
+        Finding.Unknown(id, title, T("Aucune barrette décrite par le BIOS (Win32_PhysicalMemory vide ou indisponible, fréquent en machine virtuelle)."), category);
 
     private static Task<IReadOnlyList<Finding>> Result(params Finding[] findings) => Task.FromResult<IReadOnlyList<Finding>>(findings);
 
@@ -446,7 +445,7 @@ public sealed partial class MemoryModule : IAuditModule
         string? Channel,
         MemoryPart? Part)
     {
-        public string TypeLabel => MemorySpeeds.TypeName(SmbiosType) ?? (SmbiosType is { } type ? $"type SMBIOS {type}" : "type inconnu");
+        public string TypeLabel => MemorySpeeds.TypeName(SmbiosType) ?? (SmbiosType is { } type ? $"type SMBIOS {type}" : T("type inconnu"));
 
         public static Dimm From(CimRow row, int index)
         {

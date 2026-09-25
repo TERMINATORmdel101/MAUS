@@ -2,6 +2,7 @@
 using Maus.Core.Platform;
 using Maus.Core.Preferences;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M05Power;
 
@@ -18,10 +19,10 @@ public sealed class PowerModule : Fixes.IFixableModule
     internal const string PowerPolicyKey = @"SOFTWARE\Policies\Microsoft\Power\PowerSettings";
     internal const string X3DServiceQuery = "SELECT Name, State FROM Win32_Service WHERE Name = 'amd3dvcacheSvc'";
 
-    private const string PlanCategory = "Mode de gestion";
+    private static string PlanCategory => T("Mode de gestion");
     private const string ModeCategory = "Mode d'alimentation";
-    private const string StartupCategory = "Démarrage et veille";
-    private const string HardwareCategory = "Matériel et utilitaires";
+    private static string StartupCategory => T("Démarrage et veille");
+    private static string HardwareCategory => T("Matériel et utilitaires");
 
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan EffectiveModeTimeout = TimeSpan.FromSeconds(3);
@@ -124,13 +125,13 @@ public sealed class PowerModule : Fixes.IFixableModule
             {
                 Id = plan.Id,
                 ModuleId = Id,
-                Title = $"Passer au mode de gestion « {PowerSchemes.Label(toHighPerformance ? SchemeKind.HighPerformance : SchemeKind.Balanced)} »",
+                Title = T("Passer au mode de gestion « {0} »", PowerSchemes.Label(toHighPerformance ? SchemeKind.HighPerformance : SchemeKind.Balanced)),
                 Description = plan.Explanation,
                 Category = PlanCategory,
                 Gain = toHighPerformance
-                    ? "Le processeur reste plus souvent à haute fréquence. Le gain en jeu est souvent faible."
-                    : "Les modes secteur et batterie redeviennent disponibles dans Paramètres > Système > Alimentation.",
-                Risk = toHighPerformance ? "La consommation au repos augmente." : null,
+                    ? T("Le processeur reste plus souvent à haute fréquence. Le gain en jeu est souvent faible.")
+                    : T("Les modes secteur et batterie redeviennent disponibles dans Paramètres > Système > Alimentation."),
+                Risk = toHighPerformance ? T("La consommation au repos augmente.") : null,
                 Recommended = !toHighPerformance,
                 Writes = [new Fixes.SettingWrite(Fixes.SettingKey.ActivePowerScheme, Fixes.SettingValue.Text(target.ToString("D")))],
             });
@@ -142,11 +143,11 @@ public sealed class PowerModule : Fixes.IFixableModule
             {
                 Id = fastStartup.Id,
                 ModuleId = Id,
-                Title = "Désactiver le démarrage rapide",
-                Description = "Le noyau et les pilotes repartent de zéro à chaque allumage ; la veille prolongée n'est pas touchée.",
+                Title = T("Désactiver le démarrage rapide"),
+                Description = T("Le noyau et les pilotes repartent de zéro à chaque allumage ; la veille prolongée n'est pas touchée."),
                 Category = StartupCategory,
-                Gain = "Démarrages plus propres et mesure fiable du temps de démarrage (Module 12).",
-                Risk = "L'allumage peut être un peu plus lent.",
+                Gain = T("Démarrages plus propres et mesure fiable du temps de démarrage (Module 12)."),
+                Risk = T("L'allumage peut être un peu plus lent."),
                 Writes = [new Fixes.SettingWrite(Fixes.SettingKey.Registry("HKLM", SessionPowerKey, "HiberbootEnabled"), Fixes.SettingValue.Dword(0))],
             });
         }
@@ -193,7 +194,7 @@ public sealed class PowerModule : Fixes.IFixableModule
         var listedName = listed?.FirstOrDefault(s => s.Guid == guid)?.Name;
         var friendlyName = TryRegistry(() => registry.GetString(RegistryHive.LocalMachine, $@"{SchemesKey}\{guid.Value:D}", "FriendlyName"));
         var kind = PowerSchemes.Classify(guid.Value, friendlyName, listedName);
-        var name = string.IsNullOrWhiteSpace(listedName) ? (kind == SchemeKind.Other ? $"mode personnalisé ({guid.Value:D})" : PowerSchemes.Label(kind)) : listedName;
+        var name = string.IsNullOrWhiteSpace(listedName) ? (kind == SchemeKind.Other ? T("mode personnalisé ({0:D})", guid.Value) : PowerSchemes.Label(kind)) : listedName;
         return new ActivePlan(guid.Value, kind, name);
     }
 
@@ -244,14 +245,14 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding EvaluatePlan(ActivePlan? plan, PowerProfile profile, OverlayState? overlays, bool imposedByPolicy)
     {
         const string id = "M05.power-plan";
-        const string title = "Mode de gestion de l'alimentation";
+        var title = T("Mode de gestion de l'alimentation");
         if (plan is null)
         {
-            return Finding.Unknown(id, title, "Lecture du mode de gestion actif impossible.", PlanCategory);
+            return Finding.Unknown(id, title, T("Lecture du mode de gestion actif impossible."), PlanCategory);
         }
 
         var policyNote = imposedByPolicy
-            ? " Ce mode est imposé par une stratégie (organisation ou script) : il se change par cette stratégie, pas dans les Options d'alimentation."
+            ? T(" Ce mode est imposé par une stratégie (organisation ou script) : il se change par cette stratégie, pas dans les Options d'alimentation.")
             : string.Empty;
         var current = plan.Name;
         if (plan.Kind == SchemeKind.Balanced && profile is PowerProfile.Desktop && overlays?.Ac is { IsValid: true } ac)
@@ -268,7 +269,7 @@ public sealed class PowerModule : Fixes.IFixableModule
                 Category = PlanCategory,
                 Status = FindingStatus.Info,
                 Current = current,
-                Explanation = "MAUS n'a pas pu déterminer si ce PC est fixe ou portable : aucune recommandation n'est faite sur le mode de gestion." + policyNote,
+                Explanation = T("MAUS n'a pas pu déterminer si ce PC est fixe ou portable : aucune recommandation n'est faite sur le mode de gestion.") + policyNote,
             };
         }
 
@@ -277,33 +278,33 @@ public sealed class PowerModule : Fixes.IFixableModule
             PowerProfile.DesktopX3D => (
                 plan.Kind == SchemeKind.Balanced,
                 "Utilisation normale",
-                "Nous gardons le mode Utilisation normale pour placer vos jeux sur les bons cœurs. Sur un Ryzen X3D à deux CCD, ce mode laisse le pilote AMD et la Game Bar mettre en sommeil les cœurs sans V-Cache pendant un jeu ; « Haute performance » empêche ce tri (voir aussi le Module 7).",
-                "Revenir au mode « Utilisation normale » (Panneau de configuration > Options d'alimentation). Vous pouvez garder « Haute performance » si vous le préférez, en sachant que vos jeux risquent de tourner sur les cœurs sans V-Cache."),
+                T("Nous gardons le mode Utilisation normale pour placer vos jeux sur les bons cœurs. Sur un Ryzen X3D à deux CCD, ce mode laisse le pilote AMD et la Game Bar mettre en sommeil les cœurs sans V-Cache pendant un jeu ; « Haute performance » empêche ce tri (voir aussi le Module 7)."),
+                T("Revenir au mode « Utilisation normale » (Panneau de configuration > Options d'alimentation). Vous pouvez garder « Haute performance » si vous le préférez, en sachant que vos jeux risquent de tourner sur les cœurs sans V-Cache.")),
             PowerProfile.DesktopHybrid => (
                 plan.Kind is SchemeKind.Balanced or SchemeKind.HighPerformance or SchemeKind.UltimatePerformance,
-                "Utilisation normale avec Meilleures performances, ou Haute performance",
-                "Sur un processeur Intel hybride (cœurs P et E), « Utilisation normale » avec le mode « Meilleures performances » laisse Windows répartir les tâches entre les deux types de cœurs ; « Haute performance » reste un choix valable. Aucune consigne officielle d'Intel ne tranche.",
-                "Choisir « Utilisation normale » puis le mode « Meilleures performances » dans Paramètres > Système > Alimentation, ou « Haute performance » dans les Options d'alimentation."),
+                T("Utilisation normale avec Meilleures performances, ou Haute performance"),
+                T("Sur un processeur Intel hybride (cœurs P et E), « Utilisation normale » avec le mode « Meilleures performances » laisse Windows répartir les tâches entre les deux types de cœurs ; « Haute performance » reste un choix valable. Aucune consigne officielle d'Intel ne tranche."),
+                T("Choisir « Utilisation normale » puis le mode « Meilleures performances » dans Paramètres > Système > Alimentation, ou « Haute performance » dans les Options d'alimentation.")),
             PowerProfile.DesktopModernStandby => (
                 plan.Kind is SchemeKind.Balanced or SchemeKind.HighPerformance or SchemeKind.UltimatePerformance,
-                "Utilisation normale avec Meilleures performances",
-                "Ce PC en veille moderne n'expose pas le mode « Haute performance » : « Utilisation normale » avec le mode « Meilleures performances » est le réglage le plus rapide disponible.",
-                "Choisir « Utilisation normale » dans les Options d'alimentation, puis le mode « Meilleures performances » dans Paramètres > Système > Alimentation."),
+                T("Utilisation normale avec Meilleures performances"),
+                T("Ce PC en veille moderne n'expose pas le mode « Haute performance » : « Utilisation normale » avec le mode « Meilleures performances » est le réglage le plus rapide disponible."),
+                T("Choisir « Utilisation normale » dans les Options d'alimentation, puis le mode « Meilleures performances » dans Paramètres > Système > Alimentation.")),
             PowerProfile.Laptop => (
                 plan.Kind == SchemeKind.Balanced,
                 "Utilisation normale",
-                "Sur un portable, MAUS propose « Utilisation normale » avec le mode « Meilleures performances » sur secteur et « Équilibré » sur batterie : plus de chaleur et de bruit sur secteur, autonomie préservée sur batterie. Ces modes d'alimentation n'existent qu'avec « Utilisation normale » ou un mode qui en dérive.",
-                "Revenir au mode « Utilisation normale » (Panneau de configuration > Options d'alimentation), puis régler le mode d'alimentation dans Paramètres > Système > Alimentation. Le choix final vous revient."),
+                T("Sur un portable, MAUS propose « Utilisation normale » avec le mode « Meilleures performances » sur secteur et « Équilibré » sur batterie : plus de chaleur et de bruit sur secteur, autonomie préservée sur batterie. Ces modes d'alimentation n'existent qu'avec « Utilisation normale » ou un mode qui en dérive."),
+                T("Revenir au mode « Utilisation normale » (Panneau de configuration > Options d'alimentation), puis régler le mode d'alimentation dans Paramètres > Système > Alimentation. Le choix final vous revient.")),
             _ => (
                 plan.Kind is SchemeKind.HighPerformance or SchemeKind.UltimatePerformance,
-                "Haute performance (ou une copie de Performances optimales)",
-                "Sur un PC fixe, MAUS propose le mode « Haute performance » : le processeur reste plus souvent à haute fréquence. Le gain en jeu est souvent faible et la consommation au repos augmente.",
-                "Choisir « Haute performance » dans Panneau de configuration > Options d'alimentation (rubrique « Afficher les modes supplémentaires » si besoin)."),
+                T("Haute performance (ou une copie de Performances optimales)"),
+                T("Sur un PC fixe, MAUS propose le mode « Haute performance » : le processeur reste plus souvent à haute fréquence. Le gain en jeu est souvent faible et la consommation au repos augmente."),
+                T("Choisir « Haute performance » dans Panneau de configuration > Options d'alimentation (rubrique « Afficher les modes supplémentaires » si besoin).")),
         };
 
         if (plan.Kind == SchemeKind.UltimatePerformance)
         {
-            explanation += " « Performances optimales » est une option experte : gain négligeable par rapport à « Haute performance » (à mesurer, voir Module 11) et consommation au repos plus élevée.";
+            explanation += T(" « Performances optimales » est une option experte : gain négligeable par rapport à « Haute performance » (à mesurer, voir Module 11) et consommation au repos plus élevée.");
         }
 
         return new Finding
@@ -324,7 +325,7 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding EvaluateAcMode(OverlayState? overlays, PowerProfile profile, LaptopPowerChoice choice)
     {
         const string id = "M05.power-mode-ac";
-        const string title = "Mode d'alimentation sur secteur";
+        var title = T("Mode d'alimentation sur secteur");
         if (overlays is null)
         {
             return Finding.AdminRequired(id, title, ModeCategory);
@@ -332,7 +333,7 @@ public sealed class PowerModule : Fixes.IFixableModule
 
         if (!overlays.Ac.IsValid)
         {
-            return Finding.Unknown(id, title, "Valeur du mode d'alimentation illisible.", ModeCategory);
+            return Finding.Unknown(id, title, T("Valeur du mode d'alimentation illisible."), ModeCategory);
         }
 
         var current = Describe(overlays.Ac);
@@ -345,7 +346,7 @@ public sealed class PowerModule : Fixes.IFixableModule
                 Category = ModeCategory,
                 Status = FindingStatus.Info,
                 Current = current,
-                Explanation = "Sur un Ryzen X3D à deux CCD, l'intérêt de « Meilleures performances » plutôt qu'« Équilibré » reste à valider : MAUS n'en fait pas une recommandation.",
+                Explanation = T("Sur un Ryzen X3D à deux CCD, l'intérêt de « Meilleures performances » plutôt qu'« Équilibré » reste à valider : MAUS n'en fait pas une recommandation."),
             };
         }
 
@@ -360,9 +361,9 @@ public sealed class PowerModule : Fixes.IFixableModule
                 Status = economical ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
                 Severity = Severity.Low,
                 Current = current,
-                Expected = "Équilibré (votre choix : autonomie)",
-                Explanation = "Vous avez choisi de privilégier l'autonomie et le silence : « Équilibré » sur secteur chauffe moins et fait moins de bruit.",
-                Advice = economical ? null : "Choisir « Équilibré » pour « Branché » dans Paramètres > Système > Alimentation (ms-settings:powersleep).",
+                Expected = T("Équilibré (votre choix : autonomie)"),
+                Explanation = T("Vous avez choisi de privilégier l'autonomie et le silence : « Équilibré » sur secteur chauffe moins et fait moins de bruit."),
+                Advice = economical ? null : T("Choisir « Équilibré » pour « Branché » dans Paramètres > Système > Alimentation (ms-settings:powersleep)."),
             };
         }
 
@@ -375,9 +376,9 @@ public sealed class PowerModule : Fixes.IFixableModule
             Status = compliant ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
             Severity = Severity.Low,
             Current = current,
-            Expected = PowerSchemes.OverlayLabel(PowerSchemes.OverlayBestPerformance) + (profile == PowerProfile.Laptop && choice != LaptopPowerChoice.NotChosen ? " (votre choix)" : string.Empty),
-            Explanation = "Le mode d'alimentation (Paramètres > Système > Alimentation) ajuste « Utilisation normale » : « Meilleures performances » privilégie la réactivité et la fréquence du processeur quand le PC est branché.",
-            Advice = compliant ? null : "Choisir « Meilleures performances » pour « Branché » dans Paramètres > Système > Alimentation. Plus de chaleur et de bruit sur secteur.",
+            Expected = PowerSchemes.OverlayLabel(PowerSchemes.OverlayBestPerformance) + (profile == PowerProfile.Laptop && choice != LaptopPowerChoice.NotChosen ? T(" (votre choix)") : string.Empty),
+            Explanation = T("Le mode d'alimentation (Paramètres > Système > Alimentation) ajuste « Utilisation normale » : « Meilleures performances » privilégie la réactivité et la fréquence du processeur quand le PC est branché."),
+            Advice = compliant ? null : T("Choisir « Meilleures performances » pour « Branché » dans Paramètres > Système > Alimentation. Plus de chaleur et de bruit sur secteur."),
             Fixable = !compliant,
         };
     }
@@ -385,7 +386,7 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding EvaluateDcMode(OverlayState? overlays, LaptopPowerChoice choice)
     {
         const string id = "M05.power-mode-dc";
-        const string title = "Mode d'alimentation sur batterie";
+        var title = T("Mode d'alimentation sur batterie");
         if (overlays is null)
         {
             return Finding.AdminRequired(id, title, ModeCategory);
@@ -393,7 +394,7 @@ public sealed class PowerModule : Fixes.IFixableModule
 
         if (!overlays.Dc.IsValid)
         {
-            return Finding.Unknown(id, title, "Valeur du mode d'alimentation illisible.", ModeCategory);
+            return Finding.Unknown(id, title, T("Valeur du mode d'alimentation illisible."), ModeCategory);
         }
 
         var dc = overlays.Dc.Guid;
@@ -401,19 +402,19 @@ public sealed class PowerModule : Fixes.IFixableModule
         {
             LaptopPowerChoice.PerformanceEverywhere => (
                 dc == PowerSchemes.OverlayBestPerformance,
-                "Meilleures performances (votre choix : performance partout)",
-                "Vous avez choisi la performance partout : le PC reste aussi rapide sur batterie, au prix d'une autonomie nettement réduite et de plus de chaleur.",
-                "Choisir « Meilleures performances » pour « Sur batterie » dans Paramètres > Système > Alimentation (ms-settings:powersleep)."),
+                T("Meilleures performances (votre choix : performance partout)"),
+                T("Vous avez choisi la performance partout : le PC reste aussi rapide sur batterie, au prix d'une autonomie nettement réduite et de plus de chaleur."),
+                T("Choisir « Meilleures performances » pour « Sur batterie » dans Paramètres > Système > Alimentation (ms-settings:powersleep).")),
             LaptopPowerChoice.Battery => (
                 dc == PowerSchemes.OverlayBestEfficiency,
-                "Meilleure efficacité énergétique (votre choix : autonomie)",
-                "Vous avez choisi l'autonomie : « Meilleure efficacité énergétique » allonge la durée sur batterie, le PC étant un peu moins réactif.",
-                "Choisir « Meilleure efficacité énergétique » pour « Sur batterie » dans Paramètres > Système > Alimentation (ms-settings:powersleep)."),
+                T("Meilleure efficacité énergétique (votre choix : autonomie)"),
+                T("Vous avez choisi l'autonomie : « Meilleure efficacité énergétique » allonge la durée sur batterie, le PC étant un peu moins réactif."),
+                T("Choisir « Meilleure efficacité énergétique » pour « Sur batterie » dans Paramètres > Système > Alimentation (ms-settings:powersleep).")),
             _ => (
                 dc == PowerSchemes.OverlayBalanced || dc == PowerSchemes.OverlayBestEfficiency,
-                "Équilibré (ou Meilleure efficacité énergétique)",
-                "Sur batterie, « Équilibré » préserve l'autonomie sans trop brider le PC ; « Meilleure efficacité énergétique » est un choix d'économie encore plus poussé, proposé mais jamais imposé.",
-                "Choisir « Équilibré » pour « Sur batterie » dans Paramètres > Système > Alimentation : le mode actuel réduit l'autonomie et chauffe davantage."),
+                T("Équilibré (ou Meilleure efficacité énergétique)"),
+                T("Sur batterie, « Équilibré » préserve l'autonomie sans trop brider le PC ; « Meilleure efficacité énergétique » est un choix d'économie encore plus poussé, proposé mais jamais imposé."),
+                T("Choisir « Équilibré » pour « Sur batterie » dans Paramètres > Système > Alimentation : le mode actuel réduit l'autonomie et chauffe davantage.")),
         };
 
         return new Finding
@@ -434,29 +435,29 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding DescribeLaptopChoice(LaptopPowerChoice choice) => new()
     {
         Id = "M05.laptop-choice",
-        Title = "Votre choix pour l'alimentation du portable",
+        Title = T("Votre choix pour l'alimentation du portable"),
         Category = ModeCategory,
         Status = FindingStatus.Info,
         Current = choice switch
         {
-            LaptopPowerChoice.Performance => "performance sur secteur, Équilibré sur batterie",
-            LaptopPowerChoice.PerformanceEverywhere => "performance partout",
+            LaptopPowerChoice.Performance => T("performance sur secteur, Équilibré sur batterie"),
+            LaptopPowerChoice.PerformanceEverywhere => T("performance partout"),
             LaptopPowerChoice.Battery => "autonomie",
-            _ => "pas encore choisi (proposition par défaut : performance sur secteur, Équilibré sur batterie)",
+            _ => T("pas encore choisi (proposition par défaut : performance sur secteur, Équilibré sur batterie)"),
         },
-        Expected = "au choix de l'utilisateur",
-        Explanation = "Trois réglages sont possibles : performance sur secteur et Équilibré sur batterie (proposé) ; performance partout (autonomie réduite) ; " +
-                      "autonomie (Équilibré sur secteur, Meilleure efficacité énergétique sur batterie).",
+        Expected = T("au choix de l'utilisateur"),
+        Explanation = T("Trois réglages sont possibles : performance sur secteur et Équilibré sur batterie (proposé) ; performance partout (autonomie réduite) ; " +
+                      "autonomie (Équilibré sur secteur, Meilleure efficacité énergétique sur batterie)."),
         Advice = choice == LaptopPowerChoice.NotChosen
-            ? "Faites votre choix dans l'onglet Corrections de MAUS (ou maus --set alimentation=performance|partout|autonomie)."
-            : "Vous pouvez changer d'avis à tout moment dans l'onglet Corrections.",
+            ? T("Faites votre choix dans l'onglet Corrections de MAUS (ou maus --set alimentation=performance|partout|autonomie).")
+            : T("Vous pouvez changer d'avis à tout moment dans l'onglet Corrections."),
     };
 
     /// <summary>Le démarrage rapide n'agit que si le fichier de veille prolongée existe.</summary>
     private static Finding EvaluateFastStartup(IRegistryReader registry, PowerCapabilities? capabilities)
     {
         const string id = "M05.fast-startup";
-        const string title = "Démarrage rapide désactivé";
+        var title = T("Démarrage rapide désactivé");
         int? hiberboot;
         int? hibernateEnabled;
         try
@@ -474,10 +475,10 @@ public sealed class PowerModule : Fixes.IFixableModule
         var effective = enabled && hibernationAvailable != false;
         var current = (enabled, hibernationAvailable) switch
         {
-            (false, _) => "désactivé",
-            (true, false) => "activé, mais sans effet (veille prolongée désactivée)",
-            (true, true) => hiberboot is null ? "activé (réglage Windows par défaut)" : "activé",
-            _ => "activé (veille prolongée non vérifiée)",
+            (false, _) => T("désactivé"),
+            (true, false) => T("activé, mais sans effet (veille prolongée désactivée)"),
+            (true, true) => hiberboot is null ? T("activé (réglage Windows par défaut)") : T("activé"),
+            _ => T("activé (veille prolongée non vérifiée)"),
         };
 
         return new Finding
@@ -488,9 +489,9 @@ public sealed class PowerModule : Fixes.IFixableModule
             Status = effective ? FindingStatusExtensions.ForDeviation(Severity.Low) : FindingStatus.Ok,
             Severity = Severity.Low,
             Current = current,
-            Expected = "désactivé",
-            Explanation = "Actif, le démarrage rapide recharge à chaque allumage le noyau et les pilotes figés dans le fichier hiberfil.sys : ils ne repartent pas de zéro, et la mesure du temps de démarrage est faussée. Il n'agit que si la veille prolongée est disponible.",
-            Advice = effective ? "Désactiver le démarrage rapide, sans toucher à la veille prolongée. Sa désactivation peut rendre l'allumage un peu plus lent." : null,
+            Expected = T("désactivé"),
+            Explanation = T("Actif, le démarrage rapide recharge à chaque allumage le noyau et les pilotes figés dans le fichier hiberfil.sys : ils ne repartent pas de zéro, et la mesure du temps de démarrage est faussée. Il n'agit que si la veille prolongée est disponible."),
+            Advice = effective ? T("Désactiver le démarrage rapide, sans toucher à la veille prolongée. Sa désactivation peut rendre l'allumage un peu plus lent.") : null,
             Fixable = effective,
         };
     }
@@ -510,7 +511,7 @@ public sealed class PowerModule : Fixes.IFixableModule
         }
         catch (DataSourceUnavailableException)
         {
-            return Finding.Unknown(id, title, "Liste des services Windows illisible.", HardwareCategory);
+            return Finding.Unknown(id, title, T("Liste des services Windows illisible."), HardwareCategory);
         }
 
         var state = rows.Count > 0 ? rows[0].GetString("State") : null;
@@ -522,23 +523,23 @@ public sealed class PowerModule : Fixes.IFixableModule
             Category = HardwareCategory,
             Status = running ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
             Severity = Severity.Low,
-            Current = rows.Count == 0 ? "absent" : running ? "en cours d'exécution" : "installé mais arrêté",
-            Expected = "installé et en cours d'exécution",
-            Explanation = "Sur un Ryzen X3D à deux CCD, ce service du pilote chipset AMD travaille avec la Game Bar et le mode « Utilisation normale » pour placer les jeux sur les cœurs dotés du V-Cache.",
-            Advice = running ? null : "Installer le dernier pilote chipset AMD depuis le site officiel d'AMD, puis redémarrer. Le service doit apparaître sous le nom « AMD 3D V-Cache Performance Optimizer Service ».",
+            Current = rows.Count == 0 ? T("absent") : running ? T("en cours d'exécution") : T("installé mais arrêté"),
+            Expected = T("installé et en cours d'exécution"),
+            Explanation = T("Sur un Ryzen X3D à deux CCD, ce service du pilote chipset AMD travaille avec la Game Bar et le mode « Utilisation normale » pour placer les jeux sur les cœurs dotés du V-Cache."),
+            Advice = running ? null : T("Installer le dernier pilote chipset AMD depuis le site officiel d'AMD, puis redémarrer. Le service doit apparaître sous le nom « AMD 3D V-Cache Performance Optimizer Service »."),
         };
     }
 
     private static Finding DescribeOemUtilities(IReadOnlyList<string> utilities) => new()
     {
         Id = "M05.oem-utility",
-        Title = "Utilitaire constructeur de gestion d'énergie",
+        Title = T("Utilitaire constructeur de gestion d'énergie"),
         Category = HardwareCategory,
         Status = FindingStatus.Info,
-        Current = utilities.Count > 0 ? string.Join(", ", utilities) : "aucun détecté",
-        Explanation = "Les utilitaires des constructeurs (Armoury Crate, Lenovo Vantage, Legion Space, MSI Center, Alienware Command Center, OMEN Gaming Hub) pilotent aussi la puissance du processeur et de la carte graphique, et souvent les ventilateurs. Ils peuvent changer le mode d'alimentation de leur côté.",
+        Current = utilities.Count > 0 ? string.Join(", ", utilities) : T("aucun détecté"),
+        Explanation = T("Les utilitaires des constructeurs (Armoury Crate, Lenovo Vantage, Legion Space, MSI Center, Alienware Command Center, OMEN Gaming Hub) pilotent aussi la puissance du processeur et de la carte graphique, et souvent les ventilateurs. Ils peuvent changer le mode d'alimentation de leur côté."),
         Advice = utilities.Count > 0
-            ? "MAUS n'écrase pas leurs réglages : choisissez le profil « Performance » (ou équivalent) dans l'utilitaire."
+            ? T("MAUS n'écrase pas leurs réglages : choisissez le profil « Performance » (ou équivalent) dans l'utilitaire.")
             : null,
     };
 
@@ -557,9 +558,9 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding DescribeEffectiveMode(EffectivePowerMode? mode)
     {
         const string id = "M05.effective-mode";
-        const string title = "Mode effectif appliqué par Windows";
+        var title = T("Mode effectif appliqué par Windows");
         return mode is null
-            ? Finding.Unknown(id, title, "Windows n'a pas communiqué le mode effectif.", ModeCategory)
+            ? Finding.Unknown(id, title, T("Windows n'a pas communiqué le mode effectif."), ModeCategory)
             : new Finding
             {
                 Id = id,
@@ -568,15 +569,15 @@ public sealed class PowerModule : Fixes.IFixableModule
                 Status = FindingStatus.Info,
                 Current = mode switch
                 {
-                    EffectivePowerMode.BatterySaver => "Économiseur d'énergie",
-                    EffectivePowerMode.BetterBattery => "Meilleure efficacité énergétique",
-                    EffectivePowerMode.Balanced => "Équilibré",
+                    EffectivePowerMode.BatterySaver => T("Économiseur d'énergie"),
+                    EffectivePowerMode.BetterBattery => T("Meilleure efficacité énergétique"),
+                    EffectivePowerMode.Balanced => T("Équilibré"),
                     EffectivePowerMode.HighPerformance => "Haute performance",
                     EffectivePowerMode.MaxPerformance => "Performances maximales",
-                    EffectivePowerMode.GameMode => "Mode Jeu (un jeu est au premier plan)",
-                    _ => "Réalité mixte",
+                    EffectivePowerMode.GameMode => T("Mode Jeu (un jeu est au premier plan)"),
+                    _ => T("Réalité mixte"),
                 },
-                Explanation = "C'est le mode réellement appliqué en ce moment, une fois combinés le mode de gestion, le mode d'alimentation, l'économiseur d'énergie et le Mode Jeu.",
+                Explanation = T("C'est le mode réellement appliqué en ce moment, une fois combinés le mode de gestion, le mode d'alimentation, l'économiseur d'énergie et le Mode Jeu."),
             };
     }
 
@@ -585,15 +586,15 @@ public sealed class PowerModule : Fixes.IFixableModule
         const string id = "M05.modern-standby";
         const string title = "Veille moderne (S0)";
         return capabilities is null
-            ? Finding.Unknown(id, title, "Lecture des capacités d'alimentation impossible.", StartupCategory)
+            ? Finding.Unknown(id, title, T("Lecture des capacités d'alimentation impossible."), StartupCategory)
             : new Finding
             {
                 Id = id,
                 Title = title,
                 Category = StartupCategory,
                 Status = FindingStatus.Info,
-                Current = capabilities.AoAc ? "prise en charge" : capabilities.SystemS3 ? "non prise en charge (veille classique S3)" : "non prise en charge",
-                Explanation = "En veille moderne, le PC reste connecté pendant la veille, comme un téléphone. Ces PC n'exposent souvent que le mode « Utilisation normale » : les autres modes de gestion peuvent manquer.",
+                Current = capabilities.AoAc ? T("prise en charge") : capabilities.SystemS3 ? T("non prise en charge (veille classique S3)") : T("non prise en charge"),
+                Explanation = T("En veille moderne, le PC reste connecté pendant la veille, comme un téléphone. Ces PC n'exposent souvent que le mode « Utilisation normale » : les autres modes de gestion peuvent manquer."),
             };
     }
 
@@ -603,43 +604,43 @@ public sealed class PowerModule : Fixes.IFixableModule
         Title = "Processeur Intel hybride",
         Category = HardwareCategory,
         Status = FindingStatus.Info,
-        Current = $"{cpu.Name} : cœurs performants (P) et économes (E)",
-        Explanation = "Windows répartit les tâches entre cœurs P et E avec l'aide d'Intel Thread Director. Aucune consigne officielle d'Intel ne recommande un mode d'alimentation particulier : « Utilisation normale » avec « Meilleures performances » ou « Haute performance » conviennent tous deux.",
-        Advice = "Microcode du processeur : voir le Module 8.",
+        Current = T("{0} : cœurs performants (P) et économes (E)", cpu.Name),
+        Explanation = T("Windows répartit les tâches entre cœurs P et E avec l'aide d'Intel Thread Director. Aucune consigne officielle d'Intel ne recommande un mode d'alimentation particulier : « Utilisation normale » avec « Meilleures performances » ou « Haute performance » conviennent tous deux."),
+        Advice = T("Microcode du processeur : voir le Module 8."),
     };
 
     private static Finding DescribeProfile(HardwareProfile hardware, PowerProfile profile, PowerCapabilities? capabilities)
     {
         var current = profile switch
         {
-            PowerProfile.Laptop => "Portable",
-            PowerProfile.Unknown => "Indéterminé",
-            PowerProfile.DesktopX3D => "PC fixe, Ryzen X3D à deux CCD",
-            PowerProfile.DesktopHybrid => "PC fixe, processeur Intel hybride",
-            PowerProfile.DesktopModernStandby => "PC fixe en veille moderne",
+            PowerProfile.Laptop => T("Portable"),
+            PowerProfile.Unknown => T("Indéterminé"),
+            PowerProfile.DesktopX3D => T("PC fixe, Ryzen X3D à deux CCD"),
+            PowerProfile.DesktopHybrid => T("PC fixe, processeur Intel hybride"),
+            PowerProfile.DesktopModernStandby => T("PC fixe en veille moderne"),
             _ => "PC fixe",
         };
-        var explanation = "MAUS adapte ses propositions d'alimentation au type de PC, reconnu par deux indices sur trois : type de châssis, type de système et présence d'une batterie.";
+        var explanation = T("MAUS adapte ses propositions d'alimentation au type de PC, reconnu par deux indices sur trois : type de châssis, type de système et présence d'une batterie.");
         var batteryIsUps = capabilities is { UpsPresent: true } or { BatteriesAreShortTerm: true };
         if (hardware.FormFactor == FormFactor.Desktop && (hardware.HasBattery || batteryIsUps))
         {
-            explanation += " Une batterie est signalée sur ce PC fixe : il s'agit probablement d'un onduleur branché en USB.";
+            explanation += T(" Une batterie est signalée sur ce PC fixe : il s'agit probablement d'un onduleur branché en USB.");
         }
 
         return new Finding
         {
             Id = "M05.profile",
-            Title = "Type de PC reconnu",
+            Title = T("Type de PC reconnu"),
             Category = HardwareCategory,
             Status = FindingStatus.Info,
             Current = current,
             Explanation = explanation,
-            Advice = profile == PowerProfile.Laptop ? "Au premier lancement, vous choisirez vos préférences : MAUS propose « Meilleures performances » sur secteur et « Équilibré » sur batterie." : null,
+            Advice = profile == PowerProfile.Laptop ? T("Au premier lancement, vous choisirez vos préférences : MAUS propose « Meilleures performances » sur secteur et « Équilibré » sur batterie.") : null,
         };
     }
 
     private static string Describe(OverlayValue overlay) =>
-        overlay.IsDefault ? $"{PowerSchemes.OverlayLabel(overlay.Guid)} (réglage par défaut)" : PowerSchemes.OverlayLabel(overlay.Guid);
+        overlay.IsDefault ? T("{0} (réglage par défaut)", PowerSchemes.OverlayLabel(overlay.Guid)) : PowerSchemes.OverlayLabel(overlay.Guid);
 
     /// <summary>Appel natif protégé : une DLL ou une fonction absente équivaut à une donnée indisponible.</summary>
     private static T? CallPlatform<T>(Func<T?> call)

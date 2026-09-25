@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -62,7 +63,7 @@ public sealed record SettingValue(RegistryValueKind Kind, string Data)
 
     /// <summary>Texte affiché à l'utilisateur.</summary>
     public static string Display(SettingValue? value) => value is null
-        ? "absente"
+        ? T("absente")
         : value.Kind == RegistryValueKind.MultiString ? value.Data.Replace(MultiStringSeparator, '|') : value.Data;
 
     private static bool IsInteger(RegistryValueKind kind) => kind is RegistryValueKind.DWord or RegistryValueKind.QWord;
@@ -75,7 +76,7 @@ public sealed record SettingValue(RegistryValueKind Kind, string Data)
             return value;
         }
 
-        throw new FormatException($"Valeur entière attendue : « {Data} »");
+        throw new FormatException(T("Valeur entière attendue : « {0} »", Data));
     }
 
     public override string ToString() => Display(this);

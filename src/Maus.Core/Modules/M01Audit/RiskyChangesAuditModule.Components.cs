@@ -1,5 +1,6 @@
 using System.Globalization;
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
@@ -18,17 +19,17 @@ public sealed partial class RiskyChangesAuditModule
     private static readonly (string Name, string Label)[] RequiredApps =
     [
         ("Microsoft.WindowsStore", "Microsoft Store"),
-        ("Microsoft.SecHealthUI", "Sécurité Windows"),
-        ("Microsoft.DesktopAppInstaller", "Programme d'installation d'application (winget)"),
+        ("Microsoft.SecHealthUI", T("Sécurité Windows")),
+        ("Microsoft.DesktopAppInstaller", T("Programme d'installation d'application (winget)")),
     ];
 
-    private static readonly Check CoreServicesCheck = new("M01.core-services", "Services système essentiels", ComponentsCategory, Severity.High, Fixable: true);
+    private static Check CoreServicesCheck => new("M01.core-services", T("Services système essentiels"), ComponentsCategory, Severity.High, Fixable: true);
 
-    private static readonly Check AppsCheck = new("M01.system-apps", "Microsoft Store et Sécurité Windows", ComponentsCategory, Severity.Medium);
+    private static Check AppsCheck => new("M01.system-apps", T("Microsoft Store et Sécurité Windows"), ComponentsCategory, Severity.Medium);
 
     private static readonly Check WebViewCheck = new("M01.webview2", "Composant WebView2 et Microsoft Edge", ComponentsCategory, Severity.High);
 
-    private static readonly Check PageFileCheck = new("M01.pagefile", "Fichier d'échange", ComponentsCategory, Severity.Medium, Fixable: true);
+    private static Check PageFileCheck => new("M01.pagefile", T("Fichier d'échange"), ComponentsCategory, Severity.Medium, Fixable: true);
 
     private static Finding DetectCoreServices(IRegistryReader registry, IReadOnlyList<SecurityProduct>? antivirus)
     {
@@ -41,10 +42,10 @@ public sealed partial class RiskyChangesAuditModule
         return EvaluateServices(
             CoreServicesCheck,
             services,
-            "Ces services font fonctionner des briques de base de Windows : vérification des signatures (CryptSvc), installation des mises à jour (TrustedInstaller), " +
+            T("Ces services font fonctionner des briques de base de Windows : vérification des signatures (CryptSvc), installation des mises à jour (TrustedInstaller), " +
             "son (Audiosrv), recherche (WSearch), antivirus (WinDefend), pare-feu (mpssvc), protection des applications par défaut (UCPD). " +
-            "Désactivés, ils provoquent des pannes difficiles à relier à leur cause.",
-            "Rétablir le type de démarrage d'origine de ces services (automatique ou manuel selon le service).",
+            "Désactivés, ils provoquent des pannes difficiles à relier à leur cause."),
+            T("Rétablir le type de démarrage d'origine de ces services (automatique ou manuel selon le service)."),
             service => service.Name switch
             {
                 // Couper l'indexation est un choix répandu ; la recherche reste possible, en plus lent.
@@ -56,14 +57,13 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Finding DetectSystemApps(AuditContext context)
     {
-        const string explanation =
-            "Le Microsoft Store installe et met à jour de nombreuses applications ; l'application Sécurité Windows est l'écran de réglage de l'antivirus " +
-            "et du pare-feu ; le Programme d'installation d'application fournit la commande winget. Certains scripts les retirent alors que Windows en a besoin.";
-        const string expected = "présentes";
+        var explanation = T("Le Microsoft Store installe et met à jour de nombreuses applications ; l'application Sécurité Windows est l'écran de réglage de l'antivirus " +
+            "et du pare-feu ; le Programme d'installation d'application fournit la commande winget. Certains scripts les retirent alors que Windows en a besoin.");
+        var expected = T("présentes");
         var packages = context.Packages.GetUserPackages();
         if (packages.Count == 0)
         {
-            return AppsCheck.Unknown("Inventaire des applications indisponible.");
+            return AppsCheck.Unknown(T("Inventaire des applications indisponible."));
         }
 
         var missing = RequiredApps
@@ -76,31 +76,30 @@ public sealed partial class RiskyChangesAuditModule
                 $"absente(s) : {Join(missing)}",
                 expected,
                 explanation,
-                "Réinstaller les applications manquantes depuis le Microsoft Store ; si le Store lui-même manque, la commande « wsreset -i » peut le réinstaller.");
+                T("Réinstaller les applications manquantes depuis le Microsoft Store ; si le Store lui-même manque, la commande « wsreset -i » peut le réinstaller."));
     }
 
     private static Finding DetectWebView(IRegistryReader registry)
     {
-        const string explanation =
-            "WebView2 affiche des pages web à l'intérieur des applications (Widgets, Teams, Outlook, Office, de nombreux jeux et lanceurs). " +
-            "Retiré avec Microsoft Edge par certains scripts, il laisse ces applications vides ou en panne.";
-        const string expected = "WebView2 présent";
+        var explanation = T("WebView2 affiche des pages web à l'intérieur des applications (Widgets, Teams, Outlook, Office, de nombreux jeux et lanceurs). " +
+            "Retiré avec Microsoft Edge par certains scripts, il laisse ces applications vides ou en panne.");
+        var expected = T("WebView2 présent");
         var webView = ReadEdgeClientVersion(registry, WebView2ClientId);
         var edge = ReadEdgeClientVersion(registry, EdgeClientId);
         if (webView is null)
         {
             return WebViewCheck.Deviation(
-                edge is null ? "WebView2 et Edge absents" : "WebView2 absent",
+                edge is null ? T("WebView2 et Edge absents") : "WebView2 absent",
                 expected,
                 explanation,
-                "Réinstaller le runtime WebView2 « Evergreen » depuis le site officiel de Microsoft.");
+                T("Réinstaller le runtime WebView2 « Evergreen » depuis le site officiel de Microsoft."));
         }
 
         return edge is null
             ? WebViewCheck.Neutral(
                 $"WebView2 {webView} ; Edge absent",
                 expected,
-                "Microsoft Edge a été désinstallé, mais WebView2 est présent : les applications qui en dépendent fonctionnent normalement.")
+                T("Microsoft Edge a été désinstallé, mais WebView2 est présent : les applications qui en dépendent fonctionnent normalement."))
             : WebViewCheck.Compliant($"WebView2 {webView} ; Edge {edge}", expected, explanation);
     }
 
@@ -127,12 +126,10 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Finding DetectPageFile(ICimReader cim)
     {
-        const string explanation =
-            "Le fichier d'échange sert de réserve quand la mémoire vive est pleine. Sans lui, les applications gourmandes (jeux, navigateurs) " +
-            "peuvent se fermer brutalement, et Windows ne peut pas enregistrer de rapport après un écran bleu.";
-        const string expected = "géré automatiquement par Windows";
-        const string advice =
-            "Rétablir « Gestion automatique du fichier d'échange pour les lecteurs » (Paramètres système avancés > Performances > Mémoire virtuelle), puis redémarrer.";
+        var explanation = T("Le fichier d'échange sert de réserve quand la mémoire vive est pleine. Sans lui, les applications gourmandes (jeux, navigateurs) " +
+            "peuvent se fermer brutalement, et Windows ne peut pas enregistrer de rapport après un écran bleu.");
+        var expected = T("géré automatiquement par Windows");
+        var advice = T("Rétablir « Gestion automatique du fichier d'échange pour les lecteurs » (Paramètres système avancés > Performances > Mémoire virtuelle), puis redémarrer.");
         var automatic = FirstRow(cim.Query("SELECT AutomaticManagedPagefile FROM Win32_ComputerSystem"))?.GetBool("AutomaticManagedPagefile");
         if (automatic == true)
         {
@@ -143,8 +140,8 @@ public sealed partial class RiskyChangesAuditModule
         if (settings.Count == 0)
         {
             return automatic is null
-                ? PageFileCheck.Unknown("Réglage du fichier d'échange illisible.")
-                : PageFileCheck.Deviation("aucun fichier d'échange", expected, explanation, advice);
+                ? PageFileCheck.Unknown(T("Réglage du fichier d'échange illisible."))
+                : PageFileCheck.Deviation(T("aucun fichier d'échange"), expected, explanation, advice);
         }
 
         var files = settings.Select(DescribePageFile).ToList();
@@ -158,13 +155,13 @@ public sealed partial class RiskyChangesAuditModule
 
         if (fixedMaximum.All(size => size > 0) && fixedMaximum.Sum() < 1024)
         {
-            return PageFileCheck.Deviation($"très petit : {Join(files)}", expected, explanation, advice);
+            return PageFileCheck.Deviation(T("très petit : {0}", Join(files)), expected, explanation, advice);
         }
 
         return PageFileCheck.Deviation(
-            $"réglé à la main : {Join(files)}",
+            T("réglé à la main : {0}", Join(files)),
             expected,
-            "Une taille choisie à la main fonctionne, mais Windows ajuste mieux la taille seul (pics de mémoire des jeux, rapports après un écran bleu). " + explanation,
+            T("Une taille choisie à la main fonctionne, mais Windows ajuste mieux la taille seul (pics de mémoire des jeux, rapports après un écran bleu). ") + explanation,
             advice,
             Severity.Low);
     }
@@ -175,7 +172,7 @@ public sealed partial class RiskyChangesAuditModule
         var initial = setting.GetInt64("InitialSize") ?? 0;
         var maximum = setting.GetInt64("MaximumSize") ?? 0;
         return maximum == 0
-            ? $"{name} (taille gérée par le système)"
-            : $"{name} ({initial.ToString(CultureInfo.InvariantCulture)} à {maximum.ToString(CultureInfo.InvariantCulture)} Mo)";
+            ? T("{0} (taille gérée par le système)", name)
+            : T("{0} ({1} à {2} Mo)", name, initial.ToString(CultureInfo.InvariantCulture), maximum.ToString(CultureInfo.InvariantCulture));
     }
 }

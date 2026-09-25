@@ -1,5 +1,6 @@
 using System.Security.AccessControl;
 using System.Security.Principal;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -60,7 +61,7 @@ public sealed class WindowsDirectoryProtector : IDirectoryProtector
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or PrivilegeNotHeldException or InvalidOperationException)
         {
-            throw new JournalUnsafeException($"Impossible de protéger le fichier du journal ({file}) : {ex.Message}", ex);
+            throw new JournalUnsafeException(T("Impossible de protéger le fichier du journal ({0}) : {1}", file, ex.Message), ex);
         }
     }
 
@@ -77,7 +78,7 @@ public sealed class WindowsDirectoryProtector : IDirectoryProtector
 
             if (info.Attributes.HasFlag(FileAttributes.ReparsePoint))
             {
-                throw new JournalUnsafeException($"Le dossier {directory} est un lien : MAUS refuse de s'en servir. Supprimez-le puis relancez MAUS.");
+                throw new JournalUnsafeException(T("Le dossier {0} est un lien : MAUS refuse de s'en servir. Supprimez-le puis relancez MAUS.", directory));
             }
 
             if (!IsProtected(info.GetAccessControl()))
@@ -87,7 +88,7 @@ public sealed class WindowsDirectoryProtector : IDirectoryProtector
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or PrivilegeNotHeldException or InvalidOperationException)
         {
-            throw new JournalUnsafeException($"Impossible de protéger le dossier du journal ({directory}) : {ex.Message}", ex);
+            throw new JournalUnsafeException(T("Impossible de protéger le dossier du journal ({0}) : {1}", directory, ex.Message), ex);
         }
     }
 

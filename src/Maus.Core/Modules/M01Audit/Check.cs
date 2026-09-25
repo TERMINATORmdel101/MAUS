@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Management;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
@@ -106,12 +107,12 @@ internal sealed record ServiceStart(string Name, int? Start, bool Exists, bool D
 
     public static string Label(int? start) => start switch
     {
-        0 => "démarrage du noyau",
-        1 => "démarrage système",
-        2 => "automatique",
-        3 => "manuel",
-        4 => "désactivé",
-        null => "type non renseigné",
+        0 => T("démarrage du noyau"),
+        1 => T("démarrage système"),
+        2 => T("automatique"),
+        3 => T("manuel"),
+        4 => T("désactivé"),
+        null => T("type non renseigné"),
         _ => "type " + start.Value.ToString(CultureInfo.InvariantCulture),
     };
 

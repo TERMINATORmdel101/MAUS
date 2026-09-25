@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Platform;
 
 /// <summary>Application empaquetée (Microsoft Store, MSIX) installée pour l'utilisateur courant.</summary>
@@ -38,7 +40,7 @@ public sealed class WinRtPackageInventory : IPackageInventory
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new MausAccessDeniedException("Inventaire des applications refusé.", ex);
+            throw new MausAccessDeniedException(T("Inventaire des applications refusé."), ex);
         }
     }
 }

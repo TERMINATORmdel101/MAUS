@@ -1,6 +1,7 @@
 using System.Globalization;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M13Security;
 
@@ -26,12 +27,11 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     internal const string CodeIntegrityConfigKey = @"SYSTEM\CurrentControlSet\Control\CI\Config";
     internal const string ServicesKey = @"SYSTEM\CurrentControlSet\Services";
 
-    private const string IsolationCategory = "Isolation du noyau";
-    private const string DependenciesCategory = "Dépendances";
+    private static string IsolationCategory => T("Isolation du noyau");
+    private static string DependenciesCategory => T("Dépendances");
 
     /// <summary>Message de la fiche technique, affiché avec l'état de l'intégrité de la mémoire.</summary>
-    private const string MemoryIntegrityMessage =
-        "L'intégrité de la mémoire empêche un pilote malveillant de prendre le contrôle de Windows. La couper peut faire gagner quelques images par seconde, surtout sur un processeur ancien, mais rend le PC plus vulnérable. Valorant et FACEIT peuvent refuser de se lancer.";
+    private static string MemoryIntegrityMessage => T("L'intégrité de la mémoire empêche un pilote malveillant de prendre le contrôle de Windows. La couper peut faire gagner quelques images par seconde, surtout sur un processeur ancien, mais rend le PC plus vulnérable. Valorant et FACEIT peuvent refuser de se lancer.");
 
     /// <summary>Anti-triche noyau : nom de service ou de pilote, nom affiché.</summary>
     private static readonly (string Service, string Name)[] AntiCheats =
@@ -45,13 +45,13 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     private static readonly (string Feature, string Name)[] HypervisorFeatures =
     [
         ("Microsoft-Hyper-V-All", "Hyper-V"),
-        ("VirtualMachinePlatform", "Plateforme de machine virtuelle (WSL2)"),
-        ("Containers-DisposableClientVM", "Bac à sable Windows"),
+        ("VirtualMachinePlatform", T("Plateforme de machine virtuelle (WSL2)")),
+        ("Containers-DisposableClientVM", T("Bac à sable Windows")),
     ];
 
     public string Id => "M13";
 
-    public string Title => "Performance contre sécurité";
+    public string Title => T("Performance contre sécurité");
 
     public int Order => 130;
 
@@ -94,11 +94,11 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
                     {
                         Id = finding.Id,
                         ModuleId = Id,
-                        Title = "Réactiver les atténuations Spectre et Meltdown",
-                        Description = "Supprime FeatureSettingsOverride et FeatureSettingsOverrideMask : Windows reprend ses protections par défaut.",
+                        Title = T("Réactiver les atténuations Spectre et Meltdown"),
+                        Description = T("Supprime FeatureSettingsOverride et FeatureSettingsOverrideMask : Windows reprend ses protections par défaut."),
                         Category = finding.Category,
-                        Gain = "Le PC redevient protégé contre la lecture de la mémoire du noyau par un programme malveillant.",
-                        Risk = "Quelques pour cent de performance en moins sur certains processeurs anciens.",
+                        Gain = T("Le PC redevient protégé contre la lecture de la mémoire du noyau par un programme malveillant."),
+                        Risk = T("Quelques pour cent de performance en moins sur certains processeurs anciens."),
                         Effect = Fixes.ChangeEffect.Restart,
                         Writes =
                         [
@@ -112,10 +112,10 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
                     {
                         Id = finding.Id,
                         ModuleId = Id,
-                        Title = "Réactiver la liste de blocage des pilotes vulnérables",
-                        Description = "Windows refuse de nouveau de charger les pilotes connus pour leurs failles.",
+                        Title = T("Réactiver la liste de blocage des pilotes vulnérables"),
+                        Description = T("Windows refuse de nouveau de charger les pilotes connus pour leurs failles."),
                         Category = finding.Category,
-                        Risk = "Un ancien outil qui dépend d'un pilote vulnérable (certains utilitaires de ventilation ou d'overclocking) peut ne plus démarrer.",
+                        Risk = T("Un ancien outil qui dépend d'un pilote vulnérable (certains utilitaires de ventilation ou d'overclocking) peut ne plus démarrer."),
                         Effect = Fixes.ChangeEffect.Restart,
                         Writes = [new Fixes.SettingWrite(Fixes.SettingKey.Registry("HKLM", CodeIntegrityConfigKey, "VulnerableDriverBlocklistEnable"), Fixes.SettingValue.Dword(1))],
                     });
@@ -129,8 +129,8 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     private static Finding EvaluateCpuMitigations(IRegistryReader registry)
     {
         const string id = "M13.cpu-mitigations";
-        const string title = "Atténuations Spectre et Meltdown actives";
-        const string category = "Atténuations du processeur";
+        var title = T("Atténuations Spectre et Meltdown actives");
+        var category = T("Atténuations du processeur");
         long? overrideValue;
         long? mask;
         try
@@ -161,13 +161,13 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Severity = severity,
             Current = state switch
             {
-                MitigationState.Disabled => $"désactivées : {CpuMitigationOverrides.DescribeDisabled(overrideValue!.Value)} ({values})",
-                MitigationState.DisabledWithoutMask => $"demande de désactivation incomplète, probablement sans effet ({values})",
-                MitigationState.Strengthened => $"actives et renforcées ({values})",
-                _ => overrideValue is null ? "actives (réglage Windows par défaut)" : $"actives ({values})",
+                MitigationState.Disabled => T("désactivées : {0} ({1})", CpuMitigationOverrides.DescribeDisabled(overrideValue!.Value), values),
+                MitigationState.DisabledWithoutMask => T("demande de désactivation incomplète, probablement sans effet ({0})", values),
+                MitigationState.Strengthened => T("actives et renforcées ({0})", values),
+                _ => overrideValue is null ? T("actives (réglage Windows par défaut)") : $"actives ({values})",
             },
-            Expected = "actives (valeurs absentes, ou sans bit de désactivation)",
-            Explanation = "Ces protections du processeur empêchent un programme de lire la mémoire du noyau ou d'autres programmes (failles Spectre et Meltdown). Des scripts d'optimisation les coupent pour gagner quelques pour cent : le PC devient alors vulnérable. Windows les active par défaut et MAUS ne propose jamais de les couper.",
+            Expected = T("actives (valeurs absentes, ou sans bit de désactivation)"),
+            Explanation = T("Ces protections du processeur empêchent un programme de lire la mémoire du noyau ou d'autres programmes (failles Spectre et Meltdown). Des scripts d'optimisation les coupent pour gagner quelques pour cent : le PC devient alors vulnérable. Windows les active par défaut et MAUS ne propose jamais de les couper."),
             Advice = deviating
                 ? $@"Supprimer les valeurs FeatureSettingsOverride et FeatureSettingsOverrideMask sous HKLM\{MemoryManagementKey}, puis redémarrer. Elles viennent le plus souvent d'un script d'optimisation (voir aussi le Module 1)."
                 : null,
@@ -178,7 +178,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     private static Finding EvaluateDriverBlocklist(IRegistryReader registry)
     {
         const string id = "M13.driver-blocklist";
-        const string title = "Liste de blocage des pilotes vulnérables active";
+        var title = T("Liste de blocage des pilotes vulnérables active");
         const string category = "Pilotes";
         long? value;
         try
@@ -200,14 +200,14 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Severity = Severity.High,
             Current = value switch
             {
-                null => "active (réglage Windows par défaut)",
-                0 => "désactivée (VulnerableDriverBlocklistEnable = 0)",
+                null => T("active (réglage Windows par défaut)"),
+                0 => T("désactivée (VulnerableDriverBlocklistEnable = 0)"),
                 _ => $"active (VulnerableDriverBlocklistEnable = {Format(value)})",
             },
-            Expected = "active (1 ou valeur absente)",
-            Explanation = "Windows refuse de charger les pilotes connus pour leurs failles, souvent détournés par des logiciels malveillants pour prendre le contrôle du noyau. Cette liste est active par défaut depuis Windows 11 22H2, et MAUS ne la désactive jamais.",
+            Expected = T("active (1 ou valeur absente)"),
+            Explanation = T("Windows refuse de charger les pilotes connus pour leurs failles, souvent détournés par des logiciels malveillants pour prendre le contrôle du noyau. Cette liste est active par défaut depuis Windows 11 22H2, et MAUS ne la désactive jamais."),
             Advice = disabled
-                ? "Réactiver la liste dans Sécurité Windows > Sécurité des appareils > Isolation du noyau > Liste de blocage des pilotes vulnérables Microsoft, puis redémarrer."
+                ? T("Réactiver la liste dans Sécurité Windows > Sécurité des appareils > Isolation du noyau > Liste de blocage des pilotes vulnérables Microsoft, puis redémarrer.")
                 : null,
             Fixable = disabled,
         };
@@ -216,27 +216,27 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     private static Finding EvaluateMemoryIntegrity(DeviceGuardState? deviceGuard, bool denied, VbsConfiguration? configuration, List<string>? antiCheats)
     {
         const string id = "M13.memory-integrity";
-        const string title = "Intégrité de la mémoire (HVCI)";
+        var title = T("Intégrité de la mémoire (HVCI)");
         if (deviceGuard is null)
         {
             return denied
                 ? Finding.AdminRequired(id, title, IsolationCategory)
-                : Finding.Unknown(id, title, "L'état de la sécurité basée sur la virtualisation (Win32_DeviceGuard) est illisible sur ce PC.", IsolationCategory);
+                : Finding.Unknown(id, title, T("L'état de la sécurité basée sur la virtualisation (Win32_DeviceGuard) est illisible sur ce PC."), IsolationCategory);
         }
 
         var hasAntiCheat = antiCheats is { Count: > 0 };
-        var policyNote = configuration?.IsImposedByPolicy == true ? " Ce réglage est imposé par une stratégie (organisation ou script)." : string.Empty;
+        var policyNote = configuration?.IsImposedByPolicy == true ? T(" Ce réglage est imposé par une stratégie (organisation ou script).") : string.Empty;
         if (deviceGuard.IsMemoryIntegrityRunning)
         {
-            var advice = "Recommandé : la laisser active. Option experte, jamais appliquée par défaut : la couper peut faire gagner environ 2 à 6 % en jeu sur un processeur récent, au prix d'un PC plus vulnérable.";
+            var advice = T("Recommandé : la laisser active. Option experte, jamais appliquée par défaut : la couper peut faire gagner environ 2 à 6 % en jeu sur un processeur récent, au prix d'un PC plus vulnérable.");
             if (hasAntiCheat)
             {
-                advice += $" {Installed(antiCheats!)} : sans elle, vos jeux protégés risquent de refuser de se lancer.";
+                advice += T(" {0} : sans elle, vos jeux protégés risquent de refuser de se lancer.", Installed(antiCheats!));
             }
 
             if (configuration?.IsUefiLocked == true)
             {
-                advice += " Le verrou UEFI empêche de toute façon de la couper depuis Windows.";
+                advice += T(" Le verrou UEFI empêche de toute façon de la couper depuis Windows.");
             }
 
             return new Finding
@@ -245,8 +245,8 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
                 Title = title,
                 Category = IsolationCategory,
                 Status = FindingStatus.Ok,
-                Current = "en cours d'exécution",
-                Expected = "en cours d'exécution (recommandé)",
+                Current = T("en cours d'exécution"),
+                Expected = T("en cours d'exécution (recommandé)"),
                 Explanation = MemoryIntegrityMessage + policyNote,
                 Advice = advice,
             };
@@ -261,10 +261,10 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
                 Category = IsolationCategory,
                 Status = FindingStatusExtensions.ForDeviation(Severity.Medium),
                 Severity = Severity.Medium,
-                Current = "activée dans les réglages, mais pas en cours d'exécution",
-                Expected = "en cours d'exécution",
-                Explanation = MemoryIntegrityMessage + " Elle est demandée mais ne tourne pas : redémarrage en attente, virtualisation coupée dans le BIOS (souvent après une mise à jour du BIOS, voir Module 8) ou pilote incompatible." + policyNote,
-                Advice = "Redémarrer le PC. Si rien ne change, vérifier que la virtualisation (Intel VT-x ou AMD SVM) est activée dans le BIOS, puis consulter Sécurité Windows > Sécurité des appareils > Isolation du noyau.",
+                Current = T("activée dans les réglages, mais pas en cours d'exécution"),
+                Expected = T("en cours d'exécution"),
+                Explanation = MemoryIntegrityMessage + T(" Elle est demandée mais ne tourne pas : redémarrage en attente, virtualisation coupée dans le BIOS (souvent après une mise à jour du BIOS, voir Module 8) ou pilote incompatible.") + policyNote,
+                Advice = T("Redémarrer le PC. Si rien ne change, vérifier que la virtualisation (Intel VT-x ou AMD SVM) est activée dans le BIOS, puis consulter Sécurité Windows > Sécurité des appareils > Isolation du noyau."),
             };
         }
 
@@ -274,21 +274,21 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Title = title,
             Category = IsolationCategory,
             Status = FindingStatus.Info,
-            Current = "désactivée",
+            Current = T("désactivée"),
             Explanation = MemoryIntegrityMessage + policyNote,
-            Advice = "Pour plus de sécurité, vous pouvez l'activer dans Sécurité Windows > Sécurité des appareils > Isolation du noyau, après avoir vérifié qu'aucun pilote incompatible n'est signalé."
-                + (hasAntiCheat ? $" {Installed(antiCheats!)} : si un jeu protégé refuse de se lancer, activez-la." : string.Empty),
+            Advice = T("Pour plus de sécurité, vous pouvez l'activer dans Sécurité Windows > Sécurité des appareils > Isolation du noyau, après avoir vérifié qu'aucun pilote incompatible n'est signalé.")
+                + (hasAntiCheat ? T(" {0} : si un jeu protégé refuse de se lancer, activez-la.", Installed(antiCheats!)) : string.Empty),
         };
     }
 
     private static Finding DescribeAntiCheats(List<string>? antiCheats)
     {
         const string id = "M13.anti-cheat";
-        const string title = "Anti-triche noyau (Riot Vanguard, FACEIT)";
+        var title = T("Anti-triche noyau (Riot Vanguard, FACEIT)");
         const string category = "Jeux";
         if (antiCheats is null)
         {
-            return Finding.Unknown(id, title, "Liste des services Windows illisible.", category);
+            return Finding.Unknown(id, title, T("Liste des services Windows illisible."), category);
         }
 
         var detected = antiCheats.Count > 0;
@@ -298,10 +298,10 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Title = title,
             Category = category,
             Status = FindingStatus.Info,
-            Current = detected ? string.Join(", ", antiCheats) : "aucun détecté",
-            Explanation = "Riot Vanguard (Valorant) et FACEIT surveillent le noyau de Windows. Ils peuvent refuser de fonctionner si l'intégrité de la mémoire ou la VBS est coupée.",
+            Current = detected ? string.Join(", ", antiCheats) : T("aucun détecté"),
+            Explanation = T("Riot Vanguard (Valorant) et FACEIT surveillent le noyau de Windows. Ils peuvent refuser de fonctionner si l'intégrité de la mémoire ou la VBS est coupée."),
             Advice = detected
-                ? "Gardez l'intégrité de la mémoire active : la couper risque d'empêcher vos jeux de se lancer. MAUS ne bloque rien, le choix vous revient."
+                ? T("Gardez l'intégrité de la mémoire active : la couper risque d'empêcher vos jeux de se lancer. MAUS ne bloque rien, le choix vous revient.")
                 : null,
         };
     }
@@ -309,19 +309,19 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     private static Finding DescribeModeBasedExecution(DeviceGuardState? deviceGuard, bool denied)
     {
         const string id = "M13.mbec";
-        const string title = "Accélération matérielle de l'intégrité de la mémoire (MBEC/GMET)";
+        var title = T("Accélération matérielle de l'intégrité de la mémoire (MBEC/GMET)");
         const string category = "Processeur";
         if (deviceGuard is null)
         {
             return denied
                 ? Finding.AdminRequired(id, title, category)
-                : Finding.Unknown(id, title, "Capacités de sécurité du processeur illisibles.", category);
+                : Finding.Unknown(id, title, T("Capacités de sécurité du processeur illisibles."), category);
         }
 
         // 0 seul ou liste vide : Windows ne communique aucune capacité, ce qui ne prouve pas l'absence de MBEC/GMET.
         if (!deviceGuard.AvailableProperties.Any(p => p != 0))
         {
-            return Finding.Unknown(id, title, "Windows ne communique pas les capacités de sécurité du processeur (virtualisation peut-être désactivée dans le BIOS).", category);
+            return Finding.Unknown(id, title, T("Windows ne communique pas les capacités de sécurité du processeur (virtualisation peut-être désactivée dans le BIOS)."), category);
         }
 
         if (deviceGuard.HasModeBasedExecutionControl)
@@ -332,9 +332,9 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
                 Title = title,
                 Category = category,
                 Status = FindingStatus.Ok,
-                Current = "présente",
-                Expected = "présente",
-                Explanation = "Les processeurs Intel de 7e génération (Kaby Lake) et plus récents, et AMD Zen 2 et plus récents, accélèrent l'intégrité de la mémoire (MBEC ou GMET) : son coût en performances reste faible.",
+                Current = T("présente"),
+                Expected = T("présente"),
+                Explanation = T("Les processeurs Intel de 7e génération (Kaby Lake) et plus récents, et AMD Zen 2 et plus récents, accélèrent l'intégrité de la mémoire (MBEC ou GMET) : son coût en performances reste faible."),
             };
         }
 
@@ -344,11 +344,11 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Title = title,
             Category = category,
             Status = FindingStatus.Info,
-            Current = "absente (émulation logicielle)",
-            Expected = "présente",
-            Explanation = "Ce processeur n'a pas MBEC ni GMET : Windows émule cette fonction (Restricted User Mode) et l'intégrité de la mémoire y coûte davantage, surtout sur Ryzen 1000 et 2000 ou sur Intel antérieur à la 7e génération.",
+            Current = T("absente (émulation logicielle)"),
+            Expected = T("présente"),
+            Explanation = T("Ce processeur n'a pas MBEC ni GMET : Windows émule cette fonction (Restricted User Mode) et l'intégrité de la mémoire y coûte davantage, surtout sur Ryzen 1000 et 2000 ou sur Intel antérieur à la 7e génération."),
             Advice = deviceGuard.IsMemoryIntegrityRunning
-                ? "L'intégrité de la mémoire est active : MAUS la laisse ainsi par défaut. Si vous privilégiez les performances en jeu, l'option experte permettra de la couper, en connaissance de cause."
+                ? T("L'intégrité de la mémoire est active : MAUS la laisse ainsi par défaut. Si vous privilégiez les performances en jeu, l'option experte permettra de la couper, en connaissance de cause.")
                 : null,
         };
     }
@@ -356,20 +356,20 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     private static Finding DescribeVbs(DeviceGuardState? deviceGuard, bool denied)
     {
         const string id = "M13.vbs";
-        const string title = "Sécurité basée sur la virtualisation (VBS)";
+        var title = T("Sécurité basée sur la virtualisation (VBS)");
         if (deviceGuard?.VbsStatus is null)
         {
             return denied
                 ? Finding.AdminRequired(id, title, IsolationCategory)
-                : Finding.Unknown(id, title, "L'état de la VBS (Win32_DeviceGuard) est illisible sur ce PC.", IsolationCategory);
+                : Finding.Unknown(id, title, T("L'état de la VBS (Win32_DeviceGuard) est illisible sur ce PC."), IsolationCategory);
         }
 
         var services = deviceGuard.ServicesRunning.Select(DeviceGuardState.ServiceLabel).OfType<string>().ToList();
         var current = deviceGuard.VbsStatus switch
         {
-            2 => services.Count > 0 ? $"en cours d'exécution ({string.Join(", ", services)})" : "en cours d'exécution",
-            1 => "activée, mais pas en cours d'exécution",
-            _ => "non activée",
+            2 => services.Count > 0 ? T("en cours d'exécution ({0})", string.Join(", ", services)) : T("en cours d'exécution"),
+            1 => T("activée, mais pas en cours d'exécution"),
+            _ => T("non activée"),
         };
         return new Finding
         {
@@ -378,14 +378,14 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Category = IsolationCategory,
             Status = deviceGuard.IsVbsRunning ? FindingStatus.Ok : FindingStatus.Info,
             Current = current,
-            Explanation = "La VBS isole une partie de Windows dans un espace protégé par l'hyperviseur. L'intégrité de la mémoire, Credential Guard, la connexion Windows Hello renforcée et Recall en dépendent. La couper entièrement est rarement utile et réduit fortement la sécurité.",
+            Explanation = T("La VBS isole une partie de Windows dans un espace protégé par l'hyperviseur. L'intégrité de la mémoire, Credential Guard, la connexion Windows Hello renforcée et Recall en dépendent. La couper entièrement est rarement utile et réduit fortement la sécurité."),
         };
     }
 
     private static Finding DescribeUefiLock(VbsConfiguration? configuration)
     {
         const string id = "M13.uefi-lock";
-        const string title = "Verrou UEFI de l'isolation du noyau";
+        var title = T("Verrou UEFI de l'isolation du noyau");
         if (configuration is null)
         {
             return Finding.AdminRequired(id, title, IsolationCategory);
@@ -398,33 +398,33 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Title = title,
             Category = IsolationCategory,
             Status = FindingStatus.Info,
-            Current = locked ? "présent" : "absent",
+            Current = locked ? T("présent") : T("absent"),
             Explanation = locked
-                ? "Le verrou UEFI empêche de désactiver l'intégrité de la mémoire ou la VBS depuis Windows : aucun logiciel ne peut les couper, il faut une procédure spéciale au démarrage."
-                : "Aucun verrou UEFI : l'intégrité de la mémoire et la VBS se règlent depuis Sécurité Windows.",
+                ? T("Le verrou UEFI empêche de désactiver l'intégrité de la mémoire ou la VBS depuis Windows : aucun logiciel ne peut les couper, il faut une procédure spéciale au démarrage.")
+                : T("Aucun verrou UEFI : l'intégrité de la mémoire et la VBS se règlent depuis Sécurité Windows."),
         };
     }
 
     private static Finding DescribeVbsDependencies(DeviceGuardState? deviceGuard, IReadOnlyDictionary<string, bool>? features, bool denied)
     {
         const string id = "M13.vbs-dependencies";
-        const string title = "Fonctions qui exigent la VBS";
+        var title = T("Fonctions qui exigent la VBS");
         if (deviceGuard is null && features is null)
         {
             return denied
                 ? Finding.AdminRequired(id, title, DependenciesCategory)
-                : Finding.Unknown(id, title, "État de Credential Guard et des fonctions facultatives illisible.", DependenciesCategory);
+                : Finding.Unknown(id, title, T("État de Credential Guard et des fonctions facultatives illisible."), DependenciesCategory);
         }
 
         var found = new List<string>();
         if (deviceGuard?.IsCredentialGuardRunning == true)
         {
-            found.Add("Credential Guard (en cours)");
+            found.Add(T("Credential Guard (en cours)"));
         }
 
         if (features?.GetValueOrDefault("Recall") == true)
         {
-            found.Add("Recall (installé)");
+            found.Add(T("Recall (installé)"));
         }
 
         return new Finding
@@ -433,27 +433,27 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Title = title,
             Category = DependenciesCategory,
             Status = FindingStatus.Info,
-            Current = found.Count > 0 ? string.Join(", ", found) : "aucune détectée",
-            Explanation = "Credential Guard, Recall et la connexion Windows Hello renforcée ne fonctionnent qu'avec la VBS : la couper les désactiverait.",
+            Current = found.Count > 0 ? string.Join(", ", found) : T("aucune détectée"),
+            Explanation = T("Credential Guard, Recall et la connexion Windows Hello renforcée ne fonctionnent qu'avec la VBS : la couper les désactiverait."),
         };
     }
 
     private static Finding DescribeHypervisorFeatures(IReadOnlyDictionary<string, bool>? features, bool denied, bool? hypervisorPresent)
     {
         const string id = "M13.hypervisor-features";
-        const string title = "Fonctions qui gardent l'hyperviseur chargé";
+        var title = T("Fonctions qui gardent l'hyperviseur chargé");
         if (features is null)
         {
             return denied
                 ? Finding.AdminRequired(id, title, DependenciesCategory)
-                : Finding.Unknown(id, title, "Liste des fonctionnalités facultatives de Windows illisible.", DependenciesCategory);
+                : Finding.Unknown(id, title, T("Liste des fonctionnalités facultatives de Windows illisible."), DependenciesCategory);
         }
 
         var enabled = HypervisorFeatures.Where(f => features.GetValueOrDefault(f.Feature)).Select(f => f.Name).ToList();
-        var current = enabled.Count > 0 ? string.Join(", ", enabled) : "aucune";
+        var current = enabled.Count > 0 ? string.Join(", ", enabled) : T("aucune");
         if (hypervisorPresent is not null)
         {
-            current += hypervisorPresent.Value ? " ; hyperviseur Windows chargé" : " ; hyperviseur Windows non chargé";
+            current += hypervisorPresent.Value ? T(" ; hyperviseur Windows chargé") : T(" ; hyperviseur Windows non chargé");
         }
 
         return new Finding
@@ -463,7 +463,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Category = DependenciesCategory,
             Status = FindingStatus.Info,
             Current = current,
-            Explanation = "Hyper-V, la Plateforme de machine virtuelle (WSL2, sous-système Android) et le Bac à sable Windows chargent l'hyperviseur en permanence : couper l'intégrité de la mémoire rapporterait alors encore moins.",
+            Explanation = T("Hyper-V, la Plateforme de machine virtuelle (WSL2, sous-système Android) et le Bac à sable Windows chargent l'hyperviseur en permanence : couper l'intégrité de la mémoire rapporterait alors encore moins."),
         };
     }
 
@@ -560,8 +560,8 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
 
     /// <summary>« Riot Vanguard est installé » ou « Riot Vanguard et FACEIT sont installés ».</summary>
     private static string Installed(List<string> names) =>
-        names.Count > 1 ? $"{string.Join(" et ", names)} sont installés" : $"{names[0]} est installé";
+        names.Count > 1 ? T("{0} sont installés", string.Join(" et ", names)) : T("{0} est installé", names[0]);
 
     private static string Format(long? value) =>
-        value is null ? "absente" : value.Value.ToString(CultureInfo.InvariantCulture);
+        value is null ? T("absente") : value.Value.ToString(CultureInfo.InvariantCulture);
 }

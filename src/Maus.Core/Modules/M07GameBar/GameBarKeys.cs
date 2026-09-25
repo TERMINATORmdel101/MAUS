@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Modules.M07GameBar;
 
 /// <summary>Clés de registre, paquets et catégories du Module 7, partagés avec les tests.</summary>
@@ -7,7 +9,7 @@ internal static class GameBarKeys
     public const string Recording = "Enregistrement";
     public const string Overlay = "Superposition Game Bar";
     public const string GameMode = "Mode Jeu";
-    public const string Profile = "Profil de jeu";
+    public static string Profile => T("Profil de jeu");
 
     // HKCU : réglages de l'utilisateur courant.
     public const string GameDvrUser = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";

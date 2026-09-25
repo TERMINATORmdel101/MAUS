@@ -1,4 +1,5 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M04Privacy;
 
@@ -64,7 +65,7 @@ internal static class PrivacyFindings
         }
         catch (DataSourceUnavailableException)
         {
-            return Finding.Unknown(id, title, "Cette information n'est pas disponible sur ce PC.", category);
+            return Finding.Unknown(id, title, T("Cette information n'est pas disponible sur ce PC."), category);
         }
     }
 }

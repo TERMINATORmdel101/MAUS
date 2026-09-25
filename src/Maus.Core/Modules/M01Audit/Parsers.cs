@@ -1,9 +1,11 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Modules.M01Audit;
 
 /// <summary>Lecture de <c>bcdedit /enum {current}</c> : un élément par ligne, nom puis valeur (noms non traduits, valeurs parfois traduites).</summary>
 internal static class BcdEditParser
 {
-    private static readonly string[] YesWords = ["Yes", "Oui", "Ja", "Sí", "Si", "Sì", "Sim", "On", "True"];
+    private static string[] YesWords => ["Yes", T("Oui"), "Ja", "Sí", "Si", "Sì", "Sim", "On", "True"];
 
     /// <summary>Éléments de la première entrée, ou dictionnaire vide si la sortie est illisible.</summary>
     public static IReadOnlyDictionary<string, string> Parse(string? output)
@@ -58,7 +60,7 @@ internal sealed record WinHttpProxy(WinHttpProxyKind Kind, string? Server = null
 /// <summary>Lecture de <c>netsh winhttp show proxy</c>, en français comme en anglais.</summary>
 internal static class WinHttpProxyParser
 {
-    private static readonly string[] DirectMarkers = ["Direct access", "Accès direct", "Acces direct", "sans serveur proxy", "no proxy server"];
+    private static string[] DirectMarkers => ["Direct access", T("Accès direct"), "Acces direct", T("sans serveur proxy"), T("no proxy server")];
 
     public static WinHttpProxy Parse(string? output)
     {

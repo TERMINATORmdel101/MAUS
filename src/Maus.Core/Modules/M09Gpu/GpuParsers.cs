@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M09Gpu;
 
@@ -117,8 +118,8 @@ internal static partial class GpuParsers
         4 => "Gen4 (16 GT/s)",
         5 => "Gen5 (32 GT/s)",
         6 => "Gen6 (64 GT/s)",
-        null => "vitesse inconnue",
-        _ => $"code de vitesse {speed}",
+        null => T("vitesse inconnue"),
+        _ => T("code de vitesse {0}", speed),
     };
 
     /// <summary>Échappe une chaîne pour un littéral WQL entre apostrophes.</summary>

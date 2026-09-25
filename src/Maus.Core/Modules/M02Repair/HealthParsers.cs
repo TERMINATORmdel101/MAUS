@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M02Repair;
 
@@ -9,20 +10,20 @@ internal static partial class HealthParsers
     /// <summary>Codes d'arrêt fréquents : nom officiel et piste à suivre pour un non-spécialiste.</summary>
     private static readonly Dictionary<long, (string Name, string Hint)> KnownBugchecks = new()
     {
-        [0x0A] = ("IRQL_NOT_LESS_OR_EQUAL", "souvent un pilote ou la mémoire vive"),
-        [0x1A] = ("MEMORY_MANAGEMENT", "souvent la mémoire vive : profil XMP/EXPO ou barrette défaillante (Module 10)"),
-        [0x3B] = ("SYSTEM_SERVICE_EXCEPTION", "souvent un pilote"),
-        [0x50] = ("PAGE_FAULT_IN_NONPAGED_AREA", "souvent la mémoire vive (Module 10) ou un pilote"),
-        [0x7E] = ("SYSTEM_THREAD_EXCEPTION_NOT_HANDLED", "souvent un pilote"),
-        [0x9F] = ("DRIVER_POWER_STATE_FAILURE", "un pilote qui gère mal la mise en veille"),
-        [0xD1] = ("DRIVER_IRQL_NOT_LESS_OR_EQUAL", "un pilote défaillant"),
-        [0xEF] = ("CRITICAL_PROCESS_DIED", "fichiers système ou disque abîmés : la réparation DISM puis SFC est indiquée"),
-        [0x101] = ("CLOCK_WATCHDOG_TIMEOUT", "processeur bloqué, souvent un overclocking ou un undervolting instable (Module 15)"),
-        [0x116] = ("VIDEO_TDR_FAILURE", "pilote ou carte graphique (Module 9)"),
-        [0x117] = ("VIDEO_TDR_TIMEOUT_DETECTED", "pilote ou carte graphique (Module 9)"),
-        [0x124] = ("WHEA_UNCORRECTABLE_ERROR", "erreur matérielle : overclocking, tension ou température (Module 15)"),
-        [0x133] = ("DPC_WATCHDOG_VIOLATION", "souvent le pilote ou le micrologiciel du disque SSD"),
-        [0x139] = ("KERNEL_SECURITY_CHECK_FAILURE", "souvent un pilote ou la mémoire vive"),
+        [0x0A] = ("IRQL_NOT_LESS_OR_EQUAL", T("souvent un pilote ou la mémoire vive")),
+        [0x1A] = ("MEMORY_MANAGEMENT", T("souvent la mémoire vive : profil XMP/EXPO ou barrette défaillante (Module 10)")),
+        [0x3B] = ("SYSTEM_SERVICE_EXCEPTION", T("souvent un pilote")),
+        [0x50] = ("PAGE_FAULT_IN_NONPAGED_AREA", T("souvent la mémoire vive (Module 10) ou un pilote")),
+        [0x7E] = ("SYSTEM_THREAD_EXCEPTION_NOT_HANDLED", T("souvent un pilote")),
+        [0x9F] = ("DRIVER_POWER_STATE_FAILURE", T("un pilote qui gère mal la mise en veille")),
+        [0xD1] = ("DRIVER_IRQL_NOT_LESS_OR_EQUAL", T("un pilote défaillant")),
+        [0xEF] = ("CRITICAL_PROCESS_DIED", T("fichiers système ou disque abîmés : la réparation DISM puis SFC est indiquée")),
+        [0x101] = ("CLOCK_WATCHDOG_TIMEOUT", T("processeur bloqué, souvent un overclocking ou un undervolting instable (Module 15)")),
+        [0x116] = ("VIDEO_TDR_FAILURE", T("pilote ou carte graphique (Module 9)")),
+        [0x117] = ("VIDEO_TDR_TIMEOUT_DETECTED", T("pilote ou carte graphique (Module 9)")),
+        [0x124] = ("WHEA_UNCORRECTABLE_ERROR", T("erreur matérielle : overclocking, tension ou température (Module 15)")),
+        [0x133] = ("DPC_WATCHDOG_VIOLATION", T("souvent le pilote ou le micrologiciel du disque SSD")),
+        [0x139] = ("KERNEL_SECURITY_CHECK_FAILURE", T("souvent un pilote ou la mémoire vive")),
     };
 
     /// <summary>

@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Reporting;
 
 /// <summary>Rapport lisible en console, avec voyants colorés.</summary>
@@ -5,12 +7,12 @@ public static class TextReport
 {
     public static void Write(AuditReport report, TextWriter writer, bool useColor)
     {
-        writer.WriteLine($"MAUS {report.MausVersion} — audit en lecture seule, aucune modification");
-        writer.WriteLine($"{report.Windows.ProductName} {report.Windows.DisplayVersion} (build {report.Windows.FullBuild}), édition {report.Windows.EditionId}");
+        writer.WriteLine(T("MAUS {0} — audit en lecture seule, aucune modification", report.MausVersion));
+        writer.WriteLine(T("{0} {1} (build {2}), édition {3}", report.Windows.ProductName, report.Windows.DisplayVersion, report.Windows.FullBuild, report.Windows.EditionId));
         writer.WriteLine($"{Labels.Of(report.Hardware.FormFactor)} · {report.Hardware.Cpu.Name} · {string.Join(", ", report.Hardware.Gpus.Select(g => g.Name))}");
         if (!report.IsElevated)
         {
-            writer.WriteLine("Sans droits administrateur : certains contrôles restent indéterminés.");
+            writer.WriteLine(T("Sans droits administrateur : certains contrôles restent indéterminés."));
         }
 
         foreach (var module in report.Modules)
@@ -46,11 +48,11 @@ public static class TextReport
 
         var all = report.Modules.SelectMany(m => m.Findings).ToList();
         writer.WriteLine();
-        writer.WriteLine($"Bilan : {all.Count(f => f.Status == FindingStatus.Problem)} problème(s), " +
-                         $"{all.Count(f => f.Status == FindingStatus.Warning)} point(s) à surveiller, " +
-                         $"{all.Count(f => f.Status == FindingStatus.Improvable)} optimisation(s) possible(s), " +
-                         $"{all.Count(f => f.Status == FindingStatus.Ok)} conforme(s), " +
-                         $"{all.Count(f => f.Status == FindingStatus.Unknown)} indéterminé(s).");
+        writer.WriteLine(T("Bilan : {0} problème(s), " +
+                         "{1} point(s) à surveiller, " +
+                         "{2} optimisation(s) possible(s), " +
+                         "{3} conforme(s), " +
+                         "{4} indéterminé(s).", all.Count(f => f.Status == FindingStatus.Problem), all.Count(f => f.Status == FindingStatus.Warning), all.Count(f => f.Status == FindingStatus.Improvable), all.Count(f => f.Status == FindingStatus.Ok), all.Count(f => f.Status == FindingStatus.Unknown)));
     }
 
     private static string Symbol(FindingStatus status) => status switch

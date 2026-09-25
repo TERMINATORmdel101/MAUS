@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Fixes;
 
 /// <summary>Effet réel d'une correction, vu par un nouvel audit (l'écriture relue ne suffit pas : une stratégie peut être ignorée).</summary>
@@ -40,23 +42,23 @@ public static class FixVerification
 
             if (!findings.TryGetValue(change.FindingId ?? change.Id, out var finding) || finding.Status == FindingStatus.Unknown)
             {
-                return new VerifiedOutcome(outcome, EffectCheck.NotChecked, "Appliqué ; l'effet n'a pas pu être relu par le nouvel audit.");
+                return new VerifiedOutcome(outcome, EffectCheck.NotChecked, T("Appliqué ; l'effet n'a pas pu être relu par le nouvel audit."));
             }
 
             if (finding.Status is FindingStatus.Ok or FindingStatus.Info)
             {
-                return new VerifiedOutcome(outcome, EffectCheck.Confirmed, "Appliqué et confirmé par le nouvel audit.");
+                return new VerifiedOutcome(outcome, EffectCheck.Confirmed, T("Appliqué et confirmé par le nouvel audit."));
             }
 
             if (change.Effect != ChangeEffect.Immediate)
             {
-                return new VerifiedOutcome(outcome, EffectCheck.PendingRestart, $"Appliqué : {Reporting.Labels.Of(change.Effect)}.");
+                return new VerifiedOutcome(outcome, EffectCheck.PendingRestart, T("Appliqué : {0}.", Reporting.Labels.Of(change.Effect)));
             }
 
             var policy = change.Writes.Any(w => (w.Key.Path ?? string.Empty).Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase));
             var message = windows.IsHomeEdition && policy
-                ? "Écrit, mais sans effet sur votre édition : Windows Famille ignore cette stratégie. Vous pouvez l'annuler depuis l'Historique."
-                : "Écrit, mais Windows n'en tient pas compte pour l'instant (un autre réglage ou une application le remplace peut-être). Vous pouvez l'annuler depuis l'Historique.";
+                ? T("Écrit, mais sans effet sur votre édition : Windows Famille ignore cette stratégie. Vous pouvez l'annuler depuis l'Historique.")
+                : T("Écrit, mais Windows n'en tient pas compte pour l'instant (un autre réglage ou une application le remplace peut-être). Vous pouvez l'annuler depuis l'Historique.");
             return new VerifiedOutcome(outcome, EffectCheck.NoEffect, message);
         }).ToList();
     }

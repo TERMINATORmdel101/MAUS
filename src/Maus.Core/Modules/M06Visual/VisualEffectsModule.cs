@@ -2,6 +2,7 @@ using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Maus.Core.Rules;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M06Visual;
 
@@ -11,31 +12,31 @@ namespace Maus.Core.Modules.M06Visual;
 /// </summary>
 public sealed class VisualEffectsModule : IFixableModule
 {
-    private const string Category = "Effets désactivés";
+    private static string Category => T("Effets désactivés");
 
     /// <summary>Effets pilotés par SystemParametersInfo : code GET, libellé Windows, valeur attendue.</summary>
     private static readonly (string Id, uint Action, string Title, bool Expected, string Explanation)[] SpiEffects =
     [
-        ("M06.keep.drag", SpiGet.DragFullWindows, "Contenu des fenêtres pendant leur déplacement (à conserver)", true,
-            "Voir le contenu d'une fenêtre qu'on déplace est plus confortable ; cet effet fait partie des 4 conservés."),
-        ("M06.keep.fonts", SpiGet.FontSmoothing, "Lissage des polices d'écran (à conserver)", true,
-            "Sans lissage, le texte devient crénelé et fatigant à lire ; cet effet fait partie des 4 conservés."),
-        ("M06.client-animation", SpiGet.ClientAreaAnimation, "Animations dans les fenêtres désactivées", false,
-            "Couvre « Animer les contrôles et éléments » et l'interrupteur « Effets d'animation » des Paramètres."),
-        ("M06.menu-animation", SpiGet.MenuAnimation, "Fondu ou glissement des menus désactivé", false,
-            "Les menus s'ouvrent instantanément sans cette animation."),
-        ("M06.tooltip-animation", SpiGet.TooltipAnimation, "Fondu des infobulles désactivé", false,
-            "Les infobulles apparaissent instantanément sans cette animation."),
-        ("M06.selection-fade", SpiGet.SelectionFade, "Disparition progressive des éléments de menu désactivée", false,
-            "Effet décoratif après un clic dans un menu."),
-        ("M06.cursor-shadow", SpiGet.CursorShadow, "Ombre sous le pointeur désactivée", false,
-            "Effet décoratif sous le pointeur de la souris."),
-        ("M06.window-shadow", SpiGet.DropShadow, "Ombre sous les fenêtres désactivée", false,
-            "Effet décoratif autour des fenêtres."),
-        ("M06.combobox-animation", SpiGet.ComboBoxAnimation, "Animation des listes déroulantes désactivée", false,
-            "Les listes s'ouvrent instantanément sans cette animation."),
-        ("M06.smooth-scrolling", SpiGet.ListBoxSmoothScrolling, "Défilement doux des listes désactivé", false,
-            "Le défilement doux ralentit la navigation dans les longues listes."),
+        ("M06.keep.drag", SpiGet.DragFullWindows, T("Contenu des fenêtres pendant leur déplacement (à conserver)"), true,
+            T("Voir le contenu d'une fenêtre qu'on déplace est plus confortable ; cet effet fait partie des 4 conservés.")),
+        ("M06.keep.fonts", SpiGet.FontSmoothing, T("Lissage des polices d'écran (à conserver)"), true,
+            T("Sans lissage, le texte devient crénelé et fatigant à lire ; cet effet fait partie des 4 conservés.")),
+        ("M06.client-animation", SpiGet.ClientAreaAnimation, T("Animations dans les fenêtres désactivées"), false,
+            T("Couvre « Animer les contrôles et éléments » et l'interrupteur « Effets d'animation » des Paramètres.")),
+        ("M06.menu-animation", SpiGet.MenuAnimation, T("Fondu ou glissement des menus désactivé"), false,
+            T("Les menus s'ouvrent instantanément sans cette animation.")),
+        ("M06.tooltip-animation", SpiGet.TooltipAnimation, T("Fondu des infobulles désactivé"), false,
+            T("Les infobulles apparaissent instantanément sans cette animation.")),
+        ("M06.selection-fade", SpiGet.SelectionFade, T("Disparition progressive des éléments de menu désactivée"), false,
+            T("Effet décoratif après un clic dans un menu.")),
+        ("M06.cursor-shadow", SpiGet.CursorShadow, T("Ombre sous le pointeur désactivée"), false,
+            T("Effet décoratif sous le pointeur de la souris.")),
+        ("M06.window-shadow", SpiGet.DropShadow, T("Ombre sous les fenêtres désactivée"), false,
+            T("Effet décoratif autour des fenêtres.")),
+        ("M06.combobox-animation", SpiGet.ComboBoxAnimation, T("Animation des listes déroulantes désactivée"), false,
+            T("Les listes s'ouvrent instantanément sans cette animation.")),
+        ("M06.smooth-scrolling", SpiGet.ListBoxSmoothScrolling, T("Défilement doux des listes désactivé"), false,
+            T("Le défilement doux ralentit la navigation dans les longues listes.")),
     ];
 
     /// <summary>Code SPI_SET* de chaque effet ; la valeur passe par uiParam pour le glisser des fenêtres et le lissage des polices.</summary>
@@ -53,25 +54,25 @@ public sealed class VisualEffectsModule : IFixableModule
         [SpiGet.ListBoxSmoothScrolling] = (SpiSet.ListBoxSmoothScrolling, false),
     };
 
-    private static readonly Dictionary<string, string> ActionTitles = new(StringComparer.Ordinal)
+    private static Dictionary<string, string> ActionTitles => new(StringComparer.Ordinal)
     {
-        ["M06.keep.drag"] = "Réafficher le contenu des fenêtres pendant leur déplacement",
-        ["M06.keep.fonts"] = "Réactiver le lissage des polices",
-        ["M06.client-animation"] = "Désactiver les animations dans les fenêtres",
-        ["M06.menu-animation"] = "Désactiver l'animation des menus",
-        ["M06.tooltip-animation"] = "Désactiver le fondu des infobulles",
-        ["M06.selection-fade"] = "Désactiver la disparition progressive des menus",
-        ["M06.cursor-shadow"] = "Désactiver l'ombre sous le pointeur",
-        ["M06.window-shadow"] = "Désactiver l'ombre sous les fenêtres",
-        ["M06.combobox-animation"] = "Désactiver l'animation des listes déroulantes",
-        ["M06.smooth-scrolling"] = "Désactiver le défilement doux des listes",
+        ["M06.keep.drag"] = T("Réafficher le contenu des fenêtres pendant leur déplacement"),
+        ["M06.keep.fonts"] = T("Réactiver le lissage des polices"),
+        ["M06.client-animation"] = T("Désactiver les animations dans les fenêtres"),
+        ["M06.menu-animation"] = T("Désactiver l'animation des menus"),
+        ["M06.tooltip-animation"] = T("Désactiver le fondu des infobulles"),
+        ["M06.selection-fade"] = T("Désactiver la disparition progressive des menus"),
+        ["M06.cursor-shadow"] = T("Désactiver l'ombre sous le pointeur"),
+        ["M06.window-shadow"] = T("Désactiver l'ombre sous les fenêtres"),
+        ["M06.combobox-animation"] = T("Désactiver l'animation des listes déroulantes"),
+        ["M06.smooth-scrolling"] = T("Désactiver le défilement doux des listes"),
     };
 
     private static readonly Lazy<IReadOnlyList<RegistryRule>> Rules = new(() => EmbeddedCatalog.LoadRegistryRules("m06-visual-rules.json"));
 
     public string Id => "M06";
 
-    public string Title => "Interface et effets visuels";
+    public string Title => T("Interface et effets visuels");
 
     public int Order => 60;
 
@@ -87,12 +88,12 @@ public sealed class VisualEffectsModule : IFixableModule
         {
             var current = context.SystemParameters.GetBool(effect.Action);
             findings.Add(current is null
-                ? Finding.Unknown(effect.Id, effect.Title, "Lecture du paramètre système impossible.", Category)
+                ? Finding.Unknown(effect.Id, effect.Title, T("Lecture du paramètre système impossible."), Category)
                 : new Finding
                 {
                     Id = effect.Id,
                     Title = effect.Title,
-                    Category = effect.Id.StartsWith("M06.keep", StringComparison.Ordinal) ? "Effets conservés" : Category,
+                    Category = effect.Id.StartsWith("M06.keep", StringComparison.Ordinal) ? T("Effets conservés") : Category,
                     Status = current == effect.Expected ? FindingStatus.Ok : FindingStatus.Improvable,
                     Severity = Severity.Low,
                     Current = OnOff(current.Value),
@@ -122,7 +123,7 @@ public sealed class VisualEffectsModule : IFixableModule
                 effect.Id,
                 ActionTitles[effect.Id],
                 effect.Explanation,
-                effect.Id.StartsWith("M06.keep", StringComparison.Ordinal) ? "Effets conservés" : Category,
+                effect.Id.StartsWith("M06.keep", StringComparison.Ordinal) ? T("Effets conservés") : Category,
                 new SettingWrite(SettingKey.Spi(effect.Action, set, uiParam), SettingValue.Bool(effect.Expected))));
         }
 
@@ -130,8 +131,8 @@ public sealed class VisualEffectsModule : IFixableModule
         {
             changes.Add(Change(
                 "M06.minimize-animation",
-                "Désactiver l'animation de réduction et d'agrandissement",
-                "Les fenêtres réduites ou agrandies apparaissent instantanément.",
+                T("Désactiver l'animation de réduction et d'agrandissement"),
+                T("Les fenêtres réduites ou agrandies apparaissent instantanément."),
                 Category,
                 new SettingWrite(SettingKey.MinimizeAnimation, SettingValue.Bool(false))));
         }
@@ -140,12 +141,12 @@ public sealed class VisualEffectsModule : IFixableModule
         {
             changes.Add(Change(
                 "M06.widgets",
-                "Désactiver les Widgets (stratégie AllowNewsAndInterests)",
-                "Coupe tout le panneau Widgets, bouton de la barre des tâches compris. Le réglage de la barre des tâches est protégé par Windows (UCPD) : MAUS passe par la stratégie officielle, sans jamais toucher à cette protection.",
-                "Barre des tâches",
+                T("Désactiver les Widgets (stratégie AllowNewsAndInterests)"),
+                T("Coupe tout le panneau Widgets, bouton de la barre des tâches compris. Le réglage de la barre des tâches est protégé par Windows (UCPD) : MAUS passe par la stratégie officielle, sans jamais toucher à cette protection."),
+                T("Barre des tâches"),
                 new SettingWrite(SettingKey.Registry("HKLM", @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests"), SettingValue.Dword(0))) with
             {
-                Gain = "Moins de contenu en ligne chargé en arrière-plan (actualités, météo, publicités).",
+                Gain = T("Moins de contenu en ligne chargé en arrière-plan (actualités, météo, publicités)."),
                 Effect = ChangeEffect.ExplorerRestart,
             });
         }
@@ -163,7 +164,7 @@ public sealed class VisualEffectsModule : IFixableModule
         Title = title,
         Description = description,
         Category = category,
-        Gain = "Gain surtout visuel : Windows paraît plus réactif.",
+        Gain = T("Gain surtout visuel : Windows paraît plus réactif."),
         Writes = [write],
     };
 
@@ -173,7 +174,7 @@ public sealed class VisualEffectsModule : IFixableModule
     /// </summary>
     private static Finding DetectWidgets(IRegistryReader registry, WindowsInfo windows)
     {
-        const string title = "Widgets désactivés";
+        var title = T("Widgets désactivés");
         try
         {
             var policy = registry.GetDword(RegistryHive.LocalMachine, @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests");
@@ -183,29 +184,29 @@ public sealed class VisualEffectsModule : IFixableModule
             {
                 Id = "M06.widgets",
                 Title = title,
-                Category = "Barre des tâches",
+                Category = T("Barre des tâches"),
                 Status = disabled ? FindingStatus.Ok : FindingStatus.Improvable,
                 Severity = Severity.Low,
-                Current = disabled ? "désactivés" : "actifs",
-                Expected = "désactivés",
-                Explanation = "Le panneau Widgets charge du contenu en ligne en arrière-plan (actualités, météo, publicités).",
-                Advice = disabled ? null : "Désactiver les Widgets par la stratégie AllowNewsAndInterests (Pro et plus) ou dans Paramètres > Barre des tâches.",
+                Current = disabled ? T("désactivés") : "actifs",
+                Expected = T("désactivés"),
+                Explanation = T("Le panneau Widgets charge du contenu en ligne en arrière-plan (actualités, météo, publicités)."),
+                Advice = disabled ? null : T("Désactiver les Widgets par la stratégie AllowNewsAndInterests (Pro et plus) ou dans Paramètres > Barre des tâches."),
                 Fixable = !disabled && !windows.IsHomeEdition,
             };
         }
         catch (MausAccessDeniedException)
         {
-            return Finding.AdminRequired("M06.widgets", title, "Barre des tâches");
+            return Finding.AdminRequired("M06.widgets", title, T("Barre des tâches"));
         }
     }
 
     private static Finding DetectMinimizeAnimation(ISystemParametersReader parameters)
     {
         const string id = "M06.minimize-animation";
-        const string title = "Animation de réduction et d'agrandissement désactivée";
+        var title = T("Animation de réduction et d'agrandissement désactivée");
         var current = parameters.GetMinimizeAnimation();
         return current is null
-            ? Finding.Unknown(id, title, "Lecture du paramètre système impossible.", Category)
+            ? Finding.Unknown(id, title, T("Lecture du paramètre système impossible."), Category)
             : new Finding
             {
                 Id = id,
@@ -216,9 +217,9 @@ public sealed class VisualEffectsModule : IFixableModule
                 Current = OnOff(current.Value),
                 Expected = OnOff(false),
                 Fixable = current.Value,
-                Explanation = "L'animation retarde l'apparition des fenêtres réduites ou agrandies.",
+                Explanation = T("L'animation retarde l'apparition des fenêtres réduites ou agrandies."),
             };
     }
 
-    private static string OnOff(bool value) => value ? "activé" : "désactivé";
+    private static string OnOff(bool value) => value ? T("activé") : T("désactivé");
 }

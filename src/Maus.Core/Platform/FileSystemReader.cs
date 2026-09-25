@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Platform;
 
@@ -36,7 +37,7 @@ public sealed class LocalFileSystemReader : IFileSystemReader
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new MausAccessDeniedException($"Lecture refusée : {path}", ex);
+            throw new MausAccessDeniedException(T("Lecture refusée : {0}", path), ex);
         }
     }
 
@@ -48,7 +49,7 @@ public sealed class LocalFileSystemReader : IFileSystemReader
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new MausAccessDeniedException($"Lecture refusée : {directory}", ex);
+            throw new MausAccessDeniedException(T("Lecture refusée : {0}", directory), ex);
         }
     }
 

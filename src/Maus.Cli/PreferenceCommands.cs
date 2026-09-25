@@ -2,6 +2,7 @@ using Maus.Core;
 using Maus.Core.Fixes;
 using Maus.Core.Preferences;
 using Maus.Core.Reporting;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Cli;
 
@@ -11,11 +12,11 @@ internal static class PreferenceCommands
     public static int Print(UserPreferences preferences, TextWriter output)
     {
         output.WriteLine($"Profil Game Bar : {(preferences.GameBarProfile is { } p ? $"profil {p} (choisi par vous)" : "détecté par MAUS")}");
-        output.WriteLine($"Alimentation du portable : {Describe(preferences.LaptopPower)}");
-        output.WriteLine($"Constats marqués « voulu » : {preferences.Acknowledged.Count}");
+        output.WriteLine(T("Alimentation du portable : {0}", Describe(preferences.LaptopPower)));
+        output.WriteLine(T("Constats marqués « voulu » : {0}", preferences.Acknowledged.Count));
         foreach (var mark in preferences.Acknowledged)
         {
-            output.WriteLine($"  {mark.FindingId} (valeur : {mark.Current ?? "—"}, le {mark.At.ToLocalTime():dd/MM/yyyy})");
+            output.WriteLine(T("  {0} (valeur : {1}, le {2:dd/MM/yyyy})", mark.FindingId, mark.Current ?? "—", mark.At.ToLocalTime()));
         }
 
         return 0;
@@ -26,7 +27,7 @@ internal static class PreferenceCommands
         var parts = assignment?.Split('=', 2, StringSplitOptions.TrimEntries);
         if (parts is not { Length: 2 })
         {
-            output.WriteLine("Syntaxe : maus --set gamebar=1|2|3|auto  ou  maus --set alimentation=performance|partout|autonomie|auto");
+            output.WriteLine(T("Syntaxe : maus --set gamebar=1|2|3|auto  ou  maus --set alimentation=performance|partout|autonomie|auto"));
             return 1;
         }
 
@@ -48,7 +49,7 @@ internal static class PreferenceCommands
             return 1;
         }
 
-        return Save(store, updated, output, "Choix enregistré.");
+        return Save(store, updated, output, T("Choix enregistré."));
     }
 
     public static int Acknowledge(IPreferencesStore store, AuditContext context, IReadOnlyList<ModuleResult> results, string? id, bool assumeYes, TextWriter output)
@@ -56,29 +57,29 @@ internal static class PreferenceCommands
         var finding = results.SelectMany(r => r.Findings).FirstOrDefault(f => string.Equals(f.Id, id, StringComparison.OrdinalIgnoreCase));
         if (finding is null || finding.Status is not (FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem))
         {
-            output.WriteLine($"Aucun écart signalé sous l'identifiant « {id} » (voir le rapport d'audit).");
+            output.WriteLine(T("Aucun écart signalé sous l'identifiant « {0} » (voir le rapport d'audit).", id));
             return 1;
         }
 
         output.WriteLine($"{finding.Title} : {finding.Current} ({Labels.Of(finding.Status)})");
-        output.WriteLine("MAUS ne le signalera plus tant que cette valeur ne change pas.");
-        if (finding.Status == FindingStatus.Problem && !assumeYes && !FixCommands.Confirm("C'est un problème de sécurité ou de fiabilité. Le marquer « voulu » quand même ? (o/N) "))
+        output.WriteLine(T("MAUS ne le signalera plus tant que cette valeur ne change pas."));
+        if (finding.Status == FindingStatus.Problem && !assumeYes && !FixCommands.Confirm(T("C'est un problème de sécurité ou de fiabilité. Le marquer « voulu » quand même ? (o/N) ")))
         {
             return 1;
         }
 
-        return Save(store, store.Load().Acknowledge(finding, context.Now), output, "Constat marqué « voulu ».");
+        return Save(store, store.Load().Acknowledge(finding, context.Now), output, T("Constat marqué « voulu »."));
     }
 
     public static int Unacknowledge(IPreferencesStore store, string? id, TextWriter output)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
-            output.WriteLine("Indiquez le constat : maus --unack ID (voir maus --prefs).");
+            output.WriteLine(T("Indiquez le constat : maus --unack ID (voir maus --prefs)."));
             return 1;
         }
 
-        return Save(store, store.Load().Unacknowledge(id), output, "Marque retirée : le constat sera de nouveau signalé.");
+        return Save(store, store.Load().Unacknowledge(id), output, T("Marque retirée : le constat sera de nouveau signalé."));
     }
 
     private static int Save(IPreferencesStore store, UserPreferences preferences, TextWriter output, string message)
@@ -91,16 +92,16 @@ internal static class PreferenceCommands
         }
         catch (Exception ex) when (ex is JournalUnsafeException or UnauthorizedAccessException or IOException)
         {
-            output.WriteLine($"Enregistrement impossible (droits administrateur requis) : {ex.Message}");
+            output.WriteLine(T("Enregistrement impossible (droits administrateur requis) : {0}", ex.Message));
             return 3;
         }
     }
 
     private static string Describe(LaptopPowerChoice choice) => choice switch
     {
-        LaptopPowerChoice.Performance => "performance sur secteur, Équilibré sur batterie",
-        LaptopPowerChoice.PerformanceEverywhere => "performance partout",
+        LaptopPowerChoice.Performance => T("performance sur secteur, Équilibré sur batterie"),
+        LaptopPowerChoice.PerformanceEverywhere => T("performance partout"),
         LaptopPowerChoice.Battery => "autonomie",
-        _ => "pas encore choisi",
+        _ => T("pas encore choisi"),
     };
 }

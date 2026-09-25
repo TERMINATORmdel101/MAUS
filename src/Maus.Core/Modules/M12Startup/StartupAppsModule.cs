@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M12Startup;
 
@@ -24,22 +25,21 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     internal const string TasksQuery = "SELECT TaskName, TaskPath, State, Triggers, Actions FROM MSFT_ScheduledTask";
 
     private const string SummaryCategory = "Vue d'ensemble";
-    private const string UnknownCategory = "Inconnu";
+    private static string UnknownCategory => T("Inconnu");
     private const string SuspiciousCategory = "Suspect";
-    private const string MeasureCategory = "Mesure du démarrage";
-    private const string OtherSourcesCategory = "Autres lancements automatiques";
-    private const string SettingsAdvice = "Réglage : Paramètres > Applications > Démarrage (ms-settings:startupapps).";
+    private static string MeasureCategory => T("Mesure du démarrage");
+    private static string OtherSourcesCategory => T("Autres lancements automatiques");
+    private static string SettingsAdvice => T("Réglage : Paramètres > Applications > Démarrage (ms-settings:startupapps).");
 
     private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
     private static readonly Lazy<StartupCatalog> Catalog = new(StartupCatalog.LoadEmbedded);
 
-    private static readonly RegistrySource[] RegistrySources =
-    [
-        new("hkcu-run", "registre de l'utilisateur (Run)", RegistryHive.CurrentUser, RunPath, "Run"),
-        new("hklm-run", "registre de la machine (Run)", RegistryHive.LocalMachine, RunPath, "Run"),
+    private static RegistrySource[] RegistrySources =>     [
+        new("hkcu-run", T("registre de l'utilisateur (Run)"), RegistryHive.CurrentUser, RunPath, "Run"),
+        new("hklm-run", T("registre de la machine (Run)"), RegistryHive.LocalMachine, RunPath, "Run"),
         new("hklm-run32", "registre de la machine, programmes 32 bits (WOW6432Node\\Run)", RegistryHive.LocalMachine, Wow64RunPath, "Run32"),
-        new("hkcu-runonce", "exécution unique de l'utilisateur (RunOnce)", RegistryHive.CurrentUser, RunOncePath, null),
-        new("hklm-runonce", "exécution unique de la machine (RunOnce)", RegistryHive.LocalMachine, RunOncePath, null),
+        new("hkcu-runonce", T("exécution unique de l'utilisateur (RunOnce)"), RegistryHive.CurrentUser, RunOncePath, null),
+        new("hklm-runonce", T("exécution unique de la machine (RunOnce)"), RegistryHive.LocalMachine, RunOncePath, null),
     ];
 
     private readonly IStartupEnvironment _environment;
@@ -56,7 +56,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
 
     public string Id => "M12";
 
-    public string Title => "Applications au démarrage";
+    public string Title => T("Applications au démarrage");
 
     public int Order => 120;
 
@@ -109,11 +109,11 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             {
                 Id = finding.Id,
                 ModuleId = Id,
-                Title = $"Ne plus lancer au démarrage : {finding.Title}",
-                Description = "Désactive l'entrée comme le Gestionnaire des tâches, sans rien désinstaller : l'application se lance toujours quand vous l'ouvrez." +
+                Title = T("Ne plus lancer au démarrage : {0}", finding.Title),
+                Description = T("Désactive l'entrée comme le Gestionnaire des tâches, sans rien désinstaller : l'application se lance toujours quand vous l'ouvrez.") +
                               (match is { } known ? $" Vous perdez : {known.Family.Loses}." : string.Empty),
                 Category = finding.Category,
-                Gain = "Ouverture de session plus rapide, moins de mémoire occupée en arrière-plan.",
+                Gain = T("Ouverture de session plus rapide, moins de mémoire occupée en arrière-plan."),
                 Recommended = finding.Status == FindingStatus.Improvable,
                 Writes =
                 [
@@ -135,8 +135,8 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             ReadRegistrySource(context.Registry, source, entries, findings);
         }
 
-        ReadFolderSource(context, "user-folder", "dossier Démarrage de l'utilisateur", _environment.UserStartupFolder, RegistryHive.CurrentUser, entries, findings);
-        ReadFolderSource(context, "common-folder", "dossier Démarrage commun", _environment.CommonStartupFolder, RegistryHive.LocalMachine, entries, findings);
+        ReadFolderSource(context, "user-folder", T("dossier Démarrage de l'utilisateur"), _environment.UserStartupFolder, RegistryHive.CurrentUser, entries, findings);
+        ReadFolderSource(context, "common-folder", T("dossier Démarrage commun"), _environment.CommonStartupFolder, RegistryHive.LocalMachine, entries, findings);
         ReadStoreTasks(context, entries, findings);
         return entries;
     }
@@ -250,14 +250,14 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                     var packageName = package?.Name ?? familyName.Split('_')[0];
                     var approval = new ApprovalState(state is 2 or 4, null);
                     entries.Add(new StartupEntry(
-                        "store", "tâche de démarrage d'une application du Store", taskId, taskId, $"{packageName} ({taskId})",
+                        "store", T("tâche de démarrage d'une application du Store"), taskId, taskId, $"{packageName} ({taskId})",
                         null, string.Empty, approval, false, packageName, package is null ? null : StartupParsers.PublisherName(package.Publisher)));
                 }
             }
         }
         catch (MausAccessDeniedException)
         {
-            findings.Add(Finding.AdminRequired("M12.source-store", "Lecture des applications du Store lancées au démarrage", OtherSourcesCategory));
+            findings.Add(Finding.AdminRequired("M12.source-store", T("Lecture des applications du Store lancées au démarrage"), OtherSourcesCategory));
         }
     }
 
@@ -280,22 +280,22 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         var enabled = entry.Approval.Enabled;
         var isStore = entry.SourceId == "store";
         var state = entry.RunOnce
-            ? "exécution unique au prochain démarrage"
+            ? T("exécution unique au prochain démarrage")
             : enabled
-                ? "activé"
+                ? T("activé")
                 : entry.Approval.DisabledOnUtc is { } date
-                    ? $"désactivé le {date.ToLocalTime().ToString("dd/MM/yyyy", French)}"
-                    : "désactivé";
-        var publisher = company ?? (isStore ? "application du Store" : executable is null ? null : "éditeur inconnu");
+                    ? T("désactivé le {0}", date.ToLocalTime().ToString("dd/MM/yyyy", French))
+                    : T("désactivé");
+        var publisher = company ?? (isStore ? T("application du Store") : executable is null ? null : T("éditeur inconnu"));
 
         var explanation = $"Source : {entry.SourceLabel}. Commande : {entry.Command}.";
         if (match is { } known)
         {
-            explanation += $" En le désactivant, vous perdez : {known.Family.Loses}.";
+            explanation += T(" En le désactivant, vous perdez : {0}.", known.Family.Loses);
         }
         else
         {
-            explanation += " Cette entrée ne figure pas dans le catalogue de MAUS : vérifiez l'éditeur et le chemin avant de décider.";
+            explanation += T(" Cette entrée ne figure pas dans le catalogue de MAUS : vérifiez l'éditeur et le chemin avant de décider.");
         }
 
         var (status, severity, expected, advice, fixable, category) =
@@ -307,12 +307,12 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
 
         if (orphan)
         {
-            explanation += " Le programme visé n'existe plus sur le disque : l'entrée ne sert plus à rien.";
+            explanation += T(" Le programme visé n'existe plus sur le disque : l'entrée ne sert plus à rien.");
         }
 
         var title = match is { } m
             ? $"{m.App.Name} ({m.Family.Item})"
-            : $"{displayName} (non répertorié)";
+            : T("{0} (non répertorié)", displayName);
 
         return new Finding
         {
@@ -335,44 +335,44 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         var storeAdvice = isStore ? " " + SettingsAdvice : string.Empty;
         if (suspicion is not null)
         {
-            var advice = "Lancez une analyse complète avec Microsoft Defender (voir Module 1). En cas de doute, désactivez l'entrée et ne lancez pas ce programme.";
+            var advice = T("Lancez une analyse complète avec Microsoft Defender (voir Module 1). En cas de doute, désactivez l'entrée et ne lancez pas ce programme.");
             return enabled
-                ? (FindingStatusExtensions.ForDeviation(Severity.Medium), Severity.Medium, "vérifié par une analyse antivirus", advice, false, SuspiciousCategory)
-                : (FindingStatus.Info, Severity.Medium, "vérifié par une analyse antivirus", "L'entrée est déjà désactivée. " + advice, false, SuspiciousCategory);
+                ? (FindingStatusExtensions.ForDeviation(Severity.Medium), Severity.Medium, T("vérifié par une analyse antivirus"), advice, false, SuspiciousCategory)
+                : (FindingStatus.Info, Severity.Medium, T("vérifié par une analyse antivirus"), T("L'entrée est déjà désactivée. ") + advice, false, SuspiciousCategory);
         }
 
         if (entry.RunOnce)
         {
             return (FindingStatus.Info, Severity.Info, null,
-                "Affichage seul : cette commande s'exécutera une seule fois, puis Windows l'effacera.", false, null);
+                T("Affichage seul : cette commande s'exécutera une seule fois, puis Windows l'effacera."), false, null);
         }
 
         if (!enabled)
         {
             return family?.Advice == StartupAdvice.AlwaysKeep
-                ? (FindingStatus.Info, Severity.Info, "activé", "Cette protection est désactivée au démarrage : réactivez-la. " + SettingsAdvice, false, null)
-                : (FindingStatus.Ok, Severity.Low, "désactivé si inutile", null, false, null);
+                ? (FindingStatus.Info, Severity.Info, T("activé"), T("Cette protection est désactivée au démarrage : réactivez-la. ") + SettingsAdvice, false, null)
+                : (FindingStatus.Ok, Severity.Low, T("désactivé si inutile"), null, false, null);
         }
 
         if (orphan)
         {
-            return (FindingStatus.Improvable, Severity.Low, "désactivé (programme absent)",
-                "Désactivez cette entrée : elle ne lance plus rien. " + SettingsAdvice, !isStore, null);
+            return (FindingStatus.Improvable, Severity.Low, T("désactivé (programme absent)"),
+                T("Désactivez cette entrée : elle ne lance plus rien. ") + SettingsAdvice, !isStore, null);
         }
 
         if (family is null)
         {
-            return (FindingStatus.Info, Severity.Info, "à vous de décider",
-                "Si vous ne connaissez pas ce programme, recherchez son éditeur avant de le désactiver." + storeAdvice, !isStore, null);
+            return (FindingStatus.Info, Severity.Info, T("à vous de décider"),
+                T("Si vous ne connaissez pas ce programme, recherchez son éditeur avant de le désactiver.") + storeAdvice, !isStore, null);
         }
 
         return family.Advice switch
         {
-            StartupAdvice.Disable => (FindingStatus.Improvable, Severity.Low, "désactivé", family.Recommendation + storeAdvice, !isStore, null),
-            StartupAdvice.BrowserSettings => (FindingStatus.Improvable, Severity.Low, "désactivé dans le navigateur", family.Recommendation, false, null),
-            StartupAdvice.DependsOnUse => (FindingStatus.Info, Severity.Info, "selon votre usage", family.Recommendation + storeAdvice, !isStore, null),
-            StartupAdvice.KeepIfUsed => (FindingStatus.Info, Severity.Info, "activé si vous utilisez ce service", family.Recommendation, false, null),
-            _ => (FindingStatus.Ok, Severity.Info, "activé", family.Recommendation, false, null),
+            StartupAdvice.Disable => (FindingStatus.Improvable, Severity.Low, T("désactivé"), family.Recommendation + storeAdvice, !isStore, null),
+            StartupAdvice.BrowserSettings => (FindingStatus.Improvable, Severity.Low, T("désactivé dans le navigateur"), family.Recommendation, false, null),
+            StartupAdvice.DependsOnUse => (FindingStatus.Info, Severity.Info, T("selon votre usage"), family.Recommendation + storeAdvice, !isStore, null),
+            StartupAdvice.KeepIfUsed => (FindingStatus.Info, Severity.Info, T("activé si vous utilisez ce service"), family.Recommendation, false, null),
+            _ => (FindingStatus.Ok, Severity.Info, T("activé"), family.Recommendation, false, null),
         };
     }
 
@@ -381,25 +381,25 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         var active = entries.Count(e => e.Approval.Enabled && !e.RunOnce);
         var improvable = entryFindings.Count(f => f.Status == FindingStatus.Improvable);
         var suspicious = entryFindings.Count(f => f.Status == FindingStatus.Warning);
-        var current = $"{active} lancement(s) actif(s) sur {entries.Count} entrée(s), dont {improvable} à désactiver sans problème";
+        var current = T("{0} lancement(s) actif(s) sur {1} entrée(s), dont {2} à désactiver sans problème", active, entries.Count, improvable);
         if (suspicious > 0)
         {
-            current += $" et {suspicious} suspecte(s)";
+            current += T(" et {0} suspecte(s)", suspicious);
         }
 
         return new Finding
         {
             Id = "M12.summary",
-            Title = "Programmes lancés à l'ouverture de session",
+            Title = T("Programmes lancés à l'ouverture de session"),
             Category = SummaryCategory,
             Status = FindingStatus.Info,
             Current = current,
-            Explanation = "Chaque application lancée au démarrage retarde l'ouverture de session, occupe de la mémoire et parfois le processeur "
+            Explanation = T("Chaque application lancée au démarrage retarde l'ouverture de session, occupe de la mémoire et parfois le processeur "
                 + "en arrière-plan. Au-delà des réglages Windows, c'est ici que se gagne la performance au quotidien, surtout avec 8 Go de "
                 + "mémoire ou un disque dur. Désactiver une entrée ne désinstalle rien : l'application se lance toujours quand vous l'ouvrez. "
-                + "En V0.1, MAUS indique l'éditeur et le chemin de chaque programme ; la vérification de la signature numérique viendra ensuite.",
-            Advice = "Pour désactiver une entrée : Paramètres > Applications > Démarrage, ou Gestionnaire des tâches > Applications de démarrage. "
-                + "Rien n'est supprimé et tout se réactive en un clic. La V0.2 le proposera directement, familles « sans problème » pré-cochées.",
+                + "En V0.1, MAUS indique l'éditeur et le chemin de chaque programme ; la vérification de la signature numérique viendra ensuite."),
+            Advice = T("Pour désactiver une entrée : Paramètres > Applications > Démarrage, ou Gestionnaire des tâches > Applications de démarrage. "
+                + "Rien n'est supprimé et tout se réactive en un clic. La V0.2 le proposera directement, familles « sans problème » pré-cochées."),
         };
     }
 
@@ -407,7 +407,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     private static Finding DetectBootTime(AuditContext context)
     {
         const string id = "M12.boot-time";
-        const string title = "Durée du dernier démarrage mesurée par Windows";
+        var title = T("Durée du dernier démarrage mesurée par Windows");
         IReadOnlyList<EventRecordInfo> events;
         try
         {
@@ -419,7 +419,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         }
         catch (DataSourceUnavailableException)
         {
-            return Finding.Unknown(id, title, "Le journal des performances de démarrage est absent sur ce PC.", MeasureCategory);
+            return Finding.Unknown(id, title, T("Le journal des performances de démarrage est absent sur ce PC."), MeasureCategory);
         }
 
         var boot = events.Where(e => e.Id == 100).OrderByDescending(e => e.TimeCreated).FirstOrDefault();
@@ -427,16 +427,16 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         if (boot is null || seconds is null)
         {
             return Finding.Unknown(id, title,
-                "Aucune mesure de démarrage enregistrée ces 60 derniers jours. Avec le démarrage rapide actif, Windows en enregistre rarement (voir Module 5).",
+                T("Aucune mesure de démarrage enregistrée ces 60 derniers jours. Avec le démarrage rapide actif, Windows en enregistre rarement (voir Module 5)."),
                 MeasureCategory);
         }
 
-        var explanation = "Durée mesurée par Windows entre l'allumage et un bureau utilisable. C'est la référence pour juger le gain "
+        var explanation = T("Durée mesurée par Windows entre l'allumage et un bureau utilisable. C'est la référence pour juger le gain "
             + "après avoir désactivé des applications au démarrage. Avec le démarrage rapide actif, la mesure n'est prise qu'après un vrai "
-            + "redémarrage et peut être faussée (voir Module 5).";
+            + "redémarrage et peut être faussée (voir Module 5).");
         if (StartupParsers.ParseMilliseconds(boot.Data, "MainPathBootTime") is { } mainPath)
         {
-            explanation += $" Dont {mainPath.ToString("0.0", French)} s avant l'affichage du bureau.";
+            explanation += T(" Dont {0} s avant l'affichage du bureau.", mainPath.ToString("0.0", French));
         }
 
         var slowApps = events
@@ -451,7 +451,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             .ToList();
         if (slowApps.Count > 0)
         {
-            explanation += " Programmes signalés par Windows comme ralentissant le démarrage : "
+            explanation += T(" Programmes signalés par Windows comme ralentissant le démarrage : ")
                 + string.Join(", ", slowApps.Select(a => $"{a.Name} (+{a.Delay.ToString("0.0", French)} s)")) + ".";
         }
 
@@ -463,7 +463,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Status = FindingStatus.Info,
             Current = $"{seconds.Value.ToString("0.0", French)} s, le {boot.TimeCreated.ToString("dd/MM/yyyy", French)}",
             Explanation = explanation,
-            Advice = "Notez cette durée, désactivez les entrées inutiles, redémarrez, puis comparez.",
+            Advice = T("Notez cette durée, désactivez les entrées inutiles, redémarrez, puis comparez."),
         };
     }
 
@@ -471,7 +471,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     private static Finding DetectLogonTasks(ICimReader cim)
     {
         const string id = "M12.logon-tasks";
-        const string title = "Tâches planifiées lancées à l'ouverture de session";
+        var title = T("Tâches planifiées lancées à l'ouverture de session");
         IReadOnlyList<CimRow> rows;
         try
         {
@@ -483,7 +483,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         }
         catch (DataSourceUnavailableException)
         {
-            return Finding.Unknown(id, title, "La liste des tâches planifiées est indisponible sur ce PC.", OtherSourcesCategory);
+            return Finding.Unknown(id, title, T("La liste des tâches planifiées est indisponible sur ce PC."), OtherSourcesCategory);
         }
 
         var found = rows
@@ -498,12 +498,12 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Title = title,
             Category = OtherSourcesCategory,
             Status = found.Count == 0 ? FindingStatus.Ok : FindingStatus.Info,
-            Current = found.Count == 0 ? "aucune tâche tierce" : $"{found.Count} tâche(s)",
-            Explanation = "Certains programmes se lancent par le Planificateur de tâches plutôt que par la liste de démarrage : ils n'apparaissent "
+            Current = found.Count == 0 ? T("aucune tâche tierce") : T("{0} tâche(s)", found.Count),
+            Explanation = T("Certains programmes se lancent par le Planificateur de tâches plutôt que par la liste de démarrage : ils n'apparaissent "
                 + "pas dans le Gestionnaire des tâches. Les tâches de Windows (dossier Microsoft) sont exclues ; sans droits administrateur, "
-                + "les tâches d'autres comptes peuvent manquer."
-                + (found.Count == 0 ? string.Empty : " Tâches trouvées : " + string.Join(" ; ", found) + "."),
-            Advice = found.Count == 0 ? null : "Affichage seul pour l'instant : la V0.2 proposera de désactiver une tâche, avec votre accord.",
+                + "les tâches d'autres comptes peuvent manquer.")
+                + (found.Count == 0 ? string.Empty : T(" Tâches trouvées : ") + string.Join(" ; ", found) + "."),
+            Advice = found.Count == 0 ? null : T("Affichage seul pour l'instant : la V0.2 proposera de désactiver une tâche, avec votre accord."),
             Fixable = found.Count > 0,
         };
     }
@@ -512,7 +512,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     private Finding DetectThirdPartyServices(AuditContext context, string windowsDirectory)
     {
         const string id = "M12.third-party-services";
-        const string title = "Services tiers démarrant avec Windows";
+        var title = T("Services tiers démarrant avec Windows");
         IReadOnlyList<CimRow> rows;
         try
         {
@@ -524,7 +524,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         }
         catch (DataSourceUnavailableException)
         {
-            return Finding.Unknown(id, title, "La liste des services est indisponible.", OtherSourcesCategory);
+            return Finding.Unknown(id, title, T("La liste des services est indisponible."), OtherSourcesCategory);
         }
 
         var services = new List<string>();
@@ -561,11 +561,11 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Title = title,
             Category = OtherSourcesCategory,
             Status = FindingStatus.Info,
-            Current = $"{services.Count} service(s) tiers en démarrage automatique",
-            Explanation = "Services installés par d'autres éditeurs que Microsoft (pilotes, antivirus, outils de mise à jour, anti-triche) : "
-                + "ils démarrent avec Windows, avant même l'ouverture de session."
+            Current = T("{0} service(s) tiers en démarrage automatique", services.Count),
+            Explanation = T("Services installés par d'autres éditeurs que Microsoft (pilotes, antivirus, outils de mise à jour, anti-triche) : "
+                + "ils démarrent avec Windows, avant même l'ouverture de session.")
                 + (services.Count == 0 ? string.Empty : $" {list}{(services.Count > shown ? $", et {services.Count - shown} autre(s)" : string.Empty)}."),
-            Advice = "Affichage seul : ne désactivez pas un service sans savoir à quoi il sert. MAUS ne les modifiera pas.",
+            Advice = T("Affichage seul : ne désactivez pas un service sans savoir à quoi il sert. MAUS ne les modifiera pas."),
         };
     }
 

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M11Health;
 
@@ -21,11 +22,11 @@ internal sealed record PhysicalDiskInfo(
 
     public string MediaLabel => (IsHdd, IsSsd, BusType) switch
     {
-        (true, _, _) => "disque dur (HDD)",
+        (true, _, _) => T("disque dur (HDD)"),
         (_, true, 17) => "SSD NVMe",
         (_, true, 11) => "SSD SATA",
         (_, true, _) => "SSD",
-        _ => "type de disque inconnu",
+        _ => T("type de disque inconnu"),
     };
 
     public string BusLabel => BusType switch
@@ -38,10 +39,10 @@ internal sealed record PhysicalDiskInfo(
         11 => "SATA",
         12 => "carte SD",
         13 => "MMC",
-        16 => "Espaces de stockage",
+        16 => T("Espaces de stockage"),
         17 => "NVMe",
         19 => "UFS",
-        _ => "bus inconnu",
+        _ => T("bus inconnu"),
     };
 }
 

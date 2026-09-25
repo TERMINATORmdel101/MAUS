@@ -1,6 +1,7 @@
 using System.Globalization;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M11Health;
 
@@ -18,7 +19,7 @@ public sealed class HardwareHealthModule : IAuditModule
     internal const string ProcessorPowerProvider = "Microsoft-Windows-Kernel-Processor-Power";
 
     private const string StorageCategory = "Stockage";
-    private const string MemoryCategory = "Mémoire";
+    private static string MemoryCategory => T("Mémoire");
     private const string ProcessorCategory = "Processeur";
     private const string BenchmarkCategory = "Mini-benchmark";
 
@@ -33,7 +34,7 @@ public sealed class HardwareHealthModule : IAuditModule
 
     public string Id => "M11";
 
-    public string Title => "Mini-benchmark santé";
+    public string Title => T("Mini-benchmark santé");
 
     public int Order => 110;
 
@@ -76,13 +77,13 @@ public sealed class HardwareHealthModule : IAuditModule
     private static List<PhysicalDiskInfo>? ReadDisks(ICimReader cim, List<Finding> findings)
     {
         const string id = "M11.disks";
-        const string title = "Santé des disques";
+        var title = T("Santé des disques");
         try
         {
             var disks = cim.Query(DiskQuery, CimScopes.Storage)
                 .Select(row => new PhysicalDiskInfo(
                     row.GetString("DeviceId") ?? "?",
-                    row.GetString("FriendlyName")?.Trim() is { Length: > 0 } name ? name : "sans nom",
+                    row.GetString("FriendlyName")?.Trim() is { Length: > 0 } name ? name : T("sans nom"),
                     row.GetInt64("MediaType") ?? 0,
                     row.GetInt64("BusType") ?? 0,
                     row.GetInt64("HealthStatus"),
@@ -92,7 +93,7 @@ public sealed class HardwareHealthModule : IAuditModule
                 .ToList();
             if (disks.Count == 0)
             {
-                findings.Add(Finding.Unknown(id, title, "Aucun disque physique n'a été renvoyé par Windows.", StorageCategory));
+                findings.Add(Finding.Unknown(id, title, T("Aucun disque physique n'a été renvoyé par Windows."), StorageCategory));
                 return null;
             }
 
@@ -104,7 +105,7 @@ public sealed class HardwareHealthModule : IAuditModule
         }
         catch (DataSourceUnavailableException)
         {
-            findings.Add(Finding.Unknown(id, title, "L'inventaire des disques (Storage Management) est indisponible sur ce PC.", StorageCategory));
+            findings.Add(Finding.Unknown(id, title, T("L'inventaire des disques (Storage Management) est indisponible sur ce PC."), StorageCategory));
         }
 
         return null;
@@ -114,7 +115,7 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding DetectSystemDisk(ICimReader cim, IReadOnlyList<PhysicalDiskInfo> disks, char systemLetter)
     {
         const string id = "M11.system-disk";
-        const string title = "Windows installé sur un SSD";
+        var title = T("Windows installé sur un SSD");
         PhysicalDiskInfo? disk;
         try
         {
@@ -137,7 +138,7 @@ public sealed class HardwareHealthModule : IAuditModule
 
         if (disk is null || (!disk.IsHdd && !disk.IsSsd))
         {
-            return Finding.Unknown(id, title, $"Impossible de relier le lecteur {systemLetter}: à un disque physique de type connu.", StorageCategory);
+            return Finding.Unknown(id, title, T("Impossible de relier le lecteur {0}: à un disque physique de type connu.", systemLetter), StorageCategory);
         }
 
         return new Finding
@@ -149,11 +150,11 @@ public sealed class HardwareHealthModule : IAuditModule
             Severity = Severity.Medium,
             Current = $"{disk.MediaLabel} ({disk.Name})",
             Expected = "SSD",
-            Explanation = $"Le lecteur {systemLetter}: contient Windows. Sur un disque dur, le démarrage, les mises à jour et l'ouverture des applications "
-                + "sont plusieurs fois plus lents que sur un SSD.",
+            Explanation = T("Le lecteur {0}: contient Windows. Sur un disque dur, le démarrage, les mises à jour et l'ouverture des applications "
+                + "sont plusieurs fois plus lents que sur un SSD.", systemLetter),
             Advice = disk.IsHdd
-                ? "Passer Windows sur un SSD est l'amélioration la plus visible sur un PC ancien. Un SSD SATA ou NVMe d'entrée de gamme suffit ; "
-                    + "le clonage du disque se fait avec l'outil fourni par le fabricant du SSD."
+                ? T("Passer Windows sur un SSD est l'amélioration la plus visible sur un PC ancien. Un SSD SATA ou NVMe d'entrée de gamme suffit ; "
+                    + "le clonage du disque se fait avec l'outil fourni par le fabricant du SSD.")
                 : null,
         };
     }
@@ -161,17 +162,17 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding DetectDiskHealth(PhysicalDiskInfo disk)
     {
         var id = $"M11.disk-{Slug(disk.DeviceId)}-health";
-        var title = $"Santé du disque {disk.Name}";
+        var title = T("Santé du disque {0}", disk.Name);
         var size = disk.SizeBytes is > 0 ? $" · {HealthParsers.FormatGigabytes(disk.SizeBytes.Value)}" : string.Empty;
         var bus = disk.MediaLabel.Contains(disk.BusLabel, StringComparison.Ordinal) ? string.Empty : $" ({disk.BusLabel})";
         var (status, label, advice) = disk.HealthStatus switch
         {
             0 => (FindingStatus.Ok, "sain", (string?)null),
             1 => (FindingStatus.Warning, "avertissement",
-                "Sauvegardez vos données importantes dès maintenant et surveillez ce disque : Windows y a détecté un début d'anomalie."),
-            2 => (FindingStatus.Problem, "défaillant",
-                "Sauvegardez immédiatement vos données : Windows considère ce disque comme défaillant. Prévoyez son remplacement."),
-            _ => (FindingStatus.Unknown, "état non communiqué", null),
+                T("Sauvegardez vos données importantes dès maintenant et surveillez ce disque : Windows y a détecté un début d'anomalie.")),
+            2 => (FindingStatus.Problem, T("défaillant"),
+                T("Sauvegardez immédiatement vos données : Windows considère ce disque comme défaillant. Prévoyez son remplacement.")),
+            _ => (FindingStatus.Unknown, T("état non communiqué"), null),
         };
 
         return new Finding
@@ -183,8 +184,8 @@ public sealed class HardwareHealthModule : IAuditModule
             Severity = disk.HealthStatus == 1 ? Severity.Medium : Severity.High,
             Current = $"{label} · {disk.MediaLabel}{bus}{size}",
             Expected = "sain",
-            Explanation = "État de santé global que Windows attribue au disque d'après ses propres diagnostics (SMART). "
-                + "Un disque en avertissement ou défaillant peut perdre des données à tout moment.",
+            Explanation = T("État de santé global que Windows attribue au disque d'après ses propres diagnostics (SMART). "
+                + "Un disque en avertissement ou défaillant peut perdre des données à tout moment."),
             Advice = advice,
         };
     }
@@ -192,7 +193,7 @@ public sealed class HardwareHealthModule : IAuditModule
     private static List<Finding> DetectReliability(ICimReader cim, IReadOnlyList<PhysicalDiskInfo> disks)
     {
         const string id = "M11.disk-reliability";
-        const string title = "Usure, erreurs et température des disques";
+        var title = T("Usure, erreurs et température des disques");
         IReadOnlyList<CimRow> rows;
         try
         {
@@ -204,7 +205,7 @@ public sealed class HardwareHealthModule : IAuditModule
         }
         catch (DataSourceUnavailableException)
         {
-            return [Finding.Unknown(id, title, "Les compteurs de fiabilité des disques sont indisponibles sur ce PC.", StorageCategory)];
+            return [Finding.Unknown(id, title, T("Les compteurs de fiabilité des disques sont indisponibles sur ce PC."), StorageCategory)];
         }
 
         return disks.Select(disk => DetectDiskReliability(disk, rows.FirstOrDefault(r => r.GetString("DeviceId") == disk.DeviceId))).ToList();
@@ -213,10 +214,10 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding DetectDiskReliability(PhysicalDiskInfo disk, CimRow? row)
     {
         var id = $"M11.disk-{Slug(disk.DeviceId)}-reliability";
-        var title = $"Usure, erreurs et température du disque {disk.Name}";
+        var title = T("Usure, erreurs et température du disque {0}", disk.Name);
         if (row is null)
         {
-            return Finding.Unknown(id, title, "Ce disque ne transmet pas ses compteurs de fiabilité (fréquent pour les disques USB ou derrière un contrôleur RAID).", StorageCategory);
+            return Finding.Unknown(id, title, T("Ce disque ne transmet pas ses compteurs de fiabilité (fréquent pour les disques USB ou derrière un contrôleur RAID)."), StorageCategory);
         }
 
         var wear = row.GetInt64("Wear");
@@ -234,7 +235,7 @@ public sealed class HardwareHealthModule : IAuditModule
             shown.Add($"usure {wear} %");
             if (wear >= WearWarningPercent)
             {
-                warnings.Add($"usure de {wear} % (alerte à partir de {WearWarningPercent} %)");
+                warnings.Add(T("usure de {0} % (alerte à partir de {1} %)", wear, WearWarningPercent));
             }
         }
 
@@ -243,36 +244,36 @@ public sealed class HardwareHealthModule : IAuditModule
             shown.Add(temperatureMax is > 0 ? $"{temperature} °C (limite {temperatureMax} °C)" : $"{temperature} °C");
             if (temperatureMax is > 0 && temperature >= temperatureMax)
             {
-                problems.Add("température à la limite de fonctionnement du disque");
+                problems.Add(T("température à la limite de fonctionnement du disque"));
             }
         }
 
         if (readErrors is not null)
         {
-            shown.Add(readErrors == 0 ? "aucune erreur de lecture non corrigée" : $"{readErrors} erreur(s) de lecture non corrigée(s)");
+            shown.Add(readErrors == 0 ? T("aucune erreur de lecture non corrigée") : T("{0} erreur(s) de lecture non corrigée(s)", readErrors));
             if (readErrors > 0)
             {
-                problems.Add($"{readErrors} erreur(s) de lecture que le disque n'a pas pu corriger");
+                problems.Add(T("{0} erreur(s) de lecture que le disque n'a pas pu corriger", readErrors));
             }
         }
 
         if (latency is > 0)
         {
-            shown.Add($"lecture la plus lente : {latency} ms");
+            shown.Add(T("lecture la plus lente : {0} ms", latency));
             if (latency > ReadLatencyProblemMs)
             {
-                problems.Add("une lecture a pris plus de 10 secondes");
+                problems.Add(T("une lecture a pris plus de 10 secondes"));
             }
         }
 
         if (hours is > 0)
         {
-            shown.Add($"{hours} h de fonctionnement");
+            shown.Add(T("{0} h de fonctionnement", hours));
         }
 
         if (shown.Count == 0)
         {
-            return Finding.Unknown(id, title, "Le disque renvoie des compteurs de fiabilité vides.", StorageCategory);
+            return Finding.Unknown(id, title, T("Le disque renvoie des compteurs de fiabilité vides."), StorageCategory);
         }
 
         var severity = problems.Count > 0 ? Severity.High : warnings.Count > 0 ? Severity.Medium : Severity.High;
@@ -285,12 +286,12 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = deviating ? FindingStatusExtensions.ForDeviation(severity) : FindingStatus.Ok,
             Severity = severity,
             Current = string.Join(" · ", shown),
-            Expected = $"usure < {WearWarningPercent} %, aucune erreur non corrigée, température sous la limite",
-            Explanation = "Compteurs tenus par le disque lui-même : usure des cellules (SSD), erreurs de lecture non corrigées, "
-                + "température et temps de réponse. Ils annoncent souvent une panne avant qu'elle ne survienne.",
+            Expected = T("usure < {0} %, aucune erreur non corrigée, température sous la limite", WearWarningPercent),
+            Explanation = T("Compteurs tenus par le disque lui-même : usure des cellules (SSD), erreurs de lecture non corrigées, "
+                + "température et temps de réponse. Ils annoncent souvent une panne avant qu'elle ne survienne."),
             Advice = deviating
-                ? $"À surveiller : {string.Join(", ", problems.Concat(warnings))}. Sauvegardez vos données importantes"
-                    + (problems.Count > 0 ? " sans attendre et prévoyez le remplacement du disque." : " et prévoyez le remplacement du disque à moyen terme.")
+                ? T("À surveiller : {0}. Sauvegardez vos données importantes", string.Join(", ", problems.Concat(warnings)))
+                    + (problems.Count > 0 ? T(" sans attendre et prévoyez le remplacement du disque.") : T(" et prévoyez le remplacement du disque à moyen terme."))
                 : null,
         };
     }
@@ -298,7 +299,7 @@ public sealed class HardwareHealthModule : IAuditModule
     private static async Task<Finding> DetectTrimAsync(ICommandRunner commands, IReadOnlyList<PhysicalDiskInfo>? disks, CancellationToken cancellationToken)
     {
         const string id = "M11.trim";
-        const string title = "TRIM activé pour les SSD";
+        var title = T("TRIM activé pour les SSD");
         CommandResult result;
         try
         {
@@ -306,13 +307,13 @@ public sealed class HardwareHealthModule : IAuditModule
         }
         catch (Exception ex) when (ex is DataSourceUnavailableException or InvalidOperationException or MausAccessDeniedException)
         {
-            return Finding.Unknown(id, title, "La commande fsutil n'a pas pu être lancée.", StorageCategory);
+            return Finding.Unknown(id, title, T("La commande fsutil n'a pas pu être lancée."), StorageCategory);
         }
 
         var value = result.TimedOut || result.ExitCode != 0 ? null : HealthParsers.ParseNtfsDisableDeleteNotify(result.StandardOutput);
         if (value is not (0 or 1))
         {
-            return Finding.Unknown(id, title, "Réponse de fsutil illisible : état de TRIM inconnu.", StorageCategory);
+            return Finding.Unknown(id, title, T("Réponse de fsutil illisible : état de TRIM inconnu."), StorageCategory);
         }
 
         var hasSsd = disks?.Any(d => d.IsSsd) ?? true;
@@ -324,13 +325,13 @@ public sealed class HardwareHealthModule : IAuditModule
             Category = StorageCategory,
             Status = enabled ? FindingStatus.Ok : hasSsd ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Info,
             Severity = Severity.Medium,
-            Current = enabled ? "activé (DisableDeleteNotify = 0)" : "désactivé (DisableDeleteNotify = 1)" + (hasSsd ? string.Empty : ", sans effet : aucun SSD détecté"),
-            Expected = "activé (DisableDeleteNotify = 0)",
-            Explanation = "TRIM indique au SSD quels blocs sont libérés. Sans lui, le SSD ralentit en écriture au fil du temps et s'use plus vite.",
+            Current = enabled ? T("activé (DisableDeleteNotify = 0)") : T("désactivé (DisableDeleteNotify = 1)") + (hasSsd ? string.Empty : T(", sans effet : aucun SSD détecté")),
+            Expected = T("activé (DisableDeleteNotify = 0)"),
+            Explanation = T("TRIM indique au SSD quels blocs sont libérés. Sans lui, le SSD ralentit en écriture au fil du temps et s'use plus vite."),
             Advice = enabled || !hasSsd
                 ? null
-                : "Réactiver TRIM (commande fsutil behavior set DisableDeleteNotify 0), puis lancer une optimisation du lecteur. "
-                    + "La V0.2 le proposera, avec retour arrière possible.",
+                : T("Réactiver TRIM (commande fsutil behavior set DisableDeleteNotify 0), puis lancer une optimisation du lecteur. "
+                    + "La V0.2 le proposera, avec retour arrière possible."),
             Fixable = !enabled && hasSsd,
         };
     }
@@ -338,7 +339,7 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding DetectFreeSpace(IFileSystemReader files, char systemLetter)
     {
         const string id = "M11.free-space";
-        const string title = "Espace libre sur le disque système";
+        var title = T("Espace libre sur le disque système");
         (long FreeBytes, long TotalBytes)? space;
         try
         {
@@ -351,7 +352,7 @@ public sealed class HardwareHealthModule : IAuditModule
 
         if (space is not { TotalBytes: > 0 } drive)
         {
-            return Finding.Unknown(id, title, $"Espace du lecteur {systemLetter}: illisible.", StorageCategory);
+            return Finding.Unknown(id, title, T("Espace du lecteur {0}: illisible.", systemLetter), StorageCategory);
         }
 
         var ratio = (double)drive.FreeBytes / drive.TotalBytes;
@@ -363,12 +364,12 @@ public sealed class HardwareHealthModule : IAuditModule
             Category = StorageCategory,
             Status = low ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
-            Current = $"{HealthParsers.FormatGigabytes(drive.FreeBytes)} libres sur {HealthParsers.FormatGigabytes(drive.TotalBytes)} ({ratio.ToString("0 %", French)})",
-            Expected = "au moins 15 % libres",
-            Explanation = $"Windows a besoin de place sur {systemLetter}: pour ses mises à jour, sa mémoire virtuelle et ses fichiers temporaires. "
-                + "Un SSD presque plein ralentit aussi en écriture.",
+            Current = T("{0} libres sur {1} ({2})", HealthParsers.FormatGigabytes(drive.FreeBytes), HealthParsers.FormatGigabytes(drive.TotalBytes), ratio.ToString("0 %", French)),
+            Expected = T("au moins 15 % libres"),
+            Explanation = T("Windows a besoin de place sur {0}: pour ses mises à jour, sa mémoire virtuelle et ses fichiers temporaires. "
+                + "Un SSD presque plein ralentit aussi en écriture.", systemLetter),
             Advice = low
-                ? "Libérez de la place : Paramètres > Système > Stockage > Recommandations de nettoyage, puis désinstallez les jeux et applications inutilisés."
+                ? T("Libérez de la place : Paramètres > Système > Stockage > Recommandations de nettoyage, puis désinstallez les jeux et applications inutilisés.")
                 : null,
         };
     }
@@ -377,7 +378,7 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding DetectMemoryBandwidth(ICimReader cim)
     {
         const string id = "M11.ram-bandwidth";
-        const string title = "Débit mémoire théorique";
+        var title = T("Débit mémoire théorique");
         IReadOnlyList<CimRow> modules;
         try
         {
@@ -399,7 +400,7 @@ public sealed class HardwareHealthModule : IAuditModule
             .ToList();
         if (modules.Count == 0 || speeds.Count == 0)
         {
-            return Finding.Unknown(id, title, "Vitesse des barrettes mémoire non communiquée par le BIOS.", MemoryCategory);
+            return Finding.Unknown(id, title, T("Vitesse des barrettes mémoire non communiquée par le BIOS."), MemoryCategory);
         }
 
         var mts = speeds.Min();
@@ -409,7 +410,7 @@ public sealed class HardwareHealthModule : IAuditModule
         var capacity = modules.Sum(m => m.GetInt64("Capacity") ?? 0);
         var type = modules.Select(m => HealthParsers.MemoryTypeLabel(m.GetInt64("SMBIOSMemoryType"))).FirstOrDefault(t => t is not null);
         var description = $"{modules.Count} barrette(s)"
-            + (capacity > 0 ? $", {HealthParsers.FormatGigabytes(capacity)} au total" : string.Empty)
+            + (capacity > 0 ? T(", {0} au total", HealthParsers.FormatGigabytes(capacity)) : string.Empty)
             + (type is null ? string.Empty : $" ({type})");
 
         return new Finding
@@ -419,9 +420,9 @@ public sealed class HardwareHealthModule : IAuditModule
             Category = MemoryCategory,
             Status = FindingStatus.Info,
             Current = $"{gigabytesPerSecond.ToString("0.0", French)} Go/s",
-            Explanation = $"Calcul : {channels} canal(aux){(estimated ? " (estimation)" : string.Empty)} × {mts} MT/s × 8 octets. {description}. "
-                + "C'est un plafond théorique : le mini-benchmark de la V0.3 mesurera le débit réel et le comparera à cette valeur.",
-            Advice = "Nombre de canaux et profil XMP/EXPO : voir Module 10.",
+            Explanation = T("Calcul : {0} canal(aux){1} × {2} MT/s × 8 octets. {3}. "
+                + "C'est un plafond théorique : le mini-benchmark de la V0.3 mesurera le débit réel et le comparera à cette valeur.", channels, (estimated ? " (estimation)" : string.Empty), mts, description),
+            Advice = T("Nombre de canaux et profil XMP/EXPO : voir Module 10."),
         };
     }
 
@@ -429,7 +430,7 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding DetectFirmwareThrottling(AuditContext context)
     {
         const string id = "M11.firmware-throttling";
-        const string title = "Processeur non bridé par le firmware";
+        var title = T("Processeur non bridé par le firmware");
         IReadOnlyList<EventRecordInfo> events;
         try
         {
@@ -441,7 +442,7 @@ public sealed class HardwareHealthModule : IAuditModule
         }
         catch (DataSourceUnavailableException)
         {
-            return Finding.Unknown(id, title, "Journal Système indisponible.", ProcessorCategory);
+            return Finding.Unknown(id, title, T("Journal Système indisponible."), ProcessorCategory);
         }
 
         var laptop = context.Hardware.IsLaptop;
@@ -454,14 +455,14 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = !throttled ? FindingStatus.Ok : laptop ? FindingStatus.Info : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = throttled
-                ? $"{events.Count} alerte(s) en 30 jours, la dernière le {events.Max(e => e.TimeCreated).ToString("dd/MM/yyyy", French)}"
-                : "aucune alerte en 30 jours",
-            Expected = "aucune alerte",
-            Explanation = "Windows note (événement 37 de Kernel-Processor-Power) chaque fois que le BIOS limite la vitesse du processeur : "
-                + "surchauffe, limite de puissance ou alimentation insuffisante."
-                + (laptop ? " Sur un portable, c'est souvent normal sur batterie ou avec un chargeur peu puissant." : string.Empty),
+                ? T("{0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("dd/MM/yyyy", French))
+                : T("aucune alerte en 30 jours"),
+            Expected = T("aucune alerte"),
+            Explanation = T("Windows note (événement 37 de Kernel-Processor-Power) chaque fois que le BIOS limite la vitesse du processeur : "
+                + "surchauffe, limite de puissance ou alimentation insuffisante.")
+                + (laptop ? T(" Sur un portable, c'est souvent normal sur batterie ou avec un chargeur peu puissant.") : string.Empty),
             Advice = throttled
-                ? "Vérifiez la ventilation (poussière, pâte thermique), puis le plan d'alimentation (Module 5) et la version du BIOS (Module 8)."
+                ? T("Vérifiez la ventilation (poussière, pâte thermique), puis le plan d'alimentation (Module 5) et la version du BIOS (Module 8).")
                 : null,
         };
     }
@@ -469,15 +470,15 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding BenchmarkNotice() => new()
     {
         Id = "M11.benchmark",
-        Title = "Mini-benchmark actif : prévu en V0.3",
+        Title = T("Mini-benchmark actif : prévu en V0.3"),
         Category = BenchmarkCategory,
         Status = FindingStatus.Info,
-        Current = "non lancé (audit seul)",
-        Explanation = "« Ce test ne rend pas votre PC plus rapide : il vérifie qu'il fonctionne comme prévu. » "
+        Current = T("non lancé (audit seul)"),
+        Explanation = T("« Ce test ne rend pas votre PC plus rapide : il vérifie qu'il fonctionne comme prévu. » "
             + "À partir de la V0.3, un test d'environ 2 min 30 s mesurera le processeur, la mémoire, la carte graphique et le stockage, "
             + "et gardera les résultats pour comparer avant et après optimisation. Cette version se limite aux indicateurs passifs ci-dessus. "
-            + "La température du processeur n'est pas lue : elle exige un pilote noyau, que MAUS n'installe pas.",
-        Advice = "En attendant, les causes de lenteur les plus fréquentes sont vérifiées par les Modules 5 (alimentation), 10 (mémoire) et 12 (démarrage).",
+            + "La température du processeur n'est pas lue : elle exige un pilote noyau, que MAUS n'installe pas."),
+        Advice = T("En attendant, les causes de lenteur les plus fréquentes sont vérifiées par les Modules 5 (alimentation), 10 (mémoire) et 12 (démarrage)."),
     };
 
     private static string Slug(string value)

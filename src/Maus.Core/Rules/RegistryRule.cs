@@ -1,5 +1,6 @@
 using Maus.Core.Fixes;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Rules;
 
@@ -59,7 +60,7 @@ public sealed record RegistryRule
     {
         "HKLM" or "HKEY_LOCAL_MACHINE" => RegistryHive.LocalMachine,
         "HKCU" or "HKEY_CURRENT_USER" => RegistryHive.CurrentUser,
-        _ => throw new FormatException($"Ruche inconnue dans la règle {Id} : {Hive}"),
+        _ => throw new FormatException(T("Ruche inconnue dans la règle {0} : {1}", Id, Hive)),
     };
 }
 

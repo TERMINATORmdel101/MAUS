@@ -3,6 +3,7 @@ using Maus.Core;
 using Maus.Core.Engine;
 using Maus.Core.Fixes;
 using Maus.Core.Reporting;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Cli;
 
@@ -13,7 +14,7 @@ internal static class FixCommands
     {
         if (plan.Count == 0)
         {
-            output.WriteLine("Aucune correction à proposer.");
+            output.WriteLine(T("Aucune correction à proposer."));
             return;
         }
 
@@ -23,7 +24,7 @@ internal static class FixCommands
             output.WriteLine($"== {group.Key} ==");
             foreach (var change in group)
             {
-                var mark = change.Advanced ? "[avancé]" : change.Recommended ? "[recommandé]" : "[au choix]";
+                var mark = change.Advanced ? T("[avancé]") : change.Recommended ? T("[recommandé]") : T("[au choix]");
                 output.WriteLine($"  {change.Id,-34} {mark} {change.Title}");
                 output.WriteLine($"      {change.Description}");
                 if (change.Warning is not null)
@@ -49,7 +50,7 @@ internal static class FixCommands
         }
 
         output.WriteLine();
-        output.WriteLine("Pour appliquer : maus --apply <identifiant> [...]  ou  maus --apply-recommended");
+        output.WriteLine(T("Pour appliquer : maus --apply <identifiant> [...]  ou  maus --apply-recommended"));
     }
 
     public static (int ExitCode, ApplyResult? Result) Apply(FixContext context, IReadOnlyList<PlannedChange> selected, ApplyOptions options, bool assumeYes, TextWriter output)
@@ -63,23 +64,23 @@ internal static class FixCommands
 
         if (selected.Count == 0)
         {
-            output.WriteLine("Aucune correction ne correspond à la sélection (déjà conforme, ou identifiant inconnu : voir maus --plan).");
+            output.WriteLine(T("Aucune correction ne correspond à la sélection (déjà conforme, ou identifiant inconnu : voir maus --plan)."));
             return (1, null);
         }
 
-        output.WriteLine("Corrections sélectionnées :");
+        output.WriteLine(T("Corrections sélectionnées :"));
         foreach (var change in selected)
         {
             output.WriteLine($"  - {change.Title} ({change.Id})");
         }
 
         output.WriteLine(options.CreateRestorePoint
-            ? "Un point de restauration sera créé et vérifié avant toute modification."
-            : "Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler).");
+            ? T("Un point de restauration sera créé et vérifié avant toute modification.")
+            : T("Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler)."));
 
-        if (!assumeYes && !Confirm("Appliquer ces corrections ? (o/N) "))
+        if (!assumeYes && !Confirm(T("Appliquer ces corrections ? (o/N) ")))
         {
-            output.WriteLine("Annulé : rien n'a été modifié.");
+            output.WriteLine(T("Annulé : rien n'a été modifié."));
             return (1, null);
         }
 
@@ -94,7 +95,7 @@ internal static class FixCommands
             output.WriteLine(result.BlockedReason);
             if (result.RestorePoint?.Status == RestorePointStatus.ProtectionDisabled)
             {
-                output.WriteLine("Relancez avec --enable-protection pour activer la protection du système, ou --without-restore-point pour continuer sans.");
+                output.WriteLine(T("Relancez avec --enable-protection pour activer la protection du système, ou --without-restore-point pour continuer sans."));
             }
 
             return (3, result);
@@ -107,12 +108,12 @@ internal static class FixCommands
 
         if (result.RequiredEffect != ChangeEffect.Immediate)
         {
-            output.WriteLine($"Certaines corrections ont un {Labels.Of(result.RequiredEffect)}.");
+            output.WriteLine(T("Certaines corrections ont un {0}.", Labels.Of(result.RequiredEffect)));
         }
 
         if (result.Session is { CanRevert: true } session)
         {
-            output.WriteLine($"Séance enregistrée : {session.Id}. Pour tout annuler : maus --revert {session.Id}");
+            output.WriteLine(T("Séance enregistrée : {0}. Pour tout annuler : maus --revert {0}", session.Id));
         }
 
         return (result.Changes.Any(c => c.Status == ChangeStatus.Failed) ? 2 : 0, result);
@@ -121,15 +122,15 @@ internal static class FixCommands
     public static void PrintVerification(IReadOnlyList<VerifiedOutcome> verified, TextWriter output)
     {
         output.WriteLine();
-        output.WriteLine("Vérification par un nouvel audit :");
+        output.WriteLine(T("Vérification par un nouvel audit :"));
         foreach (var item in verified.Where(v => v.Outcome.Status == ChangeStatus.Applied))
         {
             var mark = item.Check switch
             {
-                EffectCheck.Confirmed => "confirmé",
-                EffectCheck.PendingRestart => "en attente",
+                EffectCheck.Confirmed => T("confirmé"),
+                EffectCheck.PendingRestart => T("en attente"),
                 EffectCheck.NoEffect => "SANS EFFET",
-                _ => "non vérifié",
+                _ => T("non vérifié"),
             };
             output.WriteLine($"  [{mark}] {item.Outcome.Title} : {item.Message}");
         }
@@ -140,13 +141,13 @@ internal static class FixCommands
         var sessions = journal.List();
         if (sessions.Count == 0)
         {
-            output.WriteLine("Journal vide : MAUS n'a encore rien modifié sur ce PC.");
+            output.WriteLine(T("Journal vide : MAUS n'a encore rien modifié sur ce PC."));
             return 0;
         }
 
         foreach (var session in sessions)
         {
-            var state = session.RevertedAt is not null ? "annulée" : session.CanRevert ? "active" : "sans modification en cours";
+            var state = session.RevertedAt is not null ? T("annulée") : session.CanRevert ? T("active") : T("sans modification en cours");
             output.WriteLine($"{session.Id}  {session.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}  {state}  ({session.Entries.Count(e => e.State is EntryState.Applied or EntryState.Reverted or EntryState.RevertSkipped)} valeur(s))");
             foreach (var entry in session.Entries)
             {
@@ -163,10 +164,10 @@ internal static class FixCommands
 
     public static int Revert(FixContext context, string sessionId, string? changeId, bool force, bool assumeYes, TextWriter output)
     {
-        var what = changeId is null ? $"de la séance {sessionId}" : $"de la correction {changeId} (séance {sessionId})";
-        if (!assumeYes && !Confirm($"Remettre les valeurs d'origine {what} ? (o/N) "))
+        var what = changeId is null ? T("de la séance {0}", sessionId) : T("de la correction {0} (séance {1})", changeId, sessionId);
+        if (!assumeYes && !Confirm(T("Remettre les valeurs d'origine {0} ? (o/N) ", what)))
         {
-            output.WriteLine("Annulé : rien n'a été modifié.");
+            output.WriteLine(T("Annulé : rien n'a été modifié."));
             return 1;
         }
 
@@ -184,7 +185,7 @@ internal static class FixCommands
 
         if (result.Entries.Any(e => e.Status == RevertStatus.ChangedSince))
         {
-            output.WriteLine("Des valeurs ont changé depuis la correction et ont été laissées telles quelles. --force les remet quand même à leur valeur d'origine.");
+            output.WriteLine(T("Des valeurs ont changé depuis la correction et ont été laissées telles quelles. --force les remet quand même à leur valeur d'origine."));
         }
 
         return result.Completed ? 0 : 2;
@@ -193,10 +194,13 @@ internal static class FixCommands
     public static IReadOnlyList<PlannedChange> Plan(AuditEngine engine, IReadOnlyList<ModuleResult> results, AuditContext context) =>
         FixEngine.Plan(engine, results, context);
 
+    private static readonly HashSet<string> YesAnswers = new(["o", "oui", "y", "yes", "s", "si", "sí"], StringComparer.OrdinalIgnoreCase);
+
     public static bool Confirm(string question)
     {
         Console.Write(question);
         var answer = Console.ReadLine()?.Trim();
-        return answer is not null && (answer.Equals("o", StringComparison.OrdinalIgnoreCase) || answer.Equals("oui", StringComparison.OrdinalIgnoreCase));
+        // Oui en français, anglais ou espagnol, quelle que soit la langue affichée.
+        return answer is not null && YesAnswers.Contains(answer);
     }
 }

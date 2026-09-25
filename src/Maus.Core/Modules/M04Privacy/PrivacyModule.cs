@@ -1,5 +1,6 @@
 using Maus.Core.Fixes;
 using Maus.Core.Rules;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M04Privacy;
 
@@ -14,7 +15,7 @@ public sealed class PrivacyModule : IFixableModule
 
     public string Id => "M04";
 
-    public string Title => "Confidentialité et télémétrie";
+    public string Title => T("Confidentialité et télémétrie");
 
     public int Order => 40;
 

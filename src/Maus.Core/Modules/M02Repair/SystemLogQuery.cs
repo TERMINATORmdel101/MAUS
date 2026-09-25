@@ -1,5 +1,6 @@
 using System.Diagnostics.Eventing.Reader;
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M02Repair;
 
@@ -57,7 +58,7 @@ internal sealed class SystemLogQuery
 
             if (query.Error is not null)
             {
-                return Finding.Unknown(id, title, $"Lecture du journal Système impossible : {query.Error}", category);
+                return Finding.Unknown(id, title, T("Lecture du journal Système impossible : {0}", query.Error), category);
             }
         }
 

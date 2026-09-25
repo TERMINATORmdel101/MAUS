@@ -1,4 +1,5 @@
 using System.Globalization;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M03Updates;
 
@@ -112,15 +113,15 @@ internal static class UpdateParsers
     {
         var hint = unchecked((uint)hresult) switch
         {
-            0x80070422 => "le service Windows Update est désactivé",
-            0x80070005 => "accès refusé",
+            0x80070422 => T("le service Windows Update est désactivé"),
+            0x80070005 => T("accès refusé"),
             0x8024402C or 0x80072EE7 or 0x80072EFD or 0x80072EE2 or 0x8024401C or 0x80244022 or 0x80240438 =>
-                "le serveur de mises à jour est injoignable (connexion Internet, proxy ou pare-feu)",
-            0x8024500C => "l'accès à Windows Update est bloqué par une stratégie",
-            0x8024001E => "la recherche a été interrompue par l'arrêt du service",
+                T("le serveur de mises à jour est injoignable (connexion Internet, proxy ou pare-feu)"),
+            0x8024500C => T("l'accès à Windows Update est bloqué par une stratégie"),
+            0x8024001E => T("la recherche a été interrompue par l'arrêt du service"),
             _ => null,
         };
         var code = "0x" + unchecked((uint)hresult).ToString("X8", CultureInfo.InvariantCulture);
-        return hint is null ? $"code d'erreur {code}" : $"{hint} (code {code})";
+        return hint is null ? T("code d'erreur {0}", code) : $"{hint} (code {code})";
     }
 }

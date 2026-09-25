@@ -1,5 +1,6 @@
 using System.Management;
 using System.Runtime.InteropServices;
+using Maus.Core.Localization;
 
 namespace Maus.Core.Platform;
 
@@ -77,7 +78,7 @@ public sealed class WmiCimReader : ICimReader
         }
         catch (ManagementException ex) when (ex.ErrorCode == ManagementStatus.AccessDenied)
         {
-            throw new MausAccessDeniedException($"Accès WMI refusé ({scope}).", ex);
+            throw new MausAccessDeniedException(Texts.T("Accès WMI refusé ({0}).", scope), ex);
         }
         catch (ManagementException ex) when (ex.ErrorCode is ManagementStatus.InvalidNamespace or ManagementStatus.InvalidClass or ManagementStatus.NotFound)
         {
@@ -87,15 +88,15 @@ public sealed class WmiCimReader : ICimReader
                                                  or ManagementStatus.NotSupported or ManagementStatus.InvalidMethod or ManagementStatus.ProviderLoadFailure)
         {
             // Propriété ou méthode absente sur cette version de Windows : la donnée est indisponible, pas une erreur du module.
-            throw new DataSourceUnavailableException($"Requête WMI non prise en charge ({scope}) : {ex.ErrorCode}.", ex);
+            throw new DataSourceUnavailableException(Texts.T("Requête WMI non prise en charge ({0}) : {1}.", scope, ex.ErrorCode), ex);
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new MausAccessDeniedException($"Accès WMI refusé ({scope}).", ex);
+            throw new MausAccessDeniedException(Texts.T("Accès WMI refusé ({0}).", scope), ex);
         }
         catch (COMException ex) when (ex.HResult is WbemAccessDenied or EAccessDenied)
         {
-            throw new MausAccessDeniedException($"Accès WMI refusé ({scope}).", ex);
+            throw new MausAccessDeniedException(Texts.T("Accès WMI refusé ({0}).", scope), ex);
         }
         catch (COMException ex) when (ex.HResult is WbemInvalidNamespace or WbemInvalidClass)
         {

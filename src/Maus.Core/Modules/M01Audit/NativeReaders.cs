@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Microsoft.Win32.SafeHandles;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
@@ -214,12 +215,12 @@ internal sealed class ComScheduledTaskReader : IScheduledTaskReader
     public IReadOnlyList<ScheduledTaskInfo> GetTasks(string folderPath)
     {
         var type = Type.GetTypeFromProgID("Schedule.Service")
-            ?? throw new DataSourceUnavailableException("Planificateur de tâches indisponible.");
+            ?? throw new DataSourceUnavailableException(T("Planificateur de tâches indisponible."));
         object? service = null;
         try
         {
             service = Activator.CreateInstance(type)
-                ?? throw new DataSourceUnavailableException("Planificateur de tâches indisponible.");
+                ?? throw new DataSourceUnavailableException(T("Planificateur de tâches indisponible."));
             dynamic scheduler = service;
             scheduler.Connect();
             dynamic folder = scheduler.GetFolder(folderPath);
@@ -236,19 +237,19 @@ internal sealed class ComScheduledTaskReader : IScheduledTaskReader
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new MausAccessDeniedException("Lecture des tâches planifiées refusée.", ex);
+            throw new MausAccessDeniedException(T("Lecture des tâches planifiées refusée."), ex);
         }
         catch (FileNotFoundException ex)
         {
-            throw new DataSourceUnavailableException("Dossier de tâches planifiées absent.", ex);
+            throw new DataSourceUnavailableException(T("Dossier de tâches planifiées absent."), ex);
         }
         catch (COMException ex)
         {
-            throw new DataSourceUnavailableException("Planificateur de tâches illisible.", ex);
+            throw new DataSourceUnavailableException(T("Planificateur de tâches illisible."), ex);
         }
         catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException ex)
         {
-            throw new DataSourceUnavailableException("Planificateur de tâches illisible.", ex);
+            throw new DataSourceUnavailableException(T("Planificateur de tâches illisible."), ex);
         }
         finally
         {

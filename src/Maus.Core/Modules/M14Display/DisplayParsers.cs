@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Modules.M14Display;
 
 /// <summary>Conversions pures entre les valeurs brutes de Windows et le modèle du module.</summary>
@@ -99,11 +101,11 @@ internal static class DisplayParsers
         OutputTechnology.DisplayPortUsbTunnel => "DisplayPort par USB-C",
         OutputTechnology.Dvi => "DVI",
         OutputTechnology.Hd15 => "VGA (analogique)",
-        OutputTechnology.Miracast => "Miracast (sans fil)",
-        OutputTechnology.IndirectWired => "adaptateur USB ou station d'accueil",
-        OutputTechnology.IndirectVirtual => "écran virtuel",
-        _ when IsInternal(output) => "dalle intégrée",
-        _ => "autre connecteur",
+        OutputTechnology.Miracast => T("Miracast (sans fil)"),
+        OutputTechnology.IndirectWired => T("adaptateur USB ou station d'accueil"),
+        OutputTechnology.IndirectVirtual => T("écran virtuel"),
+        _ when IsInternal(output) => T("dalle intégrée"),
+        _ => T("autre connecteur"),
     };
 
     public static string EncodingLabel(ColorEncoding encoding) => encoding switch
@@ -112,7 +114,7 @@ internal static class DisplayParsers
         ColorEncoding.YCbCr444 => "YCbCr 4:4:4",
         ColorEncoding.YCbCr422 => "YCbCr 4:2:2",
         ColorEncoding.YCbCr420 => "YCbCr 4:2:0",
-        _ => "niveaux de gris",
+        _ => T("niveaux de gris"),
     };
 
     public static bool IsChromaSubsampled(ColorEncoding encoding) => encoding is ColorEncoding.YCbCr422 or ColorEncoding.YCbCr420;

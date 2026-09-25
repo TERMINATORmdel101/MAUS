@@ -3,6 +3,7 @@ using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Microsoft.Win32;
 using static Maus.Core.Modules.M07GameBar.GameBarKeys;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M07GameBar;
 
@@ -57,7 +58,7 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DetectBackgroundRecording(IRegistryReader registry)
     {
         const string id = "M07.background-recording";
-        const string title = "Enregistrement en arrière-plan désactivé";
+        var title = T("Enregistrement en arrière-plan désactivé");
         return Guard(id, title, Recording, () =>
         {
             var value = registry.GetDword(Hkcu, GameDvrUser, "HistoricalCaptureEnabled");
@@ -71,16 +72,16 @@ public sealed class GameBarModule : IFixableModule
                 Severity = Severity.Low,
                 Current = value switch
                 {
-                    null => "désactivé (par défaut)",
-                    0 => "désactivé",
-                    _ => "activé",
+                    null => T("désactivé (par défaut)"),
+                    0 => T("désactivé"),
+                    _ => T("activé"),
                 },
-                Expected = "désactivé, quel que soit le profil",
+                Expected = T("désactivé, quel que soit le profil"),
                 Explanation =
-                    "« Enregistrer ce qui s'est passé » filme la partie en continu pour pouvoir sauvegarder les dernières minutes après coup. " +
-                    "C'est la partie de la Game Bar qui sollicite le plus la machine (carte graphique et disque).",
+                    T("« Enregistrer ce qui s'est passé » filme la partie en continu pour pouvoir sauvegarder les dernières minutes après coup. " +
+                    "C'est la partie de la Game Bar qui sollicite le plus la machine (carte graphique et disque)."),
                 Advice = on
-                    ? "Couper « Enregistrer ce qui s'est passé » dans Paramètres > Jeux > Captures (ms-settings:gaming-gamedvr). Les captures manuelles restent possibles."
+                    ? T("Couper « Enregistrer ce qui s'est passé » dans Paramètres > Jeux > Captures (ms-settings:gaming-gamedvr). Les captures manuelles restent possibles.")
                     : null,
                 Fixable = on,
             };
@@ -91,10 +92,10 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DetectGameBarPackage(IRegistryReader registry, GamingPackages? packages, bool x3d)
     {
         const string id = "M07.gamebar-package";
-        const string title = "Game Bar installée";
+        var title = T("Game Bar installée");
         if (packages is null)
         {
-            return Finding.Unknown(id, title, "L'inventaire des applications n'a pas pu être lu.", Overlay);
+            return Finding.Unknown(id, title, T("L'inventaire des applications n'a pas pu être lu."), Overlay);
         }
 
         if (packages.GameBar is { } gameBar)
@@ -106,26 +107,26 @@ public sealed class GameBarModule : IFixableModule
                 Category = Overlay,
                 Status = FindingStatus.Ok,
                 Severity = Severity.Medium,
-                Current = $"installée (version {gameBar.Version})",
-                Expected = "installée",
+                Current = T("installée (version {0})", gameBar.Version),
+                Expected = T("installée"),
                 Explanation =
-                    "La Game Bar (Win+G) est la superposition de jeu de Windows. MAUS ne la désinstalle jamais : sans elle, " +
-                    "Windows affiche une fenêtre d'erreur quand un jeu ou le raccourci Win+G l'appelle.",
+                    T("La Game Bar (Win+G) est la superposition de jeu de Windows. MAUS ne la désinstalle jamais : sans elle, " +
+                    "Windows affiche une fenêtre d'erreur quand un jeu ou le raccourci Win+G l'appelle."),
             };
         }
 
         var explanation =
-            "La Game Bar (Microsoft.XboxGamingOverlay) est absente. Le raccourci Win+G et certains jeux appellent pourtant le lien " +
-            "ms-gamingoverlay, qui n'a plus d'application associée : Windows affiche alors une fenêtre d'erreur.";
+            T("La Game Bar (Microsoft.XboxGamingOverlay) est absente. Le raccourci Win+G et certains jeux appellent pourtant le lien " +
+            "ms-gamingoverlay, qui n'a plus d'application associée : Windows affiche alors une fenêtre d'erreur.");
         var games = CountRecognizedGames(registry);
         if (games > 0)
         {
-            explanation += $" Windows reconnaît {games.Value.ToString(CultureInfo.InvariantCulture)} jeu(x) sur ce PC.";
+            explanation += T(" Windows reconnaît {0} jeu(x) sur ce PC.", games.Value.ToString(CultureInfo.InvariantCulture));
         }
 
         if (x3d)
         {
-            explanation += " Sur votre Ryzen X3D, elle sert aussi à placer les jeux sur les cœurs dotés du V-Cache.";
+            explanation += T(" Sur votre Ryzen X3D, elle sert aussi à placer les jeux sur les cœurs dotés du V-Cache.");
         }
 
         return new Finding
@@ -135,12 +136,12 @@ public sealed class GameBarModule : IFixableModule
             Category = Overlay,
             Status = FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
-            Current = "absente",
-            Expected = "installée",
+            Current = T("absente"),
+            Expected = T("installée"),
             Explanation = explanation,
             Advice =
-                $"Réinstaller « Game Bar » depuis le Microsoft Store (identifiant {GameBarStoreId}). MAUS proposera la commande " +
-                $"« winget install --id {GameBarStoreId} --source msstore », lancée seulement avec votre accord.",
+                T("Réinstaller « Game Bar » depuis le Microsoft Store (identifiant {0}). MAUS proposera la commande " +
+                "« winget install --id {0} --source msstore », lancée seulement avec votre accord.", GameBarStoreId),
             Fixable = true,
         };
     }
@@ -149,18 +150,18 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DetectGameMode(IRegistryReader registry, bool x3d)
     {
         const string id = "M07.game-mode";
-        const string title = "Mode Jeu activé";
+        var title = T("Mode Jeu activé");
         return Guard(id, title, GameMode, () =>
         {
             var value = registry.GetDword(Hkcu, GameBarUser, "AutoGameModeEnabled");
             var off = value == 0;
             var severity = x3d ? Severity.Medium : Severity.Low;
             var explanation =
-                "Le Mode Jeu donne la priorité au jeu en cours et empêche Windows Update d'installer des pilotes ou d'afficher " +
-                "des notifications de redémarrage pendant la partie. MAUS le laisse activé dans tous les cas.";
+                T("Le Mode Jeu donne la priorité au jeu en cours et empêche Windows Update d'installer des pilotes ou d'afficher " +
+                "des notifications de redémarrage pendant la partie. MAUS le laisse activé dans tous les cas.");
             if (x3d)
             {
-                explanation += " Sur un Ryzen X3D à deux CCD, il aide aussi la Game Bar à placer le jeu sur les cœurs dotés du V-Cache.";
+                explanation += T(" Sur un Ryzen X3D à deux CCD, il aide aussi la Game Bar à placer le jeu sur les cœurs dotés du V-Cache.");
             }
 
             return new Finding
@@ -172,13 +173,13 @@ public sealed class GameBarModule : IFixableModule
                 Severity = severity,
                 Current = value switch
                 {
-                    null => "activé (par défaut)",
-                    0 => "désactivé",
-                    _ => "activé",
+                    null => T("activé (par défaut)"),
+                    0 => T("désactivé"),
+                    _ => T("activé"),
                 },
-                Expected = "activé",
+                Expected = T("activé"),
                 Explanation = explanation,
-                Advice = off ? "Activer « Mode Jeu » dans Paramètres > Jeux > Mode Jeu (ms-settings:gaming-gamemode)." : null,
+                Advice = off ? T("Activer « Mode Jeu » dans Paramètres > Jeux > Mode Jeu (ms-settings:gaming-gamemode).") : null,
                 Fixable = off,
             };
         });
@@ -188,11 +189,11 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DetectX3DRecommendation(IRegistryReader registry, string cpuName, GamingPackages? packages, GamingProfile? profile)
     {
         const string id = "M07.x3d-vcache";
-        const string title = "Ryzen X3D à deux CCD : garder la Game Bar et le Mode Jeu";
+        var title = T("Ryzen X3D à deux CCD : garder la Game Bar et le Mode Jeu");
         return Guard(id, title, Profile, () =>
         {
-            var gameBar = packages is null ? "inconnue" : packages.GameBar is null ? "absente" : "installée";
-            var gameMode = registry.GetDword(Hkcu, GameBarUser, "AutoGameModeEnabled") == 0 ? "désactivé" : "activé";
+            var gameBar = packages is null ? T("inconnue") : packages.GameBar is null ? T("absente") : T("installée");
+            var gameMode = registry.GetDword(Hkcu, GameBarUser, "AutoGameModeEnabled") == 0 ? T("désactivé") : T("activé");
             return new Finding
             {
                 Id = id,
@@ -201,16 +202,16 @@ public sealed class GameBarModule : IFixableModule
                 Status = FindingStatus.Info,
                 Severity = Severity.Info,
                 Current = $"{cpuName} ; Game Bar : {gameBar} ; Mode Jeu : {gameMode}",
-                Expected = "Game Bar installée, activée et à jour, avec le Mode Jeu (recommandé)",
+                Expected = T("Game Bar installée, activée et à jour, avec le Mode Jeu (recommandé)"),
                 Explanation =
-                    "Sur ce processeur, un seul des deux blocs de cœurs (CCD) porte le cache 3D V-Cache. La Game Bar reconnaît les jeux " +
+                    T("Sur ce processeur, un seul des deux blocs de cœurs (CCD) porte le cache 3D V-Cache. La Game Bar reconnaît les jeux " +
                     "et, avec le Mode Jeu, les place sur ce bloc, ce qui donne les meilleures performances. Un jeu non reconnu peut être " +
-                    "marqué comme jeu depuis Win+G.",
+                    "marqué comme jeu depuis Win+G."),
                 Advice = profile is null or GamingProfile.X3D
-                    ? "Recommandé : garder la Game Bar et le Mode Jeu. Vous pouvez choisir de les couper après avertissement : " +
-                      "vos jeux risquent alors de tourner sur le bloc de cœurs sans V-Cache."
-                    : $"Vous avez choisi le profil {(int)profile.Value} : vos jeux risquent de tourner sur le bloc de cœurs sans V-Cache. " +
-                      "Vous pouvez revenir au profil 3 à tout moment.",
+                    ? T("Recommandé : garder la Game Bar et le Mode Jeu. Vous pouvez choisir de les couper après avertissement : " +
+                      "vos jeux risquent alors de tourner sur le bloc de cœurs sans V-Cache.")
+                    : T("Vous avez choisi le profil {0} : vos jeux risquent de tourner sur le bloc de cœurs sans V-Cache. " +
+                      "Vous pouvez revenir au profil 3 à tout moment.", (int)profile.Value),
             };
         });
     }
@@ -218,25 +219,25 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DescribeProfile(GamingProfile? profile, GamingPackages? packages, bool chosenByUser)
     {
         const string id = "M07.profile";
-        var title = chosenByUser ? "Profil de jeu choisi par vous" : "Profil de jeu proposé";
+        var title = chosenByUser ? T("Profil de jeu choisi par vous") : T("Profil de jeu proposé");
         if (profile is null)
         {
-            return Finding.Unknown(id, title, "Le profil n'a pas pu être proposé : l'inventaire des applications n'a pas pu être lu.", Profile);
+            return Finding.Unknown(id, title, T("Le profil n'a pas pu être proposé : l'inventaire des applications n'a pas pu être lu."), Profile);
         }
 
         var (label, explanation) = profile.Value switch
         {
             GamingProfile.X3D => (
-                "Profil 3 : Ryzen X3D à deux CCD",
-                "Game Bar installée, activée et à jour, avec le Mode Jeu ; seul l'enregistrement en arrière-plan est coupé."),
+                T("Profil 3 : Ryzen X3D à deux CCD"),
+                T("Game Bar installée, activée et à jour, avec le Mode Jeu ; seul l'enregistrement en arrière-plan est coupé.")),
             GamingProfile.XboxApp => (
-                "Profil 2 : j'utilise l'app Xbox ou le Game Pass",
-                "Profil Game Pass détecté : la superposition peut rester, seul l'enregistrement en arrière-plan est coupé. " +
-                "L'app Xbox et les Services de jeu ne sont jamais modifiés."),
+                T("Profil 2 : j'utilise l'app Xbox ou le Game Pass"),
+                T("Profil Game Pass détecté : la superposition peut rester, seul l'enregistrement en arrière-plan est coupé. " +
+                "L'app Xbox et les Services de jeu ne sont jamais modifiés.")),
             _ => (
-                "Profil 1 : je n'utilise ni l'app Xbox ni le Game Pass",
-                "Captures, enregistrement en arrière-plan et ouverture par la manette sont coupés. Aucun interrupteur global n'est " +
-                "documenté : Win+G ouvre encore la Game Bar, qui reste installée."),
+                T("Profil 1 : je n'utilise ni l'app Xbox ni le Game Pass"),
+                T("Captures, enregistrement en arrière-plan et ouverture par la manette sont coupés. Aucun interrupteur global n'est " +
+                "documenté : Win+G ouvre encore la Game Bar, qui reste installée.")),
         };
 
         return new Finding
@@ -248,12 +249,12 @@ public sealed class GameBarModule : IFixableModule
             Severity = Severity.Info,
             Current = packages is null
                 ? label
-                : $"{label} (app Xbox : {(packages.XboxApp is null ? "absente" : "installée")} ; Services de jeu : {(packages.GamingServices is null ? "absents" : "installés")})",
-            Expected = "au choix de l'utilisateur",
+                : T("{0} (app Xbox : {1} ; Services de jeu : {2})", label, (packages.XboxApp is null ? T("absente") : T("installée")), (packages.GamingServices is null ? T("absents") : T("installés"))),
+            Expected = T("au choix de l'utilisateur"),
             Explanation = explanation,
             Advice = chosenByUser
-                ? "Vous avez choisi ce profil : MAUS s'y tient. Vous pouvez en changer à tout moment dans l'onglet Corrections."
-                : "Ce profil est seulement présélectionné : vous pouvez en choisir un autre dans l'onglet Corrections avant toute correction.",
+                ? T("Vous avez choisi ce profil : MAUS s'y tient. Vous pouvez en changer à tout moment dans l'onglet Corrections.")
+                : T("Ce profil est seulement présélectionné : vous pouvez en choisir un autre dans l'onglet Corrections avant toute correction."),
         };
     }
 
@@ -261,7 +262,7 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DetectCaptures(IRegistryReader registry, GamingProfile? profile)
     {
         const string id = "M07.captures";
-        const string title = "Captures de jeu (clips et captures d'écran)";
+        var title = T("Captures de jeu (clips et captures d'écran)");
         return Guard(id, title, Recording, () =>
         {
             var gameDvr = registry.GetDword(Hkcu, GameConfigStore, "GameDVR_Enabled");
@@ -269,13 +270,12 @@ public sealed class GameBarModule : IFixableModule
             var disabledCount = (gameDvr == 0 ? 1 : 0) + (appCapture == 0 ? 1 : 0);
             var current = disabledCount switch
             {
-                0 => "activées",
-                1 => "désactivées en partie",
-                _ => "désactivées",
+                0 => T("activées"),
+                1 => T("désactivées en partie"),
+                _ => T("désactivées"),
             };
-            const string explanation =
-                "Les captures permettent d'enregistrer des clips et des captures d'écran avec la Game Bar. Elles ne coûtent rien tant " +
-                "que vous ne vous en servez pas ; l'enregistrement en arrière-plan est traité à part.";
+            var explanation = T("Les captures permettent d'enregistrer des clips et des captures d'écran avec la Game Bar. Elles ne coûtent rien tant " +
+                "que vous ne vous en servez pas ; l'enregistrement en arrière-plan est traité à part.");
 
             if (profile == GamingProfile.NoXbox)
             {
@@ -288,9 +288,9 @@ public sealed class GameBarModule : IFixableModule
                     Status = compliant ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
                     Severity = Severity.Low,
                     Current = current,
-                    Expected = "désactivées (profil 1)",
+                    Expected = T("désactivées (profil 1)"),
                     Explanation = explanation,
-                    Advice = compliant ? null : "Couper les captures dans Paramètres > Jeux > Captures, ou depuis la Game Bar (Win+G > Paramètres > Captures).",
+                    Advice = compliant ? null : T("Couper les captures dans Paramètres > Jeux > Captures, ou depuis la Game Bar (Win+G > Paramètres > Captures)."),
                     Fixable = !compliant,
                 };
             }
@@ -303,18 +303,18 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DetectControllerButton(IRegistryReader registry, GamingProfile? profile)
     {
         const string id = "M07.controller-button";
-        const string title = "Ouverture de la Game Bar par le bouton Xbox de la manette";
+        var title = T("Ouverture de la Game Bar par le bouton Xbox de la manette");
         return Guard(id, title, Overlay, () =>
         {
             var value = registry.GetDword(Hkcu, GameBarUser, "UseNexusForGameBarEnabled");
             var on = value != 0;
             var current = value switch
             {
-                null => "activée (par défaut)",
-                0 => "désactivée",
-                _ => "activée",
+                null => T("activée (par défaut)"),
+                0 => T("désactivée"),
+                _ => T("activée"),
             };
-            const string explanation = "Un appui sur le bouton Xbox d'une manette ouvre la Game Bar, parfois par erreur en pleine partie.";
+            var explanation = T("Un appui sur le bouton Xbox d'une manette ouvre la Game Bar, parfois par erreur en pleine partie.");
 
             if (profile == GamingProfile.NoXbox)
             {
@@ -326,9 +326,9 @@ public sealed class GameBarModule : IFixableModule
                     Status = on ? FindingStatusExtensions.ForDeviation(Severity.Low) : FindingStatus.Ok,
                     Severity = Severity.Low,
                     Current = current,
-                    Expected = "désactivée (profil 1)",
+                    Expected = T("désactivée (profil 1)"),
                     Explanation = explanation,
-                    Advice = on ? "Couper « Ouvrir la Game Bar avec ce bouton sur une manette » dans Paramètres > Jeux > Game Bar (ms-settings:gaming-gamebar)." : null,
+                    Advice = on ? T("Couper « Ouvrir la Game Bar avec ce bouton sur une manette » dans Paramètres > Jeux > Game Bar (ms-settings:gaming-gamebar).") : null,
                     Fixable = on,
                 };
             }
@@ -341,7 +341,7 @@ public sealed class GameBarModule : IFixableModule
     private static Finding DetectRecordingPolicy(IRegistryReader registry, WindowsInfo windows, bool x3d)
     {
         const string id = "M07.gamedvr-policy";
-        const string title = "Stratégie d'enregistrement des jeux (AllowGameDVR)";
+        var title = T("Stratégie d'enregistrement des jeux (AllowGameDVR)");
         return Guard(id, title, Recording, () =>
         {
             var value = registry.GetDword(Hklm, GameDvrPolicy, "AllowGameDVR");
@@ -354,9 +354,9 @@ public sealed class GameBarModule : IFixableModule
                     Category = Recording,
                     Status = FindingStatus.Ok,
                     Severity = Severity.Info,
-                    Current = value is null ? "non configurée (enregistrement autorisé)" : "enregistrement autorisé",
-                    Expected = x3d ? "non configurée (jamais posée en profil 3)" : "non configurée, ou 0 en verrou optionnel du profil 1",
-                    Explanation = "Cette stratégie peut interdire l'enregistrement des jeux pour tous les utilisateurs. Elle n'est pas posée.",
+                    Current = value is null ? T("non configurée (enregistrement autorisé)") : T("enregistrement autorisé"),
+                    Expected = x3d ? T("non configurée (jamais posée en profil 3)") : T("non configurée, ou 0 en verrou optionnel du profil 1"),
+                    Explanation = T("Cette stratégie peut interdire l'enregistrement des jeux pour tous les utilisateurs. Elle n'est pas posée."),
                 };
             }
 
@@ -369,20 +369,20 @@ public sealed class GameBarModule : IFixableModule
                     Category = Recording,
                     Status = FindingStatusExtensions.ForDeviation(Severity.Medium),
                     Severity = Severity.Medium,
-                    Current = "enregistrement interdit (0)",
-                    Expected = "non configurée (jamais posée en profil 3)",
+                    Current = T("enregistrement interdit (0)"),
+                    Expected = T("non configurée (jamais posée en profil 3)"),
                     Explanation =
-                        "Cette stratégie coupe les fonctions de jeu de la Game Bar. Sur un Ryzen X3D à deux CCD, la Game Bar doit rester " +
-                        "pleinement active pour placer les jeux sur les cœurs dotés du V-Cache.",
-                    Advice = "Retirer la stratégie « Active ou désactive l'enregistrement et la diffusion de jeux Windows » (AllowGameDVR).",
+                        T("Cette stratégie coupe les fonctions de jeu de la Game Bar. Sur un Ryzen X3D à deux CCD, la Game Bar doit rester " +
+                        "pleinement active pour placer les jeux sur les cœurs dotés du V-Cache."),
+                    Advice = T("Retirer la stratégie « Active ou désactive l'enregistrement et la diffusion de jeux Windows » (AllowGameDVR)."),
                     Fixable = true,
                 };
             }
 
-            var explanation = "Verrou optionnel du profil 1 : l'enregistrement des jeux est interdit pour tous les utilisateurs de ce PC.";
+            var explanation = T("Verrou optionnel du profil 1 : l'enregistrement des jeux est interdit pour tous les utilisateurs de ce PC.");
             if (windows.IsHomeEdition)
             {
-                explanation += " Sur Windows Famille, cette stratégie n'est pas garantie.";
+                explanation += T(" Sur Windows Famille, cette stratégie n'est pas garantie.");
             }
 
             return new Finding
@@ -392,8 +392,8 @@ public sealed class GameBarModule : IFixableModule
                 Category = Recording,
                 Status = FindingStatus.Info,
                 Severity = Severity.Info,
-                Current = "enregistrement interdit (0)",
-                Expected = "non configurée, ou 0 en verrou optionnel du profil 1",
+                Current = T("enregistrement interdit (0)"),
+                Expected = T("non configurée, ou 0 en verrou optionnel du profil 1"),
                 Explanation = explanation,
             };
         });
@@ -409,9 +409,9 @@ public sealed class GameBarModule : IFixableModule
         Current = current,
         Expected = profile switch
         {
-            GamingProfile.XboxApp => "inchangé (profil 2)",
-            GamingProfile.X3D => "inchangé (profil 3)",
-            _ => "selon le profil choisi",
+            GamingProfile.XboxApp => T("inchangé (profil 2)"),
+            GamingProfile.X3D => T("inchangé (profil 3)"),
+            _ => T("selon le profil choisi"),
         },
         Explanation = explanation,
     };

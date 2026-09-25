@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Management;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -67,11 +68,11 @@ public sealed class WmiSystemRestore(IRegistryReader registry) : ISystemRestore
         }
         catch (ManagementException ex)
         {
-            throw new DataSourceUnavailableException($"Liste des points de restauration illisible : {ex.Message}", ex);
+            throw new DataSourceUnavailableException(T("Liste des points de restauration illisible : {0}", ex.Message), ex);
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new MausAccessDeniedException("Liste des points de restauration refusée.", ex);
+            throw new MausAccessDeniedException(T("Liste des points de restauration refusée."), ex);
         }
     }
 
@@ -86,16 +87,16 @@ public sealed class WmiSystemRestore(IRegistryReader registry) : ISystemRestore
             var code = Convert.ToUInt32(result ?? 0u, CultureInfo.InvariantCulture);
             if (code != 0)
             {
-                throw new InvalidOperationException($"SystemRestore.{method} a renvoyé le code 0x{code:X8}.");
+                throw new InvalidOperationException(T("SystemRestore.{0} a renvoyé le code 0x{1:X8}.", method, code));
             }
         }
         catch (ManagementException ex)
         {
-            throw new InvalidOperationException($"SystemRestore.{method} a échoué : {ex.Message}", ex);
+            throw new InvalidOperationException(T("SystemRestore.{0} a échoué : {1}", method, ex.Message), ex);
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new MausAccessDeniedException($"SystemRestore.{method} refusé : droits administrateur requis.", ex);
+            throw new MausAccessDeniedException(T("SystemRestore.{0} refusé : droits administrateur requis.", method), ex);
         }
     }
 

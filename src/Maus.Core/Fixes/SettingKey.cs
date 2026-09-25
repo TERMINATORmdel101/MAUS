@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -69,7 +70,7 @@ public sealed record SettingKey
     {
         SettingKind.Registry => $@"{Hive}\{Path}\{Name}",
         SettingKind.SystemParameter => "SystemParametersInfo 0x" + SpiSet.ToString("X4", CultureInfo.InvariantCulture),
-        SettingKind.ActivePowerScheme => "Mode de gestion de l'alimentation actif",
+        SettingKind.ActivePowerScheme => T("Mode de gestion de l'alimentation actif"),
         _ => "SystemParametersInfo SPI_SETANIMATION",
     };
 

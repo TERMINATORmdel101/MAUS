@@ -1,5 +1,6 @@
 using Maus.Core.Engine;
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -40,12 +41,12 @@ public sealed class FixEngine
     {
         if (_context.Audit.Hardware.IsManaged)
         {
-            return "Ce PC est géré par une organisation (domaine ou MDM) : MAUS n'y applique aucune correction. Adressez-vous à votre service informatique.";
+            return T("Ce PC est géré par une organisation (domaine ou MDM) : MAUS n'y applique aucune correction. Adressez-vous à votre service informatique.");
         }
 
         return _context.Audit.IsElevated
             ? null
-            : "Les corrections demandent les droits administrateur. Relancez MAUS en tant qu'administrateur.";
+            : T("Les corrections demandent les droits administrateur. Relancez MAUS en tant qu'administrateur.");
     }
 
     public ApplyResult Apply(IReadOnlyList<PlannedChange> changes, ApplyOptions options)
@@ -57,7 +58,7 @@ public sealed class FixEngine
 
         if (changes.Count == 0)
         {
-            return ApplyResult.Block("Aucune correction sélectionnée.");
+            return ApplyResult.Block(T("Aucune correction sélectionnée."));
         }
 
         RestorePointOutcome? restorePoint = null;
@@ -67,7 +68,7 @@ public sealed class FixEngine
                 .Create(options.RestorePointDescription, options.EnableProtectionIfNeeded);
             if (!restorePoint.Succeeded && !options.ProceedWithoutRestorePoint)
             {
-                return ApplyResult.Block(restorePoint.Message + " Aucune modification n'a été faite.", restorePoint);
+                return ApplyResult.Block(restorePoint.Message + T(" Aucune modification n'a été faite."), restorePoint);
             }
         }
 
@@ -79,7 +80,7 @@ public sealed class FixEngine
             RestorePoint = restorePoint?.Point,
             RestorePointNote = restorePoint switch
             {
-                null => "Point de restauration non demandé par l'utilisateur.",
+                null => T("Point de restauration non demandé par l'utilisateur."),
                 { Succeeded: false } failed => failed.Message,
                 _ => null,
             },
@@ -136,13 +137,13 @@ public sealed class FixEngine
     {
         if (!_context.Audit.IsElevated)
         {
-            return new RevertResult(null, [], "L'annulation demande les droits administrateur. Relancez MAUS en tant qu'administrateur.");
+            return new RevertResult(null, [], T("L'annulation demande les droits administrateur. Relancez MAUS en tant qu'administrateur."));
         }
 
         var session = _context.Journal.Load(sessionId);
         if (session is null)
         {
-            return new RevertResult(null, [], $"Séance {sessionId} introuvable dans le journal (ou fichier non fiable, ignoré).");
+            return new RevertResult(null, [], T("Séance {0} introuvable dans le journal (ou fichier non fiable, ignoré).", sessionId));
         }
 
         var outcomes = new List<RevertOutcome>();
@@ -151,7 +152,7 @@ public sealed class FixEngine
             .ToList();
         if (changeId is not null && targets.Count == 0)
         {
-            return new RevertResult(session, [], $"La correction {changeId} n'a rien à annuler dans cette séance.");
+            return new RevertResult(session, [], T("La correction {0} n'a rien à annuler dans cette séance.", changeId));
         }
 
         foreach (var entry in targets)
@@ -180,12 +181,12 @@ public sealed class FixEngine
         if (change.IsUserScoped && _context.ElevatedAsAnotherUser)
         {
             return Outcome(ChangeStatus.Skipped,
-                "MAUS a été lancé avec un autre compte administrateur : ce réglage irait dans le mauvais profil. Relancez MAUS depuis votre propre session.");
+                T("MAUS a été lancé avec un autre compte administrateur : ce réglage irait dans le mauvais profil. Relancez MAUS depuis votre propre session."));
         }
 
         if (change.Writes.Any(w => written.Contains(w.Key.Identity)))
         {
-            return Outcome(ChangeStatus.Skipped, "Ce réglage est déjà modifié par une autre correction de cette séance.");
+            return Outcome(ChangeStatus.Skipped, T("Ce réglage est déjà modifié par une autre correction de cette séance."));
         }
 
         // Valeurs d'origine, lues juste avant d'écrire.
@@ -199,7 +200,7 @@ public sealed class FixEngine
             }
             catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException)
             {
-                return Outcome(ChangeStatus.Skipped, $"Valeur d'origine illisible ({write.Key}) : rien n'a été modifié.");
+                return Outcome(ChangeStatus.Skipped, T("Valeur d'origine illisible ({0}) : rien n'a été modifié.", write.Key));
             }
 
             if (!SettingValue.AreEquivalent(before, write.Value))
@@ -219,7 +220,7 @@ public sealed class FixEngine
 
         if (entries.Count == 0)
         {
-            return Outcome(ChangeStatus.Skipped, "Déjà en place : rien à modifier.");
+            return Outcome(ChangeStatus.Skipped, T("Déjà en place : rien à modifier."));
         }
 
         session.Entries.AddRange(entries);
@@ -238,7 +239,7 @@ public sealed class FixEngine
                 entry.Error = ex.Message;
                 RollBack(entries);
                 _context.Journal.Save(session);
-                return Outcome(ChangeStatus.Failed, $"Écriture refusée ({entry.Key}) : valeurs d'origine remises.");
+                return Outcome(ChangeStatus.Failed, T("Écriture refusée ({0}) : valeurs d'origine remises.", entry.Key));
             }
         }
 
@@ -251,7 +252,7 @@ public sealed class FixEngine
                 entry.Error = $"Relu : {SettingValue.Display(actual)}, attendu : {SettingValue.Display(entry.After)}";
                 RollBack(entries);
                 _context.Journal.Save(session);
-                return Outcome(ChangeStatus.Failed, $"Windows n'a pas gardé la valeur ({entry.Key}) : valeurs d'origine remises.");
+                return Outcome(ChangeStatus.Failed, T("Windows n'a pas gardé la valeur ({0}) : valeurs d'origine remises.", entry.Key));
             }
         }
 
@@ -261,7 +262,7 @@ public sealed class FixEngine
         }
 
         _context.Journal.Save(session);
-        return Outcome(ChangeStatus.Applied, "Appliqué et vérifié.");
+        return Outcome(ChangeStatus.Applied, T("Appliqué et vérifié."));
     }
 
     private RevertOutcome RevertOne(JournalEntry entry, bool force)
@@ -270,20 +271,20 @@ public sealed class FixEngine
 
         if (entry.Key.IsUserScoped && _context.ElevatedAsAnotherUser)
         {
-            return Outcome(RevertStatus.Skipped, "MAUS a été lancé avec un autre compte administrateur : relancez-le depuis votre propre session pour annuler ce réglage.");
+            return Outcome(RevertStatus.Skipped, T("MAUS a été lancé avec un autre compte administrateur : relancez-le depuis votre propre session pour annuler ce réglage."));
         }
 
         var current = TryRead(entry.Key, out var readable);
         if (!readable)
         {
-            return Outcome(RevertStatus.Failed, "Valeur actuelle illisible : rien n'a été modifié.");
+            return Outcome(RevertStatus.Failed, T("Valeur actuelle illisible : rien n'a été modifié."));
         }
 
         if (!force && !SettingValue.AreEquivalent(current, entry.After))
         {
             entry.State = EntryState.RevertSkipped;
             return Outcome(RevertStatus.ChangedSince,
-                $"La valeur a changé depuis la correction ({SettingValue.Display(current)}) : laissée telle quelle.");
+                T("La valeur a changé depuis la correction ({0}) : laissée telle quelle.", SettingValue.Display(current)));
         }
 
         try
@@ -293,19 +294,19 @@ public sealed class FixEngine
         catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException or UnauthorizedAccessException)
         {
             entry.Error = ex.Message;
-            return Outcome(RevertStatus.Failed, $"Restauration refusée : {ex.Message}");
+            return Outcome(RevertStatus.Failed, T("Restauration refusée : {0}", ex.Message));
         }
 
         var restored = TryRead(entry.Key, out readable);
         if (!readable || !SettingValue.AreEquivalent(restored, entry.Before))
         {
-            entry.Error = $"Relu après restauration : {SettingValue.Display(restored)}";
-            return Outcome(RevertStatus.Failed, "La valeur d'origine n'a pas pu être relue après restauration.");
+            entry.Error = T("Relu après restauration : {0}", SettingValue.Display(restored));
+            return Outcome(RevertStatus.Failed, T("La valeur d'origine n'a pas pu être relue après restauration."));
         }
 
         entry.State = EntryState.Reverted;
         entry.RevertedAt = _context.Audit.Now;
-        return Outcome(RevertStatus.Reverted, $"Valeur d'origine remise ({SettingValue.Display(entry.Before)}).");
+        return Outcome(RevertStatus.Reverted, T("Valeur d'origine remise ({0}).", SettingValue.Display(entry.Before)));
     }
 
     /// <summary>Défait les écritures d'une correction, dans l'ordre inverse.</summary>
@@ -321,7 +322,7 @@ public sealed class FixEngine
                 }
                 catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException or UnauthorizedAccessException)
                 {
-                    entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + "retour arrière refusé : " + ex.Message;
+                    entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + T("retour arrière refusé : ") + ex.Message;
                 }
             }
 

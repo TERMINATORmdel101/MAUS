@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Engine;
 
@@ -66,7 +67,7 @@ public sealed class AuditEngine
         }
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
         {
-            return new ModuleResult(module.Id, module.Title, [], stopwatch.Elapsed, $"Délai dépassé ({module.Timeout.TotalSeconds:0} s).");
+            return new ModuleResult(module.Id, module.Title, [], stopwatch.Elapsed, T("Délai dépassé ({0:0} s).", module.Timeout.TotalSeconds));
         }
         catch (Exception ex)
         {

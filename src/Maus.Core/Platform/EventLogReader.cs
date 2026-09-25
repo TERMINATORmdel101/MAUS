@@ -1,6 +1,7 @@
 using System.Diagnostics.Eventing.Reader;
 using System.Globalization;
 using System.Xml.Linq;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Platform;
 
@@ -68,7 +69,7 @@ public sealed class WindowsEventLogReader : IEventLogReader
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or EventLogException { InnerException: UnauthorizedAccessException })
         {
-            throw new MausAccessDeniedException($"Lecture du journal refusée : {logName}", ex);
+            throw new MausAccessDeniedException(T("Lecture du journal refusée : {0}", logName), ex);
         }
     }
 

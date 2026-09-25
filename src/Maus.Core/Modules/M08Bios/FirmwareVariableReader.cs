@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M08Bios;
 
@@ -40,7 +41,7 @@ internal sealed unsafe partial class WindowsFirmwareVariableReader : IFirmwareVa
     {
         if (!ImpersonateSelf(SecurityImpersonation))
         {
-            throw new DataSourceUnavailableException($"Lecture de la variable {name} impossible (erreur {Marshal.GetLastPInvokeError()}).");
+            throw new DataSourceUnavailableException(T("Lecture de la variable {0} impossible (erreur {1}).", name, Marshal.GetLastPInvokeError()));
         }
 
         try
@@ -58,21 +59,21 @@ internal sealed unsafe partial class WindowsFirmwareVariableReader : IFirmwareVa
     {
         if (!OpenThreadToken(GetCurrentThread(), TokenAdjustPrivileges | TokenQuery, true, out var token))
         {
-            throw new MausAccessDeniedException("Jeton de sécurité inaccessible.");
+            throw new MausAccessDeniedException(T("Jeton de sécurité inaccessible."));
         }
 
         try
         {
             if (!LookupPrivilegeValueW(null, "SeSystemEnvironmentPrivilege", out var luid))
             {
-                throw new DataSourceUnavailableException("Privilège SeSystemEnvironmentPrivilege inconnu.");
+                throw new DataSourceUnavailableException(T("Privilège SeSystemEnvironmentPrivilege inconnu."));
             }
 
             var privileges = new TokenPrivileges { PrivilegeCount = 1, Luid = luid, Attributes = SePrivilegeEnabled };
             var adjusted = AdjustTokenPrivileges(token, false, ref privileges, 0, 0, 0);
             if (!adjusted || Marshal.GetLastPInvokeError() == ErrorNotAllAssigned)
             {
-                throw new MausAccessDeniedException("Privilège SeSystemEnvironmentPrivilege absent : droits administrateur requis.");
+                throw new MausAccessDeniedException(T("Privilège SeSystemEnvironmentPrivilege absent : droits administrateur requis."));
             }
         }
         finally
@@ -108,15 +109,15 @@ internal sealed unsafe partial class WindowsFirmwareVariableReader : IFirmwareVa
                     size *= 4;
                     continue;
                 case ErrorPrivilegeNotHeld:
-                    throw new MausAccessDeniedException($"Lecture de la variable {name} refusée.");
+                    throw new MausAccessDeniedException(T("Lecture de la variable {0} refusée.", name));
                 case ErrorInvalidFunction:
-                    throw new DataSourceUnavailableException("Firmware sans UEFI : variables inaccessibles.");
+                    throw new DataSourceUnavailableException(T("Firmware sans UEFI : variables inaccessibles."));
                 case var error:
-                    throw new DataSourceUnavailableException($"Lecture de la variable {name} impossible (erreur {error}).");
+                    throw new DataSourceUnavailableException(T("Lecture de la variable {0} impossible (erreur {1}).", name, error));
             }
         }
 
-        throw new DataSourceUnavailableException($"Variable {name} trop volumineuse.");
+        throw new DataSourceUnavailableException(T("Variable {0} trop volumineuse.", name));
     }
 
     [StructLayout(LayoutKind.Sequential)]

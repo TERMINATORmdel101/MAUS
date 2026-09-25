@@ -1,4 +1,5 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -40,12 +41,12 @@ public sealed class SettingsAccessor(
                 return raw is null ? null : SettingValue.FromRegistry(raw, registryReader.GetValueKind(key.RegistryHive, key.Path!, key.Name!));
             case SettingKind.SystemParameter:
                 return SettingValue.Bool(parametersReader.GetBool(key.SpiGet)
-                    ?? throw new InvalidOperationException($"Paramètre système illisible : {key}"));
+                    ?? throw new InvalidOperationException(T("Paramètre système illisible : {0}", key)));
             case SettingKind.MinimizeAnimation:
                 return SettingValue.Bool(parametersReader.GetMinimizeAnimation()
-                    ?? throw new InvalidOperationException($"Paramètre système illisible : {key}"));
+                    ?? throw new InvalidOperationException(T("Paramètre système illisible : {0}", key)));
             case SettingKind.ActivePowerScheme:
-                return SettingValue.Text((_power.GetActiveScheme() ?? throw new InvalidOperationException("Mode de gestion actif illisible.")).ToString("D"));
+                return SettingValue.Text((_power.GetActiveScheme() ?? throw new InvalidOperationException(T("Mode de gestion actif illisible."))).ToString("D"));
             default:
                 throw new NotSupportedException(key.Kind.ToString());
         }
@@ -67,21 +68,21 @@ public sealed class SettingsAccessor(
             case SettingKind.SystemParameter:
                 if (!parametersWriter.SetBool(key.SpiSet, RequireValue(key, value).AsBool(), key.SpiUseUiParam))
                 {
-                    throw new InvalidOperationException($"Windows a refusé le réglage {key}.");
+                    throw new InvalidOperationException(T("Windows a refusé le réglage {0}.", key));
                 }
 
                 break;
             case SettingKind.MinimizeAnimation:
                 if (!parametersWriter.SetMinimizeAnimation(RequireValue(key, value).AsBool()))
                 {
-                    throw new InvalidOperationException($"Windows a refusé le réglage {key}.");
+                    throw new InvalidOperationException(T("Windows a refusé le réglage {0}.", key));
                 }
 
                 break;
             case SettingKind.ActivePowerScheme:
                 if (!Guid.TryParse(RequireValue(key, value).Data, out var scheme) || !_power.SetActiveScheme(scheme))
                 {
-                    throw new InvalidOperationException($"Windows a refusé le mode de gestion {value?.Data} (absent de ce PC ?).");
+                    throw new InvalidOperationException(T("Windows a refusé le mode de gestion {0} (absent de ce PC ?).", value?.Data));
                 }
 
                 break;
@@ -99,5 +100,5 @@ public sealed class SettingsAccessor(
     }
 
     private static SettingValue RequireValue(SettingKey key, SettingValue? value) =>
-        value ?? throw new InvalidOperationException($"Un paramètre système ne peut pas être supprimé : {key}");
+        value ?? throw new InvalidOperationException(T("Un paramètre système ne peut pas être supprimé : {0}", key));
 }

@@ -41,7 +41,10 @@ public partial class TranslationCoverageTests
         Assert.Equal(["fr", "en", "es"], Texts.Languages.Select(l => l.Code));
     }
 
-    /// <summary>Textes source : littéraux passés à T( dans src/**/*.cs (chaînes simples, séquences d'échappement C# décodées).</summary>
+    /// <summary>
+    /// Textes source : littéraux passés à T( dans src/**/*.cs (chaînes simples, éventuellement coupées en « "a" + "b" »,
+    /// séquences d'échappement C# décodées).
+    /// </summary>
     internal static HashSet<string> SourceTexts([CallerFilePath] string here = "")
     {
         var root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "..", "src"));
@@ -55,7 +58,7 @@ public partial class TranslationCoverageTests
 
             foreach (Match match in TCall().Matches(File.ReadAllText(file)))
             {
-                texts.Add(Regex.Unescape(match.Groups[1].Value));
+                texts.Add(Regex.Unescape(string.Concat(match.Groups["piece"].Captures.Select(c => c.Value))));
             }
         }
 
@@ -72,7 +75,7 @@ public partial class TranslationCoverageTests
     private static HashSet<string> Placeholders(string text) =>
         [.. PlaceholderPattern().Matches(text).Select(m => m.Value)];
 
-    [GeneratedRegex(@"(?:(?<![\w.])|(?<=Texts\.))T\(\s*""((?:[^""\\]|\\.)*)""")]
+    [GeneratedRegex(@"(?:(?<![\w.])|(?<=Texts\.))T\(\s*""(?<piece>(?:[^""\\]|\\.)*)""(?:\s*\+\s*""(?<piece>(?:[^""\\]|\\.)*)"")*")]
     private static partial Regex TCall();
 
     [GeneratedRegex(@"\{\d+(?::[^}]*)?\}")]

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Maus.Core.Rules;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
@@ -41,7 +42,7 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
 
     public string Id => "M01";
 
-    public string Title => "Audit des modifications risquées";
+    public string Title => T("Audit des modifications risquées");
 
     public int Order => 10;
 
@@ -150,7 +151,7 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
         }
         catch (Exception ex) when (ex is DataSourceUnavailableException or ManagementException or COMException)
         {
-            return check.Unknown("Information indisponible sur ce PC.");
+            return check.Unknown(T("Information indisponible sur ce PC."));
         }
         catch (IOException ex)
         {
@@ -187,7 +188,7 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
     {
         var list = items.ToList();
         var shown = string.Join(" ; ", list.Take(max));
-        return list.Count > max ? $"{shown} ; et {list.Count - max} autre(s)" : shown;
+        return list.Count > max ? T("{0} ; et {1} autre(s)", shown, list.Count - max) : shown;
     }
 
     private static bool IsSet([NotNullWhen(true)] string? value) => !string.IsNullOrWhiteSpace(value);

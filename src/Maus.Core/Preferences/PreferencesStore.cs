@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Maus.Core.Fixes;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Preferences;
 
@@ -72,7 +73,7 @@ public static class Acknowledgements
                     Status = FindingStatus.Info,
                     AcknowledgedFrom = finding.Status,
                     Fixable = false,
-                    Advice = $"Marqué « voulu » par vous le {mark.At.ToLocalTime():dd/MM/yyyy}. MAUS le signalera de nouveau si la situation change.",
+                    Advice = T("Marqué « voulu » par vous le {0:dd/MM/yyyy}. MAUS le signalera de nouveau si la situation change.", mark.At.ToLocalTime()),
                 }
                 : finding).ToList();
         return result with { Findings = findings };

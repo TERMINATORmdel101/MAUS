@@ -1,4 +1,5 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
@@ -55,10 +56,10 @@ public sealed class RestorePointCreator(ISystemRestore restore, ISettingsAccesso
         {
             case ProtectionState.DisabledByPolicy:
                 return new(RestorePointStatus.ProtectionDisabled, null,
-                    "La protection du système est coupée par une stratégie (PC géré ou réglage d'entreprise) : MAUS ne peut pas créer de point de restauration.");
+                    T("La protection du système est coupée par une stratégie (PC géré ou réglage d'entreprise) : MAUS ne peut pas créer de point de restauration."));
             case ProtectionState.Disabled when !enableProtectionIfNeeded:
                 return new(RestorePointStatus.ProtectionDisabled, null,
-                    $"La protection du système est désactivée sur {systemDrive} : aucun point de restauration possible sans l'activer.");
+                    T("La protection du système est désactivée sur {0} : aucun point de restauration possible sans l'activer.", systemDrive));
             case ProtectionState.Disabled:
                 try
                 {
@@ -66,7 +67,7 @@ public sealed class RestorePointCreator(ISystemRestore restore, ISettingsAccesso
                 }
                 catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException or DataSourceUnavailableException)
                 {
-                    return new(RestorePointStatus.Failed, null, $"Activation de la protection du système impossible : {ex.Message}");
+                    return new(RestorePointStatus.Failed, null, T("Activation de la protection du système impossible : {0}", ex.Message));
                 }
 
                 break;
@@ -78,7 +79,7 @@ public sealed class RestorePointCreator(ISystemRestore restore, ISettingsAccesso
         }
         catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException or DataSourceUnavailableException)
         {
-            return new(RestorePointStatus.Failed, null, $"Création du point de restauration impossible : {ex.Message}");
+            return new(RestorePointStatus.Failed, null, T("Création du point de restauration impossible : {0}", ex.Message));
         }
     }
 
@@ -102,7 +103,7 @@ public sealed class RestorePointCreator(ISystemRestore restore, ISettingsAccesso
             .FirstOrDefault();
 
         return created is null
-            ? new(RestorePointStatus.Failed, null, "Windows a répondu sans créer de point de restauration (vérifié en relisant la liste des points).")
-            : new(RestorePointStatus.Created, created, $"Point de restauration n° {created.SequenceNumber} créé et vérifié.");
+            ? new(RestorePointStatus.Failed, null, T("Windows a répondu sans créer de point de restauration (vérifié en relisant la liste des points)."))
+            : new(RestorePointStatus.Created, created, T("Point de restauration n° {0} créé et vérifié.", created.SequenceNumber));
     }
 }

@@ -1,5 +1,6 @@
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
@@ -31,20 +32,19 @@ public sealed partial class RiskyChangesAuditModule
         (Hkcu, @"Software\Microsoft\Windows\CurrentVersion\RunOnce"),
     ];
 
-    private static readonly Check IfeoCheck = new("M01.ifeo-debugger", "Programmes détournés par un « débogueur » (IFEO)", PersistenceCategory, Severity.High, Fixable: true);
+    private static Check IfeoCheck => new("M01.ifeo-debugger", T("Programmes détournés par un « débogueur » (IFEO)"), PersistenceCategory, Severity.High, Fixable: true);
 
-    private static readonly Check WinlogonCheck = new("M01.winlogon", "Programmes lancés à l'ouverture de session (Winlogon)", PersistenceCategory, Severity.Critical, Fixable: true);
+    private static Check WinlogonCheck => new("M01.winlogon", T("Programmes lancés à l'ouverture de session (Winlogon)"), PersistenceCategory, Severity.Critical, Fixable: true);
 
-    private static readonly Check AppInitCheck = new("M01.appinit", "Bibliothèques injectées dans tous les programmes (AppInit_DLLs)", PersistenceCategory, Severity.Critical, Fixable: true);
+    private static Check AppInitCheck => new("M01.appinit", T("Bibliothèques injectées dans tous les programmes (AppInit_DLLs)"), PersistenceCategory, Severity.Critical, Fixable: true);
 
-    private static readonly Check StartupCheck = new("M01.unsigned-startup", "Programmes non signés au démarrage", PersistenceCategory, Severity.Medium);
+    private static Check StartupCheck => new("M01.unsigned-startup", T("Programmes non signés au démarrage"), PersistenceCategory, Severity.Medium);
 
     private static Finding DetectIfeoDebuggers(IRegistryReader registry)
     {
-        const string explanation =
-            "La clé « Image File Execution Options » permet de lancer un autre programme à la place de celui demandé. Des logiciels malveillants s'en servent " +
-            "pour se relancer ou pour bloquer l'antivirus ; quelques outils légitimes aussi (Process Explorer qui remplace le Gestionnaire des tâches).";
-        const string expected = "aucun débogueur";
+        var explanation = T("La clé « Image File Execution Options » permet de lancer un autre programme à la place de celui demandé. Des logiciels malveillants s'en servent " +
+            "pour se relancer ou pour bloquer l'antivirus ; quelques outils légitimes aussi (Process Explorer qui remplace le Gestionnaire des tâches).");
+        var expected = T("aucun débogueur");
         var found = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         var protectedKeys = 0;
         foreach (var root in IfeoKeys)
@@ -70,22 +70,21 @@ public sealed partial class RiskyChangesAuditModule
         if (found.Count > 0)
         {
             return IfeoCheck.Deviation(
-                $"à examiner : {Join(found)}",
+                T("à examiner : {0}", Join(found)),
                 expected,
                 explanation,
-                "Examiner chaque entrée : si vous ne reconnaissez pas le programme indiqué après la flèche, supprimer la valeur Debugger correspondante et lancer une analyse antivirus.");
+                T("Examiner chaque entrée : si vous ne reconnaissez pas le programme indiqué après la flèche, supprimer la valeur Debugger correspondante et lancer une analyse antivirus."));
         }
 
-        var current = protectedKeys > 0 ? $"aucun ({protectedKeys} clé(s) protégée(s) non lue(s))" : "aucun";
+        var current = protectedKeys > 0 ? T("aucun ({0} clé(s) protégée(s) non lue(s))", protectedKeys) : T("aucun");
         return IfeoCheck.Compliant(current, expected, explanation);
     }
 
     private Finding DetectWinlogon(IRegistryReader registry)
     {
-        const string explanation =
-            "À l'ouverture de session, Windows lance les programmes indiqués dans les valeurs Shell (le Bureau, explorer.exe) et Userinit. " +
-            "Un programme ajouté à ces valeurs démarre avant tout le reste : c'est une technique classique des logiciels malveillants.";
-        const string expected = "Shell = explorer.exe ; Userinit = userinit.exe seul";
+        var explanation = T("À l'ouverture de session, Windows lance les programmes indiqués dans les valeurs Shell (le Bureau, explorer.exe) et Userinit. " +
+            "Un programme ajouté à ces valeurs démarre avant tout le reste : c'est une technique classique des logiciels malveillants.");
+        var expected = T("Shell = explorer.exe ; Userinit = userinit.exe seul");
         var shell = registry.GetString(Hklm, WinlogonKey, "Shell");
         var userinit = registry.GetString(Hklm, WinlogonKey, "Userinit");
         var userShell = registry.GetString(Hkcu, WinlogonKey, "Shell");
@@ -98,7 +97,7 @@ public sealed partial class RiskyChangesAuditModule
 
         if (IsSet(userShell) && !IsDefaultWinlogonEntry(userShell, "explorer.exe", _windowsDirectory, _windowsDirectory))
         {
-            issues.Add($"Shell de l'utilisateur = {userShell}");
+            issues.Add(T("Shell de l'utilisateur = {0}", userShell));
         }
 
         if (IsSet(userinit) && !IsDefaultWinlogonEntry(userinit, "userinit.exe", _windowsDirectory + @"\System32", _windowsDirectory))
@@ -112,7 +111,7 @@ public sealed partial class RiskyChangesAuditModule
                 Join(issues),
                 expected,
                 explanation,
-                "Identifier le programme ajouté (analyse antivirus recommandée), puis remettre Shell à « explorer.exe » et Userinit à « C:\\Windows\\system32\\userinit.exe, ».");
+                T("Identifier le programme ajouté (analyse antivirus recommandée), puis remettre Shell à « explorer.exe » et Userinit à « C:\\Windows\\system32\\userinit.exe, »."));
     }
 
     /// <summary>
@@ -147,11 +146,10 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Finding DetectAppInit(IRegistryReader registry)
     {
-        const string explanation =
-            "Les bibliothèques listées dans AppInit_DLLs sont chargées dans presque tous les programmes qui s'ouvrent. " +
-            "Ce mécanisme ancien sert surtout aux logiciels malveillants et publicitaires.";
-        const string expected = "liste vide ; LoadAppInit_DLLs = 0";
-        const string advice = "Vider AppInit_DLLs et remettre LoadAppInit_DLLs à 0, après une analyse antivirus complète.";
+        var explanation = T("Les bibliothèques listées dans AppInit_DLLs sont chargées dans presque tous les programmes qui s'ouvrent. " +
+            "Ce mécanisme ancien sert surtout aux logiciels malveillants et publicitaires.");
+        var expected = T("liste vide ; LoadAppInit_DLLs = 0");
+        var advice = T("Vider AppInit_DLLs et remettre LoadAppInit_DLLs à 0, après une analyse antivirus complète.");
         var active = new List<string>();
         var inactive = new List<string>();
         foreach (var key in AppInitKeys)
@@ -167,25 +165,24 @@ public sealed partial class RiskyChangesAuditModule
 
         if (active.Count > 0)
         {
-            return AppInitCheck.Deviation($"chargées : {Join(active)}", expected, explanation, advice);
+            return AppInitCheck.Deviation(T("chargées : {0}", Join(active)), expected, explanation, advice);
         }
 
         return inactive.Count > 0
             ? AppInitCheck.Deviation(
-                $"liste présente mais inactive : {Join(inactive)}",
+                T("liste présente mais inactive : {0}", Join(inactive)),
                 expected,
-                "Le chargement est coupé (LoadAppInit_DLLs = 0), mais la liste reste une trace à examiner. " + explanation,
+                T("Le chargement est coupé (LoadAppInit_DLLs = 0), mais la liste reste une trace à examiner. ") + explanation,
                 advice,
                 Severity.Low)
-            : AppInitCheck.Compliant("liste vide", expected, explanation);
+            : AppInitCheck.Compliant(T("liste vide"), expected, explanation);
     }
 
     private Finding DetectUnsignedStartup(AuditContext context)
     {
-        const string explanation =
-            "Une signature numérique garantit l'éditeur d'un programme et qu'il n'a pas été modifié. Un programme non signé lancé à chaque démarrage " +
-            "n'est pas forcément dangereux (petits logiciels gratuits), mais c'est aussi l'emplacement préféré des logiciels malveillants.";
-        const string expected = "programmes signés par leur éditeur";
+        var explanation = T("Une signature numérique garantit l'éditeur d'un programme et qu'il n'a pas été modifié. Un programme non signé lancé à chaque démarrage " +
+            "n'est pas forcément dangereux (petits logiciels gratuits), mais c'est aussi l'emplacement préféré des logiciels malveillants.");
+        var expected = T("programmes signés par leur éditeur");
         var unsigned = new List<string>();
         var orphans = new List<string>();
         var checkedCount = 0;
@@ -230,28 +227,28 @@ public sealed partial class RiskyChangesAuditModule
             return StartupCheck.AdminRequired();
         }
 
-        var orphanNote = orphans.Count > 0 ? $" ; {orphans.Count} entrée(s) sans programme : {Join(orphans, 3)}" : string.Empty;
+        var orphanNote = orphans.Count > 0 ? T(" ; {0} entrée(s) sans programme : {1}", orphans.Count, Join(orphans, 3)) : string.Empty;
         if (unsigned.Count > 0)
         {
             return StartupCheck.Deviation(
-                $"{unsigned.Count} programme(s) non signé(s) : {Join(unsigned, 4)}{orphanNote}",
+                T("{0} programme(s) non signé(s) : {1}{2}", unsigned.Count, Join(unsigned, 4), orphanNote),
                 expected,
                 explanation,
-                "Vérifier que vous reconnaissez chaque programme listé ; sinon, le désactiver (voir Module 12) et lancer une analyse antivirus.");
+                T("Vérifier que vous reconnaissez chaque programme listé ; sinon, le désactiver (voir Module 12) et lancer une analyse antivirus."));
         }
 
         if (orphans.Count > 0)
         {
             return StartupCheck.Deviation(
-                $"{orphans.Count} entrée(s) sans programme : {Join(orphans)}",
+                T("{0} entrée(s) sans programme : {1}", orphans.Count, Join(orphans)),
                 expected,
-                "Ces entrées lancent un programme qui n'existe plus : elles sont inutiles mais sans danger.",
-                "Retirer ces entrées orphelines (voir Module 12).",
+                T("Ces entrées lancent un programme qui n'existe plus : elles sont inutiles mais sans danger."),
+                T("Retirer ces entrées orphelines (voir Module 12)."),
                 Severity.Low);
         }
 
         return StartupCheck.Compliant(
-            checkedCount == 0 ? "aucun programme" : $"{checkedCount} programme(s), tous signés",
+            checkedCount == 0 ? T("aucun programme") : T("{0} programme(s), tous signés", checkedCount),
             expected,
             explanation);
     }

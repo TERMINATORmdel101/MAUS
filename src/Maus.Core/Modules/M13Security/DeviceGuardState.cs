@@ -1,4 +1,5 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M13Security;
 
@@ -36,12 +37,12 @@ internal sealed record DeviceGuardState(
     public static string? ServiceLabel(long service) => service switch
     {
         1 => "Credential Guard",
-        2 => "intégrité de la mémoire",
-        3 => "System Guard (lancement sécurisé)",
-        4 => "mesure du micrologiciel SMM",
-        5 => "protection matérielle de la pile du noyau",
-        6 => "protection de la pile du noyau (audit)",
-        7 => "traduction de pagination protégée par l'hyperviseur",
+        2 => T("intégrité de la mémoire"),
+        3 => T("System Guard (lancement sécurisé)"),
+        4 => T("mesure du micrologiciel SMM"),
+        5 => T("protection matérielle de la pile du noyau"),
+        6 => T("protection de la pile du noyau (audit)"),
+        7 => T("traduction de pagination protégée par l'hyperviseur"),
         _ => null,
     };
 }

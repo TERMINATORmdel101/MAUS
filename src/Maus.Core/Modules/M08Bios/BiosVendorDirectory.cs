@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Maus.Core.Rules;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M08Bios;
 
@@ -103,20 +104,20 @@ internal static partial class BiosVendorDirectory
         {
             var model = systemModel!.Trim();
             var name = systemVendor?.Name ?? systemManufacturer!.Trim();
-            var tool = systemVendor?.OemTool ?? "l'application de mise à jour fournie par le fabricant du PC";
+            var tool = systemVendor?.OemTool ?? T("l'application de mise à jour fournie par le fabricant du PC");
             return new BiosTarget($"{name} {model}", model, true, systemVendor, BuildUrl(systemVendor, model), tool);
         }
 
         var boardVendor = Find(boardManufacturer, vendors);
         var boardModel = IsPlaceholder(boardProduct) ? null : CleanModel(boardProduct!);
-        var boardName = boardVendor?.Name ?? (IsPlaceholder(boardManufacturer) ? "Carte mère" : boardManufacturer!.Trim());
+        var boardName = boardVendor?.Name ?? (IsPlaceholder(boardManufacturer) ? T("Carte mère") : boardManufacturer!.Trim());
         var display = boardProduct is not null && !IsPlaceholder(boardProduct) ? $"{boardName} {boardProduct.Trim()}" : boardName;
         var boardTool = boardVendor?.BoardTool is { } flash
-            ? $"{flash} depuis le BIOS, avec une clé USB formatée en FAT32"
-            : "l'outil de mise à jour intégré au BIOS, avec une clé USB formatée en FAT32";
+            ? T("{0} depuis le BIOS, avec une clé USB formatée en FAT32", flash)
+            : T("l'outil de mise à jour intégré au BIOS, avec une clé USB formatée en FAT32");
         if (boardVendor?.RescueTool is { } rescue)
         {
-            boardTool += $" ; en secours : {rescue}";
+            boardTool += T(" ; en secours : {0}", rescue);
         }
 
         return new BiosTarget(display, boardModel, false, boardVendor, BuildUrl(boardVendor, boardModel), boardTool);

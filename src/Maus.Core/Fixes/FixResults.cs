@@ -1,3 +1,5 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Fixes;
 
 /// <summary>Choix de l'utilisateur pour la séance de corrections.</summary>
@@ -12,7 +14,7 @@ public sealed record ApplyOptions
     /// <summary>Accord explicite pour continuer si le point de restauration échoue (le journal permet quand même d'annuler).</summary>
     public bool ProceedWithoutRestorePoint { get; init; }
 
-    public string RestorePointDescription { get; init; } = "MAUS : avant corrections";
+    public string RestorePointDescription { get; init; } = T("MAUS : avant corrections");
 }
 
 public enum ChangeStatus

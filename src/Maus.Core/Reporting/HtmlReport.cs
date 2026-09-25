@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Maus.Core.Fixes;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Reporting;
 
@@ -23,8 +24,6 @@ public sealed record HtmlReportInput
 /// </summary>
 public static class HtmlReport
 {
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
-
     private static readonly FindingStatus[] Order =
         [FindingStatus.Problem, FindingStatus.Warning, FindingStatus.Improvable, FindingStatus.Unknown, FindingStatus.Info, FindingStatus.Ok];
 
@@ -32,18 +31,20 @@ public static class HtmlReport
     {
         var after = input.After;
         var html = new StringBuilder();
-        var title = input.Before is null ? "Rapport d'audit MAUS" : "Rapport avant/après MAUS";
-        html.Append("<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\">")
+        var title = input.Before is null ? T("Rapport d'audit MAUS") : T("Rapport avant/après MAUS");
+        html.Append(CultureInfo.InvariantCulture, $"<!DOCTYPE html><html lang=\"{Language}\"><head><meta charset=\"utf-8\">")
             .Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
             .Append(CultureInfo.InvariantCulture, $"<title>{E(title)}</title><style>{StyleSheet}</style></head><body><main>");
 
-        html.Append(CultureInfo.InvariantCulture, $"<header><h1>{E(title)}</h1><p class=\"sub\">{E(after.CreatedAt.ToLocalTime().ToString("dddd d MMMM yyyy, HH:mm", French))}</p>")
-            .Append(CultureInfo.InvariantCulture, $"<p>{E($"{after.Windows.ProductName} {after.Windows.DisplayVersion} (build {after.Windows.FullBuild}), édition {after.Windows.EditionId}")}</p>")
+        html.Append(CultureInfo.InvariantCulture, $"<header><h1>{E(title)}</h1><p class=\"sub\">{E(after.CreatedAt.ToLocalTime().ToString("f", Culture))}</p>")
+            .Append(CultureInfo.InvariantCulture, $"<p>{E(T("{0} {1} (build {2}), édition {3}", after.Windows.ProductName, after.Windows.DisplayVersion, after.Windows.FullBuild, after.Windows.EditionId))}</p>")
             .Append(CultureInfo.InvariantCulture, $"<p>{E($"{Labels.Of(after.Hardware.FormFactor)} · {after.Hardware.Cpu.Name}")}")
             .Append(after.Hardware.Gpus.Count > 0 ? E(" · " + string.Join(", ", after.Hardware.Gpus.Select(g => g.Name))) : string.Empty)
             .Append("</p></header>");
 
-        html.Append("<section><h2>En résumé</h2><div class=\"cards\">");
+        var score = HealthScore.Compute(after.Modules);
+        html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(T("En résumé"))}</h2>")
+            .Append(CultureInfo.InvariantCulture, $"<p class=\"score\"><b>{score}</b>/100 · {E(T("santé du PC : {0}", HealthScore.Describe(score)))}</p><div class=\"cards\">");
         foreach (var status in Order.Take(4))
         {
             var now = Count(after, status);
@@ -51,7 +52,7 @@ public static class HtmlReport
             html.Append(CultureInfo.InvariantCulture, $"<div class=\"card s-{Css(status)}\"><div class=\"n\">{now}</div><div>{E(Labels.Of(status))}</div>");
             if (before is not null)
             {
-                html.Append(CultureInfo.InvariantCulture, $"<div class=\"was\">avant : {before}</div>");
+                html.Append(CultureInfo.InvariantCulture, $"<div class=\"was\">{E(T("avant : {0}", before))}</div>");
             }
 
             html.Append("</div>");
@@ -69,7 +70,7 @@ public static class HtmlReport
             AppendChanges(html, input.Before, after);
         }
 
-        html.Append("<section><h2>Constats détaillés</h2>");
+        html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(T("Constats détaillés"))}</h2>");
         foreach (var module in after.Modules)
         {
             html.Append(CultureInfo.InvariantCulture, $"<details{(module.WorstStatus.Rank() >= FindingStatus.Improvable.Rank() ? " open" : string.Empty)}><summary><span class=\"dot s-{Css(module.WorstStatus)}\"></span>{E($"{module.ModuleId} · {module.Title}")}</summary>");
@@ -83,7 +84,7 @@ public static class HtmlReport
                 html.Append(CultureInfo.InvariantCulture, $"<div class=\"finding s-{Css(finding.Status)}\"><div class=\"ft\"><b>{E(finding.Title)}</b><span class=\"tag\">{E(Labels.Of(finding.Status))}</span></div>");
                 if (finding.Current is not null)
                 {
-                    html.Append(CultureInfo.InvariantCulture, $"<div class=\"val\">Constaté : {E(finding.Current)}{(finding.Expected is null ? string.Empty : " · Attendu : " + E(finding.Expected))}</div>");
+                    html.Append(CultureInfo.InvariantCulture, $"<div class=\"val\">{E(finding.Expected is null ? T("Constaté : {0}", finding.Current) : T("Constaté : {0}   ·   Attendu : {1}", finding.Current, finding.Expected))}</div>");
                 }
 
                 html.Append(CultureInfo.InvariantCulture, $"<p>{E(finding.Explanation)}</p>");
@@ -99,19 +100,20 @@ public static class HtmlReport
         }
 
         html.Append("</section>")
-            .Append(CultureInfo.InvariantCulture, $"<footer>MAUS {E(after.MausVersion)} · Logiciel libre (GPL-3.0) conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur. ")
-            .Append("Ce rapport ne contient ni nom d'utilisateur, ni nom de PC, ni numéro de série.</footer></main></body></html>");
+            .Append(CultureInfo.InvariantCulture, $"<footer>MAUS {E(after.MausVersion)} · {E(T("Logiciel libre (GPL-3.0) conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur."))} ")
+            .Append(E(T("Ce rapport ne contient ni nom d'utilisateur, ni nom de PC, ni numéro de série.")))
+            .Append("</footer></main></body></html>");
         return html.ToString();
     }
 
     private static void AppendSession(StringBuilder html, JournalSession session, IReadOnlyList<VerifiedOutcome> outcomes)
     {
-        html.Append("<section><h2>Corrections faites</h2>");
+        html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(T("Corrections faites"))}</h2>");
         html.Append(session.RestorePoint is { } point
-            ? string.Create(CultureInfo.InvariantCulture, $"<p class=\"ok\">Point de restauration n° {point.SequenceNumber} créé et vérifié avant toute modification.</p>")
-            : $"<p class=\"warn\">{E(session.RestorePointNote ?? "Aucun point de restauration.")}</p>");
+            ? $"<p class=\"ok\">{E(T("Point de restauration n° {0} créé et vérifié avant toute modification.", point.SequenceNumber))}</p>"
+            : $"<p class=\"warn\">{E(session.RestorePointNote ?? T("Aucun point de restauration."))}</p>");
 
-        html.Append("<table><thead><tr><th>Correction</th><th>Résultat</th><th>Valeur avant → après</th></tr></thead><tbody>");
+        html.Append(CultureInfo.InvariantCulture, $"<table><thead><tr><th>{E(T("Correction"))}</th><th>{E(T("Résultat"))}</th><th>{E(T("Valeur avant → après"))}</th></tr></thead><tbody>");
         var verified = outcomes.ToDictionary(o => o.Outcome.ChangeId, StringComparer.Ordinal);
         foreach (var change in session.Entries.GroupBy(e => e.ChangeId))
         {
@@ -120,9 +122,9 @@ public static class HtmlReport
                 ? v.Message
                 : first.State switch
                 {
-                    EntryState.Applied => "Appliqué",
-                    EntryState.Reverted => "Annulé depuis",
-                    EntryState.Failed => "Échec : valeur d'origine remise",
+                    EntryState.Applied => T("Appliqué"),
+                    EntryState.Reverted => T("Annulé depuis"),
+                    EntryState.Failed => T("Échec : valeur d'origine remise"),
                     _ => first.State.ToString(),
                 };
             var values = string.Join("<br>", change.Select(e => $"<code>{E(e.Key.Describe())}</code> : {E(SettingValue.Display(e.Before))} → {E(SettingValue.Display(e.After))}"));
@@ -130,12 +132,12 @@ public static class HtmlReport
         }
 
         html.Append("</tbody></table>")
-            .Append("<h3>Comment tout annuler</h3><ul>")
-            .Append("<li>Dans MAUS : onglet <b>Historique</b>, bouton « Annuler cette séance » (ou une seule correction).</li>")
-            .Append(CultureInfo.InvariantCulture, $"<li>En ligne de commande (administrateur) : <code>maus --revert {E(session.Id)}</code></li>");
+            .Append(CultureInfo.InvariantCulture, $"<h3>{E(T("Comment tout annuler"))}</h3><ul>")
+            .Append(CultureInfo.InvariantCulture, $"<li>{E(T("Dans MAUS : onglet « Historique », bouton « Annuler cette séance » (ou une seule correction)."))}</li>")
+            .Append(CultureInfo.InvariantCulture, $"<li>{E(T("En ligne de commande (administrateur) :"))} <code>maus --revert {E(session.Id)}</code></li>");
         if (session.RestorePoint is { } rp)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<li>En dernier recours : Restauration du système (<code>rstrui.exe</code>), point n° {rp.SequenceNumber}.</li>");
+            html.Append(CultureInfo.InvariantCulture, $"<li>{E(T("En dernier recours : Restauration du système (rstrui.exe), point n° {0}.", rp.SequenceNumber))}</li>");
         }
 
         html.Append("</ul></section>");
@@ -147,14 +149,14 @@ public static class HtmlReport
         var changed = after.Modules.SelectMany(m => m.Findings)
             .Where(f => old.TryGetValue(f.Id, out var o) && o.Status != f.Status)
             .ToList();
-        html.Append("<section><h2>Ce qui a changé</h2>");
+        html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(T("Ce qui a changé"))}</h2>");
         if (changed.Count == 0)
         {
-            html.Append("<p>Aucun verdict n'a changé entre les deux audits.</p></section>");
+            html.Append(CultureInfo.InvariantCulture, $"<p>{E(T("Aucun verdict n'a changé entre les deux audits."))}</p></section>");
             return;
         }
 
-        html.Append("<table><thead><tr><th>Constat</th><th>Avant</th><th>Après</th></tr></thead><tbody>");
+        html.Append(CultureInfo.InvariantCulture, $"<table><thead><tr><th>{E(T("Constat"))}</th><th>{E(T("Avant"))}</th><th>{E(T("Après"))}</th></tr></thead><tbody>");
         foreach (var finding in changed)
         {
             var was = old[finding.Id];
@@ -192,5 +194,6 @@ public static class HtmlReport
         ".tag{color:var(--c);font-weight:600;font-size:13px;white-space:nowrap}" +
         "table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden}th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}" +
         "code{font-family:Consolas,monospace;font-size:13px;overflow-wrap:anywhere}.ok{color:var(--ok)}.warn,.err{color:var(--warning)}footer{margin-top:40px;font-size:13px}" +
+        ".score{font-size:17px;margin:0 0 12px}.score b{font-size:30px}" +
         "@media print{details{break-inside:avoid}details:not([open])>*:not(summary){display:block}}";
 }

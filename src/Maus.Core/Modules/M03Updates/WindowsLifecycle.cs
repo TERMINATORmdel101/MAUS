@@ -1,4 +1,5 @@
 using Maus.Core.Rules;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M03Updates;
 
@@ -57,7 +58,7 @@ internal sealed class WindowsLifecycleCatalog
     public static string Describe(ServicingChannel channel) => channel switch
     {
         ServicingChannel.HomePro => "Famille et Pro",
-        ServicingChannel.EnterpriseEducation => "Entreprise et Éducation",
+        ServicingChannel.EnterpriseEducation => T("Entreprise et Éducation"),
         ServicingChannel.Ltsc => "Entreprise LTSC",
         _ => "IoT Entreprise LTSC",
     };

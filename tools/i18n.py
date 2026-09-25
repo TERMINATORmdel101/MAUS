@@ -9,7 +9,8 @@ import json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I18N = os.path.join(ROOT, "src", "Maus.Core", "Localization", "i18n")
-CALL = re.compile(r'(?:(?<![\w.])|(?<=Texts\.))T\(\s*"((?:[^"\\]|\\.)*)"')
+CALL = re.compile(r'(?:(?<![\w.])|(?<=Texts\.))T\(\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)')
+PIECE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 def unescape(s):
     return s.encode("latin-1", "backslashreplace").decode("unicode_escape") if "\\" in s else s
@@ -23,7 +24,8 @@ def sources():
             if f.endswith(".cs"):
                 text = open(os.path.join(base, f), encoding="utf-8").read()
                 for m in CALL.finditer(text):
-                    found.add(m.group(1).replace('\\"', '"').replace("\\\\", "\\").replace("\\n", "\n"))
+                    literal = "".join(p.group(1) for p in PIECE.finditer(m.group(1)))
+                    found.add(literal.replace('\\"', '"').replace("\\\\", "\\").replace("\\n", "\n"))
     return found | catalog_texts()
 
 # Catalogues JSON déjà traduits, et leurs champs de texte.

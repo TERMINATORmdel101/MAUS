@@ -1,11 +1,12 @@
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
 /// <summary>Catégorie « Système » : image modifiée, activation, stratégies résiduelles.</summary>
 public sealed partial class RiskyChangesAuditModule
 {
-    private const string SystemCategory = "Système";
+    private static string SystemCategory => T("Système");
     private const string PoliciesRoot = @"SOFTWARE\Policies\Microsoft";
     private const int MaxPolicyKeys = 3000;
 
@@ -35,25 +36,24 @@ public sealed partial class RiskyChangesAuditModule
         @"Windows\OneDrive", @"Windows\DataCollection", @"Windows\GameDVR", @"Windows\AdvertisingInfo", @"Windows\Windows Search",
     ];
 
-    private static readonly Check ModifiedImageCheck = new("M01.modified-image", "Image de Windows modifiée", SystemCategory, Severity.High);
+    private static Check ModifiedImageCheck => new("M01.modified-image", T("Image de Windows modifiée"), SystemCategory, Severity.High);
 
     private static readonly Check ActivationCheck = new("M01.activation", "Activation de Windows", SystemCategory, Severity.Medium);
 
-    private static readonly Check ResidualPoliciesCheck = new("M01.residual-policies", "Stratégies locales résiduelles", SystemCategory, Severity.Low, Fixable: true);
+    private static Check ResidualPoliciesCheck => new("M01.residual-policies", T("Stratégies locales résiduelles"), SystemCategory, Severity.Low, Fixable: true);
 
     private Finding DetectModifiedImage(AuditContext context, bool? winRe)
     {
-        const string explanation =
-            "Des versions « allégées » de Windows (Tiny11, AtlasOS, ReviOS…) retirent des composants de sécurité et de mise à jour. " +
-            "MAUS cherche un faisceau d'indices : services supprimés, dossiers propres à ces versions, environnement de récupération absent.";
-        const string expected = "image officielle de Microsoft";
+        var explanation = T("Des versions « allégées » de Windows (Tiny11, AtlasOS, ReviOS…) retirent des composants de sécurité et de mise à jour. " +
+            "MAUS cherche un faisceau d'indices : services supprimés, dossiers propres à ces versions, environnement de récupération absent.");
+        var expected = T("image officielle de Microsoft");
         var clues = new List<string>();
         var strong = false;
         foreach (var (service, label) in new[]
         {
-            ("WinDefend", "service de l'antivirus (WinDefend) supprimé"),
-            ("wuauserv", "service Windows Update supprimé"),
-            ("WaaSMedicSvc", "service de réparation de Windows Update supprimé"),
+            ("WinDefend", T("service de l'antivirus (WinDefend) supprimé")),
+            ("wuauserv", T("service Windows Update supprimé")),
+            ("WaaSMedicSvc", T("service de réparation de Windows Update supprimé")),
         })
         {
             if (!context.Registry.KeyExists(Hklm, ServicesKey + service))
@@ -70,13 +70,13 @@ public sealed partial class RiskyChangesAuditModule
 
         if (winRe == false)
         {
-            clues.Add("environnement de récupération (WinRE) désactivé");
+            clues.Add(T("environnement de récupération (WinRE) désactivé"));
         }
 
         if (clues.Count == 0)
         {
             return ModifiedImageCheck.Compliant(
-                winRe is null ? "aucun indice (WinRE non vérifié sans droits administrateur)" : "aucun indice",
+                winRe is null ? T("aucun indice (WinRE non vérifié sans droits administrateur)") : T("aucun indice"),
                 expected,
                 explanation);
         }
@@ -86,34 +86,34 @@ public sealed partial class RiskyChangesAuditModule
             return ModifiedImageCheck.Deviation(
                 Join(clues),
                 expected,
-                "Ce Windows provient d'une image modifiée. Des composants de sécurité et de mise à jour manquent. " +
-                "Seule une réinstallation depuis l'outil officiel Microsoft les rétablit. " + explanation,
-                "Sauvegarder vos données, puis réinstaller Windows avec l'outil de création de support officiel de Microsoft.");
+                T("Ce Windows provient d'une image modifiée. Des composants de sécurité et de mise à jour manquent. " +
+                "Seule une réinstallation depuis l'outil officiel Microsoft les rétablit. ") + explanation,
+                T("Sauvegarder vos données, puis réinstaller Windows avec l'outil de création de support officiel de Microsoft."));
         }
 
         var onlyWinRe = winRe == false;
         return ModifiedImageCheck.Deviation(
-            $"indice isolé : {clues[0]}",
+            T("indice isolé : {0}", clues[0]),
             expected,
-            "Un seul indice ne suffit pas à conclure : il peut venir d'une manipulation ponctuelle. " + explanation,
+            T("Un seul indice ne suffit pas à conclure : il peut venir d'une manipulation ponctuelle. ") + explanation,
             onlyWinRe
-                ? "Réactiver l'environnement de récupération (commande « reagentc /enable » en administrateur) ; s'il est introuvable, voir Module 2."
-                : "Vérifier l'origine de cette installation ; en cas de doute, réinstaller Windows avec l'outil officiel de Microsoft.",
+                ? T("Réactiver l'environnement de récupération (commande « reagentc /enable » en administrateur) ; s'il est introuvable, voir Module 2.")
+                : T("Vérifier l'origine de cette installation ; en cas de doute, réinstaller Windows avec l'outil officiel de Microsoft."),
             Severity.Medium);
     }
 
     private static Finding DetectActivation(AuditContext context)
     {
-        const string explanation = "MAUS lit le canal de licence de Windows à titre d'information. L'outil ne modifie jamais l'activation.";
-        const string expected = "activé (licence Retail, OEM ou numérique)";
+        var explanation = T("MAUS lit le canal de licence de Windows à titre d'information. L'outil ne modifie jamais l'activation.");
+        var expected = T("activé (licence Retail, OEM ou numérique)");
         var rows = context.Cim.Query(ActivationQuery);
         var row = rows.FirstOrDefault(r => r.GetInt64("LicenseStatus") == 1) ?? FirstRow(rows);
         if (row is null)
         {
-            return ActivationCheck.Unknown("Informations de licence indisponibles.");
+            return ActivationCheck.Unknown(T("Informations de licence indisponibles."));
         }
 
-        var channel = row.GetString("ProductKeyChannel") ?? "inconnu";
+        var channel = row.GetString("ProductKeyChannel") ?? T("inconnu");
         var server = new[] { row.GetString("KeyManagementServiceMachine"), row.GetString("DiscoveredKeyManagementServiceMachineName") }.FirstOrDefault(IsSet);
         var licensed = row.GetInt64("LicenseStatus") == 1;
         var volumeKey = channel.Equals("Volume:GVLK", StringComparison.OrdinalIgnoreCase) || IsSet(server);
@@ -121,26 +121,25 @@ public sealed partial class RiskyChangesAuditModule
         if (volumeKey && !context.Windows.IsEnterpriseOrEducation && !context.Hardware.IsManaged)
         {
             return ActivationCheck.Neutral(
-                IsSet(server) ? $"canal {channel}, serveur {server}" : $"canal {channel}",
+                IsSet(server) ? T("canal {0}, serveur {1}", channel, server) : $"canal {channel}",
                 expected,
-                "L'activation de Windows semble passer par un serveur d'activation (KMS) non officiel, ce qui est inhabituel sur une édition Famille ou Pro " +
-                "hors entreprise. " + explanation);
+                T("L'activation de Windows semble passer par un serveur d'activation (KMS) non officiel, ce qui est inhabituel sur une édition Famille ou Pro " +
+                "hors entreprise. ") + explanation);
         }
 
         return licensed
-            ? ActivationCheck.Compliant($"activé (canal {channel})", expected, explanation)
+            ? ActivationCheck.Compliant(T("activé (canal {0})", channel), expected, explanation)
             : ActivationCheck.Neutral(
-                $"non activé (canal {channel})",
+                T("non activé (canal {0})", channel),
                 expected,
-                "Windows n'est pas activé : quelques options de personnalisation sont bloquées, mais les mises à jour de sécurité continuent. " + explanation);
+                T("Windows n'est pas activé : quelques options de personnalisation sont bloquées, mais les mises à jour de sécurité continuent. ") + explanation);
     }
 
     private static Finding DetectResidualPolicies(IRegistryReader registry, bool managed)
     {
-        const string explanation =
-            "Des stratégies posées par un script ou un ancien outil restent actives sous HKLM\\SOFTWARE\\Policies. Elles verrouillent des réglages " +
-            "(Windows affiche alors « Certains paramètres sont gérés par votre organisation ») et peuvent gêner des fonctions de Windows.";
-        const string expected = "aucune sur un PC personnel";
+        var explanation = T("Des stratégies posées par un script ou un ancien outil restent actives sous HKLM\\SOFTWARE\\Policies. Elles verrouillent des réglages " +
+            "(Windows affiche alors « Certains paramètres sont gérés par votre organisation ») et peuvent gêner des fonctions de Windows.");
+        var expected = T("aucune sur un PC personnel");
         var residual = new List<string>();
         var visited = 0;
         var pending = new Stack<string>();
@@ -178,18 +177,18 @@ public sealed partial class RiskyChangesAuditModule
 
         if (residual.Count == 0)
         {
-            return ResidualPoliciesCheck.Compliant("aucune en dehors des réglages connus", expected, explanation);
+            return ResidualPoliciesCheck.Compliant(T("aucune en dehors des réglages connus"), expected, explanation);
         }
 
         residual.Sort(StringComparer.OrdinalIgnoreCase);
         var current = $"{residual.Count} valeur(s) : {Join(residual)}";
         return managed
-            ? ResidualPoliciesCheck.Neutral(current, expected, "Sur un PC géré, ces stratégies sont normalement posées par l'organisation.")
+            ? ResidualPoliciesCheck.Neutral(current, expected, T("Sur un PC géré, ces stratégies sont normalement posées par l'organisation."))
             : ResidualPoliciesCheck.Deviation(
                 current,
                 expected,
                 explanation,
-                "Passer en revue ces valeurs : celles que vous n'avez pas choisies pourront être supprimées une à une.");
+                T("Passer en revue ces valeurs : celles que vous n'avez pas choisies pourront être supprimées une à une."));
     }
 
     internal static bool IsAcceptedPolicy(string relativePath) =>

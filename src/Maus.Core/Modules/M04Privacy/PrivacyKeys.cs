@@ -1,15 +1,17 @@
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Modules.M04Privacy;
 
 /// <summary>Clés de registre, requêtes WMI et catégories du Module 4, partagées avec les tests.</summary>
 internal static class PrivacyKeys
 {
     // Catégories affichées dans l'interface.
-    public const string Diagnostic = "Données de diagnostic";
-    public const string Offers = "Recommandations et offres";
-    public const string Tips = "Publicités et astuces";
-    public const string Search = "Recherche et historique";
+    public static string Diagnostic => T("Données de diagnostic");
+    public static string Offers => T("Recommandations et offres");
+    public static string Tips => T("Publicités et astuces");
+    public static string Search => T("Recherche et historique");
     public const string Ai = "IA : Copilot et Recall";
-    public const string Downloads = "Téléchargements";
+    public static string Downloads => T("Téléchargements");
 
     // HKLM : stratégie et état effectif des données de diagnostic.
     public const string DataCollectionPolicy = @"SOFTWARE\Policies\Microsoft\Windows\DataCollection";

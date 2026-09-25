@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Platform;
 
@@ -62,7 +63,7 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
     {
         if (!IsAllowed(executable, arguments))
         {
-            throw new InvalidOperationException($"Commande refusée en mode lecture seule : {executable} {string.Join(' ', arguments)}");
+            throw new InvalidOperationException(T("Commande refusée en mode lecture seule : {0} {1}", executable, string.Join(' ', arguments)));
         }
 
         var path = ResolveSystemExecutable(executable);

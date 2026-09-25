@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M05Power;
 
@@ -82,9 +83,9 @@ internal static partial class PowerSchemes
     {
         SchemeKind.Balanced => "Utilisation normale",
         SchemeKind.HighPerformance => "Haute performance",
-        SchemeKind.PowerSaver => "Économie d'énergie",
+        SchemeKind.PowerSaver => T("Économie d'énergie"),
         SchemeKind.UltimatePerformance => "Performances optimales",
-        _ => "Mode personnalisé",
+        _ => T("Mode personnalisé"),
     };
 
     /// <summary>Libellé d'un mode d'alimentation (surcouche), tel qu'affiché dans Paramètres > Système > Alimentation.</summary>
@@ -92,7 +93,7 @@ internal static partial class PowerSchemes
     {
         if (overlay == OverlayBalanced)
         {
-            return "Équilibré";
+            return T("Équilibré");
         }
 
         if (overlay == OverlayBestPerformance)
@@ -105,7 +106,7 @@ internal static partial class PowerSchemes
             return "Performances accrues";
         }
 
-        return overlay == OverlayBestEfficiency ? "Meilleure efficacité énergétique" : $"mode inconnu ({overlay})";
+        return overlay == OverlayBestEfficiency ? T("Meilleure efficacité énergétique") : T("mode inconnu ({0})", overlay);
     }
 
     /// <summary>
@@ -120,7 +121,7 @@ internal static partial class PowerSchemes
             var match = ListLinePattern().Match(line.TrimEnd('\r', ' ', '\t'));
             if (match.Success && Guid.TryParse(match.Groups["guid"].Value, out var guid))
             {
-                schemes.Add(new ListedScheme(guid, match.Groups["name"].Value.Trim(), match.Groups["active"].Success));
+                schemes.Add(new ListedScheme(guid, match.Groups["name"].Value.Trim(), match.Groups[T("active")].Success));
             }
         }
 

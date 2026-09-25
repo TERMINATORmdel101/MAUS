@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Microsoft.CSharp.RuntimeBinder;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M03Updates;
 
@@ -59,7 +60,7 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
                 or InvalidCastException or InvalidOperationException or DataSourceUnavailableException)
             {
                 completion.TrySetException(ex is RuntimeBinderException or InvalidCastException
-                    ? new InvalidOperationException("Réponse inattendue de l'agent Windows Update.", ex)
+                    ? new InvalidOperationException(T("Réponse inattendue de l'agent Windows Update."), ex)
                     : ex);
             }
         })
@@ -80,13 +81,13 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
         {
             instance = Activator.CreateInstance(type);
             dynamic session = instance!;
-            session.ClientApplicationID = "MAUS (audit en lecture seule)";
+            session.ClientApplicationID = T("MAUS (audit en lecture seule)");
             dynamic searcher = session.CreateUpdateSearcher();
             dynamic result = searcher.Search(criteria);
             int resultCode = result.ResultCode;
             if (resultCode is ResultFailed or ResultAborted)
             {
-                throw new InvalidOperationException($"La recherche Windows Update a échoué (code de résultat {resultCode}).");
+                throw new InvalidOperationException(T("La recherche Windows Update a échoué (code de résultat {0}).", resultCode));
             }
 
             var updates = new List<PendingUpdate>();

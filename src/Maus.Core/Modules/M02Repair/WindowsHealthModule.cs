@@ -3,6 +3,7 @@ using System.Management;
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M02Repair;
 
@@ -37,11 +38,11 @@ public sealed class WindowsHealthModule : IAuditModule
     internal static readonly int[] WheaCorrectedIds = [17, 19, 47];
     internal static readonly int[] DiskIds = [7, 51, 153];
 
-    private const string HardwareCategory = "Stabilité matérielle";
-    private const string CrashCategory = "Plantages et arrêts";
+    private static string HardwareCategory => T("Stabilité matérielle");
+    private static string CrashCategory => T("Plantages et arrêts");
     private const string DiskCategory = "Disque";
-    private const string PrerequisiteCategory = "Prérequis des réparations";
-    private const string GeneralCategory = "État général";
+    private static string PrerequisiteCategory => T("Prérequis des réparations");
+    private static string GeneralCategory => T("État général");
 
     private static readonly int[] WheaIds = [.. WheaFatalIds, .. WheaCorrectedIds];
     private static readonly int[] KernelPowerIds = [41];
@@ -69,7 +70,7 @@ public sealed class WindowsHealthModule : IAuditModule
 
     public string Id => "M02";
 
-    public string Title => "Réparation de Windows";
+    public string Title => T("Réparation de Windows");
 
     public int Order => 20;
 
@@ -130,7 +131,7 @@ public sealed class WindowsHealthModule : IAuditModule
     private static Finding DetectWheaFatal(SystemLogQuery whea)
     {
         const string id = "M02.whea-fatal";
-        const string title = "Erreurs matérielles graves (WHEA)";
+        var title = T("Erreurs matérielles graves (WHEA)");
         if (SystemLogQuery.FirstFailure(id, title, HardwareCategory, whea) is { } failure)
         {
             return failure;
@@ -144,22 +145,22 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = HardwareCategory,
             Status = events.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.High),
             Severity = Severity.High,
-            Current = DescribeEvents(events, whea.Truncated, "aucune", "erreur", "erreurs"),
-            Expected = "aucune",
-            Explanation = "Le processeur, la mémoire ou le bus PCI Express signalent à Windows les erreurs qu'ils détectent. "
+            Current = DescribeEvents(events, whea.Truncated, T("aucune"), "erreur", "erreurs"),
+            Expected = T("aucune"),
+            Explanation = T("Le processeur, la mémoire ou le bus PCI Express signalent à Windows les erreurs qu'ils détectent. "
                 + "Une erreur « irrécupérable » provoque en général un plantage : ce n'est pas un défaut de Windows, "
-                + "et aucune réparation logicielle ne la corrige.",
+                + "et aucune réparation logicielle ne la corrige."),
             Advice = events.Count == 0
                 ? null
-                : "Cause fréquente : overclocking ou profil mémoire XMP/EXPO instable. Revenez aux réglages d'origine du BIOS, "
-                    + "surveillez les températures, puis consultez les Modules 10 (RAM : XMP/EXPO) et 15 (overclocking).",
+                : T("Cause fréquente : overclocking ou profil mémoire XMP/EXPO instable. Revenez aux réglages d'origine du BIOS, "
+                    + "surveillez les températures, puis consultez les Modules 10 (RAM : XMP/EXPO) et 15 (overclocking)."),
         };
     }
 
     private static Finding DetectWheaCorrected(SystemLogQuery whea)
     {
         const string id = "M02.whea-corrected";
-        const string title = "Erreurs matérielles corrigées (WHEA)";
+        var title = T("Erreurs matérielles corrigées (WHEA)");
         if (SystemLogQuery.FirstFailure(id, title, HardwareCategory, whea) is { } failure)
         {
             return failure;
@@ -175,22 +176,22 @@ public sealed class WindowsHealthModule : IAuditModule
             Status = events.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = events.Count == 0
-                ? DescribeEvents(events, whea.Truncated, "aucune", "erreur", "erreurs")
+                ? DescribeEvents(events, whea.Truncated, T("aucune"), "erreur", "erreurs")
                 : $"{DescribeEvents(events, whea.Truncated, "aucune", "erreur", "erreurs")} ({byId})",
-            Expected = "aucune",
-            Explanation = "Le matériel a détecté puis corrigé lui-même une erreur. Une erreur isolée est sans conséquence, "
-                + "mais leur répétition annonce souvent une instabilité : overclocking, profil mémoire, température ou composant fatigué.",
+            Expected = T("aucune"),
+            Explanation = T("Le matériel a détecté puis corrigé lui-même une erreur. Une erreur isolée est sans conséquence, "
+                + "mais leur répétition annonce souvent une instabilité : overclocking, profil mémoire, température ou composant fatigué."),
             Advice = events.Count == 0
                 ? null
-                : $"{CountText(events.Count, whea.Truncated, "erreur matérielle corrigée", "erreurs matérielles corrigées")} en {LookbackDays} jours. "
-                    + "Ce n'est pas un problème de Windows : vérifiez overclocking, profil XMP/EXPO et températures (Modules 10 et 15).",
+                : T("{0} en {1} jours. "
+                    + "Ce n'est pas un problème de Windows : vérifiez overclocking, profil XMP/EXPO et températures (Modules 10 et 15).", CountText(events.Count, whea.Truncated, T("erreur matérielle corrigée"), T("erreurs matérielles corrigées")), LookbackDays),
         };
     }
 
     private static Finding DetectBlueScreens(CrashSummary crashes, SystemLogQuery kernelPower, SystemLogQuery wer, SystemLogQuery volmgr)
     {
         const string id = "M02.bluescreens";
-        const string title = "Écrans bleus (arrêts sur erreur système)";
+        var title = T("Écrans bleus (arrêts sur erreur système)");
         if (SystemLogQuery.FirstFailure(id, title, CrashCategory, kernelPower, wer) is { } failure)
         {
             return failure;
@@ -206,35 +207,35 @@ public sealed class WindowsHealthModule : IAuditModule
                 Category = CrashCategory,
                 Status = FindingStatus.Ok,
                 Severity = Severity.Medium,
-                Current = $"aucun en {LookbackDays} jours",
-                Expected = "aucun",
+                Current = T("aucun en {0} jours", LookbackDays),
+                Expected = T("aucun"),
                 Explanation = BlueScreenExplanation,
             };
         }
 
         var severity = crashes.BlueScreens >= 3 ? Severity.High : Severity.Medium;
-        var current = $"{Plural(crashes.BlueScreens, "écran bleu", "écrans bleus")} en {LookbackDays} jours";
+        var current = T("{0} en {1} jours", Plural(crashes.BlueScreens, T("écran bleu"), T("écrans bleus")), LookbackDays);
         if (crashes.LatestCode is { } code)
         {
-            current += $", dernier le {FormatDate(crashes.LatestTime)} : code {HealthParsers.DescribeBugcheck(code)}";
+            current += T(", dernier le {0} : code {1}", FormatDate(crashes.LatestTime), HealthParsers.DescribeBugcheck(code));
         }
 
         if (dumpFailures > 0)
         {
-            current += $" ; vidage mémoire impossible {Plural(dumpFailures, "fois", "fois")} (volmgr 46)";
+            current += T(" ; vidage mémoire impossible {0} (volmgr 46)", Plural(dumpFailures, "fois", "fois"));
         }
 
         var advice = new List<string>();
         if (crashes.LatestCode is { } latest && HealthParsers.BugcheckHint(latest) is { } hint)
         {
-            advice.Add($"Piste pour le dernier code : {hint}.");
+            advice.Add(T("Piste pour le dernier code : {0}.", hint));
         }
 
-        advice.Add("Si les écrans bleus ont commencé après un overclocking ou l'activation de XMP/EXPO, revenez aux réglages d'origine "
-            + "(Modules 10 et 15) ; un pilote graphique récent peut aussi être en cause (Module 9).");
+        advice.Add(T("Si les écrans bleus ont commencé après un overclocking ou l'activation de XMP/EXPO, revenez aux réglages d'origine "
+            + "(Modules 10 et 15) ; un pilote graphique récent peut aussi être en cause (Module 9)."));
         if (dumpFailures > 0)
         {
-            advice.Add("Le fichier de vidage n'a pas pu être écrit : vérifiez que le fichier d'échange est actif sur le disque système.");
+            advice.Add(T("Le fichier de vidage n'a pas pu être écrit : vérifiez que le fichier d'échange est actif sur le disque système."));
         }
 
         return new Finding
@@ -245,20 +246,19 @@ public sealed class WindowsHealthModule : IAuditModule
             Status = FindingStatusExtensions.ForDeviation(severity),
             Severity = severity,
             Current = current,
-            Expected = "aucun",
+            Expected = T("aucun"),
             Explanation = BlueScreenExplanation,
             Advice = string.Join(' ', advice),
         };
     }
 
-    private const string BlueScreenExplanation =
-        "Un écran bleu est un arrêt d'urgence de Windows face à une erreur grave, le plus souvent causée par un pilote "
-        + "ou par un matériel instable. Windows note son code d'erreur, qui oriente la recherche de la cause.";
+    private static string BlueScreenExplanation => T("Un écran bleu est un arrêt d'urgence de Windows face à une erreur grave, le plus souvent causée par un pilote "
+        + "ou par un matériel instable. Windows note son code d'erreur, qui oriente la recherche de la cause.");
 
     private static Finding DetectUnexpectedShutdowns(SystemLogQuery kernelPower)
     {
         const string id = "M02.unexpected-shutdowns";
-        const string title = "Arrêts brutaux sans écran bleu";
+        var title = T("Arrêts brutaux sans écran bleu");
         if (SystemLogQuery.FirstFailure(id, title, CrashCategory, kernelPower) is { } failure)
         {
             return failure;
@@ -270,12 +270,12 @@ public sealed class WindowsHealthModule : IAuditModule
         var details = new List<string>();
         if (forced > 0)
         {
-            details.Add(Plural(forced, "arrêt forcé par appui long sur le bouton", "arrêts forcés par appui long sur le bouton"));
+            details.Add(Plural(forced, T("arrêt forcé par appui long sur le bouton"), T("arrêts forcés par appui long sur le bouton")));
         }
 
         if (cuts > 0)
         {
-            details.Add(Plural(cuts, "coupure sans arrêt propre", "coupures sans arrêt propre"));
+            details.Add(Plural(cuts, T("coupure sans arrêt propre"), T("coupures sans arrêt propre")));
         }
 
         return new Finding
@@ -286,30 +286,30 @@ public sealed class WindowsHealthModule : IAuditModule
             Status = shutdowns.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = shutdowns.Count == 0
-                ? $"aucun en {LookbackDays} jours"
-                : $"{Plural(shutdowns.Count, "arrêt brutal", "arrêts brutaux")} en {LookbackDays} jours : {string.Join(", ", details)}",
-            Expected = "aucun",
-            Explanation = "L'événement Kernel-Power 41 signale un redémarrage sans arrêt propre. Sans code d'erreur, il s'agit "
+                ? T("aucun en {0} jours", LookbackDays)
+                : T("{0} en {1} jours : {2}", Plural(shutdowns.Count, T("arrêt brutal"), T("arrêts brutaux")), LookbackDays, string.Join(", ", details)),
+            Expected = T("aucun"),
+            Explanation = T("L'événement Kernel-Power 41 signale un redémarrage sans arrêt propre. Sans code d'erreur, il s'agit "
                 + "d'une coupure de courant, d'un appui long sur le bouton d'alimentation (souvent parce que le PC était figé) "
-                + "ou d'une alimentation défaillante.",
+                + "ou d'une alimentation défaillante."),
             Advice = shutdowns.Count == 0
                 ? null
-                : "Si le PC s'éteint seul : vérifiez le bloc d'alimentation, la multiprise et les températures. "
-                    + "S'il se fige avant l'arrêt : pensez à l'overclocking ou au profil mémoire (Modules 10 et 15).",
+                : T("Si le PC s'éteint seul : vérifiez le bloc d'alimentation, la multiprise et les températures. "
+                    + "S'il se fige avant l'arrêt : pensez à l'overclocking ou au profil mémoire (Modules 10 et 15)."),
         };
     }
 
     private static Finding DetectMemoryTest(SystemLogQuery memory, bool instability)
     {
         const string id = "M02.memory-test";
-        const string title = "Test de la mémoire Windows";
+        var title = T("Test de la mémoire Windows");
         if (SystemLogQuery.FirstFailure(id, title, HardwareCategory, memory) is { } failure)
         {
             return failure;
         }
 
-        const string explanation = "L'outil Diagnostic de la mémoire Windows (mdsched.exe) teste la mémoire vive au redémarrage "
-            + "et note son résultat dans le journal Système.";
+        var explanation = T("L'outil Diagnostic de la mémoire Windows (mdsched.exe) teste la mémoire vive au redémarrage "
+            + "et note son résultat dans le journal Système.");
         var latest = memory.Events.OrderByDescending(e => e.TimeCreated).FirstOrDefault();
         if (latest is null)
         {
@@ -319,10 +319,10 @@ public sealed class WindowsHealthModule : IAuditModule
                 Title = title,
                 Category = HardwareCategory,
                 Status = FindingStatus.Info,
-                Current = $"aucun test depuis {MemoryTestLookbackDays} jours",
+                Current = T("aucun test depuis {0} jours", MemoryTestLookbackDays),
                 Explanation = explanation,
                 Advice = instability
-                    ? "Des signes d'instabilité existent : lancez « Diagnostic de la mémoire Windows » (mdsched.exe), qui teste la mémoire au prochain redémarrage."
+                    ? T("Des signes d'instabilité existent : lancez « Diagnostic de la mémoire Windows » (mdsched.exe), qui teste la mémoire au prochain redémarrage.")
                     : null,
             };
         }
@@ -336,13 +336,13 @@ public sealed class WindowsHealthModule : IAuditModule
             Status = hasErrors ? FindingStatusExtensions.ForDeviation(Severity.High) : FindingStatus.Ok,
             Severity = Severity.High,
             Current = hasErrors
-                ? $"erreurs détectées (test du {FormatDate(latest.TimeCreated)})"
-                : $"aucune erreur (test du {FormatDate(latest.TimeCreated)})",
-            Expected = "aucune erreur",
+                ? T("erreurs détectées (test du {0})", FormatDate(latest.TimeCreated))
+                : T("aucune erreur (test du {0})", FormatDate(latest.TimeCreated)),
+            Expected = T("aucune erreur"),
             Explanation = explanation,
             Advice = hasErrors
-                ? "La mémoire vive a renvoyé des erreurs : désactivez le profil XMP/EXPO (Module 10), puis refaites le test. "
-                    + "Si les erreurs persistent aux réglages d'origine, une barrette est probablement défaillante."
+                ? T("La mémoire vive a renvoyé des erreurs : désactivez le profil XMP/EXPO (Module 10), puis refaites le test. "
+                    + "Si les erreurs persistent aux réglages d'origine, une barrette est probablement défaillante.")
                 : null,
         };
     }
@@ -350,7 +350,7 @@ public sealed class WindowsHealthModule : IAuditModule
     private static Finding DetectDiskErrors(SystemLogQuery disk, SystemLogQuery ntfs)
     {
         const string id = "M02.disk-errors";
-        const string title = "Erreurs de disque dans le journal";
+        var title = T("Erreurs de disque dans le journal");
         if (SystemLogQuery.FirstFailure(id, title, DiskCategory, disk, ntfs) is { } failure)
         {
             return failure;
@@ -366,8 +366,8 @@ public sealed class WindowsHealthModule : IAuditModule
                 Category = DiskCategory,
                 Status = FindingStatus.Ok,
                 Severity = Severity.Medium,
-                Current = $"aucune en {LookbackDays} jours",
-                Expected = "aucune",
+                Current = T("aucune en {0} jours", LookbackDays),
+                Expected = T("aucune"),
                 Explanation = DiskExplanation,
             };
         }
@@ -377,7 +377,7 @@ public sealed class WindowsHealthModule : IAuditModule
             .ToList();
         if (ntfs.Events.Count > 0)
         {
-            kinds.Add($"structure du système de fichiers endommagée (Ntfs 55) ×{ntfs.Events.Count}");
+            kinds.Add(T("structure du système de fichiers endommagée (Ntfs 55) ×{0}", ntfs.Events.Count));
         }
 
         var devices = disk.Events
@@ -386,7 +386,7 @@ public sealed class WindowsHealthModule : IAuditModule
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(3)
             .ToList();
-        var current = $"{CountText(total, disk.Truncated || ntfs.Truncated, "événement", "événements")} en {LookbackDays} jours : {string.Join(", ", kinds)}";
+        var current = T("{0} en {1} jours : {2}", CountText(total, disk.Truncated || ntfs.Truncated, T("événement"), T("événements")), LookbackDays, string.Join(", ", kinds));
         if (devices.Count > 0)
         {
             current += $" ; {(devices.Count == 1 ? "périphérique" : "périphériques")} : {string.Join(", ", devices)}";
@@ -400,31 +400,30 @@ public sealed class WindowsHealthModule : IAuditModule
             Status = FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = current,
-            Expected = "aucune",
+            Expected = T("aucune"),
             Explanation = DiskExplanation,
-            Advice = "Sauvegardez vos données importantes, puis vérifiez la santé du disque avec le Module 11. "
-                + "Un disque externe ou une clé USB mal branchés produisent aussi ces erreurs."
-                + (ntfs.Events.Count > 0 ? " La vérification du système de fichiers (chkdsk) sera proposée en V0.2." : string.Empty),
+            Advice = T("Sauvegardez vos données importantes, puis vérifiez la santé du disque avec le Module 11. "
+                + "Un disque externe ou une clé USB mal branchés produisent aussi ces erreurs.")
+                + (ntfs.Events.Count > 0 ? T(" La vérification du système de fichiers (chkdsk) sera proposée en V0.2.") : string.Empty),
             Fixable = ntfs.Events.Count > 0,
         };
     }
 
-    private const string DiskExplanation =
-        "Windows note les secteurs illisibles, les lectures relancées et les dommages du système de fichiers. "
-        + "Ces erreurs annoncent souvent un disque fatigué ou une connexion défaillante, ce qu'aucune réparation de Windows ne corrige.";
+    private static string DiskExplanation => T("Windows note les secteurs illisibles, les lectures relancées et les dommages du système de fichiers. "
+        + "Ces erreurs annoncent souvent un disque fatigué ou une connexion défaillante, ce qu'aucune réparation de Windows ne corrige.");
 
     private static string DiskEventLabel(int id) => id switch
     {
-        7 => "secteur défectueux (disk 7)",
-        51 => "erreur pendant une pagination (disk 51)",
-        153 => "lecture ou écriture relancée (disk 153)",
+        7 => T("secteur défectueux (disk 7)"),
+        51 => T("erreur pendant une pagination (disk 51)"),
+        153 => T("lecture ou écriture relancée (disk 153)"),
         _ => $"disk {id}",
     };
 
     private Finding DetectDirtyVolume(AuditContext context)
     {
         const string id = "M02.volume-dirty";
-        const string title = "Volume système marqué « à vérifier »";
+        var title = T("Volume système marqué « à vérifier »");
         var driveLetter = SystemRoot.TrimEnd('\\');
         bool? dirty;
         try
@@ -438,13 +437,13 @@ public sealed class WindowsHealthModule : IAuditModule
         }
         catch (Exception ex) when (ex is DataSourceUnavailableException or ManagementException or COMException)
         {
-            return Finding.Unknown(id, title, "Lecture de l'état du volume impossible par WMI.", DiskCategory);
+            return Finding.Unknown(id, title, T("Lecture de l'état du volume impossible par WMI."), DiskCategory);
         }
 
         if (dirty is null)
         {
             return context.IsElevated
-                ? Finding.Unknown(id, title, "Windows n'a pas indiqué l'état du volume système.", DiskCategory)
+                ? Finding.Unknown(id, title, T("Windows n'a pas indiqué l'état du volume système."), DiskCategory)
                 : Finding.AdminRequired(id, title, DiskCategory);
         }
 
@@ -455,12 +454,12 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = DiskCategory,
             Status = dirty.Value ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
-            Current = dirty.Value ? $"{driveLetter} marqué comme à vérifier" : $"{driveLetter} sain",
+            Current = dirty.Value ? T("{0} marqué comme à vérifier", driveLetter) : $"{driveLetter} sain",
             Expected = "sain",
-            Explanation = "Windows marque un volume « à vérifier » (dirty bit) quand il détecte une incohérence du système de fichiers "
-                + "ou un arrêt brutal pendant une écriture. Une vérification chkdsk est alors lancée au démarrage.",
+            Explanation = T("Windows marque un volume « à vérifier » (dirty bit) quand il détecte une incohérence du système de fichiers "
+                + "ou un arrêt brutal pendant une écriture. Une vérification chkdsk est alors lancée au démarrage."),
             Advice = dirty.Value
-                ? "Redémarrez pour laisser Windows vérifier le disque ; la réparation hors ligne (chkdsk /spotfix) sera proposée en V0.2."
+                ? T("Redémarrez pour laisser Windows vérifier le disque ; la réparation hors ligne (chkdsk /spotfix) sera proposée en V0.2.")
                 : null,
             Fixable = dirty.Value,
         };
@@ -469,7 +468,7 @@ public sealed class WindowsHealthModule : IAuditModule
     private static Finding DetectPendingReboot(IRegistryReader registry)
     {
         const string id = "M02.pending-reboot";
-        const string title = "Redémarrage en attente";
+        var title = T("Redémarrage en attente");
         var reasons = new List<string>();
         var denied = 0;
 
@@ -488,9 +487,9 @@ public sealed class WindowsHealthModule : IAuditModule
             }
         }
 
-        Check(() => registry.KeyExists(RegistryHive.LocalMachine, CbsRebootPendingKey), "installation de composants Windows");
+        Check(() => registry.KeyExists(RegistryHive.LocalMachine, CbsRebootPendingKey), T("installation de composants Windows"));
         Check(() => registry.KeyExists(RegistryHive.LocalMachine, WindowsUpdateRebootKey), "Windows Update");
-        Check(() => HasPendingRenames(registry), "fichiers à remplacer au démarrage");
+        Check(() => HasPendingRenames(registry), T("fichiers à remplacer au démarrage"));
 
         if (reasons.Count == 0 && denied > 0)
         {
@@ -504,13 +503,13 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = PrerequisiteCategory,
             Status = reasons.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
-            Current = reasons.Count == 0 ? "aucun" : $"oui : {string.Join(", ", reasons)}",
-            Expected = "aucun",
-            Explanation = "Tant qu'un redémarrage est en attente, Windows n'a pas fini d'installer des mises à jour ou de remplacer "
-                + "des fichiers. Les réparations (DISM, SFC) doivent attendre : elles échoueraient ou donneraient de faux résultats.",
+            Current = reasons.Count == 0 ? T("aucun") : $"oui : {string.Join(", ", reasons)}",
+            Expected = T("aucun"),
+            Explanation = T("Tant qu'un redémarrage est en attente, Windows n'a pas fini d'installer des mises à jour ou de remplacer "
+                + "des fichiers. Les réparations (DISM, SFC) doivent attendre : elles échoueraient ou donneraient de faux résultats."),
             Advice = reasons.Count == 0
                 ? null
-                : "Redémarrez le PC (Démarrer > Marche/Arrêt > Redémarrer, et non « Arrêter »), puis relancez l'audit.",
+                : T("Redémarrez le PC (Démarrer > Marche/Arrêt > Redémarrer, et non « Arrêter »), puis relancez l'audit."),
         };
     }
 
@@ -529,7 +528,7 @@ public sealed class WindowsHealthModule : IAuditModule
     private Finding DetectFreeSpace(IFileSystemReader files)
     {
         const string id = "M02.disk-space";
-        const string title = "Espace libre sur le disque système";
+        var title = T("Espace libre sur le disque système");
         (long FreeBytes, long TotalBytes)? space;
         try
         {
@@ -542,7 +541,7 @@ public sealed class WindowsHealthModule : IAuditModule
 
         if (space is not { } drive)
         {
-            return Finding.Unknown(id, title, $"Lecture de l'espace libre de {SystemRoot} impossible.", PrerequisiteCategory);
+            return Finding.Unknown(id, title, T("Lecture de l'espace libre de {0} impossible.", SystemRoot), PrerequisiteCategory);
         }
 
         var enough = drive.FreeBytes >= MinimumFreeBytes;
@@ -553,20 +552,20 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = PrerequisiteCategory,
             Status = enough ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
-            Current = $"{FormatGigabytes(drive.FreeBytes)} libres sur {FormatGigabytes(drive.TotalBytes)} ({SystemRoot.TrimEnd('\\')})",
-            Expected = $"au moins {FormatGigabytes(MinimumFreeBytes)}",
-            Explanation = "Les réparations de Windows (DISM, mises à jour, réinstallation sur place) téléchargent et décompressent "
-                + "des fichiers. En dessous de 20 Go libres, elles risquent d'échouer faute de place.",
+            Current = T("{0} libres sur {1} ({2})", FormatGigabytes(drive.FreeBytes), FormatGigabytes(drive.TotalBytes), SystemRoot.TrimEnd('\\')),
+            Expected = T("au moins {0}", FormatGigabytes(MinimumFreeBytes)),
+            Explanation = T("Les réparations de Windows (DISM, mises à jour, réinstallation sur place) téléchargent et décompressent "
+                + "des fichiers. En dessous de 20 Go libres, elles risquent d'échouer faute de place."),
             Advice = enough
                 ? null
-                : "Libérez de l'espace : Paramètres > Système > Stockage > Recommandations de nettoyage.",
+                : T("Libérez de l'espace : Paramètres > Système > Stockage > Recommandations de nettoyage."),
         };
     }
 
     private static Finding DetectReliability(ICimReader cim, DateTimeOffset now)
     {
         const string id = "M02.reliability-index";
-        const string title = "Indice de fiabilité de Windows";
+        var title = T("Indice de fiabilité de Windows");
         IReadOnlyList<CimRow> rows;
         try
         {
@@ -578,7 +577,7 @@ public sealed class WindowsHealthModule : IAuditModule
         }
         catch (Exception ex) when (ex is DataSourceUnavailableException or ManagementException or COMException)
         {
-            return Finding.Unknown(id, title, "L'indice de fiabilité n'est pas disponible sur ce PC.", GeneralCategory);
+            return Finding.Unknown(id, title, T("L'indice de fiabilité n'est pas disponible sur ce PC."), GeneralCategory);
         }
 
         var latest = rows
@@ -591,8 +590,8 @@ public sealed class WindowsHealthModule : IAuditModule
             return Finding.Unknown(
                 id,
                 title,
-                $"Aucun indice de fiabilité calculé depuis {ReliabilityLookbackDays} jours : PC récemment installé, "
-                    + "ou tâche planifiée RacTask désactivée.",
+                T("Aucun indice de fiabilité calculé depuis {0} jours : PC récemment installé, "
+                    + "ou tâche planifiée RacTask désactivée.", ReliabilityLookbackDays),
                 GeneralCategory);
         }
 
@@ -600,7 +599,7 @@ public sealed class WindowsHealthModule : IAuditModule
         var current = index.ToString("0.0", French) + " / 10";
         if (latest.Time is { } time)
         {
-            current += $" (calculé le {FormatDate(time)})";
+            current += T(" (calculé le {0})", FormatDate(time));
         }
 
         return new Finding
@@ -611,24 +610,24 @@ public sealed class WindowsHealthModule : IAuditModule
             Status = good ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = current,
-            Expected = $"au moins {MinimumStabilityIndex.ToString("0", French)} / 10",
-            Explanation = "Windows calcule chaque heure une note de stabilité de 1 à 10 à partir des plantages d'applications, "
-                + "des erreurs de Windows et des échecs d'installation. Une note basse résume une instabilité récente.",
+            Expected = T("au moins {0} / 10", MinimumStabilityIndex.ToString("0", French)),
+            Explanation = T("Windows calcule chaque heure une note de stabilité de 1 à 10 à partir des plantages d'applications, "
+                + "des erreurs de Windows et des échecs d'installation. Une note basse résume une instabilité récente."),
             Advice = good
                 ? null
-                : "Ouvrez l'Observateur de fiabilité (tapez « fiabilité » dans Démarrer) pour voir les incidents récents, "
-                    + "puis consultez les autres constats de ce module.",
+                : T("Ouvrez l'Observateur de fiabilité (tapez « fiabilité » dans Démarrer) pour voir les incidents récents, "
+                    + "puis consultez les autres constats de ce module."),
         };
     }
 
     private static Finding DetectWmi(ICimReader cim)
     {
         const string id = "M02.wmi";
-        const string title = "Service WMI (informations système)";
+        var title = T("Service WMI (informations système)");
         string? problem;
         try
         {
-            problem = cim.Query(WmiProbeQuery).Count > 0 ? null : "aucune réponse à une requête de base";
+            problem = cim.Query(WmiProbeQuery).Count > 0 ? null : T("aucune réponse à une requête de base");
         }
         catch (MausAccessDeniedException)
         {
@@ -636,7 +635,7 @@ public sealed class WindowsHealthModule : IAuditModule
         }
         catch (Exception ex) when (ex is DataSourceUnavailableException or ManagementException or COMException)
         {
-            problem = "requête de base en échec";
+            problem = T("requête de base en échec");
         }
 
         return new Finding
@@ -646,13 +645,13 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = GeneralCategory,
             Status = problem is null ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
-            Current = problem ?? "répond normalement",
-            Expected = "répond normalement",
-            Explanation = "WMI permet à Windows et aux logiciels, dont MAUS, de lire l'état du système et du matériel. "
-                + "Un dépôt WMI abîmé fausse les diagnostics et bloque certains outils.",
+            Current = problem ?? T("répond normalement"),
+            Expected = T("répond normalement"),
+            Explanation = T("WMI permet à Windows et aux logiciels, dont MAUS, de lire l'état du système et du matériel. "
+                + "Un dépôt WMI abîmé fausse les diagnostics et bloque certains outils."),
             Advice = problem is null
                 ? null
-                : "La vérification puis la récupération du dépôt WMI (winmgmt /verifyrepository, /salvagerepository) seront proposées en V0.2.",
+                : T("La vérification puis la récupération du dépôt WMI (winmgmt /verifyrepository, /salvagerepository) seront proposées en V0.2."),
             Fixable = problem is not null,
         };
     }
@@ -660,7 +659,7 @@ public sealed class WindowsHealthModule : IAuditModule
     private Finding DetectMinidumps(IFileSystemReader files)
     {
         const string id = "M02.minidumps";
-        const string title = "Fichiers de vidage après plantage";
+        var title = T("Fichiers de vidage après plantage");
         var folder = Path.Combine(_windowsDirectory, "Minidump");
         IReadOnlyList<string> dumps;
         try
@@ -673,14 +672,14 @@ public sealed class WindowsHealthModule : IAuditModule
         }
         catch (IOException)
         {
-            return Finding.Unknown(id, title, $"Lecture du dossier {folder} impossible.", CrashCategory);
+            return Finding.Unknown(id, title, T("Lecture du dossier {0} impossible.", folder), CrashCategory);
         }
 
         var newest = dumps.Select(HealthParsers.ParseMinidumpDate).OfType<DateOnly>().DefaultIfEmpty().Max();
-        var current = dumps.Count == 0 ? "aucun" : Plural(dumps.Count, "fichier", "fichiers");
+        var current = dumps.Count == 0 ? T("aucun") : Plural(dumps.Count, "fichier", "fichiers");
         if (dumps.Count > 0 && newest != default)
         {
-            current += $" (le plus récent du {newest.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)})";
+            current += T(" (le plus récent du {0})", newest.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
         }
 
         return new Finding
@@ -690,11 +689,11 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = CrashCategory,
             Status = FindingStatus.Info,
             Current = current,
-            Explanation = $"À chaque écran bleu, Windows peut enregistrer un petit fichier de vidage (.dmp) dans {folder}. "
-                + "Il permet d'identifier le pilote ou le composant en cause.",
+            Explanation = T("À chaque écran bleu, Windows peut enregistrer un petit fichier de vidage (.dmp) dans {0}. "
+                + "Il permet d'identifier le pilote ou le composant en cause.", folder),
             Advice = dumps.Count == 0
                 ? null
-                : "Conservez ces fichiers si vous demandez de l'aide : ils s'analysent avec WinDbg (Microsoft Store).",
+                : T("Conservez ces fichiers si vous demandez de l'aide : ils s'analysent avec WinDbg (Microsoft Store)."),
         };
     }
 
@@ -702,15 +701,15 @@ public sealed class WindowsHealthModule : IAuditModule
     {
         if (events.Count == 0)
         {
-            return $"{none} en {LookbackDays} jours";
+            return T("{0} en {1} jours", none, LookbackDays);
         }
 
         var latest = events.Max(e => e.TimeCreated);
-        return $"{CountText(events.Count, truncated, singular, plural)} en {LookbackDays} jours (dernière le {FormatDate(latest)})";
+        return T("{0} en {1} jours (dernière le {2})", CountText(events.Count, truncated, singular, plural), LookbackDays, FormatDate(latest));
     }
 
     private static string CountText(int count, bool truncated, string singular, string plural) =>
-        truncated ? $"au moins {count} {plural}" : Plural(count, singular, plural);
+        truncated ? T("au moins {0} {1}", count, plural) : Plural(count, singular, plural);
 
     private static string Plural(int count, string singular, string plural) =>
         $"{count.ToString(CultureInfo.InvariantCulture)} {(count > 1 ? plural : singular)}";
