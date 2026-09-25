@@ -12,7 +12,7 @@ namespace Maus.Core.Modules.M09Gpu;
 /// Module 9 — Pilotes carte graphique. Compare le pilote de chaque GPU à la dernière version officielle connue
 /// et contrôle trois réglages bridants : HAGS, Resizable BAR et largeur du lien PCIe. Ne télécharge rien.
 /// </summary>
-public sealed partial class GpuDriverModule : IAuditModule
+public sealed partial class GpuDriverModule : Fixes.IFixableModule
 {
     private const string DriverCategory = "Pilote";
     private const string SettingsCategory = "Réglages de la carte graphique";
@@ -361,6 +361,21 @@ public sealed partial class GpuDriverModule : IAuditModule
         if (enabled is null)
         {
             return Finding.Unknown(id, title, "État réel de HAGS illisible et valeur HwSchMode absente : Windows et le pilote appliquent leur choix par défaut.", SettingsCategory);
+        }
+
+        if (kernel is { Enabled: false } && mode == 2)
+        {
+            return new Finding
+            {
+                Id = id,
+                Title = title,
+                Category = SettingsCategory,
+                Status = FindingStatus.Info,
+                Current = "activation demandée (HwSchMode = 2), effective au prochain redémarrage",
+                Expected = needsFrameGeneration ? "activée (requise pour DLSS Frame Generation)" : "au choix : gain faible sur cette carte",
+                Explanation = explanation,
+                Advice = "Redémarrez le PC pour que HAGS s'active.",
+            };
         }
 
         var source = kernel is not null ? string.Empty : $" (valeur HwSchMode = {mode})";

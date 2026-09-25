@@ -405,6 +405,49 @@ public class GpuDriverModuleTests
                 Free                                           : 254 MiB
         """;
 
+    [Fact]
+    public async Task Hags_fix_needs_a_restart_and_is_reported_as_pending_until_then()
+    {
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx4070, width: 16, maxWidth: 16, bus: 1);
+        var registry = new FakeRegistry();
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false, EnabledByDefault: true));
+        var audit = TestContext.Create(registry, cim: cim);
+        var module = new GpuDriverModule(scheduling);
+
+        var plan = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None));
+        var hags = plan.Single(c => c.Id == "M09.hags");
+        Assert.Equal(Maus.Core.Fixes.ChangeEffect.Restart, hags.Effect);
+        var drivers = plan.Single(c => c.Id == "M09.windows-update-drivers");
+        Assert.False(drivers.Recommended);
+        Assert.NotNull(drivers.Warning);
+
+        var engine = new Maus.Core.Fixes.FixEngine(TestFixContext.Create(audit, registry));
+        var result = engine.Apply([hags], new Maus.Core.Fixes.ApplyOptions());
+        Assert.Equal(Maus.Core.Fixes.ChangeStatus.Applied, result.Changes.Single().Status);
+        Assert.Equal(Maus.Core.Fixes.ChangeEffect.Restart, result.RequiredEffect);
+
+        var after = await module.DetectAsync(audit, CancellationToken.None);
+        Assert.Equal(FindingStatus.Info, Get(after, "M09.hags").Status);
+        Assert.Contains("redémarrage", Get(after, "M09.hags").Current, StringComparison.Ordinal);
+        Assert.DoesNotContain(module.Plan(audit, after), c => c.Id == "M09.hags");
+
+        Assert.True(engine.Revert(result.Session!.Id).Completed);
+        Assert.Null(registry.GetValue(RegistryHive.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode"));
+    }
+
+    [Fact]
+    public async Task Driver_blocking_is_not_offered_again_once_set()
+    {
+        var registry = new FakeRegistry().Set(RegistryHive.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "ExcludeWUDriversInQualityUpdate", 1);
+        var audit = TestContext.Create(registry);
+        var module = new GpuDriverModule(new FakeScheduling());
+
+        var plan = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None));
+
+        Assert.DoesNotContain(plan, c => c.Id == "M09.windows-update-drivers");
+    }
+
     private sealed class FakeScheduling(params GpuSchedulingInfo[]? adapters) : IGpuSchedulingReader
     {
         public IReadOnlyList<GpuSchedulingInfo>? Read() => adapters;
