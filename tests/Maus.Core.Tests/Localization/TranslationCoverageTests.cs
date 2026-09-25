@@ -59,13 +59,20 @@ public partial class TranslationCoverageTests
             }
         }
 
+        // Catalogues déjà traduits : leurs champs de texte comptent aussi.
+        foreach (var process in Maus.Core.Workshop.ProcessCatalog.Default.Entries)
+        {
+            texts.Add(process.Category);
+            texts.Add(process.What);
+        }
+
         return texts;
     }
 
     private static HashSet<string> Placeholders(string text) =>
         [.. PlaceholderPattern().Matches(text).Select(m => m.Value)];
 
-    [GeneratedRegex(@"(?<![\w.])(?:Texts\.)?T\(\s*""((?:[^""\\]|\\.)*)""")]
+    [GeneratedRegex(@"(?:(?<![\w.])|(?<=Texts\.))T\(\s*""((?:[^""\\]|\\.)*)""")]
     private static partial Regex TCall();
 
     [GeneratedRegex(@"\{\d+(?::[^}]*)?\}")]

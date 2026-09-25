@@ -1,0 +1,578 @@
+// Catalogue MAUS des processus courants : textes rédigés pour MAUS (atelier matériel, « Qu'est-ce que c'est ? »).
+// « category » et « what » sont traduits à l'affichage (Localization/i18n).
+[
+  {
+    "names": [
+      "System"
+    ],
+    "category": "Windows",
+    "what": "Le noyau de Windows lui-même : pilotes, mémoire, disques. Il ne s'arrête jamais."
+  },
+  {
+    "names": [
+      "Registry"
+    ],
+    "category": "Windows",
+    "what": "Garde en mémoire une partie du registre de Windows pour le rendre plus rapide."
+  },
+  {
+    "names": [
+      "Memory Compression"
+    ],
+    "category": "Windows",
+    "what": "Compresse la mémoire vive peu utilisée au lieu de l'écrire sur le disque : c'est normal qu'il occupe de la mémoire."
+  },
+  {
+    "names": [
+      "smss.exe"
+    ],
+    "category": "Windows",
+    "what": "Gestionnaire de session : il prépare Windows au démarrage. Vital."
+  },
+  {
+    "names": [
+      "csrss.exe"
+    ],
+    "category": "Windows",
+    "what": "Sous-système client/serveur de Windows : fenêtres et consoles. Vital, l'arrêter provoque un écran bleu."
+  },
+  {
+    "names": [
+      "wininit.exe"
+    ],
+    "category": "Windows",
+    "what": "Lance les services de Windows au démarrage. Vital."
+  },
+  {
+    "names": [
+      "winlogon.exe"
+    ],
+    "category": "Windows",
+    "what": "Gère l'ouverture et la fermeture de session, et l'écran Ctrl+Alt+Suppr. Vital."
+  },
+  {
+    "names": [
+      "services.exe"
+    ],
+    "category": "Windows",
+    "what": "Gestionnaire des services de Windows. Vital."
+  },
+  {
+    "names": [
+      "lsass.exe"
+    ],
+    "category": "Sécurité",
+    "what": "Vérifie les mots de passe et les connexions. Vital ; une copie de ce nom hors de System32 serait suspecte."
+  },
+  {
+    "names": [
+      "svchost.exe"
+    ],
+    "category": "Windows",
+    "what": "Hôte de services : chaque copie fait tourner un ou plusieurs services de Windows. Il est normal d'en voir des dizaines."
+  },
+  {
+    "names": [
+      "dwm.exe"
+    ],
+    "category": "Windows",
+    "what": "Gestionnaire de fenêtres du Bureau : il dessine tout ce qui s'affiche à l'écran, effets et transparence compris."
+  },
+  {
+    "names": [
+      "explorer.exe"
+    ],
+    "category": "Windows",
+    "what": "L'Explorateur : barre des tâches, menu Démarrer, Bureau et fenêtres de dossiers."
+  },
+  {
+    "names": [
+      "fontdrvhost.exe"
+    ],
+    "category": "Windows",
+    "what": "Affiche les polices de caractères dans un espace isolé, pour la sécurité."
+  },
+  {
+    "names": [
+      "sihost.exe"
+    ],
+    "category": "Windows",
+    "what": "Hôte de l'interface : notifications, centre de maintenance et certains éléments visuels."
+  },
+  {
+    "names": [
+      "taskhostw.exe"
+    ],
+    "category": "Windows",
+    "what": "Lance des tâches planifiées et des modules de Windows pour votre session."
+  },
+  {
+    "names": [
+      "RuntimeBroker.exe"
+    ],
+    "category": "Windows",
+    "what": "Contrôle les autorisations des applications du Store (micro, caméra, position)."
+  },
+  {
+    "names": [
+      "SearchHost.exe",
+      "SearchApp.exe"
+    ],
+    "category": "Windows",
+    "what": "L'interface de la recherche de Windows (la zone de recherche de la barre des tâches)."
+  },
+  {
+    "names": [
+      "SearchIndexer.exe"
+    ],
+    "category": "Windows",
+    "what": "Indexe vos fichiers pour que la recherche soit instantanée. Il travaille surtout quand le PC est inactif."
+  },
+  {
+    "names": [
+      "StartMenuExperienceHost.exe"
+    ],
+    "category": "Windows",
+    "what": "Le menu Démarrer."
+  },
+  {
+    "names": [
+      "ShellExperienceHost.exe"
+    ],
+    "category": "Windows",
+    "what": "Éléments de l'interface de Windows : calendrier, volume, réseau de la barre des tâches."
+  },
+  {
+    "names": [
+      "TextInputHost.exe"
+    ],
+    "category": "Windows",
+    "what": "Clavier tactile, emojis et saisie manuscrite."
+  },
+  {
+    "names": [
+      "ctfmon.exe"
+    ],
+    "category": "Windows",
+    "what": "Gère les langues et méthodes de saisie du clavier."
+  },
+  {
+    "names": [
+      "conhost.exe"
+    ],
+    "category": "Windows",
+    "what": "Fenêtre qui accompagne une application en ligne de commande."
+  },
+  {
+    "names": [
+      "dllhost.exe"
+    ],
+    "category": "Windows",
+    "what": "Hôte d'objets COM : sert à des composants de Windows, par exemple pour les miniatures d'images."
+  },
+  {
+    "names": [
+      "spoolsv.exe"
+    ],
+    "category": "Windows",
+    "what": "Spouleur d'impression : gère les files d'attente des imprimantes."
+  },
+  {
+    "names": [
+      "audiodg.exe"
+    ],
+    "category": "Windows",
+    "what": "Moteur audio de Windows : effets et mixage du son."
+  },
+  {
+    "names": [
+      "WmiPrvSE.exe"
+    ],
+    "category": "Windows",
+    "what": "Fournit les informations système (WMI) aux programmes qui les demandent, MAUS compris."
+  },
+  {
+    "names": [
+      "TiWorker.exe",
+      "TrustedInstaller.exe"
+    ],
+    "category": "Windows",
+    "what": "Installe les mises à jour et composants de Windows. Il peut beaucoup travailler juste après une mise à jour."
+  },
+  {
+    "names": [
+      "MoUsoCoreWorker.exe",
+      "usocoreworker.exe"
+    ],
+    "category": "Windows",
+    "what": "Windows Update : recherche et prépare les mises à jour."
+  },
+  {
+    "names": [
+      "WUDFHost.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Fait tourner des pilotes en mode utilisateur (capteurs, lecteurs d'empreintes, certains appareils USB)."
+  },
+  {
+    "names": [
+      "LockApp.exe"
+    ],
+    "category": "Windows",
+    "what": "L'écran de verrouillage."
+  },
+  {
+    "names": [
+      "Widgets.exe",
+      "WidgetService.exe"
+    ],
+    "category": "Windows",
+    "what": "Le panneau Widgets (actualités, météo). Le Module 6 permet de le couper."
+  },
+  {
+    "names": [
+      "PhoneExperienceHost.exe"
+    ],
+    "category": "Communication",
+    "what": "Mobile connecté : lien entre le PC et votre téléphone."
+  },
+  {
+    "names": [
+      "OneDrive.exe"
+    ],
+    "category": "Cloud et sauvegarde",
+    "what": "Synchronise vos fichiers avec OneDrive. Le fermer arrête la sauvegarde en ligne."
+  },
+  {
+    "names": [
+      "MsMpEng.exe"
+    ],
+    "category": "Sécurité",
+    "what": "L'antivirus Microsoft Defender. Protégé par Windows ; il analyse les fichiers à l'ouverture."
+  },
+  {
+    "names": [
+      "NisSrv.exe"
+    ],
+    "category": "Sécurité",
+    "what": "Inspection réseau de Microsoft Defender."
+  },
+  {
+    "names": [
+      "SecurityHealthService.exe",
+      "SecurityHealthSystray.exe"
+    ],
+    "category": "Sécurité",
+    "what": "Sécurité Windows : état de la protection et icône de la barre des tâches."
+  },
+  {
+    "names": [
+      "smartscreen.exe"
+    ],
+    "category": "Sécurité",
+    "what": "SmartScreen : vérifie les fichiers téléchargés et les sites avant de les ouvrir."
+  },
+  {
+    "names": [
+      "MpDefenderCoreService.exe"
+    ],
+    "category": "Sécurité",
+    "what": "Service de base de Microsoft Defender."
+  },
+  {
+    "names": [
+      "nvcontainer.exe",
+      "NVDisplay.Container.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Services du pilote NVIDIA (panneau de configuration, mises à jour, superposition)."
+  },
+  {
+    "names": [
+      "NVIDIA app.exe",
+      "NVIDIA Overlay.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "L'application NVIDIA : pilotes, réglages de jeux et superposition."
+  },
+  {
+    "names": [
+      "RadeonSoftware.exe",
+      "AMDRSServ.exe",
+      "amdfendrsr.exe",
+      "atieclxx.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Logiciel et services du pilote graphique AMD Radeon."
+  },
+  {
+    "names": [
+      "igfxEM.exe",
+      "IntelGraphicsSoftware.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Logiciel et services du pilote graphique Intel."
+  },
+  {
+    "names": [
+      "RtkAudUService64.exe",
+      "RtkAudioService64.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Service de la carte son Realtek."
+  },
+  {
+    "names": [
+      "steam.exe",
+      "steamwebhelper.exe"
+    ],
+    "category": "Jeux",
+    "what": "Steam : boutique, bibliothèque de jeux et mises à jour. steamwebhelper affiche les pages de Steam."
+  },
+  {
+    "names": [
+      "EpicGamesLauncher.exe"
+    ],
+    "category": "Jeux",
+    "what": "Le lanceur Epic Games."
+  },
+  {
+    "names": [
+      "EADesktop.exe"
+    ],
+    "category": "Jeux",
+    "what": "L'application EA (jeux Electronic Arts)."
+  },
+  {
+    "names": [
+      "upc.exe",
+      "UbisoftConnect.exe"
+    ],
+    "category": "Jeux",
+    "what": "Ubisoft Connect."
+  },
+  {
+    "names": [
+      "Battle.net.exe"
+    ],
+    "category": "Jeux",
+    "what": "Le lanceur Battle.net (Blizzard)."
+  },
+  {
+    "names": [
+      "GalaxyClient.exe"
+    ],
+    "category": "Jeux",
+    "what": "GOG Galaxy."
+  },
+  {
+    "names": [
+      "XboxPcApp.exe",
+      "GamingServices.exe",
+      "gamingservicesnet.exe"
+    ],
+    "category": "Jeux",
+    "what": "L'app Xbox et les Services de jeu (Game Pass)."
+  },
+  {
+    "names": [
+      "GameBar.exe",
+      "GameBarFTServer.exe"
+    ],
+    "category": "Jeux",
+    "what": "La Xbox Game Bar (Win+G). Voir le Module 7."
+  },
+  {
+    "names": [
+      "vgc.exe"
+    ],
+    "category": "Sécurité",
+    "what": "Riot Vanguard, l'anti-triche de Valorant et League of Legends, actif dès le démarrage."
+  },
+  {
+    "names": [
+      "EasyAntiCheat.exe",
+      "EasyAntiCheat_EOS.exe"
+    ],
+    "category": "Sécurité",
+    "what": "Easy Anti-Cheat, l'anti-triche de nombreux jeux en ligne."
+  },
+  {
+    "names": [
+      "BEService.exe"
+    ],
+    "category": "Sécurité",
+    "what": "BattlEye, anti-triche de jeux en ligne."
+  },
+  {
+    "names": [
+      "chrome.exe"
+    ],
+    "category": "Navigateurs",
+    "what": "Google Chrome. Chaque onglet et extension a sa propre copie : c'est normal d'en voir beaucoup."
+  },
+  {
+    "names": [
+      "msedge.exe"
+    ],
+    "category": "Navigateurs",
+    "what": "Microsoft Edge. Chaque onglet a sa propre copie ; le « Boost de démarrage » le garde prêt en arrière-plan."
+  },
+  {
+    "names": [
+      "msedgewebview2.exe"
+    ],
+    "category": "Navigateurs",
+    "what": "WebView2 : moteur d'Edge utilisé par d'autres applications (Teams, Widgets, lanceurs). Ne le désinstallez pas."
+  },
+  {
+    "names": [
+      "firefox.exe"
+    ],
+    "category": "Navigateurs",
+    "what": "Mozilla Firefox."
+  },
+  {
+    "names": [
+      "opera.exe",
+      "brave.exe",
+      "vivaldi.exe"
+    ],
+    "category": "Navigateurs",
+    "what": "Navigateur web."
+  },
+  {
+    "names": [
+      "Discord.exe"
+    ],
+    "category": "Communication",
+    "what": "Discord : messagerie, voix et partage d'écran."
+  },
+  {
+    "names": [
+      "ms-teams.exe",
+      "Teams.exe"
+    ],
+    "category": "Communication",
+    "what": "Microsoft Teams."
+  },
+  {
+    "names": [
+      "WhatsApp.exe",
+      "Telegram.exe",
+      "slack.exe",
+      "Zoom.exe"
+    ],
+    "category": "Communication",
+    "what": "Messagerie ou visioconférence."
+  },
+  {
+    "names": [
+      "Spotify.exe"
+    ],
+    "category": "Multimédia",
+    "what": "Spotify. Plusieurs copies sont normales."
+  },
+  {
+    "names": [
+      "vlc.exe"
+    ],
+    "category": "Multimédia",
+    "what": "Le lecteur multimédia VLC."
+  },
+  {
+    "names": [
+      "obs64.exe"
+    ],
+    "category": "Multimédia",
+    "what": "OBS Studio : enregistrement et diffusion en direct."
+  },
+  {
+    "names": [
+      "WINWORD.EXE",
+      "EXCEL.EXE",
+      "POWERPNT.EXE",
+      "OUTLOOK.EXE"
+    ],
+    "category": "Bureautique",
+    "what": "Microsoft Office."
+  },
+  {
+    "names": [
+      "Dropbox.exe",
+      "GoogleDriveFS.exe",
+      "iCloudDrive.exe"
+    ],
+    "category": "Cloud et sauvegarde",
+    "what": "Synchronisation de fichiers en ligne. Le fermer arrête la synchronisation."
+  },
+  {
+    "names": [
+      "Code.exe"
+    ],
+    "category": "Développement",
+    "what": "Visual Studio Code."
+  },
+  {
+    "names": [
+      "devenv.exe"
+    ],
+    "category": "Développement",
+    "what": "Visual Studio."
+  },
+  {
+    "names": [
+      "LGHUB.exe",
+      "lghub_agent.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Logitech G HUB : réglages des souris, claviers et casques Logitech."
+  },
+  {
+    "names": [
+      "RazerCentralService.exe",
+      "Razer Synapse Service.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Razer Synapse : réglages des périphériques Razer."
+  },
+  {
+    "names": [
+      "iCUE.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "Corsair iCUE : éclairage, ventilateurs et périphériques Corsair."
+  },
+  {
+    "names": [
+      "ArmouryCrate.exe",
+      "ArmouryCrate.Service.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "ASUS Armoury Crate : profils de performance, éclairage et ventilateurs des PC ASUS."
+  },
+  {
+    "names": [
+      "MSI.CentralServer.exe",
+      "MSI Center.exe"
+    ],
+    "category": "Pilotes et matériel",
+    "what": "MSI Center : réglages des PC et cartes mères MSI."
+  },
+  {
+    "names": [
+      "7zFM.exe",
+      "7zG.exe"
+    ],
+    "category": "Utilitaires",
+    "what": "7-Zip, logiciel de compression."
+  },
+  {
+    "names": [
+      "MAUS.exe",
+      "maus.exe"
+    ],
+    "category": "Utilitaires",
+    "what": "MAUS lui-même."
+  }
+]

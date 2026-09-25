@@ -9,7 +9,7 @@ import json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I18N = os.path.join(ROOT, "src", "Maus.Core", "Localization", "i18n")
-CALL = re.compile(r'(?<![\w.])(?:Texts\.)?T\(\s*"((?:[^"\\]|\\.)*)"')
+CALL = re.compile(r'(?:(?<![\w.])|(?<=Texts\.))T\(\s*"((?:[^"\\]|\\.)*)"')
 
 def unescape(s):
     return s.encode("latin-1", "backslashreplace").decode("unicode_escape") if "\\" in s else s
@@ -24,6 +24,21 @@ def sources():
                 text = open(os.path.join(base, f), encoding="utf-8").read()
                 for m in CALL.finditer(text):
                     found.add(m.group(1).replace('\\"', '"').replace("\\\\", "\\").replace("\\n", "\n"))
+    return found | catalog_texts()
+
+# Catalogues JSON déjà traduits, et leurs champs de texte.
+CATALOGS = {"processes.json": ("category", "what")}
+
+def catalog_texts():
+    found = set()
+    for name, fields in CATALOGS.items():
+        path = os.path.join(ROOT, "src", "Maus.Core", "Catalog", name)
+        lines = [l for l in open(path, encoding="utf-8") if not l.lstrip().startswith("//")]
+        data = json.loads("".join(lines))
+        for entry in data:
+            for field in fields:
+                if isinstance(entry.get(field), str):
+                    found.add(entry[field])
     return found
 
 def load(lang):
