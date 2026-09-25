@@ -18,6 +18,11 @@ public sealed class WindowsRegistryReader : IRegistryReader
     public IReadOnlyList<string> GetSubKeyNames(RegistryHive hive, string path, RegistryView view = RegistryView.Registry64) =>
         WithKey(hive, path, view, key => (IReadOnlyList<string>?)key?.GetSubKeyNames() ?? []);
 
+    public RegistryValueKind? GetValueKind(RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64) =>
+        WithKey(hive, path, view, key => key is not null && key.GetValueNames().Contains(name, StringComparer.OrdinalIgnoreCase)
+            ? key.GetValueKind(name)
+            : (RegistryValueKind?)null);
+
     private static T WithKey<T>(RegistryHive hive, string path, RegistryView view, Func<RegistryKey?, T> read)
     {
         try
