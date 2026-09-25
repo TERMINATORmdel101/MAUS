@@ -149,7 +149,7 @@ internal static class PrivacyPlanner
 
         if (Deviates("M04.delivery-optimization") && policies)
         {
-            var sharesOnLanOnly = byId["M04.delivery-optimization"].Current?.StartsWith("1 ", StringComparison.Ordinal) == true;
+            var sharesOnLanOnly = byId["M04.delivery-optimization"].Current?.StartsWith(PrivacySystemChecks.DescribeDownloadMode(1), StringComparison.Ordinal) == true;
             Add("M04.delivery-optimization", T("Télécharger les mises à jour depuis Microsoft uniquement (sans pair-à-pair)"),
                 T("Votre connexion ne sert plus à envoyer des morceaux de mises à jour à d'autres PC."), Downloads,
                 [Hklm(DeliveryOptimizationPolicy, "DODownloadMode", 0)],
