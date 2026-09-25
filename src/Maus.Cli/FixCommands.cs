@@ -1,0 +1,180 @@
+using System.Globalization;
+using Maus.Core;
+using Maus.Core.Engine;
+using Maus.Core.Fixes;
+using Maus.Core.Reporting;
+
+namespace Maus.Cli;
+
+/// <summary>Commandes de corrections (V0.2) : aperçu, application après confirmation, journal, annulation.</summary>
+internal static class FixCommands
+{
+    public static void PrintPlan(IReadOnlyList<PlannedChange> plan, TextWriter output)
+    {
+        if (plan.Count == 0)
+        {
+            output.WriteLine("Aucune correction à proposer.");
+            return;
+        }
+
+        foreach (var group in plan.GroupBy(c => c.ModuleId))
+        {
+            output.WriteLine();
+            output.WriteLine($"== {group.Key} ==");
+            foreach (var change in group)
+            {
+                var mark = change.Advanced ? "[avancé]" : change.Recommended ? "[recommandé]" : "[au choix]";
+                output.WriteLine($"  {change.Id,-34} {mark} {change.Title}");
+                output.WriteLine($"      {change.Description}");
+                if (change.Warning is not null)
+                {
+                    output.WriteLine($"      ATTENTION : {change.Warning}");
+                }
+
+                if (change.Risk is not null)
+                {
+                    output.WriteLine($"      Risque : {change.Risk}");
+                }
+
+                foreach (var write in change.Writes)
+                {
+                    output.WriteLine($"      {write.Key} -> {SettingValue.Display(write.Value)}");
+                }
+
+                if (change.Effect != ChangeEffect.Immediate)
+                {
+                    output.WriteLine($"      ({Labels.Of(change.Effect)})");
+                }
+            }
+        }
+
+        output.WriteLine();
+        output.WriteLine("Pour appliquer : maus --apply <identifiant> [...]  ou  maus --apply-recommended");
+    }
+
+    public static int Apply(FixContext context, IReadOnlyList<PlannedChange> selected, ApplyOptions options, bool assumeYes, TextWriter output)
+    {
+        var engine = new FixEngine(context);
+        if (engine.GetBlockingReason() is { } blocked)
+        {
+            output.WriteLine(blocked);
+            return 3;
+        }
+
+        if (selected.Count == 0)
+        {
+            output.WriteLine("Aucune correction ne correspond à la sélection (déjà conforme, ou identifiant inconnu : voir maus --plan).");
+            return 1;
+        }
+
+        output.WriteLine("Corrections sélectionnées :");
+        foreach (var change in selected)
+        {
+            output.WriteLine($"  - {change.Title} ({change.Id})");
+        }
+
+        output.WriteLine(options.CreateRestorePoint
+            ? "Un point de restauration sera créé et vérifié avant toute modification."
+            : "Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler).");
+
+        if (!assumeYes && !Confirm("Appliquer ces corrections ? (o/N) "))
+        {
+            output.WriteLine("Annulé : rien n'a été modifié.");
+            return 1;
+        }
+
+        var result = engine.Apply(selected, options);
+        if (result.RestorePoint is { } point)
+        {
+            output.WriteLine(point.Message);
+        }
+
+        if (result.Blocked)
+        {
+            output.WriteLine(result.BlockedReason);
+            if (result.RestorePoint?.Status == RestorePointStatus.ProtectionDisabled)
+            {
+                output.WriteLine("Relancez avec --enable-protection pour activer la protection du système, ou --without-restore-point pour continuer sans.");
+            }
+
+            return 3;
+        }
+
+        foreach (var outcome in result.Changes)
+        {
+            output.WriteLine($"  [{Labels.Of(outcome.Status)}] {outcome.Title} : {outcome.Message}");
+        }
+
+        if (result.RequiredEffect != ChangeEffect.Immediate)
+        {
+            output.WriteLine($"Certaines corrections ont un {Labels.Of(result.RequiredEffect)}.");
+        }
+
+        if (result.Session is { CanRevert: true } session)
+        {
+            output.WriteLine($"Séance enregistrée : {session.Id}. Pour tout annuler : maus --revert {session.Id}");
+        }
+
+        return result.Changes.Any(c => c.Status == ChangeStatus.Failed) ? 2 : 0;
+    }
+
+    public static int PrintJournal(IJournalStore journal, TextWriter output)
+    {
+        var sessions = journal.List();
+        if (sessions.Count == 0)
+        {
+            output.WriteLine("Journal vide : MAUS n'a encore rien modifié sur ce PC.");
+            return 0;
+        }
+
+        foreach (var session in sessions)
+        {
+            var state = session.RevertedAt is not null ? "annulée" : session.CanRevert ? "active" : "sans modification en cours";
+            output.WriteLine($"{session.Id}  {session.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}  {state}  ({session.Entries.Count(e => e.State is EntryState.Applied or EntryState.Reverted or EntryState.RevertSkipped)} valeur(s))");
+            foreach (var entry in session.Entries)
+            {
+                output.WriteLine($"    [{entry.State}] {entry.ChangeTitle} : {entry.Key} {SettingValue.Display(entry.Before)} -> {SettingValue.Display(entry.After)}");
+            }
+        }
+
+        return 0;
+    }
+
+    public static int Revert(FixContext context, string sessionId, bool force, bool assumeYes, TextWriter output)
+    {
+        if (!assumeYes && !Confirm($"Remettre les valeurs d'origine de la séance {sessionId} ? (o/N) "))
+        {
+            output.WriteLine("Annulé : rien n'a été modifié.");
+            return 1;
+        }
+
+        var result = new FixEngine(context).Revert(sessionId, force);
+        if (result.Error is not null)
+        {
+            output.WriteLine(result.Error);
+            return 3;
+        }
+
+        foreach (var entry in result.Entries)
+        {
+            output.WriteLine($"  [{Labels.Of(entry.Status)}] {entry.Title} ({entry.Setting}) : {entry.Message}");
+        }
+
+        if (result.Entries.Any(e => e.Status == RevertStatus.ChangedSince))
+        {
+            output.WriteLine("Des valeurs ont changé depuis la correction et ont été laissées telles quelles. --force les remet quand même à leur valeur d'origine.");
+        }
+
+        return result.Completed ? 0 : 2;
+    }
+
+    public static IReadOnlyList<PlannedChange> Plan(AuditEngine engine, IReadOnlyList<ModuleResult> results, AuditContext context) =>
+        FixEngine.Plan(engine, results, context);
+
+    private static bool Confirm(string question)
+    {
+        Console.Write(question);
+        var answer = Console.ReadLine()?.Trim();
+        return answer is not null && (answer.Equals("o", StringComparison.OrdinalIgnoreCase) || answer.Equals("oui", StringComparison.OrdinalIgnoreCase));
+    }
+}
