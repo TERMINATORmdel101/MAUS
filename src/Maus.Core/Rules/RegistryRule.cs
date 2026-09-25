@@ -93,8 +93,16 @@ public sealed record RuleFix
 
     public string? Warning { get; init; }
 
-    /// <summary>Écriture à faire, ou <c>null</c> si la règle ne permet pas d'en déduire une.</summary>
-    public SettingWrite? ToWrite(RegistryRule rule)
+    /// <summary>Autres valeurs de la même clé à supprimer en même temps (par exemple <c>ShellSmartScreenLevel</c>).</summary>
+    public IReadOnlyList<string> AlsoDelete { get; init; } = [];
+
+    /// <summary>Écritures à faire, ou liste vide si la règle ne permet pas d'en déduire.</summary>
+    public IReadOnlyList<SettingWrite> ToWrites(RegistryRule rule) =>
+        ToWrite(rule) is { } main
+            ? [main, .. AlsoDelete.Select(name => new SettingWrite(SettingKey.Registry(rule.Hive, rule.Path, name), null))]
+            : [];
+
+    private SettingWrite? ToWrite(RegistryRule rule)
     {
         var key = SettingKey.Registry(rule.Hive, rule.Path, rule.Name);
         if (Delete || (Value is null && rule.Expect == RuleExpectation.Absent))

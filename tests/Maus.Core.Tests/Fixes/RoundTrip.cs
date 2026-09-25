@@ -25,8 +25,8 @@ public static class RoundTrip
         var after = await module.DetectAsync(audit, CancellationToken.None);
         foreach (var change in plan)
         {
-            var finding = after.Single(f => f.Id == change.Id);
-            Assert.True(finding.Status is FindingStatus.Ok or FindingStatus.Info, $"{change.Id} reste {finding.Status} après correction");
+            var finding = after.Single(f => f.Id == (change.FindingId ?? change.Id));
+            Assert.True(finding.Status is FindingStatus.Ok or FindingStatus.Info, $"{change.Id} : {finding.Id} reste {finding.Status} après correction");
         }
 
         Assert.Empty(module.Plan(audit, after));

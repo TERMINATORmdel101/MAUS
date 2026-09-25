@@ -30,6 +30,9 @@ public sealed record PlannedChange
 
     public required string ModuleId { get; init; }
 
+    /// <summary>Constat corrigé, s'il diffère de <see cref="Id"/> (un constat peut donner plusieurs corrections, par exemple une par service).</summary>
+    public string? FindingId { get; init; }
+
     /// <summary>Libellé court de l'action (« Masquer le bouton Vue des tâches »).</summary>
     public required string Title { get; init; }
 

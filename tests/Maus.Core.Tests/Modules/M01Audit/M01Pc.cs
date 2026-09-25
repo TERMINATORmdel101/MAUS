@@ -179,14 +179,19 @@ internal sealed class M01Pc
         ["LicenseStatus"] = status,
     };
 
-    public async Task<IReadOnlyList<Finding>> RunAsync()
+    public RiskyChangesAuditModule Module => new(Signatures, Tasks, WindowsDirectory);
+
+    public async Task<IReadOnlyList<Finding>> RunAsync() => await Module.DetectAsync(CreateContext(), CancellationToken.None);
+
+    /// <summary>Écrit les services dans le registre, puis construit le contexte d'audit.</summary>
+    public AuditContext CreateContext()
     {
         foreach (var (name, start) in Services)
         {
             Registry.Set(Hklm, @"SYSTEM\CurrentControlSet\Services\" + name, "Start", start);
         }
 
-        var context = TestContext.Create(
+        return TestContext.Create(
             Registry,
             Cim,
             Commands,
@@ -196,7 +201,6 @@ internal sealed class M01Pc
             now: Now,
             packages: Packages,
             files: Files);
-        return await new RiskyChangesAuditModule(Signatures, Tasks, WindowsDirectory).DetectAsync(context, CancellationToken.None);
     }
 
     public async Task<Finding> RunAsync(string id) => (await RunAsync()).Single(f => f.Id == id);

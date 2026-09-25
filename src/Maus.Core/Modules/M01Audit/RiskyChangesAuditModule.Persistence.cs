@@ -101,7 +101,7 @@ public sealed partial class RiskyChangesAuditModule
             issues.Add($"Shell de l'utilisateur = {userShell}");
         }
 
-        if (IsSet(userinit) && !IsDefaultWinlogonEntry(userinit, "userinit.exe", Path.Combine(_windowsDirectory, "System32"), _windowsDirectory))
+        if (IsSet(userinit) && !IsDefaultWinlogonEntry(userinit, "userinit.exe", _windowsDirectory + @"\System32", _windowsDirectory))
         {
             issues.Add($"Userinit = {userinit}");
         }
@@ -124,13 +124,15 @@ public sealed partial class RiskyChangesAuditModule
         var items = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         return items.Length > 0 && items.All(item =>
         {
+            // Découpage explicite sur « \ » : chemins Windows, quel que soit le système qui exécute les tests.
             var path = item.Trim('"');
-            if (!string.Equals(Path.GetFileName(path), fileName, StringComparison.OrdinalIgnoreCase))
+            var separator = path.LastIndexOf('\\');
+            if (!string.Equals(path[(separator + 1)..], fileName, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
-            var folder = Path.GetDirectoryName(path);
+            var folder = separator < 0 ? null : path[..separator];
             if (string.IsNullOrEmpty(folder))
             {
                 return true;

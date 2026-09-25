@@ -14,7 +14,7 @@ public static class RegistryRulePlanner
             if (rule.Fix is not { } fix
                 || !byId.TryGetValue(rule.Id, out var finding)
                 || finding.Status is FindingStatus.Ok or FindingStatus.Info or FindingStatus.Unknown
-                || fix.ToWrite(rule) is not { } write)
+                || fix.ToWrites(rule) is not { Count: > 0 } writes)
             {
                 continue;
             }
@@ -32,7 +32,7 @@ public static class RegistryRulePlanner
                 Effect = fix.Effect,
                 Advanced = fix.Advanced,
                 Recommended = fix.Recommended && !fix.Advanced,
-                Writes = [write],
+                Writes = writes,
             });
         }
 

@@ -1,6 +1,7 @@
 // Module 1 — Audit des modifications risquées : contrôles de registre simples.
 // Les contrôles qui croisent plusieurs sources (Defender, pare-feu, services, BCD, fichiers…) sont codés
 // dans RiskyChangesAuditModule. Restaurer une stratégie = supprimer sa valeur, jamais écrire la valeur « activée ».
+// « fix » : correction réversible (V0.2) ; pré-cochée seulement si le constat est Critique.
 [
   {
     "id": "M01.defender-policy",
@@ -13,7 +14,8 @@
     "expectedLabel": "absente",
     "severity": "High",
     "explanation": "Cette stratégie servait à couper l'antivirus Microsoft Defender. Windows l'ignore sur les PC personnels depuis 2021, mais sa présence trahit le passage d'un script de « nettoyage » qui a pu toucher à d'autres réglages de sécurité.",
-    "advice": "Supprimer la valeur DisableAntiSpyware, puis vérifier les autres constats de la catégorie Defender."
+    "advice": "Supprimer la valeur DisableAntiSpyware, puis vérifier les autres constats de la catégorie Defender.",
+    "fix": { "title": "Supprimer la stratégie DisableAntiSpyware" }
   },
   {
     "id": "M01.uac",
@@ -28,7 +30,8 @@
     "expectedLabel": "activé (1)",
     "severity": "Critical",
     "explanation": "L'UAC demande votre accord avant qu'un programme modifie Windows. Désactivé, tout programme lancé reçoit d'emblée les droits administrateur : un logiciel malveillant peut alors s'installer sans rien demander, et les applications du Store ne fonctionnent plus.",
-    "advice": "Remettre EnableLUA à 1, puis redémarrer le PC."
+    "advice": "Remettre EnableLUA à 1, puis redémarrer le PC.",
+    "fix": { "title": "Réactiver l'UAC (EnableLUA = 1)", "effect": "Restart" }
   },
   {
     "id": "M01.smartscreen",
@@ -42,7 +45,8 @@
     "expectedLabel": "absente (SmartScreen actif)",
     "severity": "High",
     "explanation": "SmartScreen vous avertit avant d'ouvrir un fichier téléchargé inconnu ou un site de hameçonnage. Coupé par une stratégie, il ne peut plus être réactivé depuis Sécurité Windows.",
-    "advice": "Supprimer les valeurs EnableSmartScreen et ShellSmartScreenLevel pour rendre la main à Sécurité Windows."
+    "advice": "Supprimer les valeurs EnableSmartScreen et ShellSmartScreenLevel pour rendre la main à Sécurité Windows.",
+    "fix": { "title": "Supprimer la stratégie qui coupe SmartScreen", "delete": true, "alsoDelete": ["ShellSmartScreenLevel"] }
   },
   {
     "id": "M01.wu-auto-update",
@@ -56,6 +60,7 @@
     "expectedLabel": "absente",
     "severity": "High",
     "explanation": "NoAutoUpdate = 1 empêche Windows d'installer seul ses mises à jour : les correctifs de sécurité s'accumulent sans être appliqués.",
-    "advice": "Supprimer la valeur NoAutoUpdate pour que Windows Update reprenne son fonctionnement normal."
+    "advice": "Supprimer la valeur NoAutoUpdate pour que Windows Update reprenne son fonctionnement normal.",
+    "fix": { "title": "Supprimer la stratégie qui bloque les mises à jour automatiques", "delete": true }
   }
 ]
