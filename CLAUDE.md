@@ -41,12 +41,16 @@ Décisions prises (24-25/09/2026) :
 | `src/Maus.Core/Rules` + `Catalog/*.json` | Règles de registre déclaratives, catalogues embarqués (`mXX-*.json`) |
 | `src/Maus.Core/Engine` | `AuditEngine` : découverte des modules par réflexion, exécution parallèle avec délai |
 | `src/Maus.Core/Modules/MxxNom/` | Un dossier par module (M01 à M15) |
+| `src/Maus.Core/Fixes` | V0.2 : `IFixableModule.Plan`, `PlannedChange` / `SettingWrite` / `SettingKey` / `SettingValue`, `FixEngine` (Apply, Verify, Revert), `FixContext`, journal (`FileJournalStore` + `WindowsDirectoryProtector`), `RestorePointCreator` + `WmiSystemRestore`, `FixProfile` |
 | `src/Maus.Cli` | `maus` : audit en ligne de commande (`--module Mxx`, `--json`) |
 | `src/Maus.App` | Interface WPF (thème Fluent), manifeste `requireAdministrator`, filet de sécurité qui journalise les plantages dans `%LOCALAPPDATA%\MAUS\logs` |
 | `tests/Maus.Core.Tests` | xUnit avec faux (`Fakes.cs` : FakeRegistry, FakeCim, FakeCommands, FakeEventLogs, FakePackages, FakeFiles, `TestContext.Create`) |
 
 Règles de code :
-- **V0.1 = lecture seule absolue** : jamais de clé de registre ouverte en écriture, jamais de `Process.Start` hors `context.Commands`, jamais d'appel qui modifie un réglage. Tout accès système passe par `AuditContext` ou par une interface interne au module (P/Invoke, COM) avec un faux dans les tests.
+- **Detect et Plan = lecture seule absolue** : jamais de clé de registre ouverte en écriture, jamais de `Process.Start` hors `context.Commands`, jamais d'appel qui modifie un réglage. Tout accès système passe par `AuditContext` ou par une interface interne au module (P/Invoke, COM) avec un faux dans les tests.
+- **Écrire (V0.2)** : uniquement par le `FixEngine`, via `FixContext` (jamais dans `AuditContext`). Un module corrigeable implémente `IFixableModule.Plan` et décrit ses corrections comme des écritures élémentaires (`SettingWrite` : registre, SPI, mode de gestion) ; le moteur journalise la valeur d'origine avant d'écrire, relit, défait la correction entière si une écriture échoue, et sait tout annuler. Nouveau type de réglage = nouveau `SettingKind` + lecture/écriture dans `SettingsAccessor` + faux.
+- Stratégies (`Policies`) : restaurer = **supprimer** la valeur, jamais écrire la valeur « activée ». Stratégies posées seulement sur Pro et plus. Pré-coché (`Recommended`) = sans risque connu ; `Advanced` = jamais dans un profil hors de son domaine ; `Warning` = avertissement renforcé.
+- Test de chaque module corrigeable : `RoundTrip.AssertAsync` (critère d'acceptation de la fiche : après Apply les constats sont conformes, après Revert un nouveau Detect est identique à l'état initial).
 - Données illisibles → `Finding.Unknown` / `Finding.AdminRequired`, **jamais** un faux Problem.
 - Écart → `FindingStatusExtensions.ForDeviation(severity)` : Critical/High = rouge, Medium = orange, Low = bleu (optimisation).
 - Textes utilisateur en français clair ; identifiants `Mxx.nom-en-kebab`.
@@ -71,19 +75,30 @@ dotnet publish src/Maus.App -c Release -o publish/MAUS
 
 ### Dans le cloud (Linux)
 
-Les sessions cloud tournent sous Linux : l'application WPF et les API Windows (registre, WMI, P/Invoke) n'y fonctionnent pas. `EnableWindowsTargeting` est activé dans `Directory.Build.props` pour permettre la **compilation**. Les tests qui appellent de vraies API Windows échoueront sous Linux : écrire le code et les tests avec les faux, puis faire valider sur le PC Windows (build, tests, `maus` en lecture seule).
+SDK : `apt-get install -y dotnet-sdk-10.0` (dépôt Ubuntu ; `dot.net/v1/dotnet-install.sh` est bloqué par le proxy). Les sessions cloud tournent sous Linux : l'application WPF et les API Windows (registre, WMI, P/Invoke) n'y fonctionnent pas. `EnableWindowsTargeting` est activé dans `Directory.Build.props` pour permettre la **compilation**. Les tests qui appellent de vraies API Windows échoueront sous Linux : écrire le code et les tests avec les faux, puis faire valider sur le PC Windows (build, tests, `maus` en lecture seule).
 
-## État (25/09/2026)
+## État (25/09/2026, fin de session cloud)
 
-**V0.1 terminée** : les 15 modules détectent en lecture seule ; 902 tests verts ; 0 avertissement ; application WPF testée (audit complet sans plantage en ~15 s).
+**V0.1 terminée** : les 15 modules détectent en lecture seule ; application WPF testée (audit complet sans plantage en ~15 s).
 
-Reste à faire / points connus :
+**V0.2 codée, à valider sur Windows** (écrite sous Linux : compilée, testée avec les faux, jamais exécutée sur un vrai Windows) :
+- Socle : journal protégé sous `%ProgramData%\MAUS\journal`, point de restauration vérifié, blocage sur PC géré / sans droits admin / élévation par un autre compte (réglages HKCU et SPI ignorés), corrections tout ou rien, Annuler qui respecte les valeurs changées depuis.
+- Corrections branchées (registre, SPI, mode de gestion) : M01 (stratégies, UAC, services, Winlogon, AppInit, IFEO, pare-feu, pause/version/WSUS), M04 (lignes Standard du registre), M05 (mode de gestion, démarrage rapide), M06 (tout), M07 (selon le profil), M09 (HAGS, blocage des pilotes au choix), M12 (StartupApproved), M13 (Spectre/Meltdown, liste de blocage des pilotes).
+- CLI : `maus --plan`, `--apply ID...`, `--apply-recommended`, `--journal`, `--revert SEANCE [--force]`.
+- Interface : onglets Constats / Corrections (profils, cases, détails techniques, point de restauration) / Historique (Annuler). Jamais lancée : à tester (manifeste `asInvoker` interdit ici, il faut l'admin → **Windows Sandbox**).
+- Tests : 954, dont 12 échecs **attendus sous Linux** (vraies API Windows, chemins) ; 0 avertissement. Sous Windows, tout doit être vert.
+
+À valider en priorité dans Windows Sandbox : `maus --plan` ; `maus --apply-recommended` (point de restauration créé et relu, journal écrit, ACL du dossier) ; `maus --journal` puis `maus --revert` ; même chose dans l'interface. Points marqués « à vérifier » : effet de `ShowTaskViewButton` / `TaskbarAnimations` sans redémarrage de l'Explorateur, valeurs de pause de Windows Update, clé `SPP\Clients` pour l'état de la protection du système.
+
+Reste à faire V0.2 (écritures d'autres natures, non commencées) : services via l'API (DiagTrack), tâches planifiées (CEIP, UpdateOrchestrator, tâches d'ouverture de session M12), Defender (exclusions), pare-feu local, BCD (DEP, signature des pilotes), fichier hosts, proxy WinHTTP, fichier d'échange, Copilot/Recall, réinstallation Game Bar (winget), modes secteur/batterie (M05, fonctions non documentées), retrait des valeurs de `Registry.pol`, bouton « Valeurs Windows » (défauts) du M06, redémarrage de l'Explorateur proposé.
+
+Reste à faire / points connus (hors V0.2) :
 - [ ] Fichier `LICENSE` (texte officiel GPL-3.0 de gnu.org) : le porteur n'a pas encore autorisé le téléchargement.
 - [ ] Relecture juridique de `TRADEMARKS.md` et des mentions légales avant publication publique.
 - [ ] Module 11 : le benchmark actif (CPU, RAM, GPU, stockage) est prévu en V0.3 ; seule la santé passive existe.
 - [ ] Module 14 : contrôle « écran branché sur la carte mère » par comparaison d'adaptateur, sans le drapeau D3D12 UMA.
 - [ ] Module 9 : versions du catalogue `m09-gpu-drivers.json` à revérifier chaque mois ; Module 15 : URLs NVIDIA App / AMD / Intel Arc à revérifier.
-- [ ] Cas « élévation par un autre compte administrateur » (réglages HKCU du mauvais profil) non traité.
+- [x] Cas « élévation par un autre compte administrateur » : détecté (`SessionUser`), réglages HKCU/SPI ignorés avec message (à valider sur Windows).
 - [ ] Les nombreux « (à vérifier) » de la fiche technique.
 
 ## Feuille de route
@@ -95,3 +110,4 @@ Reste à faire / points connus :
 
 - 24/09/2026 : fiche technique (15 modules), décisions, nom MAUS, licence, socle V0.1, module 6.
 - 25/09/2026 : 14 autres modules codés par des agents en parallèle (worktrees Git), intégration, correction du plantage WPF au démarrage (liaison TwoWay sur propriété en lecture seule), correction « PC géré » (pseudo-inscriptions Windows ignorées). Dépôt poussé sur GitHub.
+- 25/09/2026 (cloud, branche `claude/keen-wozniak-93as1n`) : V0.2 codée (socle des corrections, 8 modules corrigeables, CLI, interface). SDK .NET installé par `apt-get install dotnet-sdk-10.0` (le script dotnet-install est bloqué par le proxy). Chemins Winlogon du M01 découpés explicitement sur `\` pour passer sous Linux.

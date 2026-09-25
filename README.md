@@ -16,8 +16,8 @@
 
 | Version | Contenu | État |
 |---|---|---|
-| V0.1 | Socle, profil matériel, mode « audit seul » des modules | En cours |
-| V0.2 | Corrections réversibles (journal, point de restauration, Annuler) | À venir |
+| V0.1 | Socle, profil matériel, mode « audit seul » des modules | Terminée |
+| V0.2 | Corrections réversibles (journal, point de restauration, Annuler) | En cours : à valider sur Windows |
 | V0.3 | Mini-benchmark, écran et HDR, publication sur le Microsoft Store | À venir |
 
 Configuration requise : Windows 11 23H2 (build 22631) ou plus récent.
@@ -37,6 +37,8 @@ Audit en ligne de commande (lecture seule, aucun droit particulier requis ; cert
 dotnet run --project src/Maus.Cli -- --module M06
 ```
 
+Corrections en ligne de commande (V0.2, invite de commandes **administrateur**) : `--plan` affiche les corrections proposées sans rien modifier, `--apply ID...` ou `--apply-recommended` les applique après confirmation (point de restauration vérifié d'abord), `--journal` liste les séances et `--revert SEANCE` remet les valeurs d'origine. À tester d'abord dans Windows Sandbox.
+
 L'application graphique (`src/Maus.App`) demande les droits administrateur au lancement.
 
 ## Organisation du code
@@ -44,7 +46,8 @@ L'application graphique (`src/Maus.App`) demande les droits administrateur au la
 | Dossier | Rôle |
 |---|---|
 | `src/Maus.Core/Abstractions` | Contrat des modules (`IAuditModule`), constats, verdicts |
-| `src/Maus.Core/Platform` | Lecture du registre, de WMI et de commandes système, en lecture seule |
+| `src/Maus.Core/Platform` | Lecture du registre, de WMI et de commandes système ; écrivains séparés, réservés aux corrections |
+| `src/Maus.Core/Fixes` | Corrections réversibles : journal, point de restauration vérifié, moteur Apply / Verify / Revert, profils |
 | `src/Maus.Core/Hardware` | Profil matériel commun (fixe ou portable, CPU, GPU) |
 | `src/Maus.Core/Rules` et `Catalog` | Règles de registre déclaratives en JSON |
 | `src/Maus.Core/Modules` | Un dossier par module de la fiche technique (M01 à M15) |
