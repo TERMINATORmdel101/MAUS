@@ -41,3 +41,7 @@ Cette restauration est active par défaut sur Famille et Pro non géré si le vo
 - « La réparation peut être longue. N'éteignez pas le PC et laissez-le sur secteur. »
 - « 14 erreurs matérielles corrigées en 30 jours. Ce n'est pas un problème de Windows : vérifiez overclocking, profil XMP/EXPO et températures. »
 - « La réinstallation sur place conserve fichiers et applications. Sauvegardez quand même vos données avant. »
+
+**Mise en œuvre (25/09/2026) :**
+- Détection `M02.component-store` : API DISM (`dismapi.dll`), `DismCheckImageHealth` avec `ScanImage = FALSE`, équivalent de `DISM /CheckHealth` : lecture de l'indicateur d'altération, quelques secondes, droits administrateur requis, délai de 45 s (au-delà, « indéterminé » : une maintenance de Windows est peut-être en cours). Réparable = orange, non réparable = rouge (réinstallation sur place).
+- Réparation : bouton « Réparer les fichiers de Windows » (onglet Corrections), après confirmation (avertissement si un redémarrage est en attente) : fenêtre de commande **visible** qui enchaîne `DISM /Online /Cleanup-Image /RestoreHealth` puis `sfc /scannow`. Les étapes 1, 2, 4, 6 et 7 restent à faire.

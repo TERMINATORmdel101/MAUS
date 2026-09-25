@@ -357,6 +357,8 @@
                         <Button Content="{x:Static app:Ui.SaveReport}" Padding="12,4" Margin="0,0,8,0" Command="{Binding SaveReportCommand}"
                                 IsEnabled="{Binding HasAudit, Mode=OneWay}"
                                 ToolTip="{x:Static app:Ui.SaveReportTip}" />
+                        <Button Content="{x:Static app:Ui.RepairWindows}" Padding="12,4" Margin="0,0,8,0" Command="{Binding RepairWindowsCommand}"
+                                ToolTip="{x:Static app:Ui.RepairWindowsTip}" />
                         <Button Content="{x:Static app:Ui.RestartExplorer}" Padding="12,4" Command="{Binding RestartExplorerCommand}"
                                 Visibility="{Binding NeedsExplorerRestart, Converter={StaticResource BoolToVisibility}}"
                                 ToolTip="{x:Static app:Ui.RestartExplorerTip}" />

@@ -228,6 +228,32 @@ public sealed partial class MainViewModel
         }
     }
 
+    /// <summary>« Réparer les fichiers de Windows » : DISM puis SFC dans une console visible, après confirmation.</summary>
+    public ICommand RepairWindowsCommand => _repairWindows ??= new ParameterCommand(_ =>
+    {
+        var message = T("MAUS va ouvrir une fenêtre de commande qui lance deux outils officiels de Microsoft :") + Environment.NewLine
+            + T("• DISM répare la copie de référence de Windows en la comparant à Windows Update (connexion Internet conseillée) ;") + Environment.NewLine
+            + T("• SFC remplace ensuite les fichiers système abîmés par une copie saine.") + Environment.NewLine + Environment.NewLine
+            + T("Vos fichiers, vos applications et vos réglages ne sont pas touchés. Comptez 10 à 30 minutes : ne fermez pas la fenêtre, gardez le PC branché, puis redémarrez-le.");
+        if (_results.SelectMany(r => r.Findings).Any(f => f.Id == "M02.pending-reboot" && f.Status is FindingStatus.Warning or FindingStatus.Problem))
+        {
+            message += Environment.NewLine + Environment.NewLine
+                + T("Attention : un redémarrage est en attente. Redémarrez d'abord le PC, sinon la réparation risque d'échouer ou de donner un faux résultat.");
+        }
+
+        if (!Confirm(T("Réparer les fichiers de Windows ?"), message + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        {
+            return;
+        }
+
+        FixReport = (FixReport.Length > 0 ? FixReport + Environment.NewLine + Environment.NewLine : string.Empty)
+            + (ShellLauncher.RunRepairConsole()
+                ? T("Réparation lancée dans une fenêtre de commande. Quand elle est terminée, redémarrez le PC puis relancez l'audit.")
+                : T("La fenêtre de commande n'a pas pu s'ouvrir."));
+    });
+
+    private ICommand? _repairWindows;
+
     private async Task RestartExplorerAsync()
     {
         if (!Confirm(T("Redémarrer l'Explorateur ?"), ExplorerRestart.Warning + Environment.NewLine + Environment.NewLine + T("Continuer ?")))

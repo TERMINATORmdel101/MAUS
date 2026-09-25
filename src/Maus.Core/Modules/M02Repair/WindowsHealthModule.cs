@@ -10,7 +10,8 @@ namespace Maus.Core.Modules.M02Repair;
 /// <summary>
 /// Module 2 — Réparation de Windows. En V0.1 (audit seul), le module lit les signaux de santé : 30 jours de journaux
 /// (erreurs matérielles WHEA, écrans bleus, arrêts brutaux, disque), test mémoire, indice de fiabilité, prérequis des
-/// réparations (redémarrage en attente, espace libre) et état de WMI. Les réparations (chkdsk, DISM, SFC…) arrivent en V0.2.
+/// réparations (redémarrage en attente, espace libre), état de WMI et du magasin des composants (DISM /CheckHealth).
+/// La réparation DISM puis SFC est lancée par l'interface, dans une console visible, avec l'accord de l'utilisateur.
 /// </summary>
 public sealed class WindowsHealthModule : IAuditModule
 {
@@ -55,17 +56,22 @@ public sealed class WindowsHealthModule : IAuditModule
 
     private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
 
+    /// <summary>Délai laissé à DISM pour lire l'indicateur d'altération.</summary>
+    internal static readonly TimeSpan ImageHealthTimeout = TimeSpan.FromSeconds(45);
+
     private readonly string _windowsDirectory;
+    private readonly IImageHealthChecker _imageHealth;
 
     public WindowsHealthModule()
-        : this(Environment.GetFolderPath(Environment.SpecialFolder.Windows))
+        : this(Environment.GetFolderPath(Environment.SpecialFolder.Windows), new DismImageHealthChecker())
     {
     }
 
-    /// <summary>Dossier Windows injecté pour les tests (minidumps, lecteur système).</summary>
-    internal WindowsHealthModule(string windowsDirectory)
+    /// <summary>Dossier Windows (minidumps, lecteur système) et lecture DISM injectés pour les tests.</summary>
+    internal WindowsHealthModule(string windowsDirectory, IImageHealthChecker imageHealth)
     {
         _windowsDirectory = string.IsNullOrEmpty(windowsDirectory) ? @"C:\Windows" : windowsDirectory;
+        _imageHealth = imageHealth;
     }
 
     public string Id => "M02";
@@ -122,6 +128,7 @@ public sealed class WindowsHealthModule : IAuditModule
             DetectFreeSpace(context.Files),
             DetectReliability(context.Cim, context.Now),
             DetectWmi(context.Cim),
+            DetectComponentStore(context.IsElevated),
             DetectMinidumps(context.Files),
         };
 
@@ -653,6 +660,61 @@ public sealed class WindowsHealthModule : IAuditModule
                 ? null
                 : T("La vérification puis la récupération du dépôt WMI (winmgmt /verifyrepository, /salvagerepository) seront proposées dans une prochaine version."),
             Fixable = problem is not null,
+        };
+    }
+
+    private Finding DetectComponentStore(bool elevated)
+    {
+        const string id = "M02.component-store";
+        var title = T("Fichiers de Windows (magasin des composants)");
+        if (!elevated)
+        {
+            return Finding.AdminRequired(id, title, GeneralCategory);
+        }
+
+        ImageHealth health;
+        try
+        {
+            health = _imageHealth.Check(ImageHealthTimeout);
+        }
+        catch (MausAccessDeniedException)
+        {
+            return Finding.AdminRequired(id, title, GeneralCategory);
+        }
+        catch (DataSourceUnavailableException ex)
+        {
+            return Finding.Unknown(id, title, T("Vérification DISM impossible : {0}", ex.Message), GeneralCategory);
+        }
+
+        var severity = health == ImageHealth.NotRepairable ? Severity.High : Severity.Medium;
+        return new Finding
+        {
+            Id = id,
+            Title = title,
+            Category = GeneralCategory,
+            Status = health == ImageHealth.Healthy ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(severity),
+            Severity = severity,
+            Current = health switch
+            {
+                ImageHealth.Healthy => T("aucune altération signalée"),
+                ImageHealth.Repairable => T("altération signalée, réparable"),
+                _ => T("altération signalée, non réparable par DISM"),
+            },
+            Expected = T("aucune altération signalée"),
+            Explanation = T("Windows garde une copie de référence de ses composants (le dossier WinSxS). Si elle est abîmée, "
+                + "des mises à jour échouent et SFC ne peut plus réparer les fichiers système. MAUS lit seulement l'indicateur "
+                + "d'altération noté par Windows, comme « DISM /CheckHealth » : c'est rapide, mais ce n'est pas une analyse complète."),
+            Advice = health switch
+            {
+                ImageHealth.Healthy => T("Si Windows plante ou que des mises à jour échouent malgré tout, la réparation DISM puis SFC "
+                    + "(onglet Corrections, « Réparer les fichiers de Windows ») fait l'analyse complète."),
+                ImageHealth.Repairable => T("Réparez avec les outils officiels de Microsoft : onglet Corrections, « Réparer les fichiers de Windows » "
+                    + "(DISM /RestoreHealth puis SFC /scannow, 10 à 30 minutes, connexion Internet conseillée). Vos fichiers et réglages ne sont pas touchés."),
+                _ => T("DISM ne peut pas réparer cette copie : une réinstallation sur place de Windows (elle garde fichiers, "
+                    + "applications et réglages) est la solution. Paramètres > Système > Récupération propose « Résoudre les problèmes "
+                    + "à l'aide de Windows Update » sur les versions récentes (à vérifier), sinon l'Assistant d'installation de Windows 11 "
+                    + "sur le site de Microsoft. Sauvegardez d'abord vos fichiers."),
+            },
         };
     }
 

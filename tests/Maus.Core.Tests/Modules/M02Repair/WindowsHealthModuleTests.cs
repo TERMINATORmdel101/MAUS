@@ -30,7 +30,7 @@ public class WindowsHealthModuleTests
         FakeCim? cim = null,
         FakeFiles? files = null,
         bool elevated = true) =>
-        new WindowsHealthModule(@"C:\Windows").DetectAsync(
+        new WindowsHealthModule(@"C:\Windows", new FakeImageHealth(ImageHealth.Healthy)).DetectAsync(
             TestContext.Create(registry, cim ?? HealthyCim(), elevated: elevated, now: Now, eventLogs: logs, files: files ?? HealthyFiles()),
             CancellationToken.None);
 
@@ -38,7 +38,7 @@ public class WindowsHealthModuleTests
 
     /// <summary>Contexte construit à la main, pour des lecteurs qui ne sont pas des faux partagés.</summary>
     private static Task<IReadOnlyList<Finding>> DetectWith(IEventLogReader logs, IFileSystemReader files) =>
-        new WindowsHealthModule(@"C:\Windows").DetectAsync(
+        new WindowsHealthModule(@"C:\Windows", new FakeImageHealth(ImageHealth.Healthy)).DetectAsync(
             new AuditContext
             {
                 Registry = new FakeRegistry(),

@@ -109,6 +109,10 @@ public static class Ui
 
     public static string SpaceDetail => T("Les dossiers et les fichiers les plus lourds, expliqués, sans rien supprimer.");
 
+    public static string RepairWindows => T("Réparer les fichiers de Windows");
+
+    public static string RepairWindowsTip => T("DISM puis SFC, les outils officiels de Microsoft, dans une fenêtre visible. Utile si Windows plante, si des mises à jour échouent ou si l'audit signale des fichiers abîmés.");
+
     public static string HelpTitle => T("Demander de l'aide");
 
     public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");
