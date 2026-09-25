@@ -105,6 +105,7 @@ Reste à faire / points connus (hors V0.2) :
 
 - **V0.2 — corrections réversibles** : contrat `Plan / Apply / Verify / Revert` à côté de `Detect` ; journal JSON des valeurs d'origine sous `%ProgramData%\MAUS\journal` (ACL SYSTEM + Administrateurs) ; point de restauration vérifié (`SystemRestorePointCreationFrequency` = 0 le temps de la création, relecture de la liste, protection système activée avec accord) ; corrections bloquées sur PC géré ; interface : cases à cocher, profils, aperçu, bouton Annuler. Premières corrections : M06 visuels, M04 confidentialité, M05 alimentation, M07 Game Bar, M12 démarrage (via `StartupApproved`, comme le Gestionnaire des tâches), M01 valeurs par défaut (dont réactivation des atténuations Spectre/Meltdown), M09 HAGS.
 - **V0.3** : benchmark actif (M11), réglage fréquence/HDR (M14), paquet Microsoft Store, catalogue signé mis à jour chaque mois, anglais.
+- **Atelier matériel (M16, demande du 25/09/2026)** : identité du matériel, capteurs en direct, seuils de sécurité par composant, gestionnaire des tâches à la MAUS (« Qu'est-ce que c'est ? », recherche web à la demande), tests CPU / RAM / VRAM. **S'inspirer des logiciels existants sans jamais les copier** (ni présentation, ni noms, ni code, ni données). Voir `docs/fiche-technique/m16-atelier-materiel.md`. Question ouverte : pilote (PawnIO / LibreHardwareMonitor) pour les tensions et la température réelle du CPU.
 
 ## Journal des sessions
 
