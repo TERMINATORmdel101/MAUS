@@ -41,7 +41,7 @@ Décisions prises (24-25/09/2026) :
 | `src/Maus.Core/Hardware` | Profil matériel commun (fixe/portable 2 indices sur 3, CPU X3D / Raptor Lake, GPU intégré/dédié, PC géré) |
 | `src/Maus.Core/Rules` + `Catalog/*.json` | Règles de registre déclaratives, catalogues embarqués (`mXX-*.json`) |
 | `src/Maus.Core/Engine` | `AuditEngine` : découverte des modules par réflexion, exécution parallèle avec délai |
-| `src/Maus.Core/Modules/MxxNom/` | Un dossier par module (M01 à M16 ; M16 = Atelier matériel, résumé dans l'audit) |
+| `src/Maus.Core/Modules/MxxNom/` | Un dossier par module (M01 à M19 ; M16 = Atelier matériel, M17 = périphériques et pilotes, M18 = réseau, M19 = sauvegardes) |
 | `src/Maus.Core/Fixes` | V0.2 : `IFixableModule.Plan`, `PlannedChange` / `SettingWrite` / `SettingKey` / `SettingValue`, `FixEngine` (Apply, Verify, Revert), `FixContext`, journal (`FileJournalStore` + `WindowsDirectoryProtector`), `RestorePointCreator` + `WmiSystemRestore`, `FixProfile` |
 | `src/Maus.Core/Localization` | `Texts` : français = langue source, `T("…")` / `T("… {0}", args)`, `Optional(texte?)` pour les catalogues ; traductions `i18n/en.json` et `i18n/es.json` (embarquées) |
 | `src/Maus.Core/Preferences` | Choix de l'utilisateur (`preferences.json` protégé sous `%ProgramData%\MAUS\settings`) : profil Game Bar, alimentation du portable, constats « voulus » (liés à la valeur et à la langue), langue, moteur de recherche |

@@ -17,9 +17,9 @@
 
 ## Ce que fait MAUS
 
-- **Audit** de 16 domaines de Windows 11 (modifications risquées, réparation, mises à jour, confidentialité, alimentation, effets visuels, Game Bar, BIOS, carte graphique, mémoire, santé du matériel, démarrage, sécurité, écran, overclocking, atelier), résumé par un **score de santé** et les quatre familles **M·A·U·S**.
+- **Audit** de 19 domaines de Windows 11 (modifications risquées, réparation, mises à jour, confidentialité, alimentation, effets visuels, Game Bar, BIOS, carte graphique, mémoire, santé du matériel, démarrage, sécurité, écran, overclocking, atelier, périphériques, réseau, sauvegardes), résumé par un **score de santé** et les quatre familles **M·A·U·S**.
 - **Corrections réversibles**, choisies ligne par ligne ou par profil, avec point de restauration vérifié, journal des valeurs d'origine et bouton **Annuler** (séance entière ou une seule correction).
-- **Atelier matériel**, sans pilote : fiche d'identité du PC, jauges de sécurité (températures, tensions), mesures en direct, gestionnaire des tâches qui explique chaque processus, « Pourquoi mon PC est lent ? », tests du processeur, de la mémoire vive et de la mémoire vidéo avec arrêt automatique en cas de surchauffe.
+- **Atelier matériel**, sans pilote : fiche d'identité du PC, jauges de sécurité (températures, tensions), mesures en direct, gestionnaire des tâches qui explique chaque processus, « Pourquoi mon PC est lent ? », tests du processeur (dont un test cœur par cœur pour valider un Curve Optimizer ou un undervolt), de la mémoire vive et de la mémoire vidéo, avec arrêt automatique en cas de surchauffe.
 - **Rapport HTML** avant/après, à garder ou à imprimer.
 - **Trois langues** : français, anglais, espagnol.
 
@@ -62,7 +62,7 @@ L'application graphique (`src/Maus.App`) demande les droits administrateur au la
 | `src/Maus.Core/Fixes` | Corrections réversibles : journal, point de restauration vérifié, moteur Apply / Verify / Revert, profils |
 | `src/Maus.Core/Hardware` | Profil matériel commun (fixe ou portable, CPU, GPU) |
 | `src/Maus.Core/Rules` et `Catalog` | Règles de registre déclaratives en JSON |
-| `src/Maus.Core/Modules` | Un dossier par module de la fiche technique (M01 à M16) |
+| `src/Maus.Core/Modules` | Un dossier par module de la fiche technique (M01 à M19) |
 | `src/Maus.Core/Workshop` | Atelier matériel : inventaire, capteurs, processus, tests |
 | `src/Maus.Core/Localization` | Traductions (le français est la langue source) |
 | `src/Maus.Core/Reporting` | Score de santé, rapports texte, JSON et HTML |

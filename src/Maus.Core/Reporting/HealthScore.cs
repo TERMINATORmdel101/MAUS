@@ -38,6 +38,9 @@ public static class HealthScore
         ["M14"] = ModuleFamily.Maintenance,
         ["M15"] = ModuleFamily.Updates,
         ["M16"] = ModuleFamily.Maintenance,
+        ["M17"] = ModuleFamily.Maintenance,
+        ["M18"] = ModuleFamily.Maintenance,
+        ["M19"] = ModuleFamily.Security,
     };
 
     public static ModuleFamily FamilyOf(string moduleId) => Families.GetValueOrDefault(moduleId, ModuleFamily.Maintenance);
@@ -68,10 +71,10 @@ public static class HealthScore
             var findings = list.Where(r => FamilyOf(r.ModuleId) == family).SelectMany(r => r.Findings).ToList();
             var (letter, name, description) = family switch
             {
-                ModuleFamily.Maintenance => ("M", T("Maintenance"), T("Démarrage, santé du matériel, effets visuels, alimentation, mémoire")),
+                ModuleFamily.Maintenance => ("M", T("Maintenance"), T("Démarrage, santé du matériel, périphériques, réseau, alimentation, mémoire")),
                 ModuleFamily.Audit => ("A", T("Audit"), T("Modifications risquées faites par des scripts ou des logiciels")),
                 ModuleFamily.Updates => ("U", T("Mises à jour"), T("Windows Update, pilote graphique, BIOS et microcode")),
-                _ => ("S", T("Sécurité"), T("Protections du processeur, intégrité de la mémoire, confidentialité")),
+                _ => ("S", T("Sécurité"), T("Protections du processeur, intégrité de la mémoire, confidentialité, sauvegardes")),
             };
             return new FamilySummary(family, letter, name, description,
                 findings.Count(f => f.Status == FindingStatus.Problem),
