@@ -104,6 +104,11 @@ public class MemoryDetailsTests
         U16(b, p + 19, 32000);
         U16(b, p + 21, 44667);
         U16(b, p + 25, 295);
+        U16(b, p + 31, 5000);
+        b[p + 33] = 8;
+        U16(b, p + 52, 13333);
+        b[p + 54] = 32;
+        Crc(b.AsSpan(p, 62), b, p + 62);
 
         "EXPO"u8.ToArray().CopyTo(b, 832);
         b[836] = 0x10;
@@ -120,14 +125,17 @@ public class MemoryDetailsTests
         U16(b, e + 14, 37000);
         U16(b, e + 24, 4000);
         U16(b, e + 32, 13333);
+        Crc(b.AsSpan(832, 126), b, 958);
         return b;
     }
 
     private static void U16(byte[] b, int offset, int value) => BinaryPrimitives.WriteUInt16LittleEndian(b.AsSpan(offset), (ushort)value);
 
-    private static void Crc(byte[] b, int length, int at)
+    private static void Crc(byte[] b, int length, int at) => Crc(b.AsSpan(0, length), b, at);
+
+    private static void Crc(ReadOnlySpan<byte> covered, byte[] b, int at)
     {
-        var crc = SpdDecoder.Crc16(b.AsSpan(0, length));
+        var crc = SpdDecoder.Crc16(covered);
         b[at] = (byte)crc;
         b[at + 1] = (byte)(crc >> 8);
     }
@@ -187,12 +195,30 @@ public class MemoryDetailsTests
         Assert.Equal("Gaming", xmp.Name);
         Assert.Equal("36-38-38-96", xmp.Summary);
         Assert.Equal((1.35, 1.35, 1.8), (xmp.Vdd!.Value, xmp.Vddq!.Value, xmp.Vpp!.Value));
+        Assert.True(xmp.ChecksumOk);
+        Assert.Equal(15, Clocks(xmp, "tRRDL"));
+        Assert.Equal(40, Clocks(xmp, "tFAW"));
 
         var expo = module.Profiles.Single(p => p.Kind == ProfileKind.Expo);
         Assert.Equal("30-36-36-75", expo.Summary);
         Assert.Equal(1.4, expo.Vdd);
         Assert.Equal(12, Clocks(expo, "tRRDL"));
         Assert.Equal(40, Clocks(expo, "tFAW"));
+        Assert.True(expo.ChecksumOk);
+    }
+
+    [Theory]
+    [InlineData(0x01, 1)]
+    [InlineData(0x03, 1)]
+    [InlineData(0x11, 2)]
+    public void Expo_profile_two_is_enabled_by_bit_four(byte enableBits, int expected)
+    {
+        var bytes = Ddr5Kit();
+        bytes[837] = enableBits;
+        U16(bytes, 882 + 4, 312);
+        U16(bytes, 882 + 6, 10000);
+
+        Assert.Equal(expected, SpdDecoder.Decode(new SpdImage(0, bytes))!.Profiles.Count(p => p.Kind == ProfileKind.Expo));
     }
 
     [Fact]

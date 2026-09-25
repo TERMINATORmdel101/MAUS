@@ -55,7 +55,8 @@ public sealed class SessionRecording(DateTimeOffset start)
         var n = _samples.Count;
 
         var cpuTemps = _samples.Select(s => s.CpuTemperatureC).ToList();
-        if (cpuTemps.Any(t => t is not null) && cpuMaxC is { } max)
+        var chipLimit = _samples.Select(s => s.CpuTjMaxC).FirstOrDefault(t => t is not null);
+        if (cpuTemps.Any(t => t is not null) && (chipLimit ?? cpuMaxC) is { } max)
         {
             var hot = Share(cpuTemps.Select(t => t is { } v ? v >= max - 3 : (bool?)null));
             if (hot >= 10)

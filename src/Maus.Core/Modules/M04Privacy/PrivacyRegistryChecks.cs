@@ -267,7 +267,7 @@ internal static class PrivacyRegistryChecks
             var explanation = T("Ce que vous tapez dans la recherche de Windows part vers Bing pour afficher des résultats web. " +
                 "Les couper garde la recherche sur le PC : elle est plus rapide et plus discrète.");
             var advice = T("Couper « Recherches sur le web » dans Paramètres > Confidentialité et sécurité > Rechercher (mise à jour KB5120998, déployée progressivement). " +
-                "Sinon, MAUS pourra poser la stratégie DisableSearchBoxSuggestions, dont l'effet sur le web reste à vérifier.");
+                "Sinon, MAUS peut poser la stratégie DisableSearchBoxSuggestions, qui coupe les suggestions web selon la presse spécialisée (Tom's Hardware, Pureinfotech).");
 
             if (suggestionsOff || connectedOff)
             {

@@ -113,8 +113,8 @@ internal static class PrivacyPlanner
         if (Deviates("M04.web-search"))
         {
             Add("M04.web-search", T("Couper les suggestions web de la recherche (stratégie DisableSearchBoxSuggestions)"),
-                T("Pose la stratégie qui coupe les suggestions de la zone de recherche. Microsoft ne la documente que pour l'historique de l'Explorateur : " +
-                "son effet sur les résultats web est à vérifier. L'interrupteur « Recherches sur le web » de Paramètres reste la méthode préférée."),
+                T("Pose la stratégie qui coupe les suggestions de la zone de recherche. Microsoft ne la documente que pour l'historique de l'Explorateur ; " +
+                "son effet sur les résultats web est rapporté par la presse spécialisée (Tom's Hardware, Pureinfotech). L'interrupteur « Recherches sur le web » de Paramètres reste la méthode préférée."),
                 Search,
                 [Hkcu(ExplorerPolicy, "DisableSearchBoxSuggestions", 1)],
                 c => c with

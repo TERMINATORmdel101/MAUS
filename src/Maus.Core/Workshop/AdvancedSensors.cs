@@ -84,9 +84,31 @@ public static class AdvancedReadings
     /// <summary>Température interne du processeur : Tctl/Tdie (AMD), boîtier (Intel), sinon la plus haute des sondes du processeur.</summary>
     public static double? CpuTemperature(IReadOnlyList<HardwareReading> readings)
     {
-        var cpu = readings.Where(r => r.Group == ReadingGroup.Cpu && r.Kind == ReadingKind.Temperature && r.Value is > 0 and < 150).ToList();
+        var cpu = readings.Where(r => r.Group == ReadingGroup.Cpu && r.Kind == ReadingKind.Temperature && r.Value is > 0 and < 150
+            && !r.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)).ToList();
         return Named(cpu, "Core (Tctl/Tdie)", "Core (Tctl)", "Core (Tdie)", "CPU Package", "Package", "Core Max")
             ?? (cpu.Count > 0 ? cpu.Max(r => r.Value) : null);
+    }
+
+    /// <summary>
+    /// Limite de température lue dans le processeur (Intel : registre TjMax, exposé par LibreHardwareMonitor comme
+    /// « Distance to TjMax ») : température d'un cœur + distance à la limite. <c>null</c> si le processeur ne la donne pas.
+    /// </summary>
+    public static int? CpuTjMax(IReadOnlyList<HardwareReading> readings)
+    {
+        const string suffix = " Distance to TjMax";
+        var cpu = readings.Where(r => r.Group == ReadingGroup.Cpu && r.Kind == ReadingKind.Temperature).ToList();
+        foreach (var distance in cpu.Where(r => r.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
+        {
+            var core = distance.Name[..^suffix.Length];
+            if (cpu.FirstOrDefault(r => r.Name.Equals(core, StringComparison.OrdinalIgnoreCase)) is { } temperature
+                && (int)Math.Round(temperature.Value + distance.Value) is var tj and >= 70 and <= 115)
+            {
+                return tj;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Puissance consommée par le processeur (boîtier), en watts.</summary>
@@ -138,6 +160,7 @@ public sealed class CombinedSensorSource(ISensorSource basic, IAdvancedSensors a
             CpuTemperatureC = AdvancedReadings.CpuTemperature(readings),
             CpuPowerWatts = AdvancedReadings.CpuPower(readings),
             CpuVoltage = AdvancedReadings.CpuVoltage(readings),
+            CpuTjMaxC = AdvancedReadings.CpuTjMax(readings),
             Readings = readings,
         };
     }

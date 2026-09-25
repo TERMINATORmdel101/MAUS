@@ -5,9 +5,11 @@ namespace Maus.Core.Workshop.Memory;
 
 /// <summary>
 /// Décodage de la puce SPD des barrettes DDR4 (JESD21-C annexe L) et DDR5 (JESD400-5), avec les profils Intel XMP 2.0 / 3.0
-/// et AMD EXPO. Emplacements des octets recoupés avec memtest86+ (<c>system/spd.c</c>) et ZenStates-Core
-/// (<c>Ddr5SpdDecoder.cs</c>) ; les timings secondaires DDR5 (octets 70 à 93) et ceux des profils EXPO sont « à vérifier »
-/// sur de vraies barrettes, et ne sont affichés que s'ils sont vraisemblables.
+/// et AMD EXPO. Chaque emplacement d'octet est recoupé avec au moins une source ouverte (relevé du 25/09/2026) :
+/// memtest86+ (<c>system/spd.c</c>, GPL-2.0), ZenStates-Core (<c>Ddr5SpdDecoder.cs</c>, GPL-3.0), spdr
+/// (<c>timing.rs</c> et <c>vendor.rs</c>, Apache-2.0 : timings DDR5 des octets 70 à 93, en-têtes XMP 3.0 et EXPO),
+/// DDR5SPDEditor (<c>ddr5spd_structs.h</c>, GPL-3.0 : profils XMP 3.0 et EXPO complets, bits d'activation) et
+/// DDR4XMPEditor (<c>XMP.cs</c> : profils XMP 2.0 complets). Rien n'est deviné : un champ sans source n'est pas lu.
 /// </summary>
 public static class SpdDecoder
 {
@@ -151,9 +153,12 @@ public static class SpdDecoder
             Rrdl = b[p + 23] * Mtb + (sbyte)b[p + 32] * Ftb,
         };
 
-        // Tension : bit 7 = volts entiers, bits 6:0 = centièmes (1,35 V = 0xA3).
+        // Tension : bit 7 = volts entiers, bits 6:0 = centièmes (1,35 V = 0xA3), comme DDR4XMPEditor.
         var voltage = ((b[p] >> 7) & 1) + (b[p] & 0x7F) / 100.0;
-        return timings.ToProfile(ProfileKind.Xmp, number, version, null, Ddr4ClList(b, p + 4), voltage is > 0.9 and < 2.0 ? voltage : null, null, null);
+        // Latences CAS d'un profil XMP : 3 octets seulement (CL 7 à 30), l'octet suivant n'est pas documenté.
+        var xmpCl = b[p + 4] | (b[p + 5] << 8) | (b[p + 6] << 16);
+        var cls = Enumerable.Range(0, 24).Where(bit => (xmpCl & (1 << bit)) != 0).Select(bit => 7 + bit).ToList();
+        return timings.ToProfile(ProfileKind.Xmp, number, version, null, cls, voltage is > 0.9 and < 2.0 ? voltage : null, null, null);
     }
 
     private static List<int> Ddr4ClList(byte[] b, int offset)
@@ -283,7 +288,8 @@ public static class SpdDecoder
             var version = $"{b[836] >> 4}.{b[836] & 0x0F}";
             for (var n = 1; n <= 2; n++)
             {
-                if ((b[837] & (1 << (n - 1))) != 0
+                // Bits d'activation EXPO : profil 1 = bit 0, profil 2 = bit 4 (DDR5SPDEditor).
+                if ((b[837] & (1 << (n == 1 ? 0 : 4))) != 0
                     && Ddr5Profile(b, ProfileKind.Expo, n, version, null, 842 + (40 * (n - 1)), vppAt: 2, vddAt: 0, vddqAt: 1, tckAt: 4) is { } expo)
                 {
                     profiles.Add(expo);
@@ -342,7 +348,7 @@ public static class SpdDecoder
         var cycle = 2000.0 / speed;
         var timings = Ddr5Core(b, 30, cycle);
 
-        // Timings secondaires JEDEC (octets 70 à 93) : durée minimale en ps puis plancher en cycles (à vérifier).
+        // Timings secondaires JEDEC (octets 70 à 93, confirmés par spdr) : durée minimale en ps puis plancher en cycles.
         void Secondary(string key, int offset)
         {
             var ps = U16(b, offset);
@@ -375,9 +381,21 @@ public static class SpdDecoder
         var speed = (int)Math.Round(2_000_000.0 / tckPs / 100) * 100;
         var cycle = 2000.0 / speed;
         var timings = Ddr5Core(b, p + tckAt + (kind == ProfileKind.Xmp ? 8 : 2), cycle);
-        if (kind == ProfileKind.Expo)
+        if (kind == ProfileKind.Xmp)
         {
-            // Fin du profil EXPO : tRRD_L, tCCD_L, tCCD_L_WR, tCCD_L_WR2, tFAW, tCCD_L_WTR, tCCD_S_WTR, tRTP en ps (à vérifier).
+            // Profil XMP 3.0 (64 octets, DDR5SPDEditor) : durée en ps puis plancher en cycles, à partir de +31.
+            foreach (var (key, at) in new[] { ("tRRDL", 31), ("tCCDL_WR", 34), ("tCCDL_WR2", 37), ("tWTRL", 40), ("tWTRS", 43), ("tCCDL", 46), ("tRTP", 49), ("tFAW", 52) })
+            {
+                var ps = U16(b, p + at);
+                if (ps is > 0 and < 100_000)
+                {
+                    timings.Add(new MemoryTiming(key, TimingGroup.Secondary, Math.Max(Clocks(ps / 1000.0, cycle), b[p + at + 2])));
+                }
+            }
+        }
+        else
+        {
+            // Fin du profil EXPO (DDR5SPDEditor) : tRRD_L, tCCD_L, tCCD_L_WR, tCCD_L_WR2, tFAW, tCCD_L_WTR, tCCD_S_WTR, tRTP en ps.
             string[] keys = ["tRRDL", "tCCDL", "tCCDL_WR", "tCCDL_WR2", "tFAW", "tWTRL", "tWTRS", "tRTP"];
             for (var i = 0; i < keys.Length; i++)
             {
@@ -392,7 +410,14 @@ public static class SpdDecoder
         var cls = kind == ProfileKind.Xmp
             ? Enumerable.Range(0, 40).Where(bit => (b[p + 7 + (bit / 8)] & (1 << (bit % 8))) != 0).Select(bit => 20 + (2 * bit)).ToList()
             : [];
-        return new SpdProfile(kind, number, version, name, speed, tckPs / 1000.0, cls, timings, Volts(b[p + vddAt]), Volts(b[p + vddqAt]), Volts(b[p + vppAt]));
+        // Somme de contrôle : 2 derniers octets de chaque profil XMP, ou du bloc EXPO entier (832 à 959).
+        var checksum = kind == ProfileKind.Xmp
+            ? Crc16(b.AsSpan(p, 62)) == U16(b, p + 62)
+            : Crc16(b.AsSpan(832, 126)) == U16(b, 958);
+        return new SpdProfile(kind, number, version, name, speed, tckPs / 1000.0, cls, timings, Volts(b[p + vddAt]), Volts(b[p + vddqAt]), Volts(b[p + vppAt]))
+        {
+            ChecksumOk = checksum,
+        };
     }
 
     /// <summary>tAA, tRCD, tRP, tRAS, tRC, tWR (ps) puis tRFC1, tRFC2, tRFCsb (ns), dans cet ordre à partir de <paramref name="offset"/>.</summary>
@@ -421,7 +446,7 @@ public static class SpdDecoder
     /// <summary>Fréquence DDR5 : palier JEDEC le plus proche (multiples de 400, puis de 200 au-delà de 6400).</summary>
     internal static int Ddr5Speed(int tckPs) => tckPs <= 0 ? 0 : (int)Math.Round(2_000_000.0 / tckPs / 200) * 200;
 
-    /// <summary>Tension XMP 3.0 / EXPO : bits 7:5 = volts entiers, bits 4:0 = pas de 50 mV.</summary>
+    /// <summary>Tension XMP 3.0 / EXPO : bits 7:5 = volts entiers, bits 4:0 = pas de 50 mV (DDR5SPDEditor, <c>ConvertByteToVoltageDDR5</c>).</summary>
     private static double? Volts(byte code)
     {
         var volts = ((code >> 5) & 0x07) + ((code & 0x1F) * 0.05);

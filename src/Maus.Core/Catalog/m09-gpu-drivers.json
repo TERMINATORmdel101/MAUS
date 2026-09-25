@@ -12,7 +12,7 @@
       "namePattern": "GTX\\s*(745|750|8[56]0M|9\\d\\d)|GTX\\s*10[5-8]0|GT\\s*1030|GeForce\\s*9[2-4]0MX?\\b|MX\\s*[123]\\d0\\b|TITAN\\s*(X|Xp|V)\\b|Quadro\\s*(M|P|GV)\\d",
       "scheme": "NvidiaMarketing",
       "latestVersion": "582.66",
-      "releasedOn": "2026-06-17",
+      "releasedOn": "2026-06-16",
       "downloadUrl": "https://www.nvidia.com/fr-fr/drivers/",
       "note": "Mises à jour de sécurité trimestrielles seulement, sans optimisation pour les nouveaux jeux."
     },

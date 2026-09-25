@@ -1,3 +1,4 @@
+using System.Text;
 using Maus.Core.Platform;
 
 namespace Maus.Core.Tests.Platform;
@@ -58,5 +59,16 @@ public class ReadOnlyCommandRunnerTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             runner.RunAsync(@"C:\Users\Alex\AppData\Local\Microsoft\WindowsApps\winget.exe", ["upgrade"], TimeSpan.FromSeconds(5), CancellationToken.None));
+    }
+
+    [Fact]
+    public void Output_is_decoded_as_utf8_when_valid_utf16_with_marker_otherwise_oem()
+    {
+        const string text = "Nom  Version disponible  Écran";
+        var latin1 = Encoding.Latin1;
+
+        Assert.Equal(text, ReadOnlyCommandRunner.DecodeOutput(Encoding.UTF8.GetBytes(text), latin1));
+        Assert.Equal(text, ReadOnlyCommandRunner.DecodeOutput([0xFF, 0xFE, .. Encoding.Unicode.GetBytes(text)], latin1));
+        Assert.Equal(text, ReadOnlyCommandRunner.DecodeOutput(latin1.GetBytes(text), latin1));
     }
 }

@@ -24,7 +24,7 @@ public static partial class Winget
 {
     public const string PackageName = "Microsoft.DesktopAppInstaller";
 
-    /// <summary>Codes de winget signifiant « rien à mettre à jour » (APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND, UPDATE_NOT_APPLICABLE ; à vérifier).</summary>
+    /// <summary>Codes de winget signifiant « rien à mettre à jour » : APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND et UPDATE_NOT_APPLICABLE (winget-cli, doc/windows/package-manager/winget/returnCodes.md).</summary>
     internal const int NoPackageFound = unchecked((int)0x8A150014);
     internal const int NoApplicableUpdate = unchecked((int)0x8A15002B);
 

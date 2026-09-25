@@ -19,14 +19,25 @@ public class WorkshopModuleTests
     [Theory]
     [InlineData(1350u, FindingStatus.Ok)]
     [InlineData(1450u, FindingStatus.Warning)]
-    [InlineData(1550u, FindingStatus.Problem)]
-    public async Task Ddr5_voltage_is_classified_against_the_safety_limits(uint millivolts, FindingStatus expected)
+    [InlineData(1550u, FindingStatus.Warning)]
+    public async Task Ddr5_voltage_is_classified_against_the_published_limit_only(uint millivolts, FindingStatus expected)
     {
         var findings = await Run(new FakeCim().Answer(HardwareInventoryReader.MemoryQuery, Dimm(millivolts)));
 
         var voltage = findings.Single(f => f.Id == "M16.memory-voltage");
         Assert.Equal(expected, voltage.Status);
         Assert.Contains("DDR5", voltage.Current, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(1450u, FindingStatus.Ok)]
+    [InlineData(1480u, FindingStatus.Warning)]
+    [InlineData(1550u, FindingStatus.Problem)]
+    public async Task Ddr4_voltage_follows_the_jedec_absolute_maximum(uint millivolts, FindingStatus expected)
+    {
+        var findings = await Run(new FakeCim().Answer(HardwareInventoryReader.MemoryQuery, Dimm(millivolts, type: 26)));
+
+        Assert.Equal(expected, findings.Single(f => f.Id == "M16.memory-voltage").Status);
     }
 
     [Fact]

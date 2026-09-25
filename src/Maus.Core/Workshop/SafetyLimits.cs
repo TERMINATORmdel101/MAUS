@@ -3,7 +3,8 @@ using Maus.Core.Rules;
 
 namespace Maus.Core.Workshop;
 
-public sealed record MemoryVoltageLimit(int Generation, int NominalMv, int ElevatedAboveMv, int DangerAboveMv, string Source);
+/// <summary>Repères de tension d'une génération de RAM ; <see cref="DangerAboveMv"/> est absent quand aucune source n'en publie.</summary>
+public sealed record MemoryVoltageLimit(int Generation, int NominalMv, int ElevatedAboveMv, int? DangerAboveMv, string Source);
 
 public sealed record CpuTemperatureLimit(string Pattern, int MaxC, string Source);
 

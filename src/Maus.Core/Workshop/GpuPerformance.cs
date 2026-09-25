@@ -6,7 +6,7 @@ namespace Maus.Core.Workshop;
 internal sealed record GpuPerformanceData(string Name, double? TemperatureC, int? FanRpm, double? PowerPercent);
 
 /// <summary>
-/// <c>D3DKMTQueryAdapterInfo</c> avec <c>KMTQAITYPE_ADAPTERPERFDATA</c> (62, à vérifier sur chaque marque) et
+/// <c>D3DKMTQueryAdapterInfo</c> avec <c>KMTQAITYPE_ADAPTERPERFDATA</c> (62 dans d3dkmthk.h ; les champs remplis dépendent du pilote de chaque marque) et
 /// <c>KMTQAITYPE_ADAPTERREGISTRYINFO</c> (8) pour le nom. Structures « réservées au système » : toute erreur donne une liste vide.
 /// </summary>
 internal static unsafe partial class GpuPerformance

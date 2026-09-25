@@ -130,7 +130,7 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
         if (Deviates("M01.wu-pause", out var pause))
         {
             Add(pause, T("Reprendre les mises à jour"),
-                T("Supprime la pause en cours et la durée de pause allongée. Noms des valeurs relevés sur Windows 11 (à vérifier selon les builds)."),
+                T("Supprime la pause en cours et la durée de pause allongée (valeurs de la clé WindowsUpdate\\UX\\Settings lues par Paramètres)."),
                 PauseValues.Select(name => Delete(WuUxSettingsKey, name)));
         }
 

@@ -38,6 +38,11 @@ public static class MemoryDetails
                     {
                         notes.Add(T("Barrette {0} : somme de contrôle SPD incorrecte, valeurs à prendre avec prudence (lecture perturbée ou SPD modifiée).", module.Slot + 1));
                     }
+
+                    foreach (var profile in module.Profiles.Where(p => p.ChecksumOk == false))
+                    {
+                        notes.Add(T("Barrette {0}, {1} : somme de contrôle du profil incorrecte, valeurs à prendre avec prudence.", module.Slot + 1, ProfileName(profile)));
+                    }
                 }
             }
         }

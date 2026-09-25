@@ -711,9 +711,10 @@ public sealed class WindowsHealthModule : IAuditModule
                 ImageHealth.Repairable => T("Réparez avec les outils officiels de Microsoft : onglet Corrections, « Réparer les fichiers de Windows » "
                     + "(DISM /RestoreHealth puis SFC /scannow, 10 à 30 minutes, connexion Internet conseillée). Vos fichiers et réglages ne sont pas touchés."),
                 _ => T("DISM ne peut pas réparer cette copie : une réinstallation sur place de Windows (elle garde fichiers, "
-                    + "applications et réglages) est la solution. Paramètres > Système > Récupération propose « Résoudre les problèmes "
-                    + "à l'aide de Windows Update » sur les versions récentes (à vérifier), sinon l'Assistant d'installation de Windows 11 "
-                    + "sur le site de Microsoft. Sauvegardez d'abord vos fichiers."),
+                    + "applications et réglages) est la solution. Paramètres > Système > Récupération propose de réinstaller la version "
+                    + "actuelle de Windows par Windows Update (« Fix problems using Windows Update », Windows 11 22H2 et plus récent, "
+                    + "mise à jour de février 2024 installée) ; sinon, l'Assistant d'installation de Windows 11 sur le site de Microsoft. "
+                    + "Sauvegardez d'abord vos fichiers."),
             },
         };
     }

@@ -105,4 +105,42 @@ public class AdvancedSensorsTests
         Assert.Contains($"\"{winget}\" uninstall --id namazso.PawnIO --exact --source winget", PawnIo.UninstallConsoleArguments(winget), StringComparison.Ordinal);
         Assert.StartsWith("/s /k \"", PawnIo.InstallConsoleArguments(winget), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Intel_limit_is_read_from_the_chip()
+    {
+        IReadOnlyList<HardwareReading> readings =
+        [
+            Cpu("CPU Core #1", ReadingKind.Temperature, 62),
+            Cpu("CPU Core #1 Distance to TjMax", ReadingKind.Temperature, 43),
+            Cpu("CPU Package", ReadingKind.Temperature, 64),
+        ];
+
+        Assert.Equal(105, AdvancedReadings.CpuTjMax(readings));
+        Assert.Equal(64, AdvancedReadings.CpuTemperature(readings));
+        Assert.Null(AdvancedReadings.CpuTjMax([Cpu("Core (Tctl/Tdie)", ReadingKind.Temperature, 70)]));
+    }
+
+    [Fact]
+    public void Unknown_limit_raises_no_invented_alarm_but_the_chip_limit_wins()
+    {
+        var hot = new SensorSnapshot { At = DateTimeOffset.Now, CpuTemperatureC = 99 };
+
+        Assert.Empty(SensorAlarms.Check(hot));
+        Assert.Equal(AlarmLevel.Attention, SensorAlarms.Check(hot with { CpuTjMaxC = 100 }, cpuMaxC: 89).Single().Level);
+    }
+
+    [Theory]
+    [InlineData("AMD Ryzen 7 9800X3D 8-Core Processor", 95)]
+    [InlineData("AMD Ryzen 9 9950X3D 16-Core Processor", 95)]
+    [InlineData("AMD Ryzen 7 7800X3D 8-Core Processor", 89)]
+    [InlineData("AMD Ryzen 9 7950X 16-Core Processor", 95)]
+    [InlineData("AMD Ryzen 5 5600X 6-Core Processor", 95)]
+    [InlineData("AMD Ryzen 7 5800X3D 8-Core Processor", 90)]
+    [InlineData("Intel(R) Core(TM) Ultra 9 285K", 105)]
+    [InlineData("AMD Ryzen 9 5900X 12-Core Processor", null)]
+    [InlineData("13th Gen Intel(R) Core(TM) i9-13900K", null)]
+    [InlineData("AMD Ryzen 7 7840HS w/ Radeon 780M Graphics", null)]
+    public void Only_verified_models_have_a_catalog_limit(string cpu, int? expected) =>
+        Assert.Equal(expected, SafetyLimits.Load().ForCpu(cpu)?.MaxC);
 }

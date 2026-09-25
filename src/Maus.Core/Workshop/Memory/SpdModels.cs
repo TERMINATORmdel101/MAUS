@@ -39,6 +39,9 @@ public sealed record SpdProfile(
 {
     private static readonly string[] SummaryKeys = ["tCL", "tRCD", "tRP", "tRAS"];
 
+    /// <summary>Somme de contrôle du profil (XMP 3.0 et EXPO) ; <c>null</c> quand le format n'en prévoit pas.</summary>
+    public bool? ChecksumOk { get; init; }
+
     /// <summary>Latence réelle d'accès en nanosecondes (CL × durée d'un cycle) : le bon moyen de comparer deux kits.</summary>
     public double? TrueLatencyNs => Timings.FirstOrDefault(t => t.Key == "tCL")?.Clocks is { } cl ? cl * 2000.0 / SpeedMts : null;
 

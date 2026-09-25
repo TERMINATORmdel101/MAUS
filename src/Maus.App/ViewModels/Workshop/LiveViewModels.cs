@@ -125,7 +125,7 @@ public sealed class LiveViewModel : ObservableObject
     {
         _history.Add(snapshot);
         Cpu.Update(Percent(snapshot.CpuPercent), snapshot.CpuMhz is { } mhz ? (mhz / 1000).ToString("0.00 ", Culture) + "GHz" : string.Empty, _history.Series(s => s.CpuPercent));
-        var cpuMax = CpuMaxC ?? 100;
+        var cpuMax = snapshot.CpuTjMaxC ?? CpuMaxC;
         var details = new List<string>();
         if (snapshot.CpuVoltage is { } volts)
         {
@@ -141,8 +141,8 @@ public sealed class LiveViewModel : ObservableObject
             snapshot.CpuTemperatureC is { } cpuC ? $"{cpuC:0} °C" : "—",
             snapshot.CpuTemperatureC is null ? T("pilote PawnIO requis") : string.Join(" · ", details),
             _history.Series(s => s.CpuTemperatureC),
-            snapshot.CpuTemperatureC is { } cpuValue
-                ? new GaugeInfo(T("Température"), 20, cpuMax + 10, cpuMax - 10, cpuMax, cpuValue, T("limite du fabricant : {0} °C", cpuMax))
+            snapshot.CpuTemperatureC is { } cpuValue && cpuMax is { } limit
+                ? new GaugeInfo(T("Température"), 20, limit + 10, limit - 10, limit, cpuValue, T("limite du fabricant : {0} °C", limit))
                 : null);
         Memory.Update(snapshot.MemoryUsedBytes is { } used ? Gb(used) : "—", snapshot.MemoryTotalBytes is { } total ? "/ " + Gb(total) : string.Empty, _history.Series(s => s.MemoryPercent));
 

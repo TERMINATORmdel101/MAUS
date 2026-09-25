@@ -1,28 +1,29 @@
-// Seuils de sécurité de l'atelier matériel (Module 16). Chaque ligne cite sa source.
-// Les seuils « élevée » et « dangereuse » de la RAM sont des valeurs prudentes de MAUS, à vérifier et à sourcer.
+// Seuils de sécurité de l'atelier matériel (Module 16). Chaque valeur cite sa source publiée (relevé du 25/09/2026).
+// Pas de source = pas de seuil : MAUS n'invente aucune limite. Avec PawnIO, les processeurs Intel donnent eux-mêmes leur limite (TjMax).
 {
   "memoryVoltage": [
     {
       "generation": 4,
       "nominalMv": 1200,
-      "elevatedAboveMv": 1400,
-      "dangerAboveMv": 1550,
-      "source": "JEDEC DDR4 : 1,2 V nominal ; profils XMP courants : 1,35 V. Seuils de MAUS (à vérifier)."
+      "elevatedAboveMv": 1450,
+      "dangerAboveMv": 1500,
+      "source": "JEDEC JESD79-4 : 1,2 V nominal, 1,50 V maximum absolu ; dégradation rapportée au-delà de 1,45 V sur certaines puces (guide d'overclocking MemTestHelper, github.com/integralfx/MemTestHelper)."
     },
     {
       "generation": 5,
       "nominalMv": 1100,
       "elevatedAboveMv": 1400,
-      "dangerAboveMv": 1500,
-      "source": "JEDEC DDR5 : 1,1 V nominal ; profils XMP/EXPO courants : 1,25 à 1,40 V. Seuils de MAUS (à vérifier)."
+      "source": "JEDEC : 1,1 V nominal ; 1,4 V maximum absolu en continu selon Samsung (Tom's Hardware, « How to Overclock DDR5 RAM »). Aucun seuil « dangereux » publié : MAUS n'en fixe pas."
     }
   ],
   "cpuMaxTemperature": [
-    { "pattern": "Ryzen [579] [79]\\d00X3D", "maxC": 89, "source": "Fiches AMD des Ryzen 7000X3D (à vérifier)" },
-    { "pattern": "Ryzen [3579] 9\\d{3}", "maxC": 95, "source": "Fiches AMD des Ryzen 9000 (à vérifier)" },
-    { "pattern": "Ryzen [3579] 7\\d{3}", "maxC": 95, "source": "Fiches AMD des Ryzen 7000 (à vérifier)" },
-    { "pattern": "Ryzen [3579] 5\\d{3}", "maxC": 90, "source": "Fiches AMD des Ryzen 5000 (à vérifier)" },
-    { "pattern": "(1[2-4]th Gen Intel|Core\\(TM\\) Ultra)", "maxC": 100, "source": "Fiches Intel (TJUNCTION), Core 12e à 14e génération et Core Ultra (à vérifier)" }
+    { "pattern": "Ryzen [79] 7(800|900|950)X3D\\b", "maxC": 89, "source": "AMD : Ryzen 7000X3D, 89 °C (wccftech.com, « Ryzen 7000 X3D CPUs have a 6C lower Tjmax of 89C »)" },
+    { "pattern": "Ryzen [579] 7(600|700|900|950)X?\\b", "maxC": 95, "source": "AMD : Ryzen 7000 de bureau sans 3D V-Cache, 95 °C (wccftech.com, même article)" },
+    { "pattern": "Ryzen [579] 9(600|700|800|900|950)X?(3D)?\\b", "maxC": 95, "source": "AMD : Ryzen 9000 de bureau, 95 °C (amd.com, fiches 9800X3D et 9950X ; TechPowerUp : cible thermique de 95 °C pour Zen 4 et Zen 5)" },
+    { "pattern": "Ryzen 5 5600X\\b", "maxC": 95, "source": "AMD : Ryzen 5 5600X, 95 °C (amd.com)" },
+    { "pattern": "Ryzen (7 5700X|7 5800X|7 5800X3D|9 5950X)\\b", "maxC": 90, "source": "AMD : Ryzen 7 5700X, 5800X, 5800X3D et Ryzen 9 5950X, 90 °C" },
+    { "pattern": "Core\\(TM\\) Ultra 9 285K\\b", "maxC": 105, "source": "Intel : Core Ultra 9 285K, 105 °C (TechPowerUp)" },
+    { "pattern": "Core\\(TM\\) i7-13700K\\b", "maxC": 100, "source": "Intel ARK : Core i7-13700K, TJUNCTION 100 °C" }
   ],
   "batteryWornBelowPercent": 80,
   "gpuIdleHotMarginC": 15

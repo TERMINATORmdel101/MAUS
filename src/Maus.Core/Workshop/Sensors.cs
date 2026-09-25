@@ -45,6 +45,9 @@ public sealed record SensorSnapshot
     /// <summary>Température interne du processeur (pilote PawnIO requis), sinon <c>null</c>.</summary>
     public double? CpuTemperatureC { get; init; }
 
+    /// <summary>Limite de température donnée par le processeur lui-même (Intel, pilote PawnIO requis).</summary>
+    public int? CpuTjMaxC { get; init; }
+
     /// <summary>Puissance du processeur en watts (pilote PawnIO requis).</summary>
     public double? CpuPowerWatts { get; init; }
 
@@ -108,11 +111,12 @@ public static class SensorAlarms
     public static IReadOnlyList<SensorAlarm> Check(SensorSnapshot snapshot, int? cpuMaxC = null)
     {
         var alarms = new List<SensorAlarm>();
-        if (snapshot.CpuTemperatureC is { } cpu)
+        // Limite : celle que donne le processeur, sinon celle du catalogue (modèles vérifiés) ; inconnue = pas d'alarme inventée
+        // (le processeur se protège de toute façon en ralentissant).
+        if (snapshot.CpuTemperatureC is { } cpu && (snapshot.CpuTjMaxC ?? cpuMaxC) is { } max)
         {
             // À sa limite, le processeur ralentit de lui-même pour se protéger ; certains modèles récents y montent
             // volontairement en pleine charge. Danger seulement au-delà (protection qui n'agit pas, ou sonde en défaut).
-            var max = cpuMaxC ?? 100;
             if (cpu >= max + 5)
             {
                 alarms.Add(new("cpu-hot", AlarmLevel.Danger,

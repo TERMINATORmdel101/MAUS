@@ -175,11 +175,11 @@ public sealed class WorkshopModule : IAuditModule
             Status = level == SafetyLevel.Normal ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(severity),
             Severity = severity,
             Current = T("{0} (DDR{1}, {2})", volts, limit.Generation, worst.Slot),
-            Expected = T("{0} nominal, jusqu'à {1} avec un profil XMP/EXPO courant", Volts(limit.NominalMv), Volts(limit.ElevatedAboveMv)),
+            Expected = T("{0} nominal ; repère : {1} au plus", Volts(limit.NominalMv), Volts(limit.ElevatedAboveMv)),
             Explanation = level switch
             {
-                SafetyLevel.Dangerous => T("Cette tension dépasse nettement ce que supportent les barrettes et le contrôleur mémoire au quotidien : risque d'usure prématurée et d'instabilité."),
-                SafetyLevel.Elevated => T("Cette tension est au-dessus des profils XMP/EXPO courants : c'est le signe d'un surcadençage manuel. Surveillez la stabilité et la température."),
+                SafetyLevel.Dangerous => T("Cette tension dépasse le maximum absolu de la norme : risque d'usure prématurée des barrettes et d'instabilité."),
+                SafetyLevel.Elevated => T("Cette tension dépasse le repère publié ci-dessous : c'est souvent le signe d'un surcadençage manuel, ou d'un kit très rapide. Surveillez la stabilité et la température."),
                 _ => T("La tension des barrettes est dans la plage normale."),
             } + " " + T("Source : {0}", limit.Source),
             Advice = level == SafetyLevel.Normal

@@ -13,7 +13,7 @@ public sealed class WmiSystemRestore(IRegistryReader registry) : ISystemRestore
     private const uint ModifySettings = 12;
     private const uint BeginSystemChange = 100;
 
-    /// <summary>Client « Protection du système » de VSS : liste des volumes protégés (à vérifier selon les builds).</summary>
+    /// <summary>Client « Protection du système » : liste des volumes protégés ; valeur absente quand la protection est coupée (tutoriel ElevenForum « Turn On or Off System Protection »).</summary>
     private const string SppClients = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients";
     private const string SystemRestoreClient = "{09F7EDC5-294E-4180-AF6A-FB0E6A0E9513}";
 

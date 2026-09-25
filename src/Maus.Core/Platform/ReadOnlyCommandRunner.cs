@@ -93,16 +93,17 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
             throw new InvalidOperationException(T("Commande refusée : winget doit être celui du dossier protégé des applications ({0}).", path));
         }
 
-        // winget écrit en UTF-8 quand sa sortie est redirigée (à vérifier) ; les outils classiques, dans la page de code OEM.
-        var oem = isWinget ? new UTF8Encoding(false) : Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
+        // Les outils classiques écrivent dans la page de code OEM. L'encodage de winget redirigé n'est pas documenté :
+        // sa sortie est lue en octets puis décodée par DecodeOutput (UTF-16 si marqueur, UTF-8 si valide, sinon OEM).
+        var oem = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
         var startInfo = new ProcessStartInfo(path)
         {
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
-            StandardOutputEncoding = oem,
-            StandardErrorEncoding = oem,
+            StandardOutputEncoding = isWinget ? Encoding.Latin1 : oem,
+            StandardErrorEncoding = isWinget ? Encoding.Latin1 : oem,
         };
         foreach (var argument in arguments)
         {
@@ -133,7 +134,40 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
             return new CommandResult(-1, string.Empty, string.Empty, TimedOut: true);
         }
 
-        return new CommandResult(process.ExitCode, await stdout.ConfigureAwait(false), await stderr.ConfigureAwait(false), TimedOut: false);
+        var output = await stdout.ConfigureAwait(false);
+        var errors = await stderr.ConfigureAwait(false);
+        if (isWinget)
+        {
+            // Latin-1 rend chaque octet tel quel : on retrouve les octets d'origine, puis on choisit l'encodage.
+            output = DecodeOutput(Encoding.Latin1.GetBytes(output), oem);
+            errors = DecodeOutput(Encoding.Latin1.GetBytes(errors), oem);
+        }
+
+        return new CommandResult(process.ExitCode, output, errors, TimedOut: false);
+    }
+
+    /// <summary>
+    /// Décode une sortie dont l'encodage n'est pas connu d'avance : UTF-16 si elle commence par son marqueur,
+    /// UTF-8 si les octets forment de l'UTF-8 valide, sinon la page de code donnée (OEM).
+    /// </summary>
+    public static string DecodeOutput(byte[] bytes, Encoding fallback)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(fallback);
+        if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+        {
+            return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+        }
+
+        var offset = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
+        try
+        {
+            return new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes, offset, bytes.Length - offset);
+        }
+        catch (DecoderFallbackException)
+        {
+            return fallback.GetString(bytes);
+        }
     }
 
     /// <summary>Les outils système sont cherchés dans System32 pour éviter un exécutable homonyme placé ailleurs.</summary>
