@@ -3,21 +3,38 @@ using Maus.Cli;
 using Maus.Core;
 using Maus.Core.Engine;
 using Maus.Core.Fixes;
+using Maus.Core.Platform;
+using Maus.Core.Preferences;
 using Maus.Core.Reporting;
 
 // MAUS en ligne de commande : audit en lecture seule, utile pour tester et comparer avant/après.
 //   maus                  audit complet, rapport texte
 //   maus --json           audit complet, rapport JSON
+//   maus --html FICHIER   audit complet, rapport HTML (avant/après si des corrections sont appliquées)
 //   maus --module M06     un seul module (répétable)
 // Corrections (V0.2, droits administrateur requis pour appliquer ou annuler) :
 //   maus --plan                       corrections proposées, sans rien modifier
-//   maus --apply ID [ID...]           applique les corrections choisies, après confirmation
+//   maus --apply ID [ID...]           applique les corrections choisies, après confirmation, puis vérifie par un nouvel audit
 //   maus --apply-recommended          applique les corrections recommandées (pré-cochées)
 //   maus --journal                    séances de corrections enregistrées
-//   maus --revert SEANCE [--force]    remet les valeurs d'origine d'une séance
+//   maus --revert SEANCE [--change ID] [--force]   remet les valeurs d'origine d'une séance, ou d'une seule correction
+//   maus --restart-explorer           redémarre l'Explorateur (corrections de la barre des tâches)
+// Choix de l'utilisateur (droits administrateur) :
+//   maus --ack ID / --unack ID        marque un constat « voulu » (ou retire la marque)
+//   maus --set gamebar=1|2|3|auto     profil Game Bar
+//   maus --set alimentation=performance|partout|autonomie|auto   choix du portable
+//   maus --prefs                      affiche vos choix
 Console.OutputEncoding = Encoding.UTF8;
 
-var json = args.Contains("--json", StringComparer.OrdinalIgnoreCase);
+bool Has(string flag) => args.Contains(flag, StringComparer.OrdinalIgnoreCase);
+
+string? ValueOf(string flag)
+{
+    var index = Array.FindIndex(args, a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
+    return index >= 0 && index + 1 < args.Length && !args[index + 1].StartsWith("--", StringComparison.Ordinal) ? args[index + 1] : null;
+}
+
+var json = Has("--json");
 var only = args
     .Select((arg, index) => (arg, index))
     .Where(x => x.arg.Equals("--module", StringComparison.OrdinalIgnoreCase) && x.index + 1 < args.Length)
@@ -26,25 +43,42 @@ var only = args
 
 if (args.Any(a => a is "-h" or "--help" or "/?"))
 {
-    Console.WriteLine("Usage : maus [--json] [--module Mxx]...");
+    Console.WriteLine("Usage : maus [--json | --html FICHIER] [--module Mxx]...");
     Console.WriteLine("Audit en lecture seule : MAUS ne modifie rien sur ce PC.");
     Console.WriteLine();
     Console.WriteLine("Corrections (droits administrateur requis pour appliquer ou annuler) :");
-    Console.WriteLine("  maus --plan [--module Mxx]             corrections proposées, sans rien modifier");
-    Console.WriteLine("  maus --apply ID [ID...]                applique les corrections choisies, après confirmation");
+    Console.WriteLine("  maus --plan [--module Mxx]              corrections proposées, sans rien modifier");
+    Console.WriteLine("  maus --apply ID [ID...]                 applique les corrections choisies, après confirmation");
     Console.WriteLine("  maus --apply-recommended [--module Mxx] applique les corrections recommandées");
-    Console.WriteLine("       [--without-restore-point] [--enable-protection] [--yes]");
-    Console.WriteLine("  maus --journal                         séances de corrections enregistrées");
-    Console.WriteLine("  maus --revert SEANCE [--force] [--yes] remet les valeurs d'origine d'une séance");
+    Console.WriteLine("       [--without-restore-point] [--enable-protection] [--yes] [--html FICHIER]");
+    Console.WriteLine("  maus --journal                          séances de corrections enregistrées");
+    Console.WriteLine("  maus --revert SEANCE [--change ID] [--force] [--yes]");
+    Console.WriteLine("                                          remet les valeurs d'origine (séance entière ou une correction)");
+    Console.WriteLine("  maus --restart-explorer                 redémarre l'Explorateur");
+    Console.WriteLine();
+    Console.WriteLine("Vos choix (droits administrateur) :");
+    Console.WriteLine("  maus --ack ID | --unack ID              marque un constat « voulu » (ou retire la marque)");
+    Console.WriteLine("  maus --set gamebar=1|2|3|auto           profil Game Bar");
+    Console.WriteLine("  maus --set alimentation=performance|partout|autonomie|auto");
+    Console.WriteLine("  maus --prefs                            affiche vos choix");
     return 0;
 }
 
-bool Has(string flag) => args.Contains(flag, StringComparer.OrdinalIgnoreCase);
+var preferencesStore = FilePreferencesStore.CreateDefault();
 
-string? ValueOf(string flag)
+if (Has("--prefs"))
 {
-    var index = Array.FindIndex(args, a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
-    return index >= 0 && index + 1 < args.Length && !args[index + 1].StartsWith("--", StringComparison.Ordinal) ? args[index + 1] : null;
+    return PreferenceCommands.Print(preferencesStore.Load(), Console.Out);
+}
+
+if (Has("--set"))
+{
+    return PreferenceCommands.Set(preferencesStore, ValueOf("--set"), Console.Out);
+}
+
+if (Has("--unack"))
+{
+    return PreferenceCommands.Unacknowledge(preferencesStore, ValueOf("--unack"), Console.Out);
 }
 
 if (Has("--journal"))
@@ -61,7 +95,20 @@ if (Has("--revert"))
     }
 
     var revertContext = FixContext.CreateDefault(AuditContext.CreateDefault());
-    return FixCommands.Revert(revertContext, sessionId, Has("--force"), Has("--yes"), Console.Out);
+    return FixCommands.Revert(revertContext, sessionId, ValueOf("--change"), Has("--force"), Has("--yes"), Console.Out);
+}
+
+if (Has("--restart-explorer"))
+{
+    Console.WriteLine(ExplorerRestart.Warning);
+    if (!Has("--yes") && !FixCommands.Confirm("Redémarrer l'Explorateur ? (o/N) "))
+    {
+        return 1;
+    }
+
+    var restart = await new ExplorerRestart(new WindowsShellProcesses(new WindowsRegistryReader())).RunAsync();
+    Console.WriteLine(restart.Message);
+    return restart.Succeeded ? 0 : 2;
 }
 
 var applyIds = args
@@ -70,6 +117,7 @@ var applyIds = args
     .TakeWhile(a => !a.StartsWith("--", StringComparison.Ordinal))
     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 var fixMode = Has("--plan") || Has("--apply") || Has("--apply-recommended");
+var htmlPath = ValueOf("--html");
 
 var engine = AuditEngine.CreateWithBuiltInModules();
 if (only.Count > 0)
@@ -85,6 +133,13 @@ Console.CancelKeyPress += (_, e) =>
 };
 
 var context = AuditContext.CreateDefault();
+
+if (Has("--ack"))
+{
+    var ackResults = await engine.RunAsync(context, cancellationToken: cancellation.Token);
+    return PreferenceCommands.Acknowledge(preferencesStore, context, ackResults, ValueOf("--ack"), Has("--yes"), Console.Out);
+}
+
 if (fixMode)
 {
     var audit = await engine.RunAsync(context, cancellationToken: cancellation.Token);
@@ -104,7 +159,30 @@ if (fixMode)
         EnableProtectionIfNeeded = Has("--enable-protection"),
         ProceedWithoutRestorePoint = Has("--without-restore-point"),
     };
-    return FixCommands.Apply(FixContext.CreateDefault(context), selected, options, Has("--yes"), Console.Out);
+    var fixContext = FixContext.CreateDefault(context);
+    var (exitCode, applied) = FixCommands.Apply(fixContext, selected, options, Has("--yes"), Console.Out);
+    if (applied is { Blocked: false, Session: { } session })
+    {
+        // Verify, second niveau : un nouvel audit relit l'état effectif.
+        var afterContext = AuditContext.CreateDefault();
+        var after = await engine.RunAsync(afterContext, cancellationToken: cancellation.Token);
+        var verified = FixVerification.CompareWithAudit(selected, applied, after, afterContext.Windows);
+        FixCommands.PrintVerification(verified, Console.Out);
+        new FixEngine(fixContext).RecordVerification(session.Id, verified);
+
+        if (htmlPath is not null)
+        {
+            WriteHtml(htmlPath, new HtmlReportInput
+            {
+                Before = AuditReport.Create(context, audit),
+                After = AuditReport.Create(afterContext, after),
+                Session = fixContext.Journal.Load(session.Id) ?? session,
+                Outcomes = verified,
+            });
+        }
+    }
+
+    return exitCode;
 }
 
 var progress = json ? null : new Progress<ModuleResult>(r => Console.Error.WriteLine($"  … {r.ModuleId} terminé ({r.Duration.TotalSeconds:0.0} s)"));
@@ -115,9 +193,19 @@ if (json)
 {
     Console.WriteLine(report.ToJson());
 }
+else if (htmlPath is not null)
+{
+    WriteHtml(htmlPath, new HtmlReportInput { After = report });
+}
 else
 {
     TextReport.Write(report, Console.Out, useColor: !Console.IsOutputRedirected);
 }
 
 return results.Any(r => r.WorstStatus == FindingStatus.Problem) ? 2 : 0;
+
+static void WriteHtml(string path, HtmlReportInput input)
+{
+    File.WriteAllText(path, HtmlReport.Build(input), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    Console.WriteLine($"Rapport HTML enregistré : {Path.GetFullPath(path)}");
+}

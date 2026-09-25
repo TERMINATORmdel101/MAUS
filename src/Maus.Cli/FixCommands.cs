@@ -52,19 +52,19 @@ internal static class FixCommands
         output.WriteLine("Pour appliquer : maus --apply <identifiant> [...]  ou  maus --apply-recommended");
     }
 
-    public static int Apply(FixContext context, IReadOnlyList<PlannedChange> selected, ApplyOptions options, bool assumeYes, TextWriter output)
+    public static (int ExitCode, ApplyResult? Result) Apply(FixContext context, IReadOnlyList<PlannedChange> selected, ApplyOptions options, bool assumeYes, TextWriter output)
     {
         var engine = new FixEngine(context);
         if (engine.GetBlockingReason() is { } blocked)
         {
             output.WriteLine(blocked);
-            return 3;
+            return (3, null);
         }
 
         if (selected.Count == 0)
         {
             output.WriteLine("Aucune correction ne correspond à la sélection (déjà conforme, ou identifiant inconnu : voir maus --plan).");
-            return 1;
+            return (1, null);
         }
 
         output.WriteLine("Corrections sélectionnées :");
@@ -80,7 +80,7 @@ internal static class FixCommands
         if (!assumeYes && !Confirm("Appliquer ces corrections ? (o/N) "))
         {
             output.WriteLine("Annulé : rien n'a été modifié.");
-            return 1;
+            return (1, null);
         }
 
         var result = engine.Apply(selected, options);
@@ -97,7 +97,7 @@ internal static class FixCommands
                 output.WriteLine("Relancez avec --enable-protection pour activer la protection du système, ou --without-restore-point pour continuer sans.");
             }
 
-            return 3;
+            return (3, result);
         }
 
         foreach (var outcome in result.Changes)
@@ -115,7 +115,24 @@ internal static class FixCommands
             output.WriteLine($"Séance enregistrée : {session.Id}. Pour tout annuler : maus --revert {session.Id}");
         }
 
-        return result.Changes.Any(c => c.Status == ChangeStatus.Failed) ? 2 : 0;
+        return (result.Changes.Any(c => c.Status == ChangeStatus.Failed) ? 2 : 0, result);
+    }
+
+    public static void PrintVerification(IReadOnlyList<VerifiedOutcome> verified, TextWriter output)
+    {
+        output.WriteLine();
+        output.WriteLine("Vérification par un nouvel audit :");
+        foreach (var item in verified.Where(v => v.Outcome.Status == ChangeStatus.Applied))
+        {
+            var mark = item.Check switch
+            {
+                EffectCheck.Confirmed => "confirmé",
+                EffectCheck.PendingRestart => "en attente",
+                EffectCheck.NoEffect => "SANS EFFET",
+                _ => "non vérifié",
+            };
+            output.WriteLine($"  [{mark}] {item.Outcome.Title} : {item.Message}");
+        }
     }
 
     public static int PrintJournal(IJournalStore journal, TextWriter output)
@@ -133,22 +150,27 @@ internal static class FixCommands
             output.WriteLine($"{session.Id}  {session.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}  {state}  ({session.Entries.Count(e => e.State is EntryState.Applied or EntryState.Reverted or EntryState.RevertSkipped)} valeur(s))");
             foreach (var entry in session.Entries)
             {
-                output.WriteLine($"    [{entry.State}] {entry.ChangeTitle} : {entry.Key} {SettingValue.Display(entry.Before)} -> {SettingValue.Display(entry.After)}");
+                output.WriteLine($"    [{entry.State}] {entry.ChangeId} · {entry.ChangeTitle} : {entry.Key} {SettingValue.Display(entry.Before)} -> {SettingValue.Display(entry.After)}");
+                if (entry.EffectNote is not null)
+                {
+                    output.WriteLine($"        {entry.EffectNote}");
+                }
             }
         }
 
         return 0;
     }
 
-    public static int Revert(FixContext context, string sessionId, bool force, bool assumeYes, TextWriter output)
+    public static int Revert(FixContext context, string sessionId, string? changeId, bool force, bool assumeYes, TextWriter output)
     {
-        if (!assumeYes && !Confirm($"Remettre les valeurs d'origine de la séance {sessionId} ? (o/N) "))
+        var what = changeId is null ? $"de la séance {sessionId}" : $"de la correction {changeId} (séance {sessionId})";
+        if (!assumeYes && !Confirm($"Remettre les valeurs d'origine {what} ? (o/N) "))
         {
             output.WriteLine("Annulé : rien n'a été modifié.");
             return 1;
         }
 
-        var result = new FixEngine(context).Revert(sessionId, force);
+        var result = new FixEngine(context).Revert(sessionId, force, changeId);
         if (result.Error is not null)
         {
             output.WriteLine(result.Error);
@@ -171,7 +193,7 @@ internal static class FixCommands
     public static IReadOnlyList<PlannedChange> Plan(AuditEngine engine, IReadOnlyList<ModuleResult> results, AuditContext context) =>
         FixEngine.Plan(engine, results, context);
 
-    private static bool Confirm(string question)
+    public static bool Confirm(string question)
     {
         Console.Write(question);
         var answer = Console.ReadLine()?.Trim();
