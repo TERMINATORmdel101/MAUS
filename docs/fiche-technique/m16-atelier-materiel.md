@@ -43,5 +43,5 @@ Catalogue JSON `hw-safety-limits.json`, une ligne par famille de composant, avec
 
 - Processeur : calculs vérifiés (hachage, nombres premiers, matrices) sur tous les cœurs, puis sur un seul ; toute erreur de calcul signale une instabilité (surcadençage, tension trop basse, surchauffe). Score comparé aux passages précédents du même PC.
 - RAM : écriture et relecture de motifs sur la mémoire libre choisie par l'utilisateur ; débit et latence. Un test en mode utilisateur ne couvre pas toute la RAM : MAUS le dit.
-- Mémoire vidéo : motifs écrits et relus par la carte graphique (Direct3D, étape ultérieure).
+- Mémoire vidéo : blocs de 64 Mo alloués dans la mémoire dédiée par Direct3D 11 (présent dans Windows), remplis de motifs par un tampon de transfert puis relus et comparés ; 60 % de la mémoire dédiée par défaut, au choix de l'utilisateur ; arrêt sur alarme de température et sur perte du pilote (signe d'instabilité). Débit de relecture affiché à titre indicatif.
 - Surveillance pendant le test : températures et arrêt immédiat au seuil ; bouton « Arrêter » toujours visible.

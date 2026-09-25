@@ -45,6 +45,11 @@ public sealed class WorkshopViewModel : ObservableObject
     private string _cpuStatus = string.Empty;
     private double _ramProgress;
     private string _ramStatus = string.Empty;
+    private readonly IGpuMemoryProvider _gpuProvider = new D3D11GpuMemoryProvider();
+    private bool _gpuAdaptersLoaded;
+    private TestOption<GpuAdapterInfo>? _vramAdapter;
+    private double _vramProgress;
+    private string _vramStatus = string.Empty;
 
     public WorkshopViewModel(Func<string, string, bool> confirm, Func<AuditContext?> context, IPreferencesStore preferences)
     {
@@ -77,6 +82,14 @@ public sealed class WorkshopViewModel : ObservableObject
             new(T("8 Go"), 8L << 30),
         ];
         _ramSize = RamSizes[0];
+        VramSizes =
+        [
+            new(T("Automatique : 60 % de la mémoire de la carte"), 0L),
+            new(T("1 Go"), 1L << 30),
+            new(T("2 Go"), 2L << 30),
+            new(T("4 Go"), 4L << 30),
+        ];
+        _vramSize = VramSizes[0];
 
         SearchProcessCommand = new AsyncCommand(() => Run(() => { if (SelectedProcess is { } p) { OpenSearch(WebSearch.ForProcess(p.Name)); } }));
         ShowProcessCommand = new AsyncCommand(() => Run(() => { if (SelectedProcess?.Sample.Path is { } path) { ShellLauncher.ShowInFolder(path); } }));
@@ -84,6 +97,7 @@ public sealed class WorkshopViewModel : ObservableObject
         DiagnoseCommand = new AsyncCommand(DiagnoseAsync);
         StartCpuTestCommand = new AsyncCommand(RunCpuTestAsync);
         StartRamTestCommand = new AsyncCommand(RunRamTestAsync);
+        StartVramTestCommand = new AsyncCommand(RunVramTestAsync);
         StopTestCommand = new AsyncCommand(() => Run(() => _stopTest?.Invoke()));
     }
 
@@ -262,6 +276,39 @@ public sealed class WorkshopViewModel : ObservableObject
 
     public ICommand StopTestCommand { get; }
 
+    public ICommand StartVramTestCommand { get; }
+
+    /// <summary>Cartes graphiques testables (mémoire dédiée), chargées à l'ouverture de l'onglet Tests.</summary>
+    public ObservableCollection<TestOption<GpuAdapterInfo>> VramAdapters { get; } = [];
+
+    public TestOption<GpuAdapterInfo>? VramAdapter
+    {
+        get => _vramAdapter;
+        set => SetProperty(ref _vramAdapter, value);
+    }
+
+    public IReadOnlyList<TestOption<long>> VramSizes { get; }
+
+    private TestOption<long> _vramSize;
+
+    public TestOption<long> VramSize
+    {
+        get => _vramSize;
+        set => SetProperty(ref _vramSize, value);
+    }
+
+    public double VramProgress
+    {
+        get => _vramProgress;
+        private set => SetProperty(ref _vramProgress, value);
+    }
+
+    public string VramStatus
+    {
+        get => _vramStatus;
+        private set => SetProperty(ref _vramStatus, value);
+    }
+
     /// <summary>Arrête les mesures et un test en cours (fermeture de la fenêtre, changement de langue).</summary>
     public void Stop()
     {
@@ -279,6 +326,11 @@ public sealed class WorkshopViewModel : ObservableObject
         if (IsActive && Section == SectionPc && !_inventoryLoaded)
         {
             await LoadInventoryAsync();
+        }
+
+        if (IsActive && Section == SectionTests && !_gpuAdaptersLoaded)
+        {
+            await LoadGpuAdaptersAsync();
         }
 
         var live = (IsActive && Section == SectionLive) || IsTesting || IsDiagnosing;
@@ -534,6 +586,78 @@ public sealed class WorkshopViewModel : ObservableObject
                 : result.Stable
                     ? T("Aucune erreur sur {0:0.0} Go. Débit de copie : {1:0.0} Go/s · latence : {2:0.0} ns. (Un test sous Windows ne couvre pas la mémoire déjà utilisée : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)", result.TestedBytes / 1073741824.0, result.CopyGigabytesPerSecond, result.LatencyNanoseconds)
                     : T("ERREURS : {0} valeur(s) relue(s) différente(s). Revenez au profil mémoire d'origine dans le BIOS (voir Module 10), puis refaites le test ; si les erreurs restent, une barrette est probablement défaillante.", result.Errors);
+        }
+        finally
+        {
+            await StopTestAsync();
+        }
+    }
+
+    private async Task LoadGpuAdaptersAsync()
+    {
+        _gpuAdaptersLoaded = true;
+        try
+        {
+            var adapters = await Task.Run(_gpuProvider.Adapters);
+            VramAdapters.Clear();
+            foreach (var adapter in adapters.Where(a => a.DedicatedBytes >= 512L << 20).OrderByDescending(a => a.DedicatedBytes))
+            {
+                VramAdapters.Add(new(T("{0} · {1:0.#} Go", adapter.Name, adapter.DedicatedBytes / 1073741824.0), adapter));
+            }
+
+            VramAdapter = VramAdapters.FirstOrDefault();
+            VramStatus = VramAdapters.Count == 0
+                ? T("Aucune carte graphique avec de la mémoire dédiée : une puce graphique intégrée utilise la mémoire vive, déjà couverte par le test de la RAM.")
+                : string.Empty;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or GpuMemoryException)
+        {
+            VramStatus = T("Direct3D ne répond pas sur ce PC : {0}", ex.Message);
+        }
+    }
+
+    private async Task RunVramTestAsync()
+    {
+        if (IsTesting || VramAdapter is not { Value: var adapter })
+        {
+            return;
+        }
+
+        var ceiling = Math.Max(256L << 20, adapter.DedicatedBytes - (512L << 20));
+        var bytes = VramSize.Value == 0 ? VramTest.SuggestedBytes(adapter.DedicatedBytes) : Math.Min(VramSize.Value, ceiling);
+        if (!_confirm(T("Lancer le test de la mémoire vidéo ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de la mémoire de « {1} ». Fermez vos jeux et applications 3D pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0, adapter.Name) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        {
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        await StartTestAsync(cancellation);
+        try
+        {
+            VramStatus = T("Test en cours…");
+            var progress = new Progress<VramTestProgress>(p =>
+            {
+                VramProgress = p.Percent;
+                VramStatus = T("{0} · {1:0} % · {2} erreur(s)", p.Step, p.Percent, p.Errors);
+            });
+            var result = await VramTest.RunAsync(_gpuProvider, adapter, new VramTestOptions(bytes), progress, () => Live.DangerAlarm, cancellation.Token);
+            VramProgress = 100;
+            if (!result.Aborted)
+            {
+                BenchmarkHistory.CreateDefault().Add(new BenchmarkEntry("vram", result.ReadbackGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now, adapter.Name));
+            }
+
+            VramStatus = result.Aborted
+                ? T("Test interrompu : {0}", result.AbortReason)
+                : result.Stable
+                    ? T("Aucune erreur sur {0:0.0} Go de mémoire vidéo. Débit de relecture vers le processeur : {1:0.0} Go/s.", result.TestedBytes / 1073741824.0, result.ReadbackGigabytesPerSecond)
+                        + (result.CardWasFull ? " " + T("La carte n'avait plus de place libre : seule la mémoire disponible a été testée.") : string.Empty)
+                        + " " + T("(La mémoire déjà utilisée par l'affichage n'est pas couverte : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)")
+                    : T("ERREURS : {0} valeur(s) relue(s) différente(s) dans la mémoire vidéo. Revenez aux fréquences d'origine de la carte (outil de surcadençage, voir Module 15), vérifiez sa température, puis refaites le test ; si les erreurs restent, la carte est probablement défaillante.", result.Errors);
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or GpuMemoryException)
+        {
+            VramStatus = T("Direct3D ne répond pas sur ce PC : {0}", ex.Message);
         }
         finally
         {

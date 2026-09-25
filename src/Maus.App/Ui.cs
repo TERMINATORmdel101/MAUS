@@ -89,7 +89,7 @@ public static class Ui
 
     public static string TestPcTitle => T("Tester mon PC");
 
-    public static string TestPcDetail => T("Stabilité du processeur et de la mémoire vive, avec arrêt automatique en cas de surchauffe.");
+    public static string TestPcDetail => T("Stabilité du processeur, de la mémoire vive et de la mémoire vidéo, avec arrêt automatique en cas de surchauffe.");
 
     public static string FixPcTitle => T("Corriger en un clic");
 
@@ -155,7 +155,9 @@ public static class Ui
 
     public static string VramTestTitle => T("Mémoire de la carte graphique");
 
-    public static string VramTestIntro => T("Test prévu dans une prochaine version (par Direct3D, sans pilote supplémentaire).");
+    public static string VramTestIntro => T("MAUS remplit la mémoire de la carte graphique de motifs, puis les relit par Direct3D (déjà présent dans Windows). Une seule erreur trahit une mémoire vidéo instable (surcadençage, chaleur) ou défaillante.");
+
+    public static string CardLabel => T("Carte :");
 
     public static string DurationLabel => T("Durée :");
 

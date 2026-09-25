@@ -475,7 +475,7 @@ public sealed class HardwareHealthModule : IAuditModule
         Status = FindingStatus.Info,
         Current = T("non lancé (audit seul)"),
         Explanation = T("« Ce test ne rend pas votre PC plus rapide : il vérifie qu'il fonctionne comme prévu. » "
-            + "Les tests du processeur et de la mémoire vive se lancent depuis l'Atelier (onglet Tests), avec arrêt automatique en cas de surchauffe, "
+            + "Les tests du processeur, de la mémoire vive et de la mémoire vidéo se lancent depuis l'Atelier (onglet Tests), avec arrêt automatique en cas de surchauffe, "
             + "et leurs résultats sont gardés pour comparer avant et après optimisation. L'audit se limite aux indicateurs passifs ci-dessus. "
             + "La température interne du processeur n'est pas lue : elle exige un pilote noyau, que MAUS n'installe pas."),
         Advice = T("En attendant, les causes de lenteur les plus fréquentes sont vérifiées par les Modules 5 (alimentation), 10 (mémoire) et 12 (démarrage)."),

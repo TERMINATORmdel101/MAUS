@@ -665,10 +665,23 @@
                                     </TextBlock>
                                 </DockPanel>
 
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0" Opacity="0.75">
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                                     <StackPanel>
+                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xE7F4;" Foreground="{StaticResource MausRed}" />
                                         <TextBlock Text="{x:Static app:Ui.VramTestTitle}" Style="{StaticResource CardTitle}" />
                                         <TextBlock Text="{x:Static app:Ui.VramTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.CardLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox MinWidth="260" Margin="0,0,16,4" ItemsSource="{Binding Workshop.VramAdapters}" SelectedItem="{Binding Workshop.VramAdapter}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox MinWidth="200" Margin="0,0,16,4" ItemsSource="{Binding Workshop.VramSizes}" SelectedItem="{Binding Workshop.VramSize}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartVramTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                        </WrapPanel>
+                                        <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.VramProgress, Mode=OneWay}" />
+                                        <TextBlock Text="{Binding Workshop.VramStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
