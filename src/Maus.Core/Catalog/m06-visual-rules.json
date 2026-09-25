@@ -1,5 +1,6 @@
 // Module 6 — Interface et effets visuels : réglages lus dans le registre de l'utilisateur.
 // Les cases gérées par SystemParametersInfo sont contrôlées directement dans VisualEffectsModule.
+// « fix » : correction réversible proposée en V0.2 (valeur attendue écrite en DWORD).
 [
   {
     "id": "M06.taskview",
@@ -13,7 +14,8 @@
     "expectedLabel": "masqué (0)",
     "severity": "Low",
     "explanation": "Le bouton Vue des tâches occupe la barre des tâches pour une fonction accessible aussi par Win+Tab.",
-    "advice": "Masquer le bouton ; Win+Tab reste disponible."
+    "advice": "Masquer le bouton ; Win+Tab reste disponible.",
+    "fix": { "title": "Masquer le bouton Vue des tâches", "gain": "Barre des tâches allégée ; Win+Tab reste disponible.", "effect": "ExplorerRestart" }
   },
   {
     "id": "M06.transparency",
@@ -27,7 +29,8 @@
     "expectedLabel": "désactivés (0)",
     "severity": "Low",
     "explanation": "La transparence demande un peu de travail graphique en permanence, sans utilité pratique.",
-    "advice": "Désactiver la transparence : gain surtout ressenti sur les petites configurations."
+    "advice": "Désactiver la transparence : gain surtout ressenti sur les petites configurations.",
+    "fix": { "title": "Désactiver les effets de transparence", "gain": "Un peu moins de travail graphique en permanence." }
   },
   {
     "id": "M06.visualfx-mode",
@@ -41,7 +44,8 @@
     "expectedLabel": "personnalisé (3)",
     "severity": "Low",
     "explanation": "Le mode personnalisé permet de ne garder que les 4 effets utiles de la fenêtre Options de performances.",
-    "advice": "Passer en mode personnalisé une fois les effets réglés."
+    "advice": "Passer en mode personnalisé une fois les effets réglés.",
+    "fix": { "title": "Passer les effets visuels en mode personnalisé", "gain": "La fenêtre Options de performances affiche « Paramètres personnalisés »." }
   },
   {
     "id": "M06.keep.thumbnails",
@@ -56,7 +60,8 @@
     "expectedLabel": "miniatures affichées (0 ou absente)",
     "severity": "Low",
     "explanation": "Les miniatures aident à reconnaître images et vidéos ; cet effet fait partie des 4 conservés.",
-    "advice": "Réactiver l'affichage des miniatures."
+    "advice": "Réactiver l'affichage des miniatures.",
+    "fix": { "title": "Réafficher les miniatures au lieu des icônes", "effect": "ExplorerRestart" }
   },
   {
     "id": "M06.keep.selection",
@@ -71,7 +76,8 @@
     "expectedLabel": "activé (1 ou absente)",
     "severity": "Low",
     "explanation": "Le rectangle translucide rend la sélection lisible ; cet effet fait partie des 4 conservés.",
-    "advice": "Réactiver le rectangle de sélection translucide."
+    "advice": "Réactiver le rectangle de sélection translucide.",
+    "fix": { "title": "Réactiver le rectangle de sélection translucide", "effect": "ExplorerRestart" }
   },
   {
     "id": "M06.taskbar-animations",
@@ -85,7 +91,8 @@
     "expectedLabel": "désactivées (0)",
     "severity": "Low",
     "explanation": "Ces animations retardent légèrement l'affichage des éléments de la barre des tâches.",
-    "advice": "Désactiver les animations de la barre des tâches."
+    "advice": "Désactiver les animations de la barre des tâches.",
+    "fix": { "title": "Désactiver les animations de la barre des tâches", "effect": "ExplorerRestart" }
   },
   {
     "id": "M06.icon-shadow",
@@ -99,7 +106,8 @@
     "expectedLabel": "désactivée (0)",
     "severity": "Low",
     "explanation": "Effet purement décoratif sur le Bureau.",
-    "advice": "Désactiver l'ombre des icônes du Bureau."
+    "advice": "Désactiver l'ombre des icônes du Bureau.",
+    "fix": { "title": "Désactiver l'ombre sous le nom des icônes", "effect": "ExplorerRestart" }
   },
   {
     "id": "M06.peek",
@@ -113,7 +121,8 @@
     "expectedLabel": "désactivé (0)",
     "severity": "Low",
     "explanation": "Peek rend les fenêtres transparentes au survol du coin de la barre des tâches ; effet décoratif.",
-    "advice": "Désactiver Peek."
+    "advice": "Désactiver Peek.",
+    "fix": { "title": "Désactiver l'aperçu du Bureau (Peek)", "effect": "SignOut" }
   },
   {
     "id": "M06.thumbnail-cache",
@@ -128,6 +137,7 @@
     "expectedLabel": "désactivé (0 ou absente)",
     "severity": "Low",
     "explanation": "Garder ces miniatures en mémoire n'apporte rien au quotidien.",
-    "advice": "Ne pas enregistrer les miniatures de la barre des tâches."
+    "advice": "Ne pas enregistrer les miniatures de la barre des tâches.",
+    "fix": { "title": "Ne plus conserver les miniatures de la barre des tâches", "effect": "SignOut" }
   }
 ]

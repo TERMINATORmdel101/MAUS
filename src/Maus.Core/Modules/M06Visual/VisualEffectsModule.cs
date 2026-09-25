@@ -1,3 +1,4 @@
+using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Maus.Core.Rules;
 using Microsoft.Win32;
@@ -8,7 +9,7 @@ namespace Maus.Core.Modules.M06Visual;
 /// Module 6 — Interface et effets visuels. Garde 4 effets utiles (miniatures, contenu des fenêtres déplacées,
 /// sélection translucide, lissage des polices) et signale les autres comme optimisations possibles.
 /// </summary>
-public sealed class VisualEffectsModule : IAuditModule
+public sealed class VisualEffectsModule : IFixableModule
 {
     private const string Category = "Effets désactivés";
 
@@ -37,6 +38,35 @@ public sealed class VisualEffectsModule : IAuditModule
             "Le défilement doux ralentit la navigation dans les longues listes."),
     ];
 
+    /// <summary>Code SPI_SET* de chaque effet ; la valeur passe par uiParam pour le glisser des fenêtres et le lissage des polices.</summary>
+    private static readonly Dictionary<uint, (uint Set, bool UiParam)> SpiSetters = new()
+    {
+        [SpiGet.DragFullWindows] = (SpiSet.DragFullWindows, true),
+        [SpiGet.FontSmoothing] = (SpiSet.FontSmoothing, true),
+        [SpiGet.ClientAreaAnimation] = (SpiSet.ClientAreaAnimation, false),
+        [SpiGet.MenuAnimation] = (SpiSet.MenuAnimation, false),
+        [SpiGet.TooltipAnimation] = (SpiSet.TooltipAnimation, false),
+        [SpiGet.SelectionFade] = (SpiSet.SelectionFade, false),
+        [SpiGet.CursorShadow] = (SpiSet.CursorShadow, false),
+        [SpiGet.DropShadow] = (SpiSet.DropShadow, false),
+        [SpiGet.ComboBoxAnimation] = (SpiSet.ComboBoxAnimation, false),
+        [SpiGet.ListBoxSmoothScrolling] = (SpiSet.ListBoxSmoothScrolling, false),
+    };
+
+    private static readonly Dictionary<string, string> ActionTitles = new(StringComparer.Ordinal)
+    {
+        ["M06.keep.drag"] = "Réafficher le contenu des fenêtres pendant leur déplacement",
+        ["M06.keep.fonts"] = "Réactiver le lissage des polices",
+        ["M06.client-animation"] = "Désactiver les animations dans les fenêtres",
+        ["M06.menu-animation"] = "Désactiver l'animation des menus",
+        ["M06.tooltip-animation"] = "Désactiver le fondu des infobulles",
+        ["M06.selection-fade"] = "Désactiver la disparition progressive des menus",
+        ["M06.cursor-shadow"] = "Désactiver l'ombre sous le pointeur",
+        ["M06.window-shadow"] = "Désactiver l'ombre sous les fenêtres",
+        ["M06.combobox-animation"] = "Désactiver l'animation des listes déroulantes",
+        ["M06.smooth-scrolling"] = "Désactiver le défilement doux des listes",
+    };
+
     private static readonly Lazy<IReadOnlyList<RegistryRule>> Rules = new(() => EmbeddedCatalog.LoadRegistryRules("m06-visual-rules.json"));
 
     public string Id => "M06";
@@ -49,7 +79,7 @@ public sealed class VisualEffectsModule : IAuditModule
     {
         var findings = new List<Finding>(RegistryRuleEvaluator.EvaluateAll(Rules.Value, context.Registry))
         {
-            DetectWidgets(context.Registry),
+            DetectWidgets(context.Registry, context.Windows),
             DetectMinimizeAnimation(context.SystemParameters),
         };
 
@@ -68,6 +98,7 @@ public sealed class VisualEffectsModule : IAuditModule
                     Current = OnOff(current.Value),
                     Expected = OnOff(effect.Expected),
                     Explanation = effect.Explanation,
+                    Fixable = current != effect.Expected,
                 });
         }
 
@@ -75,10 +106,72 @@ public sealed class VisualEffectsModule : IAuditModule
     }
 
     /// <summary>
+    /// Corrections : SPI par les mêmes API que Windows, registre par le catalogue, Widgets par la stratégie (Pro et plus).
+    /// Le mode « personnalisé » (<c>VisualFXSetting</c> = 3) passe en dernier, pour que la boîte de dialogue l'affiche.
+    /// </summary>
+    public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
+    {
+        var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
+        bool Deviates(string id) => byId.TryGetValue(id, out var f) && f.Status == FindingStatus.Improvable;
+
+        var changes = new List<PlannedChange>();
+        foreach (var effect in SpiEffects.Where(e => Deviates(e.Id)))
+        {
+            var (set, uiParam) = SpiSetters[effect.Action];
+            changes.Add(Change(
+                effect.Id,
+                ActionTitles[effect.Id],
+                effect.Explanation,
+                effect.Id.StartsWith("M06.keep", StringComparison.Ordinal) ? "Effets conservés" : Category,
+                new SettingWrite(SettingKey.Spi(effect.Action, set, uiParam), SettingValue.Bool(effect.Expected))));
+        }
+
+        if (Deviates("M06.minimize-animation"))
+        {
+            changes.Add(Change(
+                "M06.minimize-animation",
+                "Désactiver l'animation de réduction et d'agrandissement",
+                "Les fenêtres réduites ou agrandies apparaissent instantanément.",
+                Category,
+                new SettingWrite(SettingKey.MinimizeAnimation, SettingValue.Bool(false))));
+        }
+
+        if (Deviates("M06.widgets") && !context.Windows.IsHomeEdition)
+        {
+            changes.Add(Change(
+                "M06.widgets",
+                "Désactiver les Widgets (stratégie AllowNewsAndInterests)",
+                "Coupe tout le panneau Widgets, bouton de la barre des tâches compris. Le réglage de la barre des tâches est protégé par Windows (UCPD) : MAUS passe par la stratégie officielle, sans jamais toucher à cette protection.",
+                "Barre des tâches",
+                new SettingWrite(SettingKey.Registry("HKLM", @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests"), SettingValue.Dword(0))) with
+            {
+                Gain = "Moins de contenu en ligne chargé en arrière-plan (actualités, météo, publicités).",
+                Effect = ChangeEffect.ExplorerRestart,
+            });
+        }
+
+        var fromRules = RegistryRulePlanner.Plan(Id, Rules.Value, findings);
+        changes.AddRange(fromRules.Where(c => c.Id != "M06.visualfx-mode"));
+        changes.AddRange(fromRules.Where(c => c.Id == "M06.visualfx-mode"));
+        return changes;
+    }
+
+    private PlannedChange Change(string id, string title, string description, string category, SettingWrite write) => new()
+    {
+        Id = id,
+        ModuleId = Id,
+        Title = title,
+        Description = description,
+        Category = category,
+        Gain = "Gain surtout visuel : Windows paraît plus réactif.",
+        Writes = [write],
+    };
+
+    /// <summary>
     /// Les Widgets sont coupés soit par la stratégie <c>AllowNewsAndInterests</c> (Pro et plus), soit par <c>TaskbarDa</c>,
     /// que le pilote UCPD protège en écriture sur les builds récents.
     /// </summary>
-    private static Finding DetectWidgets(IRegistryReader registry)
+    private static Finding DetectWidgets(IRegistryReader registry, WindowsInfo windows)
     {
         const string title = "Widgets désactivés";
         try
@@ -97,6 +190,7 @@ public sealed class VisualEffectsModule : IAuditModule
                 Expected = "désactivés",
                 Explanation = "Le panneau Widgets charge du contenu en ligne en arrière-plan (actualités, météo, publicités).",
                 Advice = disabled ? null : "Désactiver les Widgets par la stratégie AllowNewsAndInterests (Pro et plus) ou dans Paramètres > Barre des tâches.",
+                Fixable = !disabled && !windows.IsHomeEdition,
             };
         }
         catch (MausAccessDeniedException)
@@ -121,6 +215,7 @@ public sealed class VisualEffectsModule : IAuditModule
                 Severity = Severity.Low,
                 Current = OnOff(current.Value),
                 Expected = OnOff(false),
+                Fixable = current.Value,
                 Explanation = "L'animation retarde l'apparition des fenêtres réduites ou agrandies.",
             };
     }

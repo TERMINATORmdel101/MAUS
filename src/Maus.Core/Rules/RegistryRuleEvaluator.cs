@@ -31,6 +31,7 @@ public static class RegistryRuleEvaluator
             Expected = rule.ExpectedLabel ?? DescribeExpectation(rule),
             Explanation = rule.Explanation,
             Advice = compliant ? null : rule.Advice,
+            Fixable = !compliant && rule.Fix is not null,
         };
     }
 
