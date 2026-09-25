@@ -1,0 +1,61 @@
+// Module 1 — Audit des modifications risquées : contrôles de registre simples.
+// Les contrôles qui croisent plusieurs sources (Defender, pare-feu, services, BCD, fichiers…) sont codés
+// dans RiskyChangesAuditModule. Restaurer une stratégie = supprimer sa valeur, jamais écrire la valeur « activée ».
+[
+  {
+    "id": "M01.defender-policy",
+    "title": "Stratégie de désactivation de Defender",
+    "category": "Defender",
+    "hive": "HKLM",
+    "path": "SOFTWARE\\Policies\\Microsoft\\Windows Defender",
+    "name": "DisableAntiSpyware",
+    "expect": "Absent",
+    "expectedLabel": "absente",
+    "severity": "High",
+    "explanation": "Cette stratégie servait à couper l'antivirus Microsoft Defender. Windows l'ignore sur les PC personnels depuis 2021, mais sa présence trahit le passage d'un script de « nettoyage » qui a pu toucher à d'autres réglages de sécurité.",
+    "advice": "Supprimer la valeur DisableAntiSpyware, puis vérifier les autres constats de la catégorie Defender."
+  },
+  {
+    "id": "M01.uac",
+    "title": "Contrôle de compte d'utilisateur (UAC)",
+    "category": "Défenses",
+    "hive": "HKLM",
+    "path": "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
+    "name": "EnableLUA",
+    "expect": "EqualTo",
+    "value": "1",
+    "absentIsOk": true,
+    "expectedLabel": "activé (1)",
+    "severity": "Critical",
+    "explanation": "L'UAC demande votre accord avant qu'un programme modifie Windows. Désactivé, tout programme lancé reçoit d'emblée les droits administrateur : un logiciel malveillant peut alors s'installer sans rien demander, et les applications du Store ne fonctionnent plus.",
+    "advice": "Remettre EnableLUA à 1, puis redémarrer le PC."
+  },
+  {
+    "id": "M01.smartscreen",
+    "title": "Stratégie SmartScreen",
+    "category": "Défenses",
+    "hive": "HKLM",
+    "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\System",
+    "name": "EnableSmartScreen",
+    "expect": "NotEqualTo",
+    "value": "0",
+    "expectedLabel": "absente (SmartScreen actif)",
+    "severity": "High",
+    "explanation": "SmartScreen vous avertit avant d'ouvrir un fichier téléchargé inconnu ou un site de hameçonnage. Coupé par une stratégie, il ne peut plus être réactivé depuis Sécurité Windows.",
+    "advice": "Supprimer les valeurs EnableSmartScreen et ShellSmartScreenLevel pour rendre la main à Sécurité Windows."
+  },
+  {
+    "id": "M01.wu-auto-update",
+    "title": "Stratégie des mises à jour automatiques",
+    "category": "Windows Update",
+    "hive": "HKLM",
+    "path": "SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU",
+    "name": "NoAutoUpdate",
+    "expect": "NotEqualTo",
+    "value": "1",
+    "expectedLabel": "absente",
+    "severity": "High",
+    "explanation": "NoAutoUpdate = 1 empêche Windows d'installer seul ses mises à jour : les correctifs de sécurité s'accumulent sans être appliqués.",
+    "advice": "Supprimer la valeur NoAutoUpdate pour que Windows Update reprenne son fonctionnement normal."
+  }
+]
