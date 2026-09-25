@@ -1,15 +1,34 @@
+using System.Windows.Input;
 using Maus.Core;
 using Maus.Core.Reporting;
 
 namespace Maus.App.ViewModels;
 
-public sealed class FindingViewModel(Finding finding)
+public sealed class FindingViewModel
 {
+    private readonly Finding finding;
+
+    public FindingViewModel(Finding finding, Func<Finding, bool, Task> onAcknowledge)
+    {
+        this.finding = finding;
+        AcknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, true));
+        UnacknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, false));
+    }
+
     public string Title => finding.Title;
 
     public FindingStatus Status => finding.Status;
 
-    public string StatusLabel => Labels.Of(finding.Status);
+    public string StatusLabel => finding.AcknowledgedFrom is { } was ? $"Voulu (était : {Labels.Of(was)})" : Labels.Of(finding.Status);
+
+    /// <summary>Un écart peut être marqué « voulu » : il ne sera plus signalé tant que la situation ne change pas.</summary>
+    public bool CanAcknowledge => finding.Status is FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem;
+
+    public bool IsAcknowledged => finding.AcknowledgedFrom is not null;
+
+    public ICommand AcknowledgeCommand { get; }
+
+    public ICommand UnacknowledgeCommand { get; }
 
     public string? Category => finding.Category;
 
@@ -31,12 +50,14 @@ public sealed class FindingViewModel(Finding finding)
 
 public sealed class ModuleViewModel : ObservableObject
 {
+    private readonly Func<string, Finding, bool, Task> _onAcknowledge;
     private ModuleResult? _result;
 
-    public ModuleViewModel(IAuditModule module)
+    public ModuleViewModel(IAuditModule module, Func<string, Finding, bool, Task> onAcknowledge)
     {
         Id = module.Id;
         Title = module.Title;
+        _onAcknowledge = onAcknowledge;
     }
 
     public string Id { get; }
@@ -57,7 +78,7 @@ public sealed class ModuleViewModel : ObservableObject
     public IReadOnlyList<FindingViewModel> Findings =>
         _result?.Findings
             .OrderByDescending(f => f.Status.Rank())
-            .Select(f => new FindingViewModel(f))
+            .Select(f => new FindingViewModel(f, (finding, acknowledge) => _onAcknowledge(Id, finding, acknowledge)))
             .ToList() ?? [];
 
     public void SetResult(ModuleResult result)

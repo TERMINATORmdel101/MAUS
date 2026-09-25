@@ -48,18 +48,25 @@ public sealed class ChangeViewModel(PlannedChange change) : ObservableObject
         $"{w.Key.Describe()}  →  {(w.Value is null ? "supprimée" : SettingValue.Display(w.Value))}"));
 }
 
-/// <summary>Une séance du journal, avec son bouton « Annuler ».</summary>
+/// <summary>Une séance du journal, avec son bouton « Annuler » et une ligne par correction.</summary>
 public sealed class SessionViewModel
 {
-    public SessionViewModel(JournalSession session, Func<SessionViewModel, Task> revert)
+    public SessionViewModel(JournalSession session, Func<SessionViewModel, string?, Task> revert)
     {
         Session = session;
-        RevertCommand = new AsyncCommand(() => revert(this));
+        RevertCommand = new AsyncCommand(() => revert(this, null));
+        Changes = session.Entries
+            .Where(e => e.State is not EntryState.Pending)
+            .GroupBy(e => e.ChangeId)
+            .Select(g => new SessionChangeViewModel(g.ToList(), () => revert(this, g.Key)))
+            .ToList();
     }
 
     public JournalSession Session { get; }
 
     public ICommand RevertCommand { get; }
+
+    public IReadOnlyList<SessionChangeViewModel> Changes { get; }
 
     public bool CanRevert => Session.CanRevert;
 
@@ -79,17 +86,38 @@ public sealed class SessionViewModel
             return $"{applied} valeur(s) en place, {reverted} restaurée(s) · {point}";
         }
     }
+}
 
-    public string Details => string.Join(Environment.NewLine, Session.Entries
-        .Where(e => e.State is not EntryState.Pending)
-        .Select(e => $"[{Describe(e.State)}] {e.ChangeTitle} : {e.Key.Describe()} = {SettingValue.Display(e.Before)} → {SettingValue.Display(e.After)}"));
+/// <summary>Une correction d'une séance, avec son propre bouton « Annuler ».</summary>
+public sealed class SessionChangeViewModel
+{
+    private readonly IReadOnlyList<JournalEntry> _entries;
 
-    private static string Describe(EntryState state) => state switch
+    public SessionChangeViewModel(IReadOnlyList<JournalEntry> entries, Func<Task> revert)
     {
-        EntryState.Applied => "en place",
-        EntryState.Reverted => "restaurée",
-        EntryState.RevertSkipped => "modifiée depuis",
-        EntryState.Failed => "échec, origine remise",
-        _ => "en attente",
+        _entries = entries;
+        RevertCommand = new AsyncCommand(revert);
+    }
+
+    public ICommand RevertCommand { get; }
+
+    public string Title => _entries[0].ChangeTitle;
+
+    public bool CanRevert => _entries.Any(e => e.State == EntryState.Applied);
+
+    public string State => _entries.Select(e => e.State).Distinct().ToList() switch
+    {
+        [EntryState.Applied] => "en place",
+        [EntryState.Reverted] => "annulée",
+        [EntryState.RevertSkipped] => "modifiée depuis",
+        [EntryState.Failed] => "échec, origine remise",
+        _ => "en partie annulée",
     };
+
+    public string? Note => _entries.Select(e => e.EffectNote).FirstOrDefault(n => n is not null);
+
+    public bool HasNote => Note is not null;
+
+    public string Details => string.Join(Environment.NewLine, _entries.Select(e =>
+        $"{e.Key.Describe()} = {SettingValue.Display(e.Before)} → {SettingValue.Display(e.After)}"));
 }

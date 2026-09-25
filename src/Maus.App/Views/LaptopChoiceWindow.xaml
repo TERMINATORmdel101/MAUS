@@ -1,0 +1,36 @@
+<Window x:Class="Maus.App.Views.LaptopChoiceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MAUS — votre portable"
+        Width="560" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="24">
+        <TextBlock Text="Comment voulez-vous utiliser votre portable ?" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Margin="0,8,0,16" Opacity="0.8" TextWrapping="Wrap"
+                   Text="MAUS adapte ses conseils d'alimentation à votre choix. Vous pourrez en changer à tout moment dans l'onglet Corrections." />
+
+        <RadioButton x:Name="Performance" GroupName="Choice" IsChecked="True" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="Performance sur secteur, Équilibré sur batterie (recommandé)" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="Plus de chaleur et de bruit quand le PC est branché ; autonomie préservée sur batterie." Opacity="0.8" TextWrapping="Wrap" />
+            </StackPanel>
+        </RadioButton>
+        <RadioButton x:Name="Everywhere" GroupName="Choice" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="Performance partout" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="Le PC reste aussi rapide sur batterie, mais l'autonomie baisse nettement." Opacity="0.8" TextWrapping="Wrap" />
+            </StackPanel>
+        </RadioButton>
+        <RadioButton x:Name="Battery" GroupName="Choice" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="Autonomie et silence" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="Équilibré sur secteur, économie d'énergie sur batterie : plus frais, plus silencieux, un peu moins réactif." Opacity="0.8" TextWrapping="Wrap" />
+            </StackPanel>
+        </RadioButton>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Plus tard" Padding="16,6" Margin="0,0,8,0" IsCancel="True" />
+            <Button Content="Valider" Padding="16,6" IsDefault="True" Click="OnValidate" />
+        </StackPanel>
+    </StackPanel>
+</Window>

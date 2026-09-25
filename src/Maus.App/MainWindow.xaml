@@ -81,6 +81,15 @@
                                                 <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
                                                 <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
                                                            Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                    <Button Content="C'est voulu" Padding="10,2" FontSize="12"
+                                                            ToolTip="Ne plus signaler ce constat tant que la situation ne change pas"
+                                                            Command="{Binding AcknowledgeCommand}"
+                                                            Visibility="{Binding CanAcknowledge, Converter={StaticResource BoolToVisibility}}" />
+                                                    <Button Content="Signaler de nouveau" Padding="10,2" FontSize="12"
+                                                            Command="{Binding UnacknowledgeCommand}"
+                                                            Visibility="{Binding IsAcknowledged, Converter={StaticResource BoolToVisibility}}" />
+                                                </StackPanel>
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>
@@ -116,6 +125,27 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </WrapPanel>
+                        <Expander Header="Vos choix" Margin="0,0,0,8" IsExpanded="True"
+                                  Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}">
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Profil Game Bar :" VerticalAlignment="Center" Margin="0,0,12,6" />
+                                <ComboBox Grid.Column="1" Margin="0,0,0,6" MaxWidth="520" HorizontalAlignment="Left"
+                                          ItemsSource="{Binding GameBarOptions}" SelectedItem="{Binding GameBarChoice}" DisplayMemberPath="Label" />
+                                <TextBlock Grid.Row="1" Text="Alimentation du portable :" VerticalAlignment="Center" Margin="0,0,12,0"
+                                           Visibility="{Binding IsLaptop, Converter={StaticResource BoolToVisibility}}" />
+                                <ComboBox Grid.Row="1" Grid.Column="1" MaxWidth="520" HorizontalAlignment="Left"
+                                          ItemsSource="{Binding LaptopOptions}" SelectedItem="{Binding LaptopChoice}" DisplayMemberPath="Label"
+                                          Visibility="{Binding IsLaptop, Converter={StaticResource BoolToVisibility}}" />
+                            </Grid>
+                        </Expander>
                     </StackPanel>
 
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
@@ -129,6 +159,14 @@
                             <TextBlock Text="Après les corrections, MAUS relance l'audit pour vérifier l'état réel du PC."
                                        Margin="16,0,0,0" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
                         </DockPanel>
+                        <WrapPanel Margin="0,8,0,0">
+                            <Button Content="Enregistrer le rapport (HTML)" Padding="12,4" Margin="0,0,8,0" Command="{Binding SaveReportCommand}"
+                                    IsEnabled="{Binding HasAudit, Mode=OneWay}"
+                                    ToolTip="Une page à garder ou à imprimer : ce qui a été vu, ce qui a été changé, et comment l'annuler" />
+                            <Button Content="Redémarrer l'Explorateur" Padding="12,4" Command="{Binding RestartExplorerCommand}"
+                                    Visibility="{Binding NeedsExplorerRestart, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Applique les corrections de la barre des tâches sans fermer la session" />
+                        </WrapPanel>
                         <Border Padding="12,8" Margin="0,10,0,0" CornerRadius="6" BorderThickness="1" BorderBrush="#808080"
                                 Visibility="{Binding HasFixReport, Converter={StaticResource BoolToVisibility}}">
                             <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
@@ -188,9 +226,28 @@
                                                 <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
                                             </DockPanel>
                                             <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                            <Expander Header="Valeurs modifiées" Margin="0,4,0,0">
-                                                <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                                         FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                                            <Expander Header="Corrections de cette séance" Margin="0,4,0,0">
+                                                <ItemsControl ItemsSource="{Binding Changes}" Margin="0,6,0,0">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type vm:SessionChangeViewModel}">
+                                                            <DockPanel Margin="0,0,0,8">
+                                                                <Button DockPanel.Dock="Right" Content="Annuler" Padding="10,2" FontSize="12" VerticalAlignment="Top"
+                                                                        Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                                                <StackPanel Margin="0,0,10,0">
+                                                                    <TextBlock TextWrapping="Wrap">
+                                                                        <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" />
+                                                                        <Run Text="  ·  " />
+                                                                        <Run Text="{Binding State, Mode=OneWay}" />
+                                                                    </TextBlock>
+                                                                    <TextBlock Text="{Binding Note}" FontSize="12" Foreground="#C46A00" TextWrapping="Wrap"
+                                                                               Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
+                                                                    <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                                             FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                            </DockPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </Expander>
                                         </StackPanel>
                                     </Border>

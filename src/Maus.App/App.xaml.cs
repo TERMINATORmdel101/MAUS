@@ -25,7 +25,7 @@ public partial class App : Application
     {
         var logPath = WriteCrashLog(e.Exception);
         MessageBox.Show(
-            $"MAUS a rencontré une erreur inattendue et doit s'arrêter. Rien n'a été modifié sur votre PC.\n\n{e.Exception.Message}" +
+            $"MAUS a rencontré une erreur inattendue et doit s'arrêter. Les corrections déjà faites sont enregistrées : l'onglet Historique permet de les annuler au prochain lancement.\n\n{e.Exception.Message}" +
             (logPath is null ? string.Empty : $"\n\nDétails enregistrés dans :\n{logPath}"),
             "MAUS — erreur",
             MessageBoxButton.OK,
