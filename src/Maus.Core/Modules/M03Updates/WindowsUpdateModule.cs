@@ -49,7 +49,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     private const int ServiceDisabled = 4;
     private const int MaxListedTitles = 3;
 
-    private const string VersionCategory = "Version de Windows";
+    private static string VersionCategory => T("Version de Windows");
     private const string UpdateCategory = "Windows Update";
     private const string DefenderCategory = "Defender";
 
@@ -385,7 +385,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         var title = T("Mises à jour Windows en attente (hors pilotes)");
         if (search.Updates is null)
         {
-            return Finding.Unknown(id, title, $"Recherche Windows Update impossible : {search.Error}.", UpdateCategory);
+            return Finding.Unknown(id, title, T("Recherche Windows Update impossible : {0}.", search.Error), UpdateCategory);
         }
 
         var security = search.Updates.Where(u => UpdateParsers.Classify(u) == PendingUpdateKind.Security).ToList();
@@ -446,7 +446,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         var title = T("Mises à jour facultatives disponibles");
         if (search.Updates is null)
         {
-            return Finding.Unknown(id, title, $"Recherche Windows Update impossible : {search.Error}.", UpdateCategory);
+            return Finding.Unknown(id, title, T("Recherche Windows Update impossible : {0}.", search.Error), UpdateCategory);
         }
 
         var optional = search.Updates.Where(u => UpdateParsers.Classify(u) == PendingUpdateKind.Optional).ToList();
@@ -507,7 +507,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Category = UpdateCategory,
             Status = stale ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
-            Current = T("{0} installé le {1} ({2})", latest.HotFix ?? "correctif", ShortDate(date), Ago(age)),
+            Current = T("{0} installé le {1} ({2})", latest.HotFix ?? T("correctif"), ShortDate(date), Ago(age)),
             Expected = T("moins de {0} jours", MaxInstallAgeDays),
             Explanation = T("Microsoft publie un correctif cumulatif de sécurité le deuxième mardi de chaque mois. Si aucun n'a été "
                 + "installé depuis plus de {0} jours, Windows Update est en pause, bloqué ou en panne.", MaxInstallAgeDays),
@@ -705,7 +705,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Title = title,
             Category = UpdateCategory,
             Status = FindingStatus.Info,
-            Current = string.IsNullOrWhiteSpace(server) ? "Windows Update (serveurs Microsoft)" : T("serveur de l'organisation (WSUS) : {0}", server),
+            Current = string.IsNullOrWhiteSpace(server) ? T("Windows Update (serveurs Microsoft)") : T("serveur de l'organisation (WSUS) : {0}", server),
             Explanation = T("Les mises à jour viennent des serveurs de Microsoft, ou d'un serveur interne (WSUS) sur les PC d'entreprise. "
                 + "Dans ce cas, l'organisation choisit les mises à jour publiées."),
         };
@@ -721,8 +721,8 @@ public sealed class WindowsUpdateModule : IAuditModule
 
     private static string Ago(int days) => days switch
     {
-        0 => "aujourd'hui",
-        1 => "hier",
+        0 => T("aujourd'hui"),
+        1 => T("hier"),
         _ => T("il y a {0} jours", days.ToString(CultureInfo.InvariantCulture)),
     };
 

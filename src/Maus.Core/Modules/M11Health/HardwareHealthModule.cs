@@ -18,10 +18,10 @@ public sealed class HardwareHealthModule : IAuditModule
     internal const string MemoryQuery = "SELECT Capacity, ConfiguredClockSpeed, Speed, DeviceLocator, BankLabel, SMBIOSMemoryType FROM Win32_PhysicalMemory";
     internal const string ProcessorPowerProvider = "Microsoft-Windows-Kernel-Processor-Power";
 
-    private const string StorageCategory = "Stockage";
+    private static string StorageCategory => T("Stockage");
     private static string MemoryCategory => T("Mémoire");
-    private const string ProcessorCategory = "Processeur";
-    private const string BenchmarkCategory = "Mini-benchmark";
+    private static string ProcessorCategory => T("Processeur");
+    private static string BenchmarkCategory => T("Mini-benchmark");
 
     /// <summary>Seuil maison d'usure d'un SSD (fiche technique, Module 11).</summary>
     private const int WearWarningPercent = 80;
@@ -167,7 +167,7 @@ public sealed class HardwareHealthModule : IAuditModule
         var bus = disk.MediaLabel.Contains(disk.BusLabel, StringComparison.Ordinal) ? string.Empty : $" ({disk.BusLabel})";
         var (status, label, advice) = disk.HealthStatus switch
         {
-            0 => (FindingStatus.Ok, "sain", (string?)null),
+            0 => (FindingStatus.Ok, T("sain"), (string?)null),
             1 => (FindingStatus.Warning, "avertissement",
                 T("Sauvegardez vos données importantes dès maintenant et surveillez ce disque : Windows y a détecté un début d'anomalie.")),
             2 => (FindingStatus.Problem, T("défaillant"),
@@ -183,7 +183,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = status,
             Severity = disk.HealthStatus == 1 ? Severity.Medium : Severity.High,
             Current = $"{label} · {disk.MediaLabel}{bus}{size}",
-            Expected = "sain",
+            Expected = T("sain"),
             Explanation = T("État de santé global que Windows attribue au disque d'après ses propres diagnostics (SMART). "
                 + "Un disque en avertissement ou défaillant peut perdre des données à tout moment."),
             Advice = advice,
@@ -232,7 +232,7 @@ public sealed class HardwareHealthModule : IAuditModule
         var warnings = new List<string>();
         if (disk.IsSsd && wear is not null)
         {
-            shown.Add($"usure {wear} %");
+            shown.Add(T("usure {0} %", wear));
             if (wear >= WearWarningPercent)
             {
                 warnings.Add(T("usure de {0} % (alerte à partir de {1} %)", wear, WearWarningPercent));
@@ -241,7 +241,7 @@ public sealed class HardwareHealthModule : IAuditModule
 
         if (temperature is > 0)
         {
-            shown.Add(temperatureMax is > 0 ? $"{temperature} °C (limite {temperatureMax} °C)" : $"{temperature} °C");
+            shown.Add(temperatureMax is > 0 ? T("{0} °C (limite {1} °C)", temperature, temperatureMax) : $"{temperature} °C");
             if (temperatureMax is > 0 && temperature >= temperatureMax)
             {
                 problems.Add(T("température à la limite de fonctionnement du disque"));
@@ -409,7 +409,7 @@ public sealed class HardwareHealthModule : IAuditModule
         var gigabytesPerSecond = channels * mts * 8 / 1000d;
         var capacity = modules.Sum(m => m.GetInt64("Capacity") ?? 0);
         var type = modules.Select(m => HealthParsers.MemoryTypeLabel(m.GetInt64("SMBIOSMemoryType"))).FirstOrDefault(t => t is not null);
-        var description = $"{modules.Count} barrette(s)"
+        var description = T("{0} barrette(s)", modules.Count)
             + (capacity > 0 ? T(", {0} au total", HealthParsers.FormatGigabytes(capacity)) : string.Empty)
             + (type is null ? string.Empty : $" ({type})");
 
@@ -421,7 +421,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = FindingStatus.Info,
             Current = $"{gigabytesPerSecond.ToString("0.0", French)} Go/s",
             Explanation = T("Calcul : {0} canal(aux){1} × {2} MT/s × 8 octets. {3}. "
-                + "C'est un plafond théorique : le mini-benchmark de la V0.3 mesurera le débit réel et le comparera à cette valeur.", channels, (estimated ? " (estimation)" : string.Empty), mts, description),
+                + "C'est un plafond théorique : le mini-benchmark de la V0.3 mesurera le débit réel et le comparera à cette valeur.", channels, (estimated ? T(" (estimation)") : string.Empty), mts, description),
             Advice = T("Nombre de canaux et profil XMP/EXPO : voir Module 10."),
         };
     }

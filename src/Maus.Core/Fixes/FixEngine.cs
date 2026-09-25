@@ -249,7 +249,7 @@ public sealed class FixEngine
             var actual = TryRead(entry.Key, out var readable);
             if (!readable || !SettingValue.AreEquivalent(actual, entry.After))
             {
-                entry.Error = $"Relu : {SettingValue.Display(actual)}, attendu : {SettingValue.Display(entry.After)}";
+                entry.Error = T("Relu : {0}, attendu : {1}", SettingValue.Display(actual), SettingValue.Display(entry.After));
                 RollBack(entries);
                 _context.Journal.Save(session);
                 return Outcome(ChangeStatus.Failed, T("Windows n'a pas gardé la valeur ({0}) : valeurs d'origine remises.", entry.Key));

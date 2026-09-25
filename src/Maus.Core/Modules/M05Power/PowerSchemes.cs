@@ -81,10 +81,10 @@ internal static partial class PowerSchemes
     /// <summary>Libellé français d'une famille de modes, tel qu'affiché par Windows.</summary>
     public static string Label(SchemeKind kind) => kind switch
     {
-        SchemeKind.Balanced => "Utilisation normale",
-        SchemeKind.HighPerformance => "Haute performance",
+        SchemeKind.Balanced => T("Utilisation normale"),
+        SchemeKind.HighPerformance => T("Haute performance"),
         SchemeKind.PowerSaver => T("Économie d'énergie"),
-        SchemeKind.UltimatePerformance => "Performances optimales",
+        SchemeKind.UltimatePerformance => T("Performances optimales"),
         _ => T("Mode personnalisé"),
     };
 
@@ -98,12 +98,12 @@ internal static partial class PowerSchemes
 
         if (overlay == OverlayBestPerformance)
         {
-            return "Meilleures performances";
+            return T("Meilleures performances");
         }
 
         if (overlay == OverlayBetterPerformance)
         {
-            return "Performances accrues";
+            return T("Performances accrues");
         }
 
         return overlay == OverlayBestEfficiency ? T("Meilleure efficacité énergétique") : T("mode inconnu ({0})", overlay);

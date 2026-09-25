@@ -187,7 +187,7 @@ public sealed class VisualEffectsModule : IFixableModule
                 Category = T("Barre des tâches"),
                 Status = disabled ? FindingStatus.Ok : FindingStatus.Improvable,
                 Severity = Severity.Low,
-                Current = disabled ? T("désactivés") : "actifs",
+                Current = disabled ? T("désactivés") : T("actifs"),
                 Expected = T("désactivés"),
                 Explanation = T("Le panneau Widgets charge du contenu en ligne en arrière-plan (actualités, météo, publicités)."),
                 Advice = disabled ? null : T("Désactiver les Widgets par la stratégie AllowNewsAndInterests (Pro et plus) ou dans Paramètres > Barre des tâches."),

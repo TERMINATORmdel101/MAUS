@@ -98,9 +98,9 @@ internal static class DisplayParsers
     {
         OutputTechnology.Hdmi => "HDMI",
         OutputTechnology.DisplayPortExternal => "DisplayPort",
-        OutputTechnology.DisplayPortUsbTunnel => "DisplayPort par USB-C",
+        OutputTechnology.DisplayPortUsbTunnel => T("DisplayPort par USB-C"),
         OutputTechnology.Dvi => "DVI",
-        OutputTechnology.Hd15 => "VGA (analogique)",
+        OutputTechnology.Hd15 => T("VGA (analogique)"),
         OutputTechnology.Miracast => T("Miracast (sans fil)"),
         OutputTechnology.IndirectWired => T("adaptateur USB ou station d'accueil"),
         OutputTechnology.IndirectVirtual => T("écran virtuel"),

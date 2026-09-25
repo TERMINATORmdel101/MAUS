@@ -89,7 +89,7 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
-            throw new DataSourceUnavailableException($"Commande introuvable : {executable}", ex);
+            throw new DataSourceUnavailableException(T("Commande introuvable : {0}", executable), ex);
         }
 
         var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);

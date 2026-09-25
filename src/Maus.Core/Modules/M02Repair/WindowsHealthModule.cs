@@ -40,7 +40,7 @@ public sealed class WindowsHealthModule : IAuditModule
 
     private static string HardwareCategory => T("Stabilité matérielle");
     private static string CrashCategory => T("Plantages et arrêts");
-    private const string DiskCategory = "Disque";
+    private static string DiskCategory => T("Disque");
     private static string PrerequisiteCategory => T("Prérequis des réparations");
     private static string GeneralCategory => T("État général");
 
@@ -454,8 +454,8 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = DiskCategory,
             Status = dirty.Value ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
-            Current = dirty.Value ? T("{0} marqué comme à vérifier", driveLetter) : $"{driveLetter} sain",
-            Expected = "sain",
+            Current = dirty.Value ? T("{0} marqué comme à vérifier", driveLetter) : T("{0} sain", driveLetter),
+            Expected = T("sain"),
             Explanation = T("Windows marque un volume « à vérifier » (dirty bit) quand il détecte une incohérence du système de fichiers "
                 + "ou un arrêt brutal pendant une écriture. Une vérification chkdsk est alors lancée au démarrage."),
             Advice = dirty.Value
@@ -503,7 +503,7 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = PrerequisiteCategory,
             Status = reasons.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
-            Current = reasons.Count == 0 ? T("aucun") : $"oui : {string.Join(", ", reasons)}",
+            Current = reasons.Count == 0 ? T("aucun") : T("oui : {0}", string.Join(", ", reasons)),
             Expected = T("aucun"),
             Explanation = T("Tant qu'un redémarrage est en attente, Windows n'a pas fini d'installer des mises à jour ou de remplacer "
                 + "des fichiers. Les réparations (DISM, SFC) doivent attendre : elles échoueraient ou donneraient de faux résultats."),

@@ -7,7 +7,7 @@ namespace Maus.Core.Modules.M01Audit;
 /// <summary>Catégorie « Composants » : services système, applications intégrées, WebView2, fichier d'échange.</summary>
 public sealed partial class RiskyChangesAuditModule
 {
-    private const string ComponentsCategory = "Composants";
+    private static string ComponentsCategory => T("Composants");
     private const string WebView2ClientId = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
     private const string EdgeClientId = "{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}";
 
@@ -73,7 +73,7 @@ public sealed partial class RiskyChangesAuditModule
         return missing.Count == 0
             ? AppsCheck.Compliant(expected, expected, explanation)
             : AppsCheck.Deviation(
-                $"absente(s) : {Join(missing)}",
+                T("absente(s) : {0}", Join(missing)),
                 expected,
                 explanation,
                 T("Réinstaller les applications manquantes depuis le Microsoft Store ; si le Store lui-même manque, la commande « wsreset -i » peut le réinstaller."));
@@ -89,7 +89,7 @@ public sealed partial class RiskyChangesAuditModule
         if (webView is null)
         {
             return WebViewCheck.Deviation(
-                edge is null ? T("WebView2 et Edge absents") : "WebView2 absent",
+                edge is null ? T("WebView2 et Edge absents") : T("WebView2 absent"),
                 expected,
                 explanation,
                 T("Réinstaller le runtime WebView2 « Evergreen » depuis le site officiel de Microsoft."));
@@ -97,7 +97,7 @@ public sealed partial class RiskyChangesAuditModule
 
         return edge is null
             ? WebViewCheck.Neutral(
-                $"WebView2 {webView} ; Edge absent",
+                T("WebView2 {0} ; Edge absent", webView),
                 expected,
                 T("Microsoft Edge a été désinstallé, mais WebView2 est présent : les applications qui en dépendent fonctionnent normalement."))
             : WebViewCheck.Compliant($"WebView2 {webView} ; Edge {edge}", expected, explanation);

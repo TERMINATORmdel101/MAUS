@@ -7,7 +7,7 @@ namespace Maus.Core.Modules.M01Audit;
 /// <summary>Catégorie « Persistance » : IFEO, Winlogon, AppInit_DLLs, programmes non signés au démarrage.</summary>
 public sealed partial class RiskyChangesAuditModule
 {
-    private const string PersistenceCategory = "Persistance";
+    private static string PersistenceCategory => T("Persistance");
     private const string WinlogonKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon";
 
     private static readonly string[] IfeoKeys =

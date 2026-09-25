@@ -1,4 +1,5 @@
 using Maus.Core.Fixes;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Rules;
 
@@ -23,12 +24,12 @@ public static class RegistryRulePlanner
             {
                 Id = rule.Id,
                 ModuleId = moduleId,
-                Title = fix.Title ?? rule.Advice ?? rule.Title,
-                Description = rule.Explanation,
-                Category = rule.Category,
-                Gain = fix.Gain,
-                Risk = fix.Risk,
-                Warning = fix.Warning,
+                Title = T(fix.Title ?? rule.Advice ?? rule.Title),
+                Description = T(rule.Explanation),
+                Category = Optional(rule.Category),
+                Gain = Optional(fix.Gain),
+                Risk = Optional(fix.Risk),
+                Warning = Optional(fix.Warning),
                 Effect = fix.Effect,
                 Advanced = fix.Advanced,
                 Recommended = fix.Recommended && !fix.Advanced,

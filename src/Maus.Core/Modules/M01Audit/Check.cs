@@ -99,10 +99,10 @@ internal sealed record ServiceStart(string Name, int? Start, bool Exists, bool D
     {
         if (Denied)
         {
-            return $"{Name} : illisible";
+            return T("{0} : illisible", Name);
         }
 
-        return Exists ? $"{Name} : {Label(Start)}" : $"{Name} : absent";
+        return Exists ? T("{0} : {1}", Name, Label(Start)) : $"{Name} : absent";
     }
 
     public static string Label(int? start) => start switch
@@ -113,7 +113,7 @@ internal sealed record ServiceStart(string Name, int? Start, bool Exists, bool D
         3 => T("manuel"),
         4 => T("désactivé"),
         null => T("type non renseigné"),
-        _ => "type " + start.Value.ToString(CultureInfo.InvariantCulture),
+        _ => T("type {0}", start.Value.ToString(CultureInfo.InvariantCulture)),
     };
 
     public static ServiceStart Read(IRegistryReader registry, string name)

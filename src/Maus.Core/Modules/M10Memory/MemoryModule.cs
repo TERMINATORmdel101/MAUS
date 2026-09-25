@@ -15,7 +15,7 @@ public sealed partial class MemoryModule : IAuditModule
     internal const string MemoryQuery =
         "SELECT Capacity, Speed, ConfiguredClockSpeed, PartNumber, Manufacturer, DeviceLocator, BankLabel, SMBIOSMemoryType FROM Win32_PhysicalMemory";
 
-    private const string SpeedCategory = "Vitesse (XMP / EXPO)";
+    private static string SpeedCategory => T("Vitesse (XMP / EXPO)");
     private static string LayoutCategory => T("Barrettes et canaux");
     private const string SpeedId = "M10.xmp";
     private static string SpeedTitle => T("Mémoire à sa vitesse annoncée (XMP / EXPO)");
@@ -92,7 +92,7 @@ public sealed partial class MemoryModule : IAuditModule
 
         var generation = dimms.Select(d => d.Generation).FirstOrDefault(g => g is not null) ?? MemorySpeeds.GuessGeneration(configured);
         var decoded = dimms.Where(d => d.Part is not null).ToList();
-        var unknownParts = dimms.Where(d => d.Part is null).Select(d => d.PartNumber ?? "vide").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var unknownParts = dimms.Where(d => d.Part is null).Select(d => d.PartNumber ?? T("vide")).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var maxJedec = MemorySpeeds.MaxJedecSpeed(generation);
 
         if (decoded.Count == 0)
@@ -199,7 +199,7 @@ public sealed partial class MemoryModule : IAuditModule
 
         if (hardware.Cpu.Vendor != HardwareVendor.Amd)
         {
-            return "XMP ou EXPO";
+            return T("XMP ou EXPO");
         }
 
         if (generation >= 5)
@@ -250,7 +250,7 @@ public sealed partial class MemoryModule : IAuditModule
                 Title = ChannelTitle,
                 Category = LayoutCategory,
                 Status = FindingStatus.Unknown,
-                Current = $"{dimms.Count} barrettes ({slots})",
+                Current = T("{0} barrettes ({1})", dimms.Count, slots),
                 Expected = T("réparties sur deux canaux"),
                 Explanation = T("Le nom des emplacements publié par le BIOS ne permet pas de savoir sur quel canal se trouve chaque barrette."),
             };
@@ -352,7 +352,7 @@ public sealed partial class MemoryModule : IAuditModule
         if (dimm.PartNumber is { } partNumber)
         {
             parts.Add(dimm.Part is { } part
-                ? T("référence {0} ({1}, {2} MT/s annoncés{3}{4})", partNumber, part.Brand, part.RatedSpeed, (part.CasLatency is { } cl ? $" CL{cl}" : string.Empty), (part.IsJedec ? ", standard JEDEC" : string.Empty))
+                ? T("référence {0} ({1}, {2} MT/s annoncés{3}{4})", partNumber, part.Brand, part.RatedSpeed, (part.CasLatency is { } cl ? $" CL{cl}" : string.Empty), (part.IsJedec ? T(", standard JEDEC") : string.Empty))
                 : T("référence {0} (non reconnue)", partNumber));
         }
 
@@ -364,12 +364,12 @@ public sealed partial class MemoryModule : IAuditModule
         var details = new List<string>();
         if (dimm.BankLabel is { } bank)
         {
-            details.Add($"banque {bank}");
+            details.Add(T("banque {0}", bank));
         }
 
         if (dimm.Manufacturer is { } manufacturer)
         {
-            details.Add(JedecCode().IsMatch(manufacturer) ? T("fabricant : code JEDEC {0}", manufacturer) : $"fabricant : {manufacturer}");
+            details.Add(JedecCode().IsMatch(manufacturer) ? T("fabricant : code JEDEC {0}", manufacturer) : T("fabricant : {0}", manufacturer));
         }
 
         if (dimm.MaxSpeed is { } max)
@@ -380,7 +380,7 @@ public sealed partial class MemoryModule : IAuditModule
         return new Finding
         {
             Id = $"M10.dimm-{dimm.Index}",
-            Title = $"Barrette {dimm.Slot}",
+            Title = T("Barrette {0}", dimm.Slot),
             Category = LayoutCategory,
             Status = FindingStatus.Info,
             Current = string.Join(", ", parts),
@@ -445,7 +445,7 @@ public sealed partial class MemoryModule : IAuditModule
         string? Channel,
         MemoryPart? Part)
     {
-        public string TypeLabel => MemorySpeeds.TypeName(SmbiosType) ?? (SmbiosType is { } type ? $"type SMBIOS {type}" : T("type inconnu"));
+        public string TypeLabel => MemorySpeeds.TypeName(SmbiosType) ?? (SmbiosType is { } type ? T("type SMBIOS {0}", type) : T("type inconnu"));
 
         public static Dimm From(CimRow row, int index)
         {

@@ -71,7 +71,7 @@ public sealed class AuditEngine
         }
         catch (Exception ex)
         {
-            return new ModuleResult(module.Id, module.Title, [], stopwatch.Elapsed, $"Erreur inattendue : {ex.Message}");
+            return new ModuleResult(module.Id, module.Title, [], stopwatch.Elapsed, T("Erreur inattendue : {0}", ex.Message));
         }
     }
 }

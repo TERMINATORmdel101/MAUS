@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Platform;
 
@@ -27,7 +28,7 @@ public sealed class WindowsRegistryWriter : IRegistryWriter
         {
             using var root = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = root.CreateSubKey(path, writable: true)
-                ?? throw new MausAccessDeniedException($"Création impossible : {hive}\\{path}");
+                ?? throw new MausAccessDeniedException(T("Création impossible : {0}\\{1}", hive, path));
             key.SetValue(name, value, kind);
         });
 
@@ -63,7 +64,7 @@ public sealed class WindowsRegistryWriter : IRegistryWriter
         }
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException)
         {
-            throw new MausAccessDeniedException($"Écriture refusée : {hive}\\{path}", ex);
+            throw new MausAccessDeniedException(T("Écriture refusée : {0}\\{1}", hive, path), ex);
         }
     }
 }

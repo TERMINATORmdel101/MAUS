@@ -65,7 +65,7 @@ public sealed class WindowsEventLogReader : IEventLogReader
         }
         catch (EventLogNotFoundException ex)
         {
-            throw new DataSourceUnavailableException($"Journal absent : {logName}", ex);
+            throw new DataSourceUnavailableException(T("Journal absent : {0}", logName), ex);
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or EventLogException { InnerException: UnauthorizedAccessException })
         {

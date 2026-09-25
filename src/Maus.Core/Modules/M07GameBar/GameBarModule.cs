@@ -201,7 +201,7 @@ public sealed class GameBarModule : IFixableModule
                 Category = Profile,
                 Status = FindingStatus.Info,
                 Severity = Severity.Info,
-                Current = $"{cpuName} ; Game Bar : {gameBar} ; Mode Jeu : {gameMode}",
+                Current = T("{0} ; Game Bar : {1} ; Mode Jeu : {2}", cpuName, gameBar, gameMode),
                 Expected = T("Game Bar installée, activée et à jour, avec le Mode Jeu (recommandé)"),
                 Explanation =
                     T("Sur ce processeur, un seul des deux blocs de cœurs (CCD) porte le cache 3D V-Cache. La Game Bar reconnaît les jeux " +

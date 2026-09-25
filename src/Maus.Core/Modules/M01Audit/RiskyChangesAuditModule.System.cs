@@ -121,7 +121,7 @@ public sealed partial class RiskyChangesAuditModule
         if (volumeKey && !context.Windows.IsEnterpriseOrEducation && !context.Hardware.IsManaged)
         {
             return ActivationCheck.Neutral(
-                IsSet(server) ? T("canal {0}, serveur {1}", channel, server) : $"canal {channel}",
+                IsSet(server) ? T("canal {0}, serveur {1}", channel, server) : T("canal {0}", channel),
                 expected,
                 T("L'activation de Windows semble passer par un serveur d'activation (KMS) non officiel, ce qui est inhabituel sur une édition Famille ou Pro " +
                 "hors entreprise. ") + explanation);
@@ -181,7 +181,7 @@ public sealed partial class RiskyChangesAuditModule
         }
 
         residual.Sort(StringComparer.OrdinalIgnoreCase);
-        var current = $"{residual.Count} valeur(s) : {Join(residual)}";
+        var current = T("{0} valeur(s) : {1}", residual.Count, Join(residual));
         return managed
             ? ResidualPoliciesCheck.Neutral(current, expected, T("Sur un PC géré, ces stratégies sont normalement posées par l'organisation."))
             : ResidualPoliciesCheck.Deviation(

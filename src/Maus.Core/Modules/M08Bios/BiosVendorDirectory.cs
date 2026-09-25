@@ -117,7 +117,7 @@ internal static partial class BiosVendorDirectory
             : T("l'outil de mise à jour intégré au BIOS, avec une clé USB formatée en FAT32");
         if (boardVendor?.RescueTool is { } rescue)
         {
-            boardTool += T(" ; en secours : {0}", rescue);
+            boardTool += T(" ; en secours : {0}", T(rescue));
         }
 
         return new BiosTarget(display, boardModel, false, boardVendor, BuildUrl(boardVendor, boardModel), boardTool);

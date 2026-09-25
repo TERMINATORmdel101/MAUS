@@ -164,7 +164,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
                 MitigationState.Disabled => T("désactivées : {0} ({1})", CpuMitigationOverrides.DescribeDisabled(overrideValue!.Value), values),
                 MitigationState.DisabledWithoutMask => T("demande de désactivation incomplète, probablement sans effet ({0})", values),
                 MitigationState.Strengthened => T("actives et renforcées ({0})", values),
-                _ => overrideValue is null ? T("actives (réglage Windows par défaut)") : $"actives ({values})",
+                _ => overrideValue is null ? T("actives (réglage Windows par défaut)") : T("actives ({0})", values),
             },
             Expected = T("actives (valeurs absentes, ou sans bit de désactivation)"),
             Explanation = T("Ces protections du processeur empêchent un programme de lire la mémoire du noyau ou d'autres programmes (failles Spectre et Meltdown). Des scripts d'optimisation les coupent pour gagner quelques pour cent : le PC devient alors vulnérable. Windows les active par défaut et MAUS ne propose jamais de les couper."),
@@ -202,7 +202,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             {
                 null => T("active (réglage Windows par défaut)"),
                 0 => T("désactivée (VulnerableDriverBlocklistEnable = 0)"),
-                _ => $"active (VulnerableDriverBlocklistEnable = {Format(value)})",
+                _ => T("active (VulnerableDriverBlocklistEnable = {0})", Format(value)),
             },
             Expected = T("active (1 ou valeur absente)"),
             Explanation = T("Windows refuse de charger les pilotes connus pour leurs failles, souvent détournés par des logiciels malveillants pour prendre le contrôle du noyau. Cette liste est active par défaut depuis Windows 11 22H2, et MAUS ne la désactive jamais."),

@@ -24,9 +24,9 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     internal const string TaskSchedulerScope = CimScopes.TaskScheduler;
     internal const string TasksQuery = "SELECT TaskName, TaskPath, State, Triggers, Actions FROM MSFT_ScheduledTask";
 
-    private const string SummaryCategory = "Vue d'ensemble";
+    private static string SummaryCategory => T("Vue d'ensemble");
     private static string UnknownCategory => T("Inconnu");
-    private const string SuspiciousCategory = "Suspect";
+    private static string SuspiciousCategory => T("Suspect");
     private static string MeasureCategory => T("Mesure du démarrage");
     private static string OtherSourcesCategory => T("Autres lancements automatiques");
     private static string SettingsAdvice => T("Réglage : Paramètres > Applications > Démarrage (ms-settings:startupapps).");
@@ -111,7 +111,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 ModuleId = Id,
                 Title = T("Ne plus lancer au démarrage : {0}", finding.Title),
                 Description = T("Désactive l'entrée comme le Gestionnaire des tâches, sans rien désinstaller : l'application se lance toujours quand vous l'ouvrez.") +
-                              (match is { } known ? $" Vous perdez : {known.Family.Loses}." : string.Empty),
+                              (match is { } known ? T(" Vous perdez : {0}.", T(known.Family.Loses)) : string.Empty),
                 Category = finding.Category,
                 Gain = T("Ouverture de session plus rapide, moins de mémoire occupée en arrière-plan."),
                 Recommended = finding.Status == FindingStatus.Improvable,
@@ -166,7 +166,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         }
         catch (MausAccessDeniedException)
         {
-            findings.Add(Finding.AdminRequired($"M12.source-{source.Id}", $"Lecture du {source.Label}", OtherSourcesCategory));
+            findings.Add(Finding.AdminRequired($"M12.source-{source.Id}", T("Lecture du {0}", source.Label), OtherSourcesCategory));
         }
     }
 
@@ -196,7 +196,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         }
         catch (Exception ex) when (ex is MausAccessDeniedException or IOException)
         {
-            findings.Add(Finding.AdminRequired($"M12.source-{id}", $"Lecture du {label}", OtherSourcesCategory));
+            findings.Add(Finding.AdminRequired($"M12.source-{id}", T("Lecture du {0}", label), OtherSourcesCategory));
             return;
         }
 
@@ -288,10 +288,10 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                     : T("désactivé");
         var publisher = company ?? (isStore ? T("application du Store") : executable is null ? null : T("éditeur inconnu"));
 
-        var explanation = $"Source : {entry.SourceLabel}. Commande : {entry.Command}.";
+        var explanation = T("Source : {0}. Commande : {1}.", entry.SourceLabel, entry.Command);
         if (match is { } known)
         {
-            explanation += T(" En le désactivant, vous perdez : {0}.", known.Family.Loses);
+            explanation += T(" En le désactivant, vous perdez : {0}.", T(known.Family.Loses));
         }
         else
         {
@@ -302,7 +302,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Verdict(entry, match?.Family, suspicion, orphan, enabled, isStore);
         if (suspicion is not null)
         {
-            explanation += $" Signal d'alerte : {suspicion}.";
+            explanation += T(" Signal d'alerte : {0}.", suspicion);
         }
 
         if (orphan)
@@ -311,14 +311,14 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         }
 
         var title = match is { } m
-            ? $"{m.App.Name} ({m.Family.Item})"
+            ? $"{m.App.Name} ({T(m.Family.Item)})"
             : T("{0} (non répertorié)", displayName);
 
         return new Finding
         {
             Id = id,
             Title = title,
-            Category = category ?? match?.Family.Label ?? UnknownCategory,
+            Category = category ?? Optional(match?.Family.Label) ?? UnknownCategory,
             Status = status,
             Severity = severity,
             Current = publisher is null ? state : $"{state} · {publisher}",
@@ -368,11 +368,11 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
 
         return family.Advice switch
         {
-            StartupAdvice.Disable => (FindingStatus.Improvable, Severity.Low, T("désactivé"), family.Recommendation + storeAdvice, !isStore, null),
-            StartupAdvice.BrowserSettings => (FindingStatus.Improvable, Severity.Low, T("désactivé dans le navigateur"), family.Recommendation, false, null),
-            StartupAdvice.DependsOnUse => (FindingStatus.Info, Severity.Info, T("selon votre usage"), family.Recommendation + storeAdvice, !isStore, null),
-            StartupAdvice.KeepIfUsed => (FindingStatus.Info, Severity.Info, T("activé si vous utilisez ce service"), family.Recommendation, false, null),
-            _ => (FindingStatus.Ok, Severity.Info, T("activé"), family.Recommendation, false, null),
+            StartupAdvice.Disable => (FindingStatus.Improvable, Severity.Low, T("désactivé"), T(family.Recommendation) + storeAdvice, !isStore, null),
+            StartupAdvice.BrowserSettings => (FindingStatus.Improvable, Severity.Low, T("désactivé dans le navigateur"), T(family.Recommendation), false, null),
+            StartupAdvice.DependsOnUse => (FindingStatus.Info, Severity.Info, T("selon votre usage"), T(family.Recommendation) + storeAdvice, !isStore, null),
+            StartupAdvice.KeepIfUsed => (FindingStatus.Info, Severity.Info, T("activé si vous utilisez ce service"), T(family.Recommendation), false, null),
+            _ => (FindingStatus.Ok, Severity.Info, T("activé"), T(family.Recommendation), false, null),
         };
     }
 

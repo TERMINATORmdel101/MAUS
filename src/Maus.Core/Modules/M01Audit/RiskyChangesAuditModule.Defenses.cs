@@ -18,7 +18,7 @@ public sealed partial class RiskyChangesAuditModule
     /// <summary>Clés de stratégie par profil ; « StandardProfile » est l'ancien nom du profil privé.</summary>
     private static readonly (string Key, string Label)[] FirewallPolicyProfiles =
     [
-        ("DomainProfile", "domaine"),
+        ("DomainProfile", T("domaine")),
         ("PrivateProfile", T("privé")),
         ("StandardProfile", T("privé")),
         ("PublicProfile", "public"),
@@ -108,7 +108,7 @@ public sealed partial class RiskyChangesAuditModule
         if (SecurityProduct.ActiveThirdParty(firewalls) is { } thirdParty)
         {
             return FirewallCheck.Neutral(
-                $"{current} ; {thirdParty.Name} actif",
+                T("{0} ; {1} actif", current, thirdParty.Name),
                 expected,
                 T("Un autre pare-feu ({0}) protège ce PC : le pare-feu Windows peut alors être coupé. C'est un fonctionnement normal.", thirdParty.Name));
         }
@@ -124,9 +124,9 @@ public sealed partial class RiskyChangesAuditModule
 
     private static string FirewallProfileLabel(string? name) => name?.Trim().ToUpperInvariant() switch
     {
-        "DOMAIN" => "domaine",
+        "DOMAIN" => T("domaine"),
         "PRIVATE" => T("privé"),
-        "PUBLIC" => "public",
+        "PUBLIC" => T("public"),
         _ => name ?? T("inconnu"),
     };
 }

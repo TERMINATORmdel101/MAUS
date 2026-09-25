@@ -17,21 +17,21 @@ public static class RegistryRuleEvaluator
         }
         catch (MausAccessDeniedException)
         {
-            return Finding.AdminRequired(rule.Id, rule.Title, rule.Category);
+            return Finding.AdminRequired(rule.Id, T(rule.Title), Optional(rule.Category));
         }
 
         var compliant = IsCompliant(rule, current);
         return new Finding
         {
             Id = rule.Id,
-            Title = rule.Title,
-            Category = rule.Category,
+            Title = T(rule.Title),
+            Category = Optional(rule.Category),
             Status = compliant ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(rule.Severity),
             Severity = rule.Severity,
             Current = current ?? T("absente"),
-            Expected = rule.ExpectedLabel ?? DescribeExpectation(rule),
-            Explanation = rule.Explanation,
-            Advice = compliant ? null : rule.Advice,
+            Expected = rule.ExpectedLabel is { } label ? T(label) : DescribeExpectation(rule),
+            Explanation = T(rule.Explanation),
+            Advice = compliant ? null : Optional(rule.Advice),
             Fixable = !compliant && rule.Fix is not null,
         };
     }

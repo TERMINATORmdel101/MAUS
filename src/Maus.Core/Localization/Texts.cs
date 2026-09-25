@@ -54,6 +54,9 @@ public static class Texts
     /// <summary>Traduction d'un texte français (le texte lui-même si la traduction manque).</summary>
     public static string T(string french) => _current.TryGetValue(french, out var translated) ? translated : french;
 
+    /// <summary>Traduction d'un texte facultatif (catalogues JSON) : <c>null</c> reste <c>null</c>.</summary>
+    public static string? Optional(string? french) => french is null ? null : T(french);
+
     /// <summary>Traduction d'un modèle français à trous ({0}, {1}…), puis remplissage dans la culture de la langue active.</summary>
     public static string T(string french, params object?[] args) => string.Format(Culture, T(french), args);
 

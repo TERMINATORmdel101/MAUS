@@ -28,19 +28,41 @@ def sources():
                     found.add(literal.replace('\\"', '"').replace("\\\\", "\\").replace("\\n", "\n"))
     return found | catalog_texts()
 
-# Catalogues JSON déjà traduits, et leurs champs de texte.
-CATALOGS = {"processes.json": ("category", "what")}
+# Catalogues JSON traduits, et leurs champs de texte (chemins : « [] » = chaque élément d'une liste).
+# Même liste dans tests/Maus.Core.Tests/Localization/TranslationCoverageTests.cs.
+RULES = ["[].title", "[].explanation", "[].advice", "[].category", "[].expectedLabel", "[].fix.title", "[].fix.gain", "[].fix.risk", "[].fix.warning"]
+CATALOGS = {
+    "processes.json": ["[].category", "[].what"],
+    "m01-audit-rules.json": RULES,
+    "m04-privacy-rules.json": RULES,
+    "m06-visual-rules.json": RULES,
+    "m08-bios-vendors.json": ["vendors[].rescueTool"],
+    "m09-gpu-drivers.json": ["branches[].label", "branches[].note"],
+    "m12-startup-catalog.json": ["families[].label", "families[].item", "families[].loses", "families[].recommendation"],
+}
+
+def walk(node, steps):
+    if not steps:
+        if isinstance(node, str):
+            yield node
+        return
+    step, rest = steps[0], steps[1:]
+    name, is_list = (step[:-2], True) if step.endswith("[]") else (step, False)
+    if name:
+        node = node.get(name) if isinstance(node, dict) else None
+    if node is None:
+        return
+    for item in (node if is_list else [node]):
+        yield from walk(item, rest)
 
 def catalog_texts():
     found = set()
-    for name, fields in CATALOGS.items():
+    for name, paths in CATALOGS.items():
         path = os.path.join(ROOT, "src", "Maus.Core", "Catalog", name)
         lines = [l for l in open(path, encoding="utf-8") if not l.lstrip().startswith("//")]
         data = json.loads("".join(lines))
-        for entry in data:
-            for field in fields:
-                if isinstance(entry.get(field), str):
-                    found.add(entry[field])
+        for spec in paths:
+            found.update(walk(data, spec.split(".")))
     return found
 
 def load(lang):

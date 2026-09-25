@@ -20,7 +20,7 @@ public sealed class PowerModule : Fixes.IFixableModule
     internal const string X3DServiceQuery = "SELECT Name, State FROM Win32_Service WHERE Name = 'amd3dvcacheSvc'";
 
     private static string PlanCategory => T("Mode de gestion");
-    private const string ModeCategory = "Mode d'alimentation";
+    private static string ModeCategory => T("Mode d'alimentation");
     private static string StartupCategory => T("Démarrage et veille");
     private static string HardwareCategory => T("Matériel et utilitaires");
 
@@ -52,7 +52,7 @@ public sealed class PowerModule : Fixes.IFixableModule
 
     public string Id => "M05";
 
-    public string Title => "Alimentation";
+    public string Title => T("Alimentation");
 
     public int Order => 50;
 
@@ -442,7 +442,7 @@ public sealed class PowerModule : Fixes.IFixableModule
         {
             LaptopPowerChoice.Performance => T("performance sur secteur, Équilibré sur batterie"),
             LaptopPowerChoice.PerformanceEverywhere => T("performance partout"),
-            LaptopPowerChoice.Battery => "autonomie",
+            LaptopPowerChoice.Battery => T("autonomie"),
             _ => T("pas encore choisi (proposition par défaut : performance sur secteur, Équilibré sur batterie)"),
         },
         Expected = T("au choix de l'utilisateur"),
@@ -572,8 +572,8 @@ public sealed class PowerModule : Fixes.IFixableModule
                     EffectivePowerMode.BatterySaver => T("Économiseur d'énergie"),
                     EffectivePowerMode.BetterBattery => T("Meilleure efficacité énergétique"),
                     EffectivePowerMode.Balanced => T("Équilibré"),
-                    EffectivePowerMode.HighPerformance => "Haute performance",
-                    EffectivePowerMode.MaxPerformance => "Performances maximales",
+                    EffectivePowerMode.HighPerformance => T("Haute performance"),
+                    EffectivePowerMode.MaxPerformance => T("Performances maximales"),
                     EffectivePowerMode.GameMode => T("Mode Jeu (un jeu est au premier plan)"),
                     _ => T("Réalité mixte"),
                 },
@@ -601,7 +601,7 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding DescribeHybridCpu(CpuInfo cpu) => new()
     {
         Id = "M05.hybrid-cpu",
-        Title = "Processeur Intel hybride",
+        Title = T("Processeur Intel hybride"),
         Category = HardwareCategory,
         Status = FindingStatus.Info,
         Current = T("{0} : cœurs performants (P) et économes (E)", cpu.Name),
@@ -618,7 +618,7 @@ public sealed class PowerModule : Fixes.IFixableModule
             PowerProfile.DesktopX3D => T("PC fixe, Ryzen X3D à deux CCD"),
             PowerProfile.DesktopHybrid => T("PC fixe, processeur Intel hybride"),
             PowerProfile.DesktopModernStandby => T("PC fixe en veille moderne"),
-            _ => "PC fixe",
+            _ => T("PC fixe"),
         };
         var explanation = T("MAUS adapte ses propositions d'alimentation au type de PC, reconnu par deux indices sur trois : type de châssis, type de système et présence d'une batterie.");
         var batteryIsUps = capabilities is { UpsPresent: true } or { BatteriesAreShortTerm: true };

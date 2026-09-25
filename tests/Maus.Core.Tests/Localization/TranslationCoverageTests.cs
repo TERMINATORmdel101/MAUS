@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Maus.Core.Localization;
 
@@ -62,14 +63,63 @@ public partial class TranslationCoverageTests
             }
         }
 
-        // Catalogues déjà traduits : leurs champs de texte comptent aussi.
-        foreach (var process in Maus.Core.Workshop.ProcessCatalog.Default.Entries)
+        // Catalogues JSON traduits : leurs champs de texte comptent aussi (même liste que tools/i18n.py).
+        var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
+        foreach (var (name, paths) in Catalogs)
         {
-            texts.Add(process.Category);
-            texts.Add(process.What);
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "Maus.Core", "Catalog", name)), options);
+            foreach (var path in paths)
+            {
+                texts.UnionWith(Walk(document.RootElement, path.Split('.'), 0));
+            }
         }
 
         return texts;
+    }
+
+    private static readonly string[] RuleFields =
+        ["[].title", "[].explanation", "[].advice", "[].category", "[].expectedLabel", "[].fix.title", "[].fix.gain", "[].fix.risk", "[].fix.warning"];
+
+    private static readonly Dictionary<string, string[]> Catalogs = new(StringComparer.Ordinal)
+    {
+        ["processes.json"] = ["[].category", "[].what"],
+        ["m01-audit-rules.json"] = RuleFields,
+        ["m04-privacy-rules.json"] = RuleFields,
+        ["m06-visual-rules.json"] = RuleFields,
+        ["m08-bios-vendors.json"] = ["vendors[].rescueTool"],
+        ["m09-gpu-drivers.json"] = ["branches[].label", "branches[].note"],
+        ["m12-startup-catalog.json"] = ["families[].label", "families[].item", "families[].loses", "families[].recommendation"],
+    };
+
+    /// <summary>Textes d'un chemin « a[].b.c » dans un document JSON (« [] » : chaque élément de la liste).</summary>
+    private static IEnumerable<string> Walk(JsonElement node, string[] steps, int index)
+    {
+        if (index == steps.Length)
+        {
+            if (node.ValueKind == JsonValueKind.String)
+            {
+                yield return node.GetString()!;
+            }
+
+            yield break;
+        }
+
+        var step = steps[index];
+        var isList = step.EndsWith("[]", StringComparison.Ordinal);
+        var name = isList ? step[..^2] : step;
+        if (name.Length > 0 && (node.ValueKind != JsonValueKind.Object || !node.TryGetProperty(name, out node)))
+        {
+            yield break;
+        }
+
+        var items = isList && node.ValueKind == JsonValueKind.Array ? node.EnumerateArray().ToList() : [node];
+        foreach (var item in items)
+        {
+            foreach (var text in Walk(item, steps, index + 1))
+            {
+                yield return text;
+            }
+        }
     }
 
     private static HashSet<string> Placeholders(string text) =>

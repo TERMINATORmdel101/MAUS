@@ -222,7 +222,7 @@ public sealed class DisplayModule : IAuditModule
             Status = subsampled ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
             Current = $"{DisplayParsers.EncodingLabel(color.Encoding)}, {color.BitsPerColorChannel} bits, {(color.HdrActive ? "HDR" : "SDR")}",
-            Expected = "RGB ou YCbCr 4:4:4",
+            Expected = T("RGB ou YCbCr 4:4:4"),
             Explanation = subsampled
                 ? T("En {0} à {1} Hz, votre câble compresse les couleurs et le texte bave (franges colorées). " +
                   "Le débit du câble est fixe et le HDR exige 10 bits par couleur au lieu de 8. Une fréquence plus basse ou le DisplayPort donneront une image plus nette.", (color.HdrActive ? "HDR" : "SDR"), Hz(screen.Path.RefreshHz ?? 0))
@@ -306,7 +306,7 @@ public sealed class DisplayModule : IAuditModule
         return new Finding
         {
             Id = $"M14.connector.{screen.Slug}",
-            Title = $"Connecteur : {screen.Label}",
+            Title = T("Connecteur : {0}", screen.Label),
             Category = screen.Category,
             Status = healthy && !subsampledHdmi ? FindingStatus.Ok : FindingStatus.Info,
             Current = DisplayParsers.ConnectorLabel(path.Output),

@@ -30,7 +30,7 @@ public static class TextReport
                 WriteColored(writer, useColor, finding.Status, $"    {Symbol(finding.Status)} {finding.Title}");
                 var values = finding switch
                 {
-                    { Current: not null, Expected: not null } => $" : {finding.Current} (attendu : {finding.Expected})",
+                    { Current: not null, Expected: not null } => T(" : {0} (attendu : {1})", finding.Current, finding.Expected),
                     { Current: not null } => $" : {finding.Current}",
                     _ => string.Empty,
                 };

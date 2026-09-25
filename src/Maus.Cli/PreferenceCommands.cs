@@ -11,7 +11,7 @@ internal static class PreferenceCommands
 {
     public static int Print(UserPreferences preferences, TextWriter output)
     {
-        output.WriteLine($"Profil Game Bar : {(preferences.GameBarProfile is { } p ? $"profil {p} (choisi par vous)" : "détecté par MAUS")}");
+        output.WriteLine(T("Profil Game Bar : {0}", (preferences.GameBarProfile is { } p ? T("profil {0} (choisi par vous)", p) : T("détecté par MAUS"))));
         output.WriteLine(T("Alimentation du portable : {0}", Describe(preferences.LaptopPower)));
         output.WriteLine(T("Constats marqués « voulu » : {0}", preferences.Acknowledged.Count));
         foreach (var mark in preferences.Acknowledged)
@@ -45,7 +45,7 @@ internal static class PreferenceCommands
 
         if (updated is null)
         {
-            output.WriteLine($"Choix inconnu : {assignment}");
+            output.WriteLine(T("Choix inconnu : {0}", assignment));
             return 1;
         }
 
@@ -101,7 +101,7 @@ internal static class PreferenceCommands
     {
         LaptopPowerChoice.Performance => T("performance sur secteur, Équilibré sur batterie"),
         LaptopPowerChoice.PerformanceEverywhere => T("performance partout"),
-        LaptopPowerChoice.Battery => "autonomie",
+        LaptopPowerChoice.Battery => T("autonomie"),
         _ => T("pas encore choisi"),
     };
 }

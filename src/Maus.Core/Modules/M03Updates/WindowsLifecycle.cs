@@ -57,10 +57,10 @@ internal sealed class WindowsLifecycleCatalog
 
     public static string Describe(ServicingChannel channel) => channel switch
     {
-        ServicingChannel.HomePro => "Famille et Pro",
+        ServicingChannel.HomePro => T("Famille et Pro"),
         ServicingChannel.EnterpriseEducation => T("Entreprise et Éducation"),
-        ServicingChannel.Ltsc => "Entreprise LTSC",
-        _ => "IoT Entreprise LTSC",
+        ServicingChannel.Ltsc => T("Entreprise LTSC"),
+        _ => T("IoT Entreprise LTSC"),
     };
 }
 

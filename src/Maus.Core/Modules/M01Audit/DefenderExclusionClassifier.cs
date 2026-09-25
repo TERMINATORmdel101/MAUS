@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Maus.Core.Platform;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
@@ -14,8 +15,8 @@ internal sealed record DefenderExclusion(ExclusionKind Kind, string Value)
 {
     public override string ToString() => Kind switch
     {
-        ExclusionKind.Extension => "extension " + Value,
-        ExclusionKind.Process => "processus " + Value,
+        ExclusionKind.Extension => T("extension {0}", Value),
+        ExclusionKind.Process => T("processus {0}", Value),
         _ => Value,
     };
 

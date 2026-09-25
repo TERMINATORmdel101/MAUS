@@ -74,9 +74,9 @@ internal static class PrivacyRegistryChecks
     public static string DescribeDiagnosticLevel(int level) => level switch
     {
         0 => T("0 (diagnostic désactivé)"),
-        1 => "1 (Requises)",
+        1 => T("1 (Requises)"),
         2 => T("2 (Améliorées, ancien niveau de Windows 10)"),
-        3 => "3 (Facultatives)",
+        3 => T("3 (Facultatives)"),
         _ => T("{0} (valeur inconnue)", level.ToString(CultureInfo.InvariantCulture)),
     };
 
@@ -150,7 +150,7 @@ internal static class PrivacyRegistryChecks
                     Category = Diagnostic,
                     Status = FindingStatus.Ok,
                     Severity = Severity.Info,
-                    Current = "actifs",
+                    Current = T("actifs"),
                     Expected = T("actifs (conseillé)"),
                     Explanation = explanation,
                 };

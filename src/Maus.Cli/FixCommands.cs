@@ -29,12 +29,12 @@ internal static class FixCommands
                 output.WriteLine($"      {change.Description}");
                 if (change.Warning is not null)
                 {
-                    output.WriteLine($"      ATTENTION : {change.Warning}");
+                    output.WriteLine(T("      ATTENTION : {0}", change.Warning));
                 }
 
                 if (change.Risk is not null)
                 {
-                    output.WriteLine($"      Risque : {change.Risk}");
+                    output.WriteLine(T("      Risque : {0}", change.Risk));
                 }
 
                 foreach (var write in change.Writes)

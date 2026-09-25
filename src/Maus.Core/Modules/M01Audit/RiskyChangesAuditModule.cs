@@ -155,7 +155,7 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
         }
         catch (IOException ex)
         {
-            return check.Unknown($"Lecture impossible : {ex.Message}");
+            return check.Unknown(T("Lecture impossible : {0}", ex.Message));
         }
     }
 
@@ -180,7 +180,7 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
     {
         var result = CimQueryResult.Run(cim, $"SELECT displayName, productState FROM {className}", CimScopes.SecurityCenter2);
         return result.Rows?
-            .Select(row => new SecurityProduct(row.GetString("displayName") ?? "Produit inconnu", row.GetInt64("productState") ?? 0))
+            .Select(row => new SecurityProduct(row.GetString("displayName") ?? T("Produit inconnu"), row.GetInt64("productState") ?? 0))
             .ToList();
     }
 

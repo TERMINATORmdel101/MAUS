@@ -47,7 +47,7 @@ public sealed record SettingKey
     {
         "HKLM" => RegistryHive.LocalMachine,
         "HKCU" => RegistryHive.CurrentUser,
-        _ => throw new FormatException($"Ruche inconnue : {Hive}"),
+        _ => throw new FormatException(T("Ruche inconnue : {0}", Hive)),
     };
 
     /// <summary>Réglage propre à l'utilisateur de la session (HKCU ou paramètre système) : il faut écrire dans le bon profil.</summary>

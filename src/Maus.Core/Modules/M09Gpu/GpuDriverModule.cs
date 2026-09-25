@@ -15,7 +15,7 @@ namespace Maus.Core.Modules.M09Gpu;
 /// </summary>
 public sealed partial class GpuDriverModule : Fixes.IFixableModule
 {
-    private const string DriverCategory = "Pilote";
+    private static string DriverCategory => T("Pilote");
     private static string SettingsCategory => T("Réglages de la carte graphique");
     private const string UpdateCategory = "Windows Update";
     private const string GraphicsDriversKey = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
@@ -92,7 +92,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             ? context.Hardware.Gpus
             : rows.Select(r =>
             {
-                var name = r.GetString("Name")?.Trim() ?? "GPU inconnu";
+                var name = r.GetString("Name")?.Trim() ?? T("GPU inconnu");
                 var pnp = r.GetString("PNPDeviceID") ?? string.Empty;
                 var vendor = GpuClassifier.VendorOf(pnp, name);
                 return new GpuInfo(name, vendor, r.GetString("DriverVersion"), r.GetDateTime("DriverDate"), pnp, GpuClassifier.IsLikelyIntegrated(vendor, name));
@@ -186,7 +186,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         var current = versions.InstalledLabel ?? T("version illisible");
         if (versions.WindowsVersion is { } windowsVersion && !string.Equals(windowsVersion, versions.InstalledLabel, StringComparison.Ordinal))
         {
-            current += $" (version Windows {windowsVersion})";
+            current += T(" (version Windows {0})", windowsVersion);
         }
 
         if (date is not null)
@@ -197,7 +197,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         var downloadUrl = branch?.DownloadUrl ?? catalog.DownloadUrlFor(gpu.Vendor);
         var expected = branch is null
             ? T("pilote de moins de {0} mois", catalog.MaxDriverAgeDays / 30)
-            : T("{0} ou plus récent ({1}, publié le {2})", versions.LatestLabel, branch.Label, FormatDate(branch.ReleasedOn));
+            : T("{0} ou plus récent ({1}, publié le {2})", versions.LatestLabel, T(branch.Label), FormatDate(branch.ReleasedOn));
 
         var explanation = branch is null
             ? T("MAUS ne connaît pas la dernière version pour cette carte : il juge seulement l'âge du pilote (plus de {0} mois = ancien).", catalog.MaxDriverAgeDays / 30)
@@ -205,7 +205,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         explanation += T(" Un pilote plus récent n'améliore les performances que dans certains jeux récents, mais il corrige aussi des bugs et des failles.");
         if (branch?.Note is { } note)
         {
-            explanation += " " + note;
+            explanation += " " + T(note);
         }
 
         string? advice = null;
@@ -379,7 +379,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             };
         }
 
-        var source = kernel is not null ? string.Empty : $" (valeur HwSchMode = {mode})";
+        var source = kernel is not null ? string.Empty : T(" (valeur HwSchMode = {0})", mode);
         var status = enabled.Value
             ? FindingStatus.Ok
             : needsFrameGeneration ? FindingStatusExtensions.ForDeviation(Severity.Low) : FindingStatus.Info;
@@ -672,7 +672,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         HardwareVendor.Nvidia => "NVIDIA",
         HardwareVendor.Amd => "AMD",
         HardwareVendor.Intel => "Intel",
-        _ => "graphique",
+        _ => T("graphique"),
     };
 
     private static string FormatDate(DateTime date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);

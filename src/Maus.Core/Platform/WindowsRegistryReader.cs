@@ -1,5 +1,6 @@
 using System.Security;
 using Microsoft.Win32;
+using Maus.Core.Localization;
 
 namespace Maus.Core.Platform;
 
@@ -33,7 +34,7 @@ public sealed class WindowsRegistryReader : IRegistryReader
         }
         catch (Exception ex) when (ex is SecurityException or UnauthorizedAccessException)
         {
-            throw new MausAccessDeniedException($"Lecture refusée : {hive}\\{path}", ex);
+            throw new MausAccessDeniedException(Texts.T("Lecture refusée : {0}\\{1}", hive, path), ex);
         }
     }
 }

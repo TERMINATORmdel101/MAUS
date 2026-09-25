@@ -26,7 +26,7 @@ public sealed class BiosModule : IAuditModule
     private const string IntelAdvisoryUrl = "https://www.intel.com/content/www/us/en/support/articles/000102331/processors.html";
     private const string RecoveryKeyUrl = "https://aka.ms/myrecoverykey";
     private static string UpdateCategory => T("Mise à jour du BIOS");
-    private const string CertificatesCategory = "Certificats Secure Boot 2023";
+    private static string CertificatesCategory => T("Certificats Secure Boot 2023");
     private static string PreparationCategory => T("Avant la mise à jour");
     private const int EventWindowDays = 180;
 
@@ -108,7 +108,7 @@ public sealed class BiosModule : IAuditModule
 
         var row = bios.Rows[0];
         var version = row.GetString("SMBIOSBIOSVersion")?.Trim();
-        var versionText = string.IsNullOrEmpty(version) ? T("version inconnue") : $"version {version}";
+        var versionText = string.IsNullOrEmpty(version) ? T("version inconnue") : T("version {0}", version);
         var date = row.GetDateTime("ReleaseDate");
         if (date is null)
         {
@@ -523,7 +523,7 @@ public sealed class BiosModule : IAuditModule
             1 => T("certificat 2023 en base DB, gestionnaire signé 2011 encore utilisé"),
             0 => T("certificat 2023 absent de la base DB"),
             null => T("non renseigné"),
-            var other => $"valeur {other}",
+            var other => T("valeur {0}", other),
         };
         return new Finding
         {
@@ -659,7 +659,7 @@ public sealed class BiosModule : IAuditModule
     };
 
     private static string PageAdvice(BiosTarget target) => target.Url is { } url
-        ? $"Page officielle : {url}."
+        ? T("Page officielle : {0}.", url)
         : T("Cherchez « {0} BIOS » sur le site officiel du fabricant.", target.DisplayName);
 
     private static string FormatDate(DateTime date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
@@ -673,12 +673,12 @@ public sealed class BiosModule : IAuditModule
 
         if (months < 12)
         {
-            return $"{months} mois";
+            return T("{0} mois", months);
         }
 
         var years = months / 12;
         var rest = months % 12;
-        var yearsText = years == 1 ? "1 an" : $"{years} ans";
+        var yearsText = years == 1 ? T("1 an") : T("{0} ans", years);
         return rest == 0 ? yearsText : T("{0} et {1} mois", yearsText, rest);
     }
 

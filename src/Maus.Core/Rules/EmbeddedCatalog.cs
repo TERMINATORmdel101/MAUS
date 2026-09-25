@@ -25,7 +25,7 @@ public static class EmbeddedCatalog
         using var stream = typeof(EmbeddedCatalog).Assembly.GetManifestResourceStream(resourceName)
             ?? throw new FileNotFoundException(Texts.T("Catalogue embarqué introuvable : {0}", resourceName));
         return JsonSerializer.Deserialize<T>(stream, JsonOptions)
-            ?? throw new InvalidDataException($"Catalogue vide : {resourceName}");
+            ?? throw new InvalidDataException(Texts.T("Catalogue vide : {0}", resourceName));
     }
 
     public static IReadOnlyList<RegistryRule> LoadRegistryRules(string fileName) => Load<List<RegistryRule>>(fileName);

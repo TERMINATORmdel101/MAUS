@@ -22,9 +22,9 @@ public sealed class OverclockingModule : IAuditModule
     internal const string IntelArcUrl = "https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html";
 
     private static string StartCategory => T("Avant de commencer");
-    private const string CpuCategory = "Processeur";
-    private const string GpuCategory = "Carte graphique";
-    private const string ToolsCategory = "Outils";
+    private static string CpuCategory => T("Processeur");
+    private static string GpuCategory => T("Carte graphique");
+    private static string ToolsCategory => T("Outils");
 
     private static string UndervoltFirst => T("Commencez par l'undervolting (baisser légèrement la tension) : moins de chaleur et de bruit, souvent sans perte de performance. "
         + "L'overclocking ne vient qu'ensuite, par petits pas.");
@@ -192,7 +192,7 @@ public sealed class OverclockingModule : IAuditModule
             Title = T("Processeur {0} (portable) : utilitaire du constructeur", model),
             Category = CpuCategory,
             Status = FindingStatus.Info,
-            Current = $"{model}, PC portable",
+            Current = T("{0}, PC portable", model),
             Explanation = T("Sur un portable, le processeur est généralement verrouillé et la marge thermique est faible : l'overclocking est à "
                 + "éviter. Les modes de performance et de ventilation de l'utilitaire du constructeur sont la voie sûre ; l'undervolting du "
                 + "processeur est souvent bloqué par le BIOS."),
@@ -203,7 +203,7 @@ public sealed class OverclockingModule : IAuditModule
     private static Finding IntelUnlocked(string model, InstalledTool? xtu) => new()
     {
         Id = "M15.cpu",
-        Title = $"Processeur {model} : Intel Extreme Tuning Utility (XTU)",
+        Title = T("Processeur {0} : Intel Extreme Tuning Utility (XTU)", model),
         Category = CpuCategory,
         Status = FindingStatus.Info,
         Current = xtu is null ? T("{0}, coefficient débloqué", model) : T("{0}, coefficient débloqué · {1} installé", model, xtu.Label),
@@ -242,7 +242,7 @@ public sealed class OverclockingModule : IAuditModule
         return new Finding
         {
             Id = "M15.cpu",
-            Title = $"Processeur {model} : AMD Ryzen Master, PBO et Curve Optimizer",
+            Title = T("Processeur {0} : AMD Ryzen Master, PBO et Curve Optimizer", model),
             Category = CpuCategory,
             Status = FindingStatus.Info,
             Current = current,
@@ -293,7 +293,7 @@ public sealed class OverclockingModule : IAuditModule
             HardwareVendor.Amd => new Finding
             {
                 Id = id,
-                Title = $"Carte graphique {model} : AMD Software Adrenalin",
+                Title = T("Carte graphique {0} : AMD Software Adrenalin", model),
                 Category = GpuCategory,
                 Status = FindingStatus.Info,
                 Current = WithInstalled(model, Find(tools, "adrenalin")),
@@ -305,7 +305,7 @@ public sealed class OverclockingModule : IAuditModule
             HardwareVendor.Intel => new Finding
             {
                 Id = id,
-                Title = $"Carte graphique {model} : Intel Graphics Software",
+                Title = T("Carte graphique {0} : Intel Graphics Software", model),
                 Category = GpuCategory,
                 Status = FindingStatus.Info,
                 Current = WithInstalled(model, Find(tools, "intel-graphics")),
