@@ -30,6 +30,13 @@ public static class ShellLauncher
     private static void Start(string arguments)
     {
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        using var _ = Process.Start(new ProcessStartInfo(Path.Combine(windows, "explorer.exe"), arguments) { UseShellExecute = false });
+        try
+        {
+            using var _ = Process.Start(new ProcessStartInfo(Path.Combine(windows, "explorer.exe"), arguments) { UseShellExecute = false });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            // Rien à ouvrir : l'Explorateur est absent ou refuse la demande. MAUS ne relance rien avec ses propres droits.
+        }
     }
 }

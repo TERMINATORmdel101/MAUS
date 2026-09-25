@@ -393,9 +393,12 @@ public sealed class WorkshopViewModel : ObservableObject
             var snapshot = await Task.Run(_sensors.Sample);
             Live.Add(snapshot);
         }
-        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or InvalidOperationException)
+        catch (Exception ex)
         {
+            // Une mesure impossible ne doit jamais faire tomber la fenêtre : on s'arrête et on le dit.
             _liveTimer.Stop();
+            Live.Alarms.Clear();
+            Live.Alarms.Add(T("Les mesures en direct se sont arrêtées : {0}", ex.Message));
         }
         finally
         {
@@ -417,6 +420,11 @@ public sealed class WorkshopViewModel : ObservableObject
             var monitor = _processes;
             _lastProcesses = await Task.Run(monitor.Sample);
             ShowProcesses();
+        }
+        catch (Exception ex)
+        {
+            _processTimer.Stop();
+            DiagnosisStatus = T("La liste des processus n'a pas pu être lue : {0}", ex.Message);
         }
         finally
         {
@@ -460,7 +468,7 @@ public sealed class WorkshopViewModel : ObservableObject
             await Task.Run(() => new WindowsProcessTerminator().Terminate(process.Sample));
             DiagnosisStatus = T("« {0} » a été arrêté.", process.Name);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
             DiagnosisStatus = ex.Message;
         }
@@ -493,6 +501,10 @@ public sealed class WorkshopViewModel : ObservableObject
             }
 
             DiagnosisStatus = T("Diagnostic terminé : voici les causes principales, de la plus importante à la moins importante.");
+        }
+        catch (Exception ex)
+        {
+            DiagnosisStatus = T("Le diagnostic n'a pas pu aboutir : {0}", ex.Message);
         }
         finally
         {
@@ -543,6 +555,10 @@ public sealed class WorkshopViewModel : ObservableObject
                     ? T("Stable : aucune erreur de calcul en {0:0} s. Score : {1:0.0} tours par seconde.", result.Duration.TotalSeconds, result.Score) + comparison
                     : T("INSTABLE : {0} erreur(s) de calcul. Revenez aux réglages d'origine du BIOS (surcadençage, tension) et vérifiez le refroidissement.", result.Errors);
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            CpuStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
+        }
         finally
         {
             await StopTestAsync();
@@ -587,6 +603,14 @@ public sealed class WorkshopViewModel : ObservableObject
                     ? T("Aucune erreur sur {0:0.0} Go. Débit de copie : {1:0.0} Go/s · latence : {2:0.0} ns. (Un test sous Windows ne couvre pas la mémoire déjà utilisée : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)", result.TestedBytes / 1073741824.0, result.CopyGigabytesPerSecond, result.LatencyNanoseconds)
                     : T("ERREURS : {0} valeur(s) relue(s) différente(s). Revenez au profil mémoire d'origine dans le BIOS (voir Module 10), puis refaites le test ; si les erreurs restent, une barrette est probablement défaillante.", result.Errors);
         }
+        catch (OutOfMemoryException)
+        {
+            RamStatus = T("Windows n'a pas pu réserver cette quantité de mémoire : fermez des applications ou choisissez une quantité plus petite.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            RamStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
+        }
         finally
         {
             await StopTestAsync();
@@ -610,7 +634,7 @@ public sealed class WorkshopViewModel : ObservableObject
                 ? T("Aucune carte graphique avec de la mémoire dédiée : une puce graphique intégrée utilise la mémoire vive, déjà couverte par le test de la RAM.")
                 : string.Empty;
         }
-        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or GpuMemoryException)
+        catch (Exception ex)
         {
             VramStatus = T("Direct3D ne répond pas sur ce PC : {0}", ex.Message);
         }
@@ -655,7 +679,7 @@ public sealed class WorkshopViewModel : ObservableObject
                         + " " + T("(La mémoire déjà utilisée par l'affichage n'est pas couverte : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)")
                     : T("ERREURS : {0} valeur(s) relue(s) différente(s) dans la mémoire vidéo. Revenez aux fréquences d'origine de la carte (outil de surcadençage, voir Module 15), vérifiez sa température, puis refaites le test ; si les erreurs restent, la carte est probablement défaillante.", result.Errors);
         }
-        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or GpuMemoryException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             VramStatus = T("Direct3D ne répond pas sur ce PC : {0}", ex.Message);
         }
