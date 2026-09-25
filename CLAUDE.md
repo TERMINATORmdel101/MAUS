@@ -62,6 +62,8 @@ dotnet run --project src/Maus.Cli -- --module M06
 dotnet publish src/Maus.App -c Release -o publish/MAUS
 ```
 
+- Dépôt : https://github.com/TERMINATORmdel101/MAUS (**privé** jusqu'à l'ajout du fichier `LICENSE` et la relecture juridique). Branche `main`.
+- Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@users.noreply.github.com>`. Ne jamais utiliser l'adresse e-mail personnelle du porteur : GitHub refuse le push (adresse privée protégée).
 - `nuget.config` du dépôt force nuget.org (la config NuGet globale du PC est vide).
 - Sur le PC Windows : PowerShell 5.1 (pas de `&&`) ; chemins longs du dossier temporaire > 260 caractères = erreurs, travailler dans le dépôt.
 - Tester l'interface sans fenêtre UAC : remplacer temporairement `requireAdministrator` par `asInvoker` dans `src/Maus.App/app.manifest`, compiler dans un dossier ignoré, lancer, cliquer « Lancer l'audit » via UI Automation, vérifier le journal « .NET Runtime », puis **restaurer le manifeste**.
