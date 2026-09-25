@@ -192,6 +192,22 @@ public class PrivacyModuleTests
         Assert.Equal(current, finding.Current);
     }
 
+    [Fact]
+    public void Undocumented_toggle_values_are_information_unless_a_policy_decides()
+    {
+        var registry = new FakeRegistry()
+            .Set(Hkcu, AdvertisingUser, "Enabled", 2)
+            .Set(Hkcu, ExplorerAdvanced, "Start_IrisRecommendations", 5)
+            .Set(Hkcu, SearchSettingsUser, "IsDynamicSearchBoxEnabled", 2);
+
+        Assert.Equal(FindingStatus.Info, PrivacyRegistryChecks.AdvertisingId(registry, policiesHonored: true).Status);
+        Assert.Equal("valeur 5 non documentée", PrivacyRegistryChecks.StartRecommendations(registry, Pro).Current);
+        Assert.Equal(FindingStatus.Info, PrivacyRegistryChecks.SearchHighlights(registry, policiesHonored: true).Status);
+
+        registry.Set(Hklm, AdvertisingPolicy, "DisabledByGroupPolicy", 1);
+        Assert.Equal(FindingStatus.Ok, PrivacyRegistryChecks.AdvertisingId(registry, policiesHonored: true).Status);
+    }
+
     [Theory]
     [InlineData(null, "automatique (par défaut)", FindingStatus.Improvable)]
     [InlineData(0, "jamais", FindingStatus.Ok)]
