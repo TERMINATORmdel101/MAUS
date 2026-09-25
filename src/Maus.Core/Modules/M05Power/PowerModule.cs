@@ -1,5 +1,6 @@
 ﻿using Maus.Core.Hardware;
 using Maus.Core.Platform;
+using Maus.Core.Preferences;
 using Microsoft.Win32;
 
 namespace Maus.Core.Modules.M05Power;
@@ -69,10 +70,10 @@ public sealed class PowerModule : Fixes.IFixableModule
         var findings = new List<Finding> { EvaluatePlan(plan, profile, overlays, HasPlanPolicy(registry)) };
         if (plan?.Kind == SchemeKind.Balanced && profile is PowerProfile.Laptop or PowerProfile.DesktopX3D or PowerProfile.DesktopHybrid or PowerProfile.DesktopModernStandby)
         {
-            findings.Add(EvaluateAcMode(overlays, profile));
+            findings.Add(EvaluateAcMode(overlays, profile, context.Preferences.LaptopPower));
             if (profile == PowerProfile.Laptop)
             {
-                findings.Add(EvaluateDcMode(overlays));
+                findings.Add(EvaluateDcMode(overlays, context.Preferences.LaptopPower));
             }
         }
 
@@ -88,6 +89,11 @@ public sealed class PowerModule : Fixes.IFixableModule
         if (isIntelHybrid)
         {
             findings.Add(DescribeHybridCpu(context.Hardware.Cpu));
+        }
+
+        if (profile == PowerProfile.Laptop)
+        {
+            findings.Add(DescribeLaptopChoice(context.Preferences.LaptopPower));
         }
 
         findings.Add(DescribeProfile(context.Hardware, profile, capabilities));
@@ -315,7 +321,7 @@ public sealed class PowerModule : Fixes.IFixableModule
         };
     }
 
-    private static Finding EvaluateAcMode(OverlayState? overlays, PowerProfile profile)
+    private static Finding EvaluateAcMode(OverlayState? overlays, PowerProfile profile, LaptopPowerChoice choice)
     {
         const string id = "M05.power-mode-ac";
         const string title = "Mode d'alimentation sur secteur";
@@ -343,6 +349,23 @@ public sealed class PowerModule : Fixes.IFixableModule
             };
         }
 
+        if (profile == PowerProfile.Laptop && choice == LaptopPowerChoice.Battery)
+        {
+            var economical = overlays.Ac.Guid == PowerSchemes.OverlayBalanced || overlays.Ac.Guid == PowerSchemes.OverlayBestEfficiency;
+            return new Finding
+            {
+                Id = id,
+                Title = title,
+                Category = ModeCategory,
+                Status = economical ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
+                Severity = Severity.Low,
+                Current = current,
+                Expected = "Équilibré (votre choix : autonomie)",
+                Explanation = "Vous avez choisi de privilégier l'autonomie et le silence : « Équilibré » sur secteur chauffe moins et fait moins de bruit.",
+                Advice = economical ? null : "Choisir « Équilibré » pour « Branché » dans Paramètres > Système > Alimentation (ms-settings:powersleep).",
+            };
+        }
+
         var compliant = overlays.Ac.Guid == PowerSchemes.OverlayBestPerformance;
         return new Finding
         {
@@ -352,14 +375,14 @@ public sealed class PowerModule : Fixes.IFixableModule
             Status = compliant ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
             Severity = Severity.Low,
             Current = current,
-            Expected = PowerSchemes.OverlayLabel(PowerSchemes.OverlayBestPerformance),
+            Expected = PowerSchemes.OverlayLabel(PowerSchemes.OverlayBestPerformance) + (profile == PowerProfile.Laptop && choice != LaptopPowerChoice.NotChosen ? " (votre choix)" : string.Empty),
             Explanation = "Le mode d'alimentation (Paramètres > Système > Alimentation) ajuste « Utilisation normale » : « Meilleures performances » privilégie la réactivité et la fréquence du processeur quand le PC est branché.",
             Advice = compliant ? null : "Choisir « Meilleures performances » pour « Branché » dans Paramètres > Système > Alimentation. Plus de chaleur et de bruit sur secteur.",
             Fixable = !compliant,
         };
     }
 
-    private static Finding EvaluateDcMode(OverlayState? overlays)
+    private static Finding EvaluateDcMode(OverlayState? overlays, LaptopPowerChoice choice)
     {
         const string id = "M05.power-mode-dc";
         const string title = "Mode d'alimentation sur batterie";
@@ -373,7 +396,26 @@ public sealed class PowerModule : Fixes.IFixableModule
             return Finding.Unknown(id, title, "Valeur du mode d'alimentation illisible.", ModeCategory);
         }
 
-        var compliant = overlays.Dc.Guid == PowerSchemes.OverlayBalanced || overlays.Dc.Guid == PowerSchemes.OverlayBestEfficiency;
+        var dc = overlays.Dc.Guid;
+        var (compliant, expected, explanation, advice) = choice switch
+        {
+            LaptopPowerChoice.PerformanceEverywhere => (
+                dc == PowerSchemes.OverlayBestPerformance,
+                "Meilleures performances (votre choix : performance partout)",
+                "Vous avez choisi la performance partout : le PC reste aussi rapide sur batterie, au prix d'une autonomie nettement réduite et de plus de chaleur.",
+                "Choisir « Meilleures performances » pour « Sur batterie » dans Paramètres > Système > Alimentation (ms-settings:powersleep)."),
+            LaptopPowerChoice.Battery => (
+                dc == PowerSchemes.OverlayBestEfficiency,
+                "Meilleure efficacité énergétique (votre choix : autonomie)",
+                "Vous avez choisi l'autonomie : « Meilleure efficacité énergétique » allonge la durée sur batterie, le PC étant un peu moins réactif.",
+                "Choisir « Meilleure efficacité énergétique » pour « Sur batterie » dans Paramètres > Système > Alimentation (ms-settings:powersleep)."),
+            _ => (
+                dc == PowerSchemes.OverlayBalanced || dc == PowerSchemes.OverlayBestEfficiency,
+                "Équilibré (ou Meilleure efficacité énergétique)",
+                "Sur batterie, « Équilibré » préserve l'autonomie sans trop brider le PC ; « Meilleure efficacité énergétique » est un choix d'économie encore plus poussé, proposé mais jamais imposé.",
+                "Choisir « Équilibré » pour « Sur batterie » dans Paramètres > Système > Alimentation : le mode actuel réduit l'autonomie et chauffe davantage."),
+        };
+
         return new Finding
         {
             Id = id,
@@ -382,12 +424,33 @@ public sealed class PowerModule : Fixes.IFixableModule
             Status = compliant ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
             Severity = Severity.Low,
             Current = Describe(overlays.Dc),
-            Expected = "Équilibré (ou Meilleure efficacité énergétique)",
-            Explanation = "Sur batterie, « Équilibré » préserve l'autonomie sans trop brider le PC ; « Meilleure efficacité énergétique » est un choix d'économie encore plus poussé, proposé mais jamais imposé.",
-            Advice = compliant ? null : "Choisir « Équilibré » pour « Sur batterie » dans Paramètres > Système > Alimentation : le mode actuel réduit l'autonomie et chauffe davantage.",
-            Fixable = !compliant,
+            Expected = expected,
+            Explanation = explanation,
+            Advice = compliant ? null : advice,
         };
     }
+
+    /// <summary>Décision du projet : sur un portable, l'utilisateur choisit au premier lancement ; la proposition par défaut est pré-sélectionnée.</summary>
+    private static Finding DescribeLaptopChoice(LaptopPowerChoice choice) => new()
+    {
+        Id = "M05.laptop-choice",
+        Title = "Votre choix pour l'alimentation du portable",
+        Category = ModeCategory,
+        Status = FindingStatus.Info,
+        Current = choice switch
+        {
+            LaptopPowerChoice.Performance => "performance sur secteur, Équilibré sur batterie",
+            LaptopPowerChoice.PerformanceEverywhere => "performance partout",
+            LaptopPowerChoice.Battery => "autonomie",
+            _ => "pas encore choisi (proposition par défaut : performance sur secteur, Équilibré sur batterie)",
+        },
+        Expected = "au choix de l'utilisateur",
+        Explanation = "Trois réglages sont possibles : performance sur secteur et Équilibré sur batterie (proposé) ; performance partout (autonomie réduite) ; " +
+                      "autonomie (Équilibré sur secteur, Meilleure efficacité énergétique sur batterie).",
+        Advice = choice == LaptopPowerChoice.NotChosen
+            ? "Faites votre choix dans l'onglet Corrections de MAUS (ou maus --set alimentation=performance|partout|autonomie)."
+            : "Vous pouvez changer d'avis à tout moment dans l'onglet Corrections.",
+    };
 
     /// <summary>Le démarrage rapide n'agit que si le fichier de veille prolongée existe.</summary>
     private static Finding EvaluateFastStartup(IRegistryReader registry, PowerCapabilities? capabilities)

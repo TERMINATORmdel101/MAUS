@@ -73,3 +73,53 @@ public class PowerFixTests
         Assert.Equal(PowerSchemes.Balanced, platform.ActiveScheme);
     }
 }
+
+public class LaptopPowerChoiceTests
+{
+    private static readonly HardwareProfile Laptop = new()
+    {
+        FormFactor = FormFactor.Laptop,
+        HasBattery = true,
+        Cpu = new CpuInfo("AMD Ryzen 7 5800H with Radeon Graphics", HardwareVendor.Amd, 8, 16, 3200),
+    };
+
+    private static async Task<IReadOnlyList<Finding>> Detect(Maus.Core.Preferences.LaptopPowerChoice choice, string ac, string dc)
+    {
+        var registry = new FakeRegistry()
+            .Set(RegistryHive.LocalMachine, PowerModule.SchemesKey, "ActiveOverlayAcPowerScheme", ac)
+            .Set(RegistryHive.LocalMachine, PowerModule.SchemesKey, "ActiveOverlayDcPowerScheme", dc);
+        var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced, Capabilities = FakePowerPlatform.Caps(batteries: true) };
+        var audit = TestContext.Create(registry, hardware: Laptop)
+            .WithPreferences(Maus.Core.Preferences.UserPreferences.Default with { LaptopPower = choice });
+        return await new PowerModule(platform).DetectAsync(audit, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Default_proposal_is_performance_on_ac_and_balanced_on_battery()
+    {
+        var findings = await Detect(Maus.Core.Preferences.LaptopPowerChoice.NotChosen, PowerSchemes.OverlayBestPerformance.ToString(), Guid.Empty.ToString());
+
+        Assert.Equal(FindingStatus.Ok, findings.Single(f => f.Id == "M05.power-mode-ac").Status);
+        Assert.Equal(FindingStatus.Ok, findings.Single(f => f.Id == "M05.power-mode-dc").Status);
+        Assert.Contains("pas encore choisi", findings.Single(f => f.Id == "M05.laptop-choice").Current, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Battery_choice_expects_economy_modes()
+    {
+        var findings = await Detect(Maus.Core.Preferences.LaptopPowerChoice.Battery, PowerSchemes.OverlayBestPerformance.ToString(), Guid.Empty.ToString());
+
+        Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M05.power-mode-ac").Status);
+        Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M05.power-mode-dc").Status);
+        Assert.Contains("autonomie", findings.Single(f => f.Id == "M05.power-mode-dc").Expected, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Performance_everywhere_expects_best_performance_on_battery()
+    {
+        var findings = await Detect(Maus.Core.Preferences.LaptopPowerChoice.PerformanceEverywhere, PowerSchemes.OverlayBestPerformance.ToString(), PowerSchemes.OverlayBestPerformance.ToString());
+
+        Assert.Equal(FindingStatus.Ok, findings.Single(f => f.Id == "M05.power-mode-dc").Status);
+        Assert.Equal("performance partout", findings.Single(f => f.Id == "M05.laptop-choice").Current);
+    }
+}
