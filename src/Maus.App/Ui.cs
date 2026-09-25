@@ -113,6 +113,10 @@ public static class Ui
 
     public static string RepairWindowsTip => T("DISM puis SFC, les outils officiels de Microsoft, dans une fenêtre visible. Utile si Windows plante, si des mises à jour échouent ou si l'audit signale des fichiers abîmés.");
 
+    public static string NetTestTitle => T("Connexion : latence et stabilité");
+
+    public static string NetTestIntro => T("MAUS envoie des « ping » à votre box et à deux serveurs publics très utilisés (Cloudflare 1.1.1.1 et Google 8.8.8.8), pendant une quinzaine de secondes. Aucune donnée personnelle n'est transmise et aucun réglage n'est modifié. Le résultat dit si un souci vient du Wi-Fi ou de la box, ou bien de la ligne.");
+
     public static string HelpTitle => T("Demander de l'aide");
 
     public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");

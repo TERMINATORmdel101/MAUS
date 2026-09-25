@@ -391,6 +391,8 @@ public sealed partial class WorkshopViewModel : ObservableObject
     {
         _isActive = false;
         _stopTest?.Invoke();
+        _stopNet?.Invoke();
+        _stopScan?.Invoke();
         _liveTimer.Stop();
         _processTimer.Stop();
     }
