@@ -76,4 +76,94 @@ public static class Ui
     public static string Later => T("Plus tard");
 
     public static string Validate => T("Valider");
+
+    public static string NavHome => T("Accueil");
+
+    public static string NavWorkshop => T("Atelier");
+
+    public static string HealthCaption => T("santé du PC · sur 100");
+
+    public static string SlowPcTitle => T("Pourquoi mon PC est lent ?");
+
+    public static string SlowPcDetail => T("Une minute de mesures, puis les causes principales et la façon de les corriger.");
+
+    public static string TestPcTitle => T("Tester mon PC");
+
+    public static string TestPcDetail => T("Stabilité du processeur et de la mémoire vive, avec arrêt automatique en cas de surchauffe.");
+
+    public static string FixPcTitle => T("Corriger en un clic");
+
+    public static string MyPcTitle => T("Mon matériel");
+
+    public static string MyPcDetail => T("Processeur, mémoire, carte graphique, disques : la fiche complète, avec les seuils de sécurité.");
+
+    public static string LiveTitle => T("En direct");
+
+    public static string LiveDetail => T("Charge, températures, fréquences et consommation, seconde par seconde.");
+
+    public static string ReportTitle => T("Un rapport à garder");
+
+    public static string ReportDetail => T("Une page HTML : ce qui a été vu, ce qui a été changé, et comment l'annuler.");
+
+    public static string WorkshopSubtitle => T("Votre matériel, en direct, comparé à ses limites de sécurité");
+
+    public static string SectionPc => T("Mon PC");
+
+    public static string SectionProcesses => T("Processus");
+
+    public static string SectionTests => T("Tests");
+
+    public static string SearchSheet => T("Rechercher la fiche");
+
+    public static string FilterLabel => T("Filtrer :");
+
+    public static string SearchWith => T("Recherche avec :");
+
+    public static string ColumnProcess => T("Processus");
+
+    public static string ColumnCpu => T("Processeur");
+
+    public static string ColumnMemory => T("Mémoire");
+
+    public static string ColumnDisk => T("Disque");
+
+    public static string ColumnGpu => T("GPU");
+
+    public static string ColumnTrust => T("Confiance");
+
+    public static string SearchWeb => T("Rechercher sur le web");
+
+    public static string ShowFolder => T("Ouvrir l'emplacement");
+
+    public static string Terminate => T("Arrêter le processus");
+
+    public static string PickProcess => T("Choisissez un processus dans la liste pour savoir ce que c'est, d'où il vient et s'il est sûr.");
+
+    public static string PidLabel => T("Identifiant (PID)");
+
+    public static string StartedLabel => T("Démarré le");
+
+    public static string LocationLabel => T("Emplacement");
+
+    public static string CpuTestTitle => T("Processeur : stabilité et performance");
+
+    public static string CpuTestIntro => T("Tous les cœurs calculent des résultats connus d'avance : la moindre erreur trahit un processeur instable (surcadençage, tension trop basse, surchauffe). Le score se compare à vos passages précédents.");
+
+    public static string RamTestTitle => T("Mémoire vive : recherche d'erreurs");
+
+    public static string RamTestIntro => T("MAUS écrit des motifs dans la mémoire puis les relit, et mesure au passage le débit et la latence. Une seule erreur suffit à expliquer des plantages aléatoires.");
+
+    public static string VramTestTitle => T("Mémoire de la carte graphique");
+
+    public static string VramTestIntro => T("Test prévu dans une prochaine version (par Direct3D, sans pilote supplémentaire).");
+
+    public static string DurationLabel => T("Durée :");
+
+    public static string SizeLabel => T("Quantité :");
+
+    public static string Start => T("Démarrer");
+
+    public static string StopTest => T("Arrêter le test");
+
+    public static string TestSafety => T("Pendant un test, MAUS surveille les températures lisibles et s'arrête de lui-même au seuil de danger. Fermez les jeux et programmes lourds pour un résultat fiable.");
 }

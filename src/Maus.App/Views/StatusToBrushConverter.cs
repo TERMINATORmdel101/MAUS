@@ -1,37 +1,73 @@
 using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
+using Maus.App.Controls;
 using Maus.Core;
 
 namespace Maus.App.Views;
 
-/// <summary>Couleur du voyant selon le verdict : vert, bleu, orange, rouge ou gris.</summary>
+/// <summary>Couleur du voyant selon le verdict, prise dans le logo : vert, bleu, or, rouge ; gris pour l'information et l'indéterminé.</summary>
 public sealed class StatusToBrushConverter : IValueConverter
 {
-    private static readonly Brush Ok = Freeze(0x2E, 0x7D, 0x32);
-    private static readonly Brush Improvable = Freeze(0x1E, 0x6F, 0xD9);
-    private static readonly Brush Warning = Freeze(0xE0, 0x86, 0x00);
-    private static readonly Brush Problem = Freeze(0xC6, 0x28, 0x28);
-    private static readonly Brush Info = Freeze(0x00, 0x83, 0x8F);
-    private static readonly Brush Unknown = Freeze(0x80, 0x80, 0x80);
-
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
     {
-        FindingStatus.Ok => Ok,
-        FindingStatus.Improvable => Improvable,
-        FindingStatus.Warning => Warning,
-        FindingStatus.Problem => Problem,
-        FindingStatus.Info => Info,
-        _ => Unknown,
+        FindingStatus.Ok => Palette.Green,
+        FindingStatus.Improvable => Palette.Blue,
+        FindingStatus.Warning => Palette.Gold,
+        FindingStatus.Problem => Palette.Red,
+        _ => Palette.Grey,
     };
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
+}
 
-    private static SolidColorBrush Freeze(byte r, byte g, byte b)
+/// <summary>Couleur d'un score de santé : vert au-dessus de 75, or au-dessus de 50, rouge en dessous.</summary>
+public sealed class ScoreToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
     {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-        brush.Freeze();
-        return brush;
-    }
+        int and < 0 => Palette.Grey,
+        int and >= 75 => Palette.Green,
+        int and >= 50 => Palette.Gold,
+        int => Palette.Red,
+        _ => Palette.Grey,
+    };
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>
+/// Couleur d'une lettre de MAUS (M bleu, A rouge, U vert, S or), comme sur le logo ; les tuiles des composants de l'atelier
+/// reprennent les mêmes couleurs (P processeur, C carte mère, R mémoire, G carte graphique, D disque, B batterie).
+/// </summary>
+public sealed class LetterToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => (value as string) switch
+    {
+        "M" or "P" => Palette.Blue,
+        "A" or "G" => Palette.Red,
+        "U" or "R" or "B" => Palette.Green,
+        "S" or "C" => Palette.Gold,
+        _ => (Brush)Palette.Grey,
+    };
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Couleur de la pastille « confiance » d'un processus : vert pour Windows et les programmes installés, or pour un emplacement inhabituel.</summary>
+public sealed class TrustToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
+    {
+        Maus.Core.Workshop.ProcessTrust.Windows or Maus.Core.Workshop.ProcessTrust.Installed => Palette.Green,
+        Maus.Core.Workshop.ProcessTrust.UserFolder => Palette.Blue,
+        Maus.Core.Workshop.ProcessTrust.Unusual => Palette.Gold,
+        _ => Palette.Grey,
+    };
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }

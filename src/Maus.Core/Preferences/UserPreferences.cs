@@ -32,6 +32,9 @@ public sealed record UserPreferences
 
     public LaptopPowerChoice LaptopPower { get; init; }
 
+    /// <summary>Moteur de recherche pour « Rechercher sur le web » (atelier) ; DuckDuckGo par défaut, au choix de l'utilisateur.</summary>
+    public Workshop.SearchEngine SearchEngine { get; init; }
+
     /// <summary>Langue de MAUS (« fr », « en », « es ») ; <c>null</c> = langue de Windows.</summary>
     public string? Language { get; init; }
 

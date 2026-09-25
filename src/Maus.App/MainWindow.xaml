@@ -2,272 +2,739 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:app="clr-namespace:Maus.App"
+        xmlns:controls="clr-namespace:Maus.App.Controls"
         xmlns:vm="clr-namespace:Maus.App.ViewModels"
+        xmlns:ws="clr-namespace:Maus.App.ViewModels.Workshop"
         Title="{x:Static app:Ui.WindowTitle}"
-        Width="1120" Height="760" MinWidth="820" MinHeight="520"
+        Width="1240" Height="820" MinWidth="960" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/maus.ico">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <!-- En-tête -->
-        <DockPanel Grid.Row="0" LastChildFill="True">
-            <ComboBox DockPanel.Dock="Right" VerticalAlignment="Top" MinWidth="120"
-                      ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding LanguageChoice}" DisplayMemberPath="Label"
-                      AutomationProperties.Name="Language / Langue / Idioma" ToolTip="Language · Langue · Idioma" />
-        <StackPanel>
-            <Image Source="/Assets/maus-banner.png" Height="96" HorizontalAlignment="Left" Margin="0,0,0,6"
-                   RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="MAUS" />
-            <TextBlock Text="{x:Static app:Ui.Tagline}"
-                       FontSize="14" Opacity="0.8" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding SystemSummary}" FontSize="13" Opacity="0.7" Margin="0,4,0,0" TextWrapping="Wrap" />
-        </StackPanel>
-        </DockPanel>
-
-        <!-- Lancement -->
-        <DockPanel Grid.Row="1" Margin="0,16,0,12" LastChildFill="True">
-            <Button DockPanel.Dock="Left" Content="{x:Static app:Ui.RunAudit}" Padding="18,8"
-                    Command="{Binding RunAuditCommand}" />
-            <ProgressBar DockPanel.Dock="Right" Width="180" Height="6" Margin="12,0,0,0" VerticalAlignment="Center"
-                         Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
-                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
-            <TextBlock Text="{Binding StatusText}" Margin="16,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
-        </DockPanel>
-
-        <TabControl Grid.Row="2">
-            <!-- Onglet 1 : modules et constats -->
-            <TabItem Header="{x:Static app:Ui.TabFindings}">
-                <Grid Margin="0,12,0,0">
+    <!-- Navigation à gauche (logo, parties, langue) ; la partie choisie s'affiche à droite. -->
+    <TabControl SelectedIndex="{Binding SelectedTab}" Background="Transparent" BorderThickness="0" Padding="0">
+        <TabControl.Template>
+            <ControlTemplate TargetType="TabControl">
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="340" />
-                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="232" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
+                    <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="0,0,1,0" Padding="14,16">
+                        <DockPanel>
+                            <Image DockPanel.Dock="Top" Source="/Assets/maus-banner.png" Height="108" HorizontalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="MAUS" Margin="0,0,0,16" />
+                            <ComboBox DockPanel.Dock="Bottom" ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding LanguageChoice}" DisplayMemberPath="Label"
+                                      AutomationProperties.Name="Language / Langue / Idioma" ToolTip="Language · Langue · Idioma" />
+                            <StackPanel IsItemsHost="True" />
+                        </DockPanel>
+                    </Border>
+                    <DockPanel Grid.Column="1" Margin="28,22,28,12">
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding About}" FontSize="11" Opacity="0.6" Margin="0,12,0,0" TextWrapping="Wrap" />
+                        <ContentPresenter ContentSource="SelectedContent" />
+                    </DockPanel>
+                </Grid>
+            </ControlTemplate>
+        </TabControl.Template>
 
-                    <ListBox Grid.Column="0" ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModule}"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:ModuleViewModel}">
-                                <DockPanel Margin="2,6">
-                                    <Ellipse DockPanel.Dock="Left" Width="12" Height="12" Margin="0,4,10,0" VerticalAlignment="Top"
-                                             Fill="{Binding Status, Converter={StaticResource StatusToBrush}}" />
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+        <!-- Accueil : score de santé, familles M·A·U·S et actions rapides -->
+        <TabItem Style="{StaticResource NavTab}">
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource NavIconBox}" Background="{StaticResource MausBlue}">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE80F;" />
+                    </Border>
+                    <TextBlock Text="{x:Static app:Ui.NavHome}" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="{Binding Greeting}" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="{x:Static app:Ui.Tagline}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding SystemSummary}" Style="{StaticResource Muted}" Margin="0,2,0,0" />
+
+                    <Grid Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="290" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Score -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid Width="176" Height="176" HorizontalAlignment="Center">
+                                    <controls:RingGauge Value="{Binding Score, Mode=OneWay}" Thickness="16"
+                                                        Stroke="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <TextBlock Text="{Binding ScoreText}" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding ScoreWord}" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                   Foreground="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
+                                        <TextBlock Text="{x:Static app:Ui.HealthCaption}" FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
                                     </StackPanel>
-                                </DockPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-
-                    <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <TextBlock Text="{Binding SelectedModule.Header}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="0.75" Margin="0,0,0,12" />
-                            <ItemsControl ItemsSource="{Binding SelectedModule.Findings}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type vm:FindingViewModel}">
-                                        <Border Margin="0,0,0,10" Padding="14,10" CornerRadius="6" BorderThickness="4,1,1,1"
-                                                BorderBrush="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                            <StackPanel>
-                                                <DockPanel>
-                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding StatusLabel}" FontSize="12" FontWeight="SemiBold"
-                                                               Foreground="{Binding Status, Converter={StaticResource StatusToBrush}}" />
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                                </DockPanel>
-                                                <TextBlock Text="{Binding Values}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap"
-                                                           Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
-                                                <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
-                                                           Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-                                                    <Button Content="{x:Static app:Ui.Wanted}" Padding="10,2" FontSize="12"
-                                                            ToolTip="{x:Static app:Ui.WantedTip}"
-                                                            Command="{Binding AcknowledgeCommand}"
-                                                            Visibility="{Binding CanAcknowledge, Converter={StaticResource BoolToVisibility}}" />
-                                                    <Button Content="{x:Static app:Ui.ReportAgain}" Padding="10,2" FontSize="12"
-                                                            Command="{Binding UnacknowledgeCommand}"
-                                                            Visibility="{Binding IsAcknowledged, Converter={StaticResource BoolToVisibility}}" />
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
-                        </Grid>
-            </TabItem>
-
-            <!-- Onglet 2 : corrections proposées -->
-            <TabItem Header="{x:Static app:Ui.TabFixes}">
-                <DockPanel Margin="0,12,0,0">
-                    <StackPanel DockPanel.Dock="Top">
-                        <TextBlock Text="{Binding ChangesSummary}" TextWrapping="Wrap" Margin="0,0,0,8" />
-                        <Border Padding="12,8" Margin="0,0,0,8" CornerRadius="6" BorderThickness="4,1,1,1" BorderBrush="#C42B1C"
-                                Visibility="{Binding IsBlocked, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="{Binding BlockingReason}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                                </Grid>
+                                <TextBlock Text="{Binding ScoreDetail}" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,12,0,12" />
+                                <Button Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" HorizontalAlignment="Center" />
+                                <ProgressBar Height="4" Margin="0,10,0,0" Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
+                                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding StatusText}" FontSize="12" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,8,0,0" />
+                            </StackPanel>
                         </Border>
-                        <WrapPanel Margin="0,0,0,8">
-                            <TextBlock Text="{x:Static app:Ui.OneClickProfiles}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <ItemsControl ItemsSource="{Binding Profiles}">
+
+                        <!-- Familles M·A·U·S -->
+                        <Border Grid.Column="2" Style="{StaticResource Card}">
+                            <ItemsControl ItemsSource="{Binding Families}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <WrapPanel />
+                                        <UniformGrid Columns="2" />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type vm:ProfileViewModel}">
-                                        <Button Content="{Binding Name}" ToolTip="{Binding Description}" Command="{Binding Command}"
-                                                Padding="12,4" Margin="0,0,8,4" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </WrapPanel>
-                        <Expander Header="{x:Static app:Ui.YourChoices}" Margin="0,0,0,8" IsExpanded="True"
-                                  Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}">
-                            <Grid Margin="0,6,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Text="{x:Static app:Ui.GameBarProfile}" VerticalAlignment="Center" Margin="0,0,12,6" />
-                                <ComboBox Grid.Column="1" Margin="0,0,0,6" MaxWidth="520" HorizontalAlignment="Left"
-                                          ItemsSource="{Binding GameBarOptions}" SelectedItem="{Binding GameBarChoice}" DisplayMemberPath="Label" />
-                                <TextBlock Grid.Row="1" Text="{x:Static app:Ui.LaptopPower}" VerticalAlignment="Center" Margin="0,0,12,0"
-                                           Visibility="{Binding IsLaptop, Converter={StaticResource BoolToVisibility}}" />
-                                <ComboBox Grid.Row="1" Grid.Column="1" MaxWidth="520" HorizontalAlignment="Left"
-                                          ItemsSource="{Binding LaptopOptions}" SelectedItem="{Binding LaptopChoice}" DisplayMemberPath="Label"
-                                          Visibility="{Binding IsLaptop, Converter={StaticResource BoolToVisibility}}" />
-                            </Grid>
-                        </Expander>
-                    </StackPanel>
-
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
-                        <CheckBox Content="{x:Static app:Ui.CreateRestorePoint}"
-                                  IsChecked="{Binding CreateRestorePoint}" Margin="0,0,0,4" />
-                        <CheckBox Content="{x:Static app:Ui.EnableProtection}"
-                                  IsChecked="{Binding EnableProtection}" Margin="0,0,0,8" />
-                        <DockPanel>
-                            <Button DockPanel.Dock="Left" Content="{Binding ApplyLabel}" Padding="18,8"
-                                    Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply, Mode=OneWay}" />
-                            <TextBlock Text="{x:Static app:Ui.VerifyNote}"
-                                       Margin="16,0,0,0" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
-                        </DockPanel>
-                        <WrapPanel Margin="0,8,0,0">
-                            <Button Content="{x:Static app:Ui.SaveReport}" Padding="12,4" Margin="0,0,8,0" Command="{Binding SaveReportCommand}"
-                                    IsEnabled="{Binding HasAudit, Mode=OneWay}"
-                                    ToolTip="{x:Static app:Ui.SaveReportTip}" />
-                            <Button Content="{x:Static app:Ui.RestartExplorer}" Padding="12,4" Command="{Binding RestartExplorerCommand}"
-                                    Visibility="{Binding NeedsExplorerRestart, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="{x:Static app:Ui.RestartExplorerTip}" />
-                        </WrapPanel>
-                        <Border Padding="12,8" Margin="0,10,0,0" CornerRadius="6" BorderThickness="1" BorderBrush="#808080"
-                                Visibility="{Binding HasFixReport, Converter={StaticResource BoolToVisibility}}">
-                            <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
-                                <TextBox Text="{Binding FixReport, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                         TextWrapping="Wrap" />
-                            </ScrollViewer>
-                        </Border>
-                    </StackPanel>
-
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Changes}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:ChangeViewModel}">
-                                    <Border Margin="0,0,0,8" Padding="12,8" CornerRadius="6" BorderThickness="1" BorderBrush="#808080">
-                                        <DockPanel>
-                                            <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,2,10,0" />
+                                    <DataTemplate DataType="{x:Type vm:FamilyViewModel}">
+                                        <DockPanel Margin="4,4,12,14">
+                                            <controls:LetterTile DockPanel.Dock="Left" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Top"
+                                                                 Text="{Binding Letter}" Fill="{Binding Letter, Converter={StaticResource LetterToBrush}}" />
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding Badges}" FontSize="12" Opacity="0.7" Margin="0,2,0,0" />
-                                                <TextBlock Text="{Binding Description}" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding Gain}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                                           Visibility="{Binding HasGain, Converter={StaticResource BoolToVisibility}}" />
-                                                <TextBlock Text="{Binding Risk}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
-                                                           Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibility}}" />
-                                                <TextBlock Text="{Binding Warning}" Margin="0,4,0,0" FontWeight="SemiBold" Foreground="#C42B1C" TextWrapping="Wrap"
-                                                           Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}" />
-                                                <Expander Header="{x:Static app:Ui.TechnicalDetails}" Margin="0,4,0,0">
-                                                    <TextBox Text="{Binding Technical, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                                             FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
-                                                </Expander>
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </DockPanel>
-            </TabItem>
-
-            <!-- Onglet 3 : historique et annulation -->
-            <TabItem Header="{x:Static app:Ui.TabHistory}">
-                <DockPanel Margin="0,12,0,0">
-                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Refresh}" Padding="12,4" Command="{Binding RefreshJournalCommand}" />
-                        <TextBlock Text="{Binding JournalSummary}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    </DockPanel>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Sessions}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:SessionViewModel}">
-                                    <Border Margin="0,0,0,8" Padding="12,8" CornerRadius="6" BorderThickness="1" BorderBrush="#808080">
-                                        <StackPanel>
-                                            <DockPanel>
-                                                <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.RevertSession}" Padding="12,4"
-                                                        Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
-                                                <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                            </DockPanel>
-                                            <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                            <Expander Header="{x:Static app:Ui.SessionChanges}" Margin="0,4,0,0">
-                                                <ItemsControl ItemsSource="{Binding Changes}" Margin="0,6,0,0">
+                                                <TextBlock Text="{Binding Name}" Style="{StaticResource CardTitle}" />
+                                                <TextBlock Text="{Binding Description}" FontSize="12" Style="{StaticResource Muted}" />
+                                                <ItemsControl ItemsSource="{Binding Chips}" Margin="0,6,0,0">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="{x:Type vm:SessionChangeViewModel}">
-                                                            <DockPanel Margin="0,0,0,8">
-                                                                <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Revert}" Padding="10,2" FontSize="12" VerticalAlignment="Top"
-                                                                        Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
-                                                                <StackPanel Margin="0,0,10,0">
-                                                                    <TextBlock TextWrapping="Wrap">
-                                                                        <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" />
-                                                                        <Run Text="  ·  " />
-                                                                        <Run Text="{Binding State, Mode=OneWay}" />
-                                                                    </TextBlock>
-                                                                    <TextBlock Text="{Binding Note}" FontSize="12" Foreground="#C46A00" TextWrapping="Wrap"
-                                                                               Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
-                                                                    <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                                                             FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
-                                                                </StackPanel>
-                                                            </DockPanel>
+                                                        <DataTemplate DataType="{x:Type vm:ChipViewModel}">
+                                                            <Border Style="{StaticResource Chip}" Background="{Binding Background}">
+                                                                <TextBlock Text="{Binding Text}" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                                            </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
-                                            </Expander>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Grid>
+
+                    <!-- Actions rapides -->
+                    <UniformGrid Columns="3" Margin="-6,12,-6,0">
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding SlowPcCommand}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xEC4A;" Foreground="{StaticResource MausGold}" />
+                                <TextBlock Text="{x:Static app:Ui.SlowPcTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{x:Static app:Ui.SlowPcDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="33">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" Foreground="{StaticResource MausRed}" />
+                                <TextBlock Text="{x:Static app:Ui.TestPcTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{x:Static app:Ui.TestPcDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="2">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE90F;" Foreground="{StaticResource MausGreen}" />
+                                <TextBlock Text="{x:Static app:Ui.FixPcTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{Binding FixCardDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="30">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE950;" Foreground="{StaticResource MausBlue}" />
+                                <TextBlock Text="{x:Static app:Ui.MyPcTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{x:Static app:Ui.MyPcDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="31">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D2;" Foreground="{StaticResource MausRed}" />
+                                <TextBlock Text="{x:Static app:Ui.LiveTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{x:Static app:Ui.LiveDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding SaveReportCommand}" IsEnabled="{Binding HasAudit, Mode=OneWay}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE8A5;" Foreground="{StaticResource MausGold}" />
+                                <TextBlock Text="{x:Static app:Ui.ReportTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{x:Static app:Ui.ReportDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Onglet 1 : modules et constats -->
+        <TabItem Style="{StaticResource NavTab}">
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource NavIconBox}" Background="{StaticResource MausRed}">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE9D9;" />
+                    </Border>
+                    <TextBlock Text="{x:Static app:Ui.TabFindings}" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <DockPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14" LastChildFill="True">
+                <Button DockPanel.Dock="Left" Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" />
+                <ProgressBar DockPanel.Dock="Right" Width="180" Height="6" Margin="12,0,0,0" VerticalAlignment="Center"
+                             Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
+                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock Text="{Binding StatusText}" Margin="16,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </DockPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="340" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <ListBox Grid.Column="0" ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModule}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ModuleViewModel}">
+                            <DockPanel Margin="2,6">
+                                <Ellipse DockPanel.Dock="Left" Width="12" Height="12" Margin="0,4,10,0" VerticalAlignment="Top"
+                                         Fill="{Binding Status, Converter={StaticResource StatusToBrush}}" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="{Binding SelectedModule.Header}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="0.75" Margin="0,0,0,12" />
+                        <ItemsControl ItemsSource="{Binding SelectedModule.Findings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:FindingViewModel}">
+                                    <Border Margin="0,0,0,10" Padding="14,10" CornerRadius="8" BorderThickness="4,1,1,1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{Binding Status, Converter={StaticResource StatusToBrush}}">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding StatusLabel}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{Binding Status, Converter={StaticResource StatusToBrush}}" />
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Values}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                       Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
+                                                       Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                <Button Content="{x:Static app:Ui.Wanted}" Padding="10,2" FontSize="12"
+                                                        ToolTip="{x:Static app:Ui.WantedTip}"
+                                                        Command="{Binding AcknowledgeCommand}"
+                                                        Visibility="{Binding CanAcknowledge, Converter={StaticResource BoolToVisibility}}" />
+                                                <Button Content="{x:Static app:Ui.ReportAgain}" Padding="10,2" FontSize="12"
+                                                        Command="{Binding UnacknowledgeCommand}"
+                                                        Visibility="{Binding IsAcknowledged, Converter={StaticResource BoolToVisibility}}" />
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </ScrollViewer>
-                </DockPanel>
-            </TabItem>
-        </TabControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+            </DockPanel>
+        </TabItem>
 
-        <!-- Pied de page : transparence sur la fabrication -->
-        <TextBlock Grid.Row="3" Text="{Binding About}" FontSize="11" Opacity="0.6" Margin="0,12,0,0" TextWrapping="Wrap" />
-    </Grid>
+        <!-- Onglet 2 : corrections proposées -->
+        <TabItem Style="{StaticResource NavTab}">
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource NavIconBox}" Background="{StaticResource MausGreen}">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE90F;" />
+                    </Border>
+                    <TextBlock Text="{x:Static app:Ui.TabFixes}" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Text="{Binding ChangesSummary}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                    <Border Padding="12,8" Margin="0,0,0,8" CornerRadius="6" BorderThickness="4,1,1,1" BorderBrush="{StaticResource MausRed}"
+                            Visibility="{Binding IsBlocked, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding BlockingReason}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                    </Border>
+                    <WrapPanel Margin="0,0,0,8">
+                        <TextBlock Text="{x:Static app:Ui.OneClickProfiles}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ItemsControl ItemsSource="{Binding Profiles}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:ProfileViewModel}">
+                                    <Button Content="{Binding Name}" ToolTip="{Binding Description}" Command="{Binding Command}"
+                                            Padding="12,4" Margin="0,0,8,4" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </WrapPanel>
+                    <Expander Header="{x:Static app:Ui.YourChoices}" Margin="0,0,0,8" IsExpanded="True"
+                              Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}">
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="{x:Static app:Ui.GameBarProfile}" VerticalAlignment="Center" Margin="0,0,12,6" />
+                            <ComboBox Grid.Column="1" Margin="0,0,0,6" MaxWidth="520" HorizontalAlignment="Left"
+                                      ItemsSource="{Binding GameBarOptions}" SelectedItem="{Binding GameBarChoice}" DisplayMemberPath="Label" />
+                            <TextBlock Grid.Row="1" Text="{x:Static app:Ui.LaptopPower}" VerticalAlignment="Center" Margin="0,0,12,0"
+                                       Visibility="{Binding IsLaptop, Converter={StaticResource BoolToVisibility}}" />
+                            <ComboBox Grid.Row="1" Grid.Column="1" MaxWidth="520" HorizontalAlignment="Left"
+                                      ItemsSource="{Binding LaptopOptions}" SelectedItem="{Binding LaptopChoice}" DisplayMemberPath="Label"
+                                      Visibility="{Binding IsLaptop, Converter={StaticResource BoolToVisibility}}" />
+                        </Grid>
+                    </Expander>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                    <CheckBox Content="{x:Static app:Ui.CreateRestorePoint}"
+                              IsChecked="{Binding CreateRestorePoint}" Margin="0,0,0,4" />
+                    <CheckBox Content="{x:Static app:Ui.EnableProtection}"
+                              IsChecked="{Binding EnableProtection}" Margin="0,0,0,8" />
+                    <DockPanel>
+                        <Button DockPanel.Dock="Left" Style="{StaticResource PrimaryButton}" Content="{Binding ApplyLabel}"
+                                Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply, Mode=OneWay}" />
+                        <TextBlock Text="{x:Static app:Ui.VerifyNote}"
+                                   Margin="16,0,0,0" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <WrapPanel Margin="0,8,0,0">
+                        <Button Content="{x:Static app:Ui.SaveReport}" Padding="12,4" Margin="0,0,8,0" Command="{Binding SaveReportCommand}"
+                                IsEnabled="{Binding HasAudit, Mode=OneWay}"
+                                ToolTip="{x:Static app:Ui.SaveReportTip}" />
+                        <Button Content="{x:Static app:Ui.RestartExplorer}" Padding="12,4" Command="{Binding RestartExplorerCommand}"
+                                Visibility="{Binding NeedsExplorerRestart, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="{x:Static app:Ui.RestartExplorerTip}" />
+                    </WrapPanel>
+                    <Border Padding="12,8" Margin="0,10,0,0" CornerRadius="6" BorderThickness="1" BorderBrush="#808080"
+                            Visibility="{Binding HasFixReport, Converter={StaticResource BoolToVisibility}}">
+                        <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
+                            <TextBox Text="{Binding FixReport, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                     TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Changes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:ChangeViewModel}">
+                                <Border Margin="0,0,0,8" Style="{StaticResource Card}" Padding="12,10">
+                                    <DockPanel>
+                                        <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,2,10,0" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Badges}" FontSize="12" Opacity="0.7" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding Description}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Gain}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                       Visibility="{Binding HasGain, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding Risk}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
+                                                       Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding Warning}" Margin="0,4,0,0" FontWeight="SemiBold" Foreground="{StaticResource MausRed}" TextWrapping="Wrap"
+                                                       Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}" />
+                                            <Expander Header="{x:Static app:Ui.TechnicalDetails}" Margin="0,4,0,0">
+                                                <TextBox Text="{Binding Technical, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                         FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                                            </Expander>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </TabItem>
+
+        <!-- Atelier : Mon PC, En direct, Processus, Tests -->
+        <TabItem Style="{StaticResource NavTab}">
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource NavIconBox}" Background="{StaticResource MausGold}">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE950;" />
+                    </Border>
+                    <TextBlock Text="{x:Static app:Ui.NavWorkshop}" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+                    <TextBlock Text="{x:Static app:Ui.NavWorkshop}" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="{x:Static app:Ui.WorkshopSubtitle}" Style="{StaticResource Muted}" />
+                </StackPanel>
+                <TabControl SelectedIndex="{Binding Workshop.Section}" Background="Transparent" BorderThickness="0" Padding="0">
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="TabControl">
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" IsItemsHost="True" Margin="0,0,0,14" />
+                                <ContentPresenter ContentSource="SelectedContent" />
+                            </DockPanel>
+                        </ControlTemplate>
+                    </TabControl.Template>
+
+                    <!-- Mon PC : fiche d'identité du matériel -->
+                    <TabItem Header="{x:Static app:Ui.SectionPc}" Style="{StaticResource PillTab}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Workshop.InventoryStatus}" Style="{StaticResource Muted}" Margin="0,0,0,8" />
+                                <ItemsControl ItemsSource="{Binding Workshop.Components}" Margin="-6,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="2" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type ws:ComponentCardViewModel}">
+                                            <Border Style="{StaticResource Card}" Margin="6">
+                                                <DockPanel>
+                                                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                                                        <controls:LetterTile DockPanel.Dock="Left" Width="40" Height="40" Margin="0,0,12,0"
+                                                                             Text="{Binding Letter}" Fill="{Binding Letter, Converter={StaticResource LetterToBrush}}" />
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}" Style="{StaticResource SectionLabel}" />
+                                                            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource CardTitle}" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                    <Button DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="12,4"
+                                                            Content="{x:Static app:Ui.SearchSheet}" Command="{Binding SearchCommand}"
+                                                            Visibility="{Binding HasSearch, Converter={StaticResource BoolToVisibility}}" />
+                                                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0" Visibility="{Binding HasGauge, Converter={StaticResource BoolToVisibility}}">
+                                                        <TextBlock Text="{Binding Gauge.Caption}" Style="{StaticResource SectionLabel}" Margin="0,0,0,4" />
+                                                        <controls:SafetyGauge Height="18" Minimum="{Binding Gauge.Minimum, Mode=OneWay}" Maximum="{Binding Gauge.Maximum, Mode=OneWay}"
+                                                                              Elevated="{Binding Gauge.Elevated, Mode=OneWay}" Danger="{Binding Gauge.Danger, Mode=OneWay}"
+                                                                              Value="{Binding Gauge.Value, Mode=OneWay}" />
+                                                        <TextBlock Text="{Binding Gauge.Legend}" FontSize="11" Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                                                    </StackPanel>
+                                                    <ItemsControl ItemsSource="{Binding Lines}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type ws:InfoLine}">
+                                                                <Grid Margin="0,1">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="0.45*" />
+                                                                        <ColumnDefinition Width="0.55*" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="{Binding Label}" FontSize="12" Style="{StaticResource Muted}" Margin="0,0,8,0" />
+                                                                    <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- En direct : charge, températures et alarmes -->
+                    <TabItem Header="{x:Static app:Ui.LiveTitle}" Style="{StaticResource PillTab}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Workshop.Live.Alarms}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausGold}">
+                                                <TextBlock Text="{Binding}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ItemsControl ItemsSource="{Binding Workshop.Live.Metrics}" Margin="-6,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="3" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type ws:MetricViewModel}">
+                                            <Border Style="{StaticResource Card}" Margin="6" MinHeight="140">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource SectionLabel}" />
+                                                    <TextBlock Margin="0,4,0,6" TextTrimming="CharacterEllipsis">
+                                                        <Run Text="{Binding Value, Mode=OneWay}" FontSize="26" FontWeight="Bold" />
+                                                        <Run Text="{Binding Detail, Mode=OneWay}" FontSize="12" />
+                                                    </TextBlock>
+                                                    <controls:Sparkline Height="48" Values="{Binding Series, Mode=OneWay}" Maximum="{Binding Maximum, Mode=OneWay}" Stroke="{Binding Stroke}"
+                                                                        Visibility="{Binding HasSeries, Converter={StaticResource BoolToVisibility}}" />
+                                                    <StackPanel Visibility="{Binding HasGauge, Converter={StaticResource BoolToVisibility}}" Margin="0,6,0,0">
+                                                        <controls:SafetyGauge Height="16" Minimum="{Binding Gauge.Minimum, Mode=OneWay}" Maximum="{Binding Gauge.Maximum, Mode=OneWay}"
+                                                                              Elevated="{Binding Gauge.Elevated, Mode=OneWay}" Danger="{Binding Gauge.Danger, Mode=OneWay}"
+                                                                              Value="{Binding Gauge.Value, Mode=OneWay}" />
+                                                        <TextBlock Text="{Binding Gauge.Legend}" FontSize="11" Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding Workshop.Live.ThermalNote}" FontSize="12" Style="{StaticResource Muted}" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Processus : gestionnaire des tâches expliqué -->
+                    <TabItem Header="{x:Static app:Ui.SectionProcesses}" Style="{StaticResource PillTab}">
+                        <DockPanel>
+                            <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                                <TextBlock Text="{x:Static app:Ui.FilterLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Width="200" Margin="0,0,16,0" VerticalAlignment="Center"
+                                         Text="{Binding Workshop.Filter, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="{x:Static app:Ui.SearchWith}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox MinWidth="130" Margin="0,0,16,0" VerticalAlignment="Center"
+                                          ItemsSource="{Binding Workshop.SearchEngines}" SelectedItem="{Binding Workshop.SearchEngineChoice}" DisplayMemberPath="Label" />
+                                <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Content="{x:Static app:Ui.SlowPcTitle}" Command="{Binding Workshop.DiagnoseCommand}" />
+                            </WrapPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding Workshop.DiagnosisStatus}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Workshop.ProcessList.Causes}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type ws:CauseViewModel}">
+                                        <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausBlue}" Margin="0,0,0,6">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                                <TextBlock Text="{Binding Module}" FontSize="12" Style="{StaticResource Muted}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Fiche du processus choisi -->
+                            <Border DockPanel.Dock="Right" Width="340" Margin="12,0,0,0" Style="{StaticResource Card}">
+                                <Grid>
+                                    <TextBlock Text="{x:Static app:Ui.PickProcess}" Style="{StaticResource Muted}"
+                                               Visibility="{Binding Workshop.NoSelectedProcess, Converter={StaticResource BoolToVisibility}}" />
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                  Visibility="{Binding Workshop.HasSelectedProcess, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel DataContext="{Binding Workshop.SelectedProcess}">
+                                            <TextBlock Text="{Binding Name}" Style="{StaticResource CardTitle}" FontSize="18" />
+                                            <Border Style="{StaticResource Chip}" HorizontalAlignment="Left" Background="{Binding Trust, Converter={StaticResource TrustToBrush}}">
+                                                <TextBlock Text="{Binding TrustLabel}" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Category}" Style="{StaticResource SectionLabel}" Margin="0,8,0,2" />
+                                            <TextBlock Text="{Binding What}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{x:Static app:Ui.LocationLabel}" Style="{StaticResource SectionLabel}" Margin="0,10,0,2" />
+                                            <TextBox Text="{Binding Location, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontSize="12" />
+                                            <TextBlock FontSize="12" Style="{StaticResource Muted}" Margin="0,8,0,0">
+                                                <Run Text="{x:Static app:Ui.PidLabel}" />
+                                                <Run Text=" : " />
+                                                <Run Text="{Binding PidText, Mode=OneWay}" />
+                                                <LineBreak />
+                                                <Run Text="{x:Static app:Ui.StartedLabel}" />
+                                                <Run Text=" : " />
+                                                <Run Text="{Binding Started, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <Button Content="{x:Static app:Ui.SearchWeb}" Margin="0,12,0,0" Padding="12,5" HorizontalAlignment="Stretch"
+                                                    Command="{Binding DataContext.Workshop.SearchProcessCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                            <Button Content="{x:Static app:Ui.ShowFolder}" Margin="0,6,0,0" Padding="12,5" HorizontalAlignment="Stretch"
+                                                    Command="{Binding DataContext.Workshop.ShowProcessCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                            <Button Style="{StaticResource DangerButton}" Content="{x:Static app:Ui.Terminate}" Margin="0,6,0,0" Padding="12,6"
+                                                    IsEnabled="{Binding CanTerminate, Mode=OneWay}"
+                                                    Command="{Binding DataContext.Workshop.TerminateCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                            <TextBlock Text="{Binding TerminationNote}" FontSize="12" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <DataGrid ItemsSource="{Binding Workshop.ProcessList.Rows}" SelectedItem="{Binding Workshop.SelectedProcess}"
+                                      AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="None"
+                                      SelectionMode="Single" CanUserAddRows="False" CanUserDeleteRows="False" BorderThickness="0"
+                                      Background="Transparent" RowBackground="Transparent">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="{x:Static app:Ui.ColumnProcess}" Binding="{Binding Name, Mode=OneWay}" Width="2*" FontWeight="SemiBold" />
+                                    <DataGridTemplateColumn Header="{x:Static app:Ui.ColumnCpu}" Width="*" SortMemberPath="Sample.CpuPercent">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate DataType="{x:Type ws:ProcessRowViewModel}">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Rectangle Width="{Binding CpuBar, Mode=OneWay}" Height="4" RadiusX="2" RadiusY="2" Fill="{StaticResource MausBlue}" Margin="0,0,6,0" />
+                                                    <TextBlock Text="{Binding Cpu}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="{x:Static app:Ui.ColumnMemory}" Binding="{Binding Memory, Mode=OneWay}" Width="*" SortMemberPath="Sample.PrivateBytes" />
+                                    <DataGridTextColumn Header="{x:Static app:Ui.ColumnDisk}" Binding="{Binding Disk, Mode=OneWay}" Width="*" SortMemberPath="Sample.DiskBytesPerSecond" />
+                                    <DataGridTextColumn Header="{x:Static app:Ui.ColumnGpu}" Binding="{Binding Gpu, Mode=OneWay}" Width="0.7*" SortMemberPath="Sample.GpuPercent" />
+                                    <DataGridTemplateColumn Header="{x:Static app:Ui.ColumnTrust}" Width="1.4*" SortMemberPath="Trust">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate DataType="{x:Type ws:ProcessRowViewModel}">
+                                                <Border Style="{StaticResource Chip}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,2"
+                                                        Background="{Binding Trust, Converter={StaticResource TrustToBrush}}">
+                                                    <TextBlock Text="{Binding TrustLabel}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                    </TabItem>
+
+                    <!-- Tests : processeur et mémoire vive -->
+                    <TabItem Header="{x:Static app:Ui.SectionTests}" Style="{StaticResource PillTab}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausBlue}">
+                                    <TextBlock Text="{x:Static app:Ui.TestSafety}" TextWrapping="Wrap" />
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Workshop.Live.Alarms}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausGold}">
+                                                <TextBlock Text="{Binding}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Style="{StaticResource Card}">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" Foreground="{StaticResource MausBlue}" />
+                                            <TextBlock Text="{x:Static app:Ui.CpuTestTitle}" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="{x:Static app:Ui.CpuTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                            <DockPanel Margin="0,12,0,0">
+                                                <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="8,0,0,0"
+                                                        Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartCpuTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                                <ComboBox ItemsSource="{Binding Workshop.CpuDurations}" SelectedItem="{Binding Workshop.CpuDuration}" DisplayMemberPath="Label"
+                                                          IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            </DockPanel>
+                                            <ProgressBar Height="6" Margin="0,12,0,0" Maximum="100" Value="{Binding Workshop.CpuProgress, Mode=OneWay}" />
+                                            <TextBlock Text="{Binding Workshop.CpuStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE964;" Foreground="{StaticResource MausGreen}" />
+                                            <TextBlock Text="{x:Static app:Ui.RamTestTitle}" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="{x:Static app:Ui.RamTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                            <DockPanel Margin="0,12,0,0">
+                                                <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="8,0,0,0"
+                                                        Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartRamTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                                <ComboBox ItemsSource="{Binding Workshop.RamSizes}" SelectedItem="{Binding Workshop.RamSize}" DisplayMemberPath="Label"
+                                                          IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            </DockPanel>
+                                            <ProgressBar Height="6" Margin="0,12,0,0" Maximum="100" Value="{Binding Workshop.RamProgress, Mode=OneWay}" />
+                                            <TextBlock Text="{Binding Workshop.RamStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <DockPanel Margin="0,12,0,0" Visibility="{Binding Workshop.IsTesting, Converter={StaticResource BoolToVisibility}}">
+                                    <Button DockPanel.Dock="Left" Style="{StaticResource DangerButton}" Content="{x:Static app:Ui.StopTest}" Command="{Binding Workshop.StopTestCommand}" />
+                                    <TextBlock VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap">
+                                        <Run Text="{Binding Workshop.Live.Cpu.Title, Mode=OneWay}" />
+                                        <Run Text=" : " />
+                                        <Run Text="{Binding Workshop.Live.Cpu.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                        <Run Text="   ·   " />
+                                        <Run Text="{Binding Workshop.Live.GpuTemperature.Title, Mode=OneWay}" />
+                                        <Run Text=" : " />
+                                        <Run Text="{Binding Workshop.Live.GpuTemperature.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                    </TextBlock>
+                                </DockPanel>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0" Opacity="0.75">
+                                    <StackPanel>
+                                        <TextBlock Text="{x:Static app:Ui.VramTestTitle}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{x:Static app:Ui.VramTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+            </DockPanel>
+        </TabItem>
+
+        <!-- Onglet 3 : historique et annulation -->
+        <TabItem Style="{StaticResource NavTab}">
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource NavIconBox}" Background="{StaticResource MausGrey}">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE81C;" />
+                    </Border>
+                    <TextBlock Text="{x:Static app:Ui.TabHistory}" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Refresh}" Padding="12,4" Command="{Binding RefreshJournalCommand}" />
+                    <TextBlock Text="{Binding JournalSummary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </DockPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Sessions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:SessionViewModel}">
+                                <Border Margin="0,0,0,8" Style="{StaticResource Card}" Padding="12,10">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.RevertSession}" Padding="12,4"
+                                                    Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                            <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                        <Expander Header="{x:Static app:Ui.SessionChanges}" Margin="0,4,0,0">
+                                            <ItemsControl ItemsSource="{Binding Changes}" Margin="0,6,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type vm:SessionChangeViewModel}">
+                                                        <DockPanel Margin="0,0,0,8">
+                                                            <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Revert}" Padding="10,2" FontSize="12" VerticalAlignment="Top"
+                                                                    Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                                            <StackPanel Margin="0,0,10,0">
+                                                                <TextBlock TextWrapping="Wrap">
+                                                                    <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" />
+                                                                    <Run Text="  ·  " />
+                                                                    <Run Text="{Binding State, Mode=OneWay}" />
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding Note}" FontSize="12" Foreground="{StaticResource MausGold}" TextWrapping="Wrap"
+                                                                           Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
+                                                                <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                                         FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Expander>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </TabItem>
+    </TabControl>
 </Window>

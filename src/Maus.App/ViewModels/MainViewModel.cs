@@ -149,6 +149,7 @@ public sealed partial class MainViewModel : ObservableObject
                     ? T("MAUS a été lancé avec un autre compte administrateur : les réglages de votre profil (effets visuels, confidentialité, Game Bar) seront ignorés. Relancez MAUS depuis votre propre session.")
                     : null);
             Replan();
+            RefreshDashboard();
             await RefreshJournalAsync();
             await AskLaptopChoiceOnceAsync(context);
         }
@@ -179,6 +180,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         OnPropertyChanged(nameof(SelectedModule));
         Replan();
+        RefreshDashboard();
     }
 
     private async Task SaveReportAsync()

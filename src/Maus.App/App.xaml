@@ -4,7 +4,15 @@
              xmlns:views="clr-namespace:Maus.App.Views"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <views:StatusToBrushConverter x:Key="StatusToBrush" />
-        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Maus.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <views:StatusToBrushConverter x:Key="StatusToBrush" />
+            <views:ScoreToBrushConverter x:Key="ScoreToBrush" />
+            <views:LetterToBrushConverter x:Key="LetterToBrush" />
+            <views:TrustToBrushConverter x:Key="TrustToBrush" />
+            <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

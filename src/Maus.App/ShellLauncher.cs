@@ -1,0 +1,35 @@
+using System.Diagnostics;
+using System.IO;
+
+namespace Maus.App;
+
+/// <summary>
+/// Ouvre une page web ou un dossier sans les droits administrateur de MAUS : la demande passe par explorer.exe,
+/// qui la confie à l'Explorateur déjà ouvert dans la session (non élevé). À vérifier sur chaque version de Windows.
+/// </summary>
+public static class ShellLauncher
+{
+    public static void OpenUrl(Uri url)
+    {
+        if (url.Scheme is not ("https" or "http"))
+        {
+            return;
+        }
+
+        Start($"\"{url.AbsoluteUri}\"");
+    }
+
+    public static void ShowInFolder(string path)
+    {
+        if (File.Exists(path))
+        {
+            Start($"/select,\"{path}\"");
+        }
+    }
+
+    private static void Start(string arguments)
+    {
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        using var _ = Process.Start(new ProcessStartInfo(Path.Combine(windows, "explorer.exe"), arguments) { UseShellExecute = false });
+    }
+}
