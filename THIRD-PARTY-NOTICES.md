@@ -14,3 +14,9 @@ MAUS (GPL-3.0-only) utilise les bibliothèques libres suivantes, sans les modifi
 Le texte de la MPL-2.0 : https://mozilla.org/MPL/2.0/. Les fichiers couverts par la MPL-2.0 restent sous cette licence ; MAUS n'en modifie aucun.
 
 **Pilote PawnIO** (namazso, https://github.com/namazso/PawnIO) : il n'est **pas** distribué avec MAUS. L'utilisateur l'installe s'il le souhaite, par winget (`namazso.PawnIO`), depuis l'Atelier, et peut le retirer de la même façon. Les modules PawnIO signés utilisés sont ceux inclus dans LibreHardwareMonitorLib.
+
+## Sources de données techniques (non incluses comme code)
+
+- **ZenStates-Core** (Ivan Rusanov, GPL-3.0, https://github.com/irusanov/ZenStates-Core) : emplacement et découpage des registres du contrôleur mémoire des Ryzen (UMC, bus SMN) et disposition des tables PM (FCLK, UCLK, MCLK, tensions). Ce sont des faits matériels, relus par le code propre de MAUS (`Workshop/Memory/ZenMemoryController.cs`) ; MAUS étant lui aussi sous GPL-3.0, la reprise de ces tables est compatible, et la source est citée.
+- **memtest86+** (GPL-2.0, https://github.com/memtest86plus/memtest86plus) : emplacements des octets SPD des profils XMP 2.0 (DDR4) et XMP 3.0 (DDR5), utilisés pour vérifier le décodeur de MAUS (`Workshop/Memory/SpdDecoder.cs`, code propre).
+- **Normes JEDEC** JESD21-C (annexe L, DDR4) et JESD400-5 (DDR5) : structure générale des puces SPD.

@@ -903,6 +903,102 @@
                             </ScrollViewer>
                         </DockPanel>
                     </TabItem>
+
+                    <!-- Mémoire : fiche complète (SPD, timings réels, horloges) -->
+                    <TabItem Header="{x:Static app:Ui.SectionMemory}" Style="{StaticResource PillTab}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <WrapPanel Margin="0,0,0,8">
+                                    <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.ReadMemory}"
+                                            Command="{Binding Workshop.ReadMemoryCommand}" IsEnabled="{Binding Workshop.IsNotReadingMemory, Mode=OneWay}" />
+                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.CopyMemory}" Command="{Binding Workshop.CopyMemoryCommand}"
+                                            IsEnabled="{Binding Workshop.HasMemoryReport, Mode=OneWay}" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding Workshop.MemoryStatus}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,8" />
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding Workshop.HasMemoryClocks, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{x:Static app:Ui.MemoryControllerTitle}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{Binding Workshop.MemoryClocks}" TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                        <TextBlock Text="{Binding Workshop.MemorySettings}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Workshop.LiveTimingBlocks}" Margin="-6,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="3" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type ws:TimingBlockViewModel}">
+                                            <Border Style="{StaticResource Card}" Margin="6" VerticalAlignment="Top">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" Margin="0,0,0,6" />
+                                                    <ItemsControl ItemsSource="{Binding Rows}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type ws:TimingRowViewModel}">
+                                                                <DockPanel Margin="0,1" ToolTip="{Binding Hint}" Background="Transparent">
+                                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Value}" FontWeight="SemiBold" />
+                                                                    <TextBlock Text="{Binding Key}" Style="{StaticResource Muted}" />
+                                                                </DockPanel>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ItemsControl ItemsSource="{Binding Workshop.MemoryModules}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type ws:MemoryModuleViewModel}">
+                                            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" />
+                                                    <ItemsControl ItemsSource="{Binding Lines}" Margin="0,4,0,8">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <ItemsControl ItemsSource="{Binding Profiles}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type ws:TimingBlockViewModel}">
+                                                                <Border BorderThickness="1" BorderBrush="#40808080" CornerRadius="6" Padding="10" Margin="0,0,8,8" Width="250">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                                        <TextBlock Text="{Binding Subtitle}" FontSize="11" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,2,0,6" />
+                                                                        <ItemsControl ItemsSource="{Binding Rows}">
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate DataType="{x:Type ws:TimingRowViewModel}">
+                                                                                    <DockPanel Margin="0,1" ToolTip="{Binding Hint}" Background="Transparent">
+                                                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Value}" FontWeight="SemiBold" />
+                                                                                        <TextBlock Text="{Binding Key}" Style="{StaticResource Muted}" />
+                                                                                    </DockPanel>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding Workshop.MemoryNotes}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" Margin="0,12,0,0"
+                                           Visibility="{Binding Workshop.HasMemoryNotes, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{x:Static app:Ui.MemoryHonest}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
                 </TabControl>
             </DockPanel>
         </TabItem>

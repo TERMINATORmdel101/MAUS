@@ -143,6 +143,16 @@ public static class Ui
 
     public static string ValueColumn => T("Valeur");
 
+    public static string SectionMemory => T("Mémoire");
+
+    public static string ReadMemory => T("Lire la mémoire");
+
+    public static string CopyMemory => T("Copier la fiche");
+
+    public static string MemoryControllerTitle => T("Contrôleur mémoire (réglages appliqués par le BIOS)");
+
+    public static string MemoryHonest => T("Les timings affichés ici sont ceux réellement appliqués et ceux annoncés par la barrette. Resserrer les timings ou monter la fréquence se fait dans le BIOS : le gain est souvent de quelques pour cent, surtout dans les jeux limités par le processeur, et une instabilité peut corrompre des fichiers. Testez toujours après un changement (Atelier, Tests : mémoire vive).");
+
     public static string HelpTitle => T("Demander de l'aide");
 
     public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");
