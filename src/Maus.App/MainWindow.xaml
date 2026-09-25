@@ -30,7 +30,7 @@
             <Button DockPanel.Dock="Left" Content="Lancer l'audit" Padding="18,8"
                     Command="{Binding RunAuditCommand}" />
             <ProgressBar DockPanel.Dock="Right" Width="180" Height="6" Margin="12,0,0,0" VerticalAlignment="Center"
-                         Maximum="{Binding ModuleCount}" Value="{Binding Completed}"
+                         Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
                          Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
             <TextBlock Text="{Binding StatusText}" Margin="16,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
         </DockPanel>
