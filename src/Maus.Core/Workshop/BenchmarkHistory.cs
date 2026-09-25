@@ -18,6 +18,10 @@ public sealed class BenchmarkHistory(string path)
     public static BenchmarkHistory CreateDefault() =>
         new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "benchmarks.json"));
 
+    /// <summary>Historique du score de santé, à part pour ne pas évincer les tests (un audit par jour suffit à le remplir).</summary>
+    public static BenchmarkHistory CreateHealth() =>
+        new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "health-history.json"));
+
     public IReadOnlyList<BenchmarkEntry> Load()
     {
         try

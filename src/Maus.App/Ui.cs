@@ -159,6 +159,10 @@ public static class Ui
 
     public static string ExportCsv => T("Enregistrer en CSV");
 
+    public static string ScoreHistoryTitle => T("Historique des scores");
+
+    public static string ScoreHistoryIntro => T("Chaque test réussi est gardé sur ce PC (rien n'est envoyé) : la courbe montre l'effet d'un réglage, d'un nettoyage ou d'une mise à jour. Un écart de quelques pour cent d'un passage à l'autre est normal.");
+
     public static string HelpTitle => T("Demander de l'aide");
 
     public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");

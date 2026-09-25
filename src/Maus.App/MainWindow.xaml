@@ -87,7 +87,11 @@
                                         <TextBlock Text="{x:Static app:Ui.HealthCaption}" FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </Grid>
-                                <TextBlock Text="{Binding ScoreDetail}" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,12,0,12" />
+                                <TextBlock Text="{Binding ScoreDetail}" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,12,0,4" />
+                                <StackPanel Visibility="{Binding HasHealthTrend, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8" ToolTip="{Binding HealthTrendText}">
+                                    <controls:Sparkline Height="28" Values="{Binding HealthTrend, Mode=OneWay}" Maximum="100" Stroke="{StaticResource MausGreen}" />
+                                    <TextBlock Text="{Binding HealthTrendText}" FontSize="11" Style="{StaticResource Muted}" TextAlignment="Center" TextWrapping="Wrap" />
+                                </StackPanel>
                                 <Button Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" HorizontalAlignment="Center" />
                                 <ProgressBar Height="4" Margin="0,10,0,0" Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
                                              Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
@@ -841,6 +845,25 @@
                                         <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.NetProgress, Mode=OneWay}" />
                                         <TextBox Text="{Binding Workshop.NetStatus, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
                                                  TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D2;" Foreground="{StaticResource MausGold}" />
+                                        <TextBlock Text="{x:Static app:Ui.ScoreHistoryTitle}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{x:Static app:Ui.ScoreHistoryIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                                        <ComboBox MinWidth="260" Margin="0,10,0,4" HorizontalAlignment="Left" ItemsSource="{Binding Workshop.ScoreKinds}" SelectedItem="{Binding Workshop.ScoreKind}"
+                                                  DisplayMemberPath="Label" Visibility="{Binding Workshop.HasScores, Converter={StaticResource BoolToVisibility}}" />
+                                        <controls:Sparkline Height="60" Margin="0,8,0,0" Values="{Binding Workshop.ScoreSeries, Mode=OneWay}" Maximum="0" Stroke="{StaticResource MausBlue}" />
+                                        <TextBlock Text="{Binding Workshop.ScoreTrend}" TextWrapping="Wrap" Margin="0,6,0,0" FontWeight="SemiBold" />
+                                        <ItemsControl ItemsSource="{Binding Workshop.ScoreLines}" Margin="0,6,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontSize="12" Style="{StaticResource Muted}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

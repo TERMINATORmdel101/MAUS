@@ -147,6 +147,60 @@ public sealed partial class MainViewModel
     /// <summary>Fermeture de la fenêtre : plus aucune mesure ni aucun test ne doit tourner en arrière-plan.</summary>
     public void Shutdown() => _workshop?.Stop();
 
+    private IReadOnlyList<double> _healthTrend = [];
+    private string _healthTrendText = string.Empty;
+
+    /// <summary>Scores de santé des audits précédents (courbe de l'accueil).</summary>
+    public IReadOnlyList<double> HealthTrend
+    {
+        get => _healthTrend;
+        private set
+        {
+            if (SetProperty(ref _healthTrend, value))
+            {
+                OnPropertyChanged(nameof(HasHealthTrend));
+            }
+        }
+    }
+
+    public bool HasHealthTrend => HealthTrend.Count >= 2;
+
+    public string HealthTrendText
+    {
+        get => _healthTrendText;
+        private set => SetProperty(ref _healthTrendText, value);
+    }
+
+    /// <summary>Courbe des audits précédents, affichée dès l'ouverture.</summary>
+    private void LoadHealthTrend()
+    {
+        var series = Maus.Core.Workshop.ScoreTrends.Series(Maus.Core.Workshop.BenchmarkHistory.CreateHealth().Load(), Maus.Core.Workshop.ScoreTrends.HealthKind);
+        HealthTrend = series.Select(e => e.Score).ToList();
+        HealthTrendText = Maus.Core.Workshop.ScoreTrends.Describe(series);
+    }
+
+    /// <summary>Enregistre le score de cet audit (sur ce PC seulement) et met à jour la courbe.</summary>
+    private async Task RecordHealthAsync()
+    {
+        var entry = Maus.Core.Workshop.ScoreTrends.HealthEntry(_results, DateTimeOffset.Now);
+        var series = await Task.Run(() =>
+        {
+            var history = Maus.Core.Workshop.BenchmarkHistory.CreateHealth();
+            try
+            {
+                history.Add(entry);
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                // Historique impossible à écrire : la courbe reste celle d'avant, sans gêner l'audit.
+            }
+
+            return Maus.Core.Workshop.ScoreTrends.Series(history.Load(), Maus.Core.Workshop.ScoreTrends.HealthKind);
+        });
+        HealthTrend = series.Select(e => e.Score).ToList();
+        HealthTrendText = Maus.Core.Workshop.ScoreTrends.Describe(series);
+    }
+
     /// <summary>Met à jour le score et les familles après un audit ou un changement de constat.</summary>
     private void RefreshDashboard()
     {

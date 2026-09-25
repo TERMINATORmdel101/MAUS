@@ -37,6 +37,7 @@ public sealed partial class MainViewModel : ObservableObject
         Profiles = FixProfile.All.Select(p => new ProfileViewModel(p, () => ApplyProfile(p))).ToList();
         _gameBarChoice = GameBarOptions[0];
         _laptopChoice = LaptopOptions[0];
+        LoadHealthTrend();
     }
 
     /// <summary>Demande de confirmation (titre, message) ; remplaçable pour les tests.</summary>
@@ -151,6 +152,7 @@ public sealed partial class MainViewModel : ObservableObject
                     : null);
             Replan();
             RefreshDashboard();
+            await RecordHealthAsync();
             await RefreshJournalAsync();
             await AskLaptopChoiceOnceAsync(context);
         }

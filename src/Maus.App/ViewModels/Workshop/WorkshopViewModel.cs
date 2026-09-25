@@ -412,6 +412,11 @@ public sealed partial class WorkshopViewModel : ObservableObject
             await LoadGpuAdaptersAsync();
         }
 
+        if (IsActive && Section == SectionTests && ScoreKinds.Count == 0)
+        {
+            LoadScoreHistory();
+        }
+
         if (IsActive && Section is SectionStorage or SectionTests && Drives.Count == 0)
         {
             LoadDrives();
@@ -872,6 +877,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
     {
         IsTesting = false;
         _stopTest = null;
+        LoadScoreHistory();
         await RefreshActivityAsync();
     }
 
