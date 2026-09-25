@@ -20,7 +20,9 @@
 - **Audit** de 19 domaines de Windows 11 (modifications risquées, réparation, mises à jour, confidentialité, alimentation, effets visuels, Game Bar, BIOS, carte graphique, mémoire, santé du matériel, démarrage, sécurité, écran, overclocking, atelier, périphériques, réseau, sauvegardes), résumé par un **score de santé** et les quatre familles **M·A·U·S**.
 - **Corrections réversibles**, choisies ligne par ligne ou par profil, avec point de restauration vérifié, journal des valeurs d'origine et bouton **Annuler** (séance entière ou une seule correction).
 - **Atelier matériel**, sans pilote : fiche d'identité du PC, jauges de sécurité (températures, tensions), mesures en direct, gestionnaire des tâches qui explique chaque processus, « Pourquoi mon PC est lent ? », tests du processeur (dont un test cœur par cœur pour valider un Curve Optimizer ou un undervolt), de la mémoire vive et de la mémoire vidéo, avec arrêt automatique en cas de surchauffe.
+- **Stockage** : ce qui prend de la place sur le disque (sans rien supprimer, les dossiers de Windows sont expliqués) et test de vitesse du disque.
 - **Rapport HTML** avant/après, à garder ou à imprimer.
+- **« Demander de l'aide »** : un résumé de votre PC à coller sur un forum, relu par vous, sans nom d'utilisateur, nom du PC, adresse e-mail ni numéro de série.
 - **Trois langues** : français, anglais, espagnol.
 
 ## État du projet
@@ -47,6 +49,7 @@ Audit en ligne de commande (lecture seule, aucun droit particulier requis ; cert
 ```bash
 dotnet run --project src/Maus.Cli -- --module M06
 dotnet run --project src/Maus.Cli -- --lang en --html rapport.html
+dotnet run --project src/Maus.Cli -- --summary
 ```
 
 Corrections en ligne de commande (V0.2, invite de commandes **administrateur**) : `--plan` affiche les corrections proposées sans rien modifier, `--apply ID...` ou `--apply-recommended` les applique après confirmation (point de restauration vérifié d'abord), `--journal` liste les séances et `--revert SEANCE` remet les valeurs d'origine. À tester d'abord dans Windows Sandbox.
