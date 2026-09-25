@@ -1,4 +1,5 @@
 using System.Globalization;
+using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Microsoft.Win32;
 using static Maus.Core.Modules.M07GameBar.GameBarKeys;
@@ -10,7 +11,7 @@ namespace Maus.Core.Modules.M07GameBar;
 /// seul l'enregistrement en arrière-plan a un coût notable, et le Mode Jeu reste activé dans tous les cas.
 /// La Game Bar n'est jamais désinstallée ; sur un Ryzen X3D à deux CCD, elle est recommandée.
 /// </summary>
-public sealed class GameBarModule : IAuditModule
+public sealed class GameBarModule : IFixableModule
 {
     private const RegistryHive Hklm = RegistryHive.LocalMachine;
     private const RegistryHive Hkcu = RegistryHive.CurrentUser;
@@ -48,6 +49,9 @@ public sealed class GameBarModule : IAuditModule
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
+
+    public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings) =>
+        GameBarPlanner.Plan(Id, context, findings);
 
     /// <summary>« Enregistrer ce qui s'est passé » : absente, la valeur vaut 0 (désactivé), comme le défaut de Windows.</summary>
     private static Finding DetectBackgroundRecording(IRegistryReader registry)
