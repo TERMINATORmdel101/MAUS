@@ -1,0 +1,60 @@
+// Module 3 — Fin de maintenance des versions de Windows 11 (dernier jour de correctifs, heure du Pacifique).
+// Sources, vérifiées le 24/09/2026 :
+//   https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information (page du 22/09/2026)
+//   https://learn.microsoft.com/en-us/lifecycle/products/windows-11-home-and-pro
+//   https://learn.microsoft.com/en-us/lifecycle/products/windows-11-enterprise-and-education
+// homePro : Famille, Pro, Pro Éducation, Pro pour stations de travail.
+// enterpriseEducation : Entreprise, Éducation, IoT Entreprise, Entreprise multisession.
+// ltsc / iotLtsc : Entreprise LTSC 2024 (sans support étendu) et IoT Entreprise LTSC 2024.
+// newDevicesOnly : 26H1 équipe seulement des PC neufs, jamais proposée en mise à jour d'un PC existant.
+// Dates revérifiées le 25/09/2026 sur la page release-information (mise à jour du 22/09/2026).
+{
+  "reviewed": "2026-09-24",
+  "source": "https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information",
+  "minimumSupportedBuild": 22631,
+  "windows10EndOfSupport": "2025-10-14",
+  "releases": [
+    {
+      "build": 28000,
+      "version": "26H1",
+      "homePro": "2028-03-14",
+      "enterpriseEducation": "2029-03-13",
+      "newDevicesOnly": true
+    },
+    {
+      "build": 26200,
+      "version": "25H2",
+      "homePro": "2027-10-12",
+      "enterpriseEducation": "2028-10-10"
+    },
+    {
+      "build": 26100,
+      "version": "24H2",
+      "homePro": "2026-10-13",
+      "enterpriseEducation": "2027-10-12",
+      "ltsc": "2029-10-09",
+      "iotLtsc": "2034-10-10",
+      "enablementPackage": "KB5054156",
+      "enablementTarget": "25H2",
+      "enablementMinimumUbr": 5074
+    },
+    {
+      "build": 22631,
+      "version": "23H2",
+      "homePro": "2025-11-11",
+      "enterpriseEducation": "2026-11-10"
+    },
+    {
+      "build": 22621,
+      "version": "22H2",
+      "homePro": "2024-10-08",
+      "enterpriseEducation": "2025-10-14"
+    },
+    {
+      "build": 22000,
+      "version": "21H2",
+      "homePro": "2023-10-10",
+      "enterpriseEducation": "2024-10-08"
+    }
+  ]
+}
