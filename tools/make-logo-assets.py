@@ -30,12 +30,14 @@ def main():
     # Logo réduit pour le README et le Store.
     logo.resize((800, 800), Image.LANCZOS).save(os.path.join(ROOT, "assets", "logo", "maus-logo-800.jpg"), quality=90, optimize=True)
 
-    # Icône : le « M » bleu (petites tailles) et le logo entier (grandes tailles).
+    # Icône : le logo entier, sans recadrage, à toutes les tailles (demande du porteur).
+    # bitmap_format="bmp" est indispensable : le décodeur d'icônes de Windows (WIC, utilisé par WPF) refuse
+    # les petites tailles compressées en PNG, et MAUS plantait au démarrage. Sous Windows, tools/make-icon.ps1
+    # produit la même icône.
+    frames = [logo.resize((s, s), Image.LANCZOS) for s in (16, 24, 32, 48, 64, 128, 256)]
+    frames[-1].save(os.path.join(APP, "maus.ico"), format="ICO", sizes=[f.size for f in frames],
+                    append_images=frames[:-1], bitmap_format="bmp")
     letter = square(logo, (240, 700, 670, 1225), grey)
-    whole = square(logo, (220, 600, 1710, 1260), grey)
-    frames = [letter.resize((s, s), Image.LANCZOS) for s in (16, 24, 32, 48)]
-    frames += [whole.resize((s, s), Image.LANCZOS) for s in (64, 128, 256)]
-    frames[-1].save(os.path.join(APP, "maus.ico"), format="ICO", sizes=[f.size for f in frames], append_images=frames[:-1])
     letter.resize((256, 256), Image.LANCZOS).save(os.path.join(APP, "maus-letter-256.png"), optimize=True)
 
 if __name__ == "__main__":

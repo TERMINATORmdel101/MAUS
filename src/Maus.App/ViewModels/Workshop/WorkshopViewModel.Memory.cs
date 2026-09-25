@@ -72,6 +72,8 @@ public sealed partial class WorkshopViewModel
     private string _memoryClocks = string.Empty;
     private string _memorySettings = string.Empty;
     private string _memoryNotes = string.Empty;
+    private string _memoryConfiguration = string.Empty;
+    private IReadOnlyList<MemorySlotConfiguration> _memorySlots = [];
     private MemoryDetailReport? _memoryReport;
     private ICommand? _readMemory;
     private ICommand? _copyMemory;
@@ -134,6 +136,21 @@ public sealed partial class WorkshopViewModel
 
     public bool HasMemoryNotes => MemoryNotes.Length > 0;
 
+    /// <summary>Vitesse et tension réellement appliquées, lues sans pilote : seule valeur réelle disponible sur Intel.</summary>
+    public string MemoryConfiguration
+    {
+        get => _memoryConfiguration;
+        private set
+        {
+            if (SetProperty(ref _memoryConfiguration, value))
+            {
+                OnPropertyChanged(nameof(HasMemoryConfiguration));
+            }
+        }
+    }
+
+    public bool HasMemoryConfiguration => MemoryConfiguration.Length > 0;
+
     public bool HasMemoryReport => _memoryReport is not null;
 
     public ICommand ReadMemoryCommand => _readMemory ??= new AsyncCommand(ReadMemoryAsync);
@@ -144,7 +161,7 @@ public sealed partial class WorkshopViewModel
         {
             try
             {
-                Clipboard.SetText(MemoryDetails.ToText(report));
+                Clipboard.SetText(MemoryConfiguration + Environment.NewLine + Environment.NewLine + MemoryDetails.ToText(report));
                 MemoryStatus = T("Fiche copiée : collez-la avec Ctrl+V.");
             }
             catch (ExternalException)
@@ -160,6 +177,10 @@ public sealed partial class WorkshopViewModel
         {
             return;
         }
+
+        // Sans pilote et sans droits particuliers : vitesse et tension réellement appliquées, pour tous les processeurs.
+        _memorySlots = await Task.Run(() => WindowsMemoryConfiguration.Read(new WmiCimReader()));
+        MemoryConfiguration = WindowsMemoryConfiguration.Describe(_memorySlots);
 
         var registry = new WindowsRegistryReader();
         if (!PawnIo.State(registry).Installed || !ProcessElevation.IsElevated())
@@ -222,6 +243,11 @@ public sealed partial class WorkshopViewModel
         foreach (var module in report.Modules)
         {
             MemoryModules.Add(new MemoryModuleViewModel(module));
+        }
+
+        if (WindowsMemoryConfiguration.CompareWithSpd(_memorySlots, report.Modules) is { } comparison)
+        {
+            MemoryConfiguration = WindowsMemoryConfiguration.Describe(_memorySlots) + Environment.NewLine + Environment.NewLine + comparison;
         }
 
         MemoryNotes = string.Join(Environment.NewLine, report.Notes.Select(n => "• " + n));

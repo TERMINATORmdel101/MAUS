@@ -61,7 +61,7 @@ public static class MemoryDetails
         MemoryClocks? clocks = null;
         if (smn is null)
         {
-            notes.Add(T("Timings réels : lisibles seulement sur processeur AMD Ryzen. Sur Intel, le contrôleur mémoire n'est pas accessible par PawnIO ; MAUS affiche les timings des profils SPD."));
+            notes.Add(T("Timings réellement appliqués : lisibles seulement sur processeur AMD Ryzen. Sur Intel, ils sont dans le contrôleur mémoire, que PawnIO n'ouvre pas par sécurité : MAUS affiche la vitesse et la tension réelles données par Windows, et les timings des profils SPD. Pour voir les timings réels sur Intel, CPU-Z (gratuit, cpuid.com, onglet Memory) les affiche."));
         }
         else
         {

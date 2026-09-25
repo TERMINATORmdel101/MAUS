@@ -2808,5 +2808,16 @@
   "• MAUS ne coupe jamais une protection importante (antivirus, pare-feu, mises à jour, protections du processeur) ni une fonction utile de Windows pour gagner quelques pour cent.": "• MAUS never turns off an important protection (antivirus, firewall, updates, processor protections) or a useful Windows feature to gain a few percent.",
   "• Méfiez-vous des outils qui promettent +30 % : la plupart de leurs réglages sont sans effet mesurable, ou retirent des fonctions de Windows dont vous aurez besoin un jour.": "• Beware of tools that promise +30 %: most of their tweaks have no measurable effect, or remove Windows features you will need one day.",
   "• Overclocking et undervolting : quelques pour cent, très variables d'une puce à l'autre, et seulement après des tests de stabilité (onglet Tests de l'Atelier).": "• Overclocking and undervolting: a few percent, highly variable from one chip to another, and only after stability tests (Tests tab of the Workshop).",
-  "• SFC remplace ensuite les fichiers système abîmés par une copie saine.": "• SFC then replaces damaged system files with a healthy copy."
+  "• SFC remplace ensuite les fichiers système abîmés par une copie saine.": "• SFC then replaces damaged system files with a healthy copy.",
+  "Vitesse et tension réellement appliquées (d\u0027après Windows, sans pilote)": "Speed and voltage actually applied (from Windows, no driver needed)",
+  "Timings réellement appliqués : lisibles seulement sur processeur AMD Ryzen. Sur Intel, ils sont dans le contrôleur mémoire, que PawnIO n\u0027ouvre pas par sécurité : MAUS affiche la vitesse et la tension réelles données par Windows, et les timings des profils SPD. Pour voir les timings réels sur Intel, CPU-Z (gratuit, cpuid.com, onglet Memory) les affiche.": "Timings actually applied: readable only on AMD Ryzen processors. On Intel, they sit in the memory controller, which PawnIO does not open for safety reasons: MAUS shows the real speed and voltage reported by Windows, and the timings of the SPD profiles. To see the real timings on Intel, CPU-Z (free, cpuid.com, Memory tab) displays them.",
+  "Windows ne donne aucune information sur les barrettes de ce PC.": "Windows gives no information about the memory modules of this PC.",
+  "{0} : {1} {2}, {3:0.#} Go {4} · {5} · {6}": "{0}: {1} {2}, {3:0.#} GB {4} · {5} · {6}",
+  "référence inconnue": "unknown part number",
+  "{0} V appliqués": "{0} V applied",
+  "tension non déclarée par le BIOS": "voltage not reported by the BIOS",
+  "Vitesse appliquée : {0} MT/s, au-delà du profil le plus rapide de la puce SPD ({1} MT/s) : la mémoire a été réglée à la main dans le BIOS (overclocking). Les timings et la tension réels ne figurent dans aucun profil.": "Applied speed: {0} MT/s, above the fastest profile of the SPD chip ({1} MT/s): the memory was tuned by hand in the BIOS (overclocking). The real timings and voltage are not in any profile.",
+  "Vitesse appliquée : {0} MT/s, celle du profil {1} : ce profil est probablement activé dans le BIOS.": "Applied speed: {0} MT/s, the speed of profile {1}: this profile is probably enabled in the BIOS.",
+  "Vitesse appliquée : {0} MT/s, la vitesse standard (JEDEC). Le profil {1} ({2} MT/s) n\u0027est pas activé dans le BIOS.": "Applied speed: {0} MT/s, the standard speed (JEDEC). Profile {1} ({2} MT/s) is not enabled in the BIOS.",
+  "Vitesse appliquée : {0} MT/s, différente des profils de la puce SPD : réglage personnalisé dans le BIOS.": "Applied speed: {0} MT/s, different from the SPD chip profiles: custom setting in the BIOS."
 }
