@@ -1,0 +1,76 @@
+// Module 4 — Confidentialité et télémétrie : réglages simples de l'utilisateur, valables sur toutes les éditions.
+// Les lignes qui dépendent de l'édition, des services, des tâches planifiées ou des applications sont contrôlées dans PrivacyModule.
+// Tout reste au plus « optimisation possible » (Low) : ce sont des choix, pas des dangers.
+[
+  {
+    "id": "M04.language-list",
+    "title": "Liste des langues non transmise aux sites web",
+    "category": "Recommandations et offres",
+    "hive": "HKCU",
+    "path": "Control Panel\\International\\User Profile",
+    "name": "HttpAcceptLanguageOptOut",
+    "expect": "EqualTo",
+    "value": "1",
+    "expectedLabel": "non transmise (1)",
+    "severity": "Low",
+    "explanation": "Par défaut, Windows indique aux sites web la liste de vos langues pour leur permettre d'afficher un contenu local. Ce détail aide aussi à vous reconnaître d'un site à l'autre.",
+    "advice": "Couper « Permettre aux sites web d'accéder à ma liste de langues » dans Paramètres > Confidentialité et sécurité > Recommandations et offres."
+  },
+  {
+    "id": "M04.app-launch-tracking",
+    "title": "Suivi des lancements d'applications désactivé",
+    "category": "Recommandations et offres",
+    "hive": "HKCU",
+    "path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+    "name": "Start_TrackProgs",
+    "expect": "EqualTo",
+    "value": "0",
+    "expectedLabel": "désactivé (0)",
+    "severity": "Low",
+    "explanation": "Windows note les applications que vous lancez pour personnaliser le menu Démarrer et la recherche. Le couper n'enlève rien d'essentiel ; seule la liste « Les plus utilisées » ne se remplit plus.",
+    "advice": "Couper « Améliorer les résultats de Démarrer et de la recherche en suivant les lancements d'applications » dans les paramètres de confidentialité."
+  },
+  {
+    "id": "M04.online-speech",
+    "title": "Reconnaissance vocale en ligne désactivée",
+    "category": "Voix et saisie",
+    "hive": "HKCU",
+    "path": "Software\\Microsoft\\Speech_OneCore\\Settings\\OnlineSpeechPrivacy",
+    "name": "HasAccepted",
+    "expect": "EqualTo",
+    "value": "0",
+    "absentIsOk": true,
+    "expectedLabel": "désactivée (0 ou absente)",
+    "severity": "Low",
+    "explanation": "La reconnaissance vocale en ligne envoie votre voix aux serveurs de Microsoft pour la transcrire. La reconnaissance intégrée à Windows, hors ligne, reste disponible.",
+    "advice": "Couper « Reconnaissance vocale en ligne » dans Paramètres > Confidentialité et sécurité > Voix."
+  },
+  {
+    "id": "M04.implicit-text",
+    "title": "Collecte de ce que vous tapez désactivée",
+    "category": "Voix et saisie",
+    "hive": "HKCU",
+    "path": "Software\\Microsoft\\InputPersonalization",
+    "name": "RestrictImplicitTextCollection",
+    "expect": "EqualTo",
+    "value": "1",
+    "expectedLabel": "limitée (1)",
+    "severity": "Low",
+    "explanation": "Windows peut mémoriser les mots que vous tapez pour enrichir son dictionnaire personnel et ses suggestions. Le limiter réduit ce qui est conservé sur vos habitudes de saisie.",
+    "advice": "Couper « Dictionnaire personnel pour l'écriture manuscrite et la saisie » dans Paramètres > Confidentialité et sécurité > Personnalisation de l'écriture manuscrite et de la saisie."
+  },
+  {
+    "id": "M04.implicit-ink",
+    "title": "Collecte de l'écriture manuscrite désactivée",
+    "category": "Voix et saisie",
+    "hive": "HKCU",
+    "path": "Software\\Microsoft\\InputPersonalization",
+    "name": "RestrictImplicitInkCollection",
+    "expect": "EqualTo",
+    "value": "1",
+    "expectedLabel": "limitée (1)",
+    "severity": "Low",
+    "explanation": "Windows peut analyser votre écriture au stylet pour mieux la reconnaître. Sans stylet, ce réglage ne sert à rien ; le limiter réduit ce qui est conservé.",
+    "advice": "Couper « Dictionnaire personnel pour l'écriture manuscrite et la saisie » dans Paramètres > Confidentialité et sécurité > Personnalisation de l'écriture manuscrite et de la saisie."
+  }
+]
