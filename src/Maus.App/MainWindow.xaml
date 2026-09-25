@@ -55,6 +55,17 @@
                     <TextBlock Text="{Binding Greeting}" Style="{StaticResource PageTitle}" />
                     <TextBlock Text="{x:Static app:Ui.Tagline}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
                     <TextBlock Text="{Binding SystemSummary}" Style="{StaticResource Muted}" Margin="0,2,0,0" />
+                    <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausRed}"
+                            Margin="0,12,0,0" Visibility="{Binding Workshop.HasCrashNotice, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Understood}" Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center"
+                                    Command="{Binding Workshop.DismissCrashCommand}" />
+                            <StackPanel>
+                                <TextBlock Text="{x:Static app:Ui.CrashTitle}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Workshop.CrashNotice}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
 
                     <Grid Margin="0,18,0,0">
                         <Grid.ColumnDefinitions>
@@ -597,6 +608,17 @@
                     <TabItem Header="{x:Static app:Ui.SectionTests}" Style="{StaticResource PillTab}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
+                                <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausRed}"
+                                        Visibility="{Binding Workshop.HasCrashNotice, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Understood}" Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                Command="{Binding Workshop.DismissCrashCommand}" />
+                                        <StackPanel>
+                                            <TextBlock Text="{x:Static app:Ui.CrashTitle}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Workshop.CrashNotice}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
                                 <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausBlue}">
                                     <TextBlock Text="{x:Static app:Ui.TestSafety}" TextWrapping="Wrap" />
                                 </Border>
@@ -664,6 +686,37 @@
                                         <Run Text="{Binding Workshop.Live.GpuTemperature.Value, Mode=OneWay}" FontWeight="SemiBold" />
                                     </TextBlock>
                                 </DockPanel>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xE945;" Foreground="{StaticResource MausGold}" />
+                                        <TextBlock Text="{x:Static app:Ui.CoreTestTitle}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{x:Static app:Ui.CoreTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox MinWidth="220" Margin="0,0,16,4" ItemsSource="{Binding Workshop.CoreDurations}" SelectedItem="{Binding Workshop.CoreDuration}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartCoreTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                        </WrapPanel>
+                                        <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.CoreProgress, Mode=OneWay}" />
+                                        <TextBlock Text="{Binding Workshop.CoreStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        <ItemsControl ItemsSource="{Binding Workshop.CoreChips}" Margin="0,8,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type ws:CoreChipViewModel}">
+                                                    <Border Style="{StaticResource Chip}" Background="{Binding Background}">
+                                                        <TextBlock Text="{Binding Text}" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
 
                                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                                     <StackPanel>

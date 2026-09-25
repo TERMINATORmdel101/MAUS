@@ -46,6 +46,11 @@ public sealed class WorkshopViewModel : ObservableObject
     private double _ramProgress;
     private string _ramStatus = string.Empty;
     private readonly IGpuMemoryProvider _gpuProvider = new D3D11GpuMemoryProvider();
+    private readonly ICoreTopology _topology = new WindowsCoreTopology();
+    private readonly FileCoreTestCheckpoint _checkpoint = FileCoreTestCheckpoint.CreateDefault();
+    private double _coreProgress;
+    private string _coreStatus = string.Empty;
+    private string? _crashNotice;
     private bool _gpuAdaptersLoaded;
     private TestOption<GpuAdapterInfo>? _vramAdapter;
     private double _vramProgress;
@@ -90,6 +95,15 @@ public sealed class WorkshopViewModel : ObservableObject
             new(T("4 Go"), 4L << 30),
         ];
         _vramSize = VramSizes[0];
+        CoreDurations =
+        [
+            new(T("5 minutes (aperçu)"), TimeSpan.FromMinutes(5)),
+            new(T("20 minutes (recommandé)"), TimeSpan.FromMinutes(20)),
+            new(T("1 heure (approfondi)"), TimeSpan.FromHours(1)),
+            new(T("4 heures (idéal pour une nuit)"), TimeSpan.FromHours(4)),
+        ];
+        _coreDuration = CoreDurations[1];
+        _crashNotice = DescribeCrash(_checkpoint.Load());
 
         SearchProcessCommand = new AsyncCommand(() => Run(() => { if (SelectedProcess is { } p) { OpenSearch(WebSearch.ForProcess(p.Name)); } }));
         ShowProcessCommand = new AsyncCommand(() => Run(() => { if (SelectedProcess?.Sample.Path is { } path) { ShellLauncher.ShowInFolder(path); } }));
@@ -98,6 +112,12 @@ public sealed class WorkshopViewModel : ObservableObject
         StartCpuTestCommand = new AsyncCommand(RunCpuTestAsync);
         StartRamTestCommand = new AsyncCommand(RunRamTestAsync);
         StartVramTestCommand = new AsyncCommand(RunVramTestAsync);
+        StartCoreTestCommand = new AsyncCommand(RunCoreTestAsync);
+        DismissCrashCommand = new AsyncCommand(() => Run(() =>
+        {
+            _checkpoint.Clear();
+            CrashNotice = null;
+        }));
         StopTestCommand = new AsyncCommand(() => Run(() => _stopTest?.Invoke()));
     }
 
@@ -277,6 +297,50 @@ public sealed class WorkshopViewModel : ObservableObject
     public ICommand StopTestCommand { get; }
 
     public ICommand StartVramTestCommand { get; }
+
+    public ICommand StartCoreTestCommand { get; }
+
+    public ICommand DismissCrashCommand { get; }
+
+    public IReadOnlyList<TestOption<TimeSpan>> CoreDurations { get; }
+
+    private TestOption<TimeSpan> _coreDuration;
+
+    public TestOption<TimeSpan> CoreDuration
+    {
+        get => _coreDuration;
+        set => SetProperty(ref _coreDuration, value);
+    }
+
+    public double CoreProgress
+    {
+        get => _coreProgress;
+        private set => SetProperty(ref _coreProgress, value);
+    }
+
+    public string CoreStatus
+    {
+        get => _coreStatus;
+        private set => SetProperty(ref _coreStatus, value);
+    }
+
+    /// <summary>Bilan par cœur (pastilles vertes ou rouges).</summary>
+    public ObservableCollection<CoreChipViewModel> CoreChips { get; } = [];
+
+    /// <summary>Le dernier test cœur par cœur s'est interrompu brutalement (gel ou redémarrage) : explication, sinon <c>null</c>.</summary>
+    public string? CrashNotice
+    {
+        get => _crashNotice;
+        private set
+        {
+            if (SetProperty(ref _crashNotice, value))
+            {
+                OnPropertyChanged(nameof(HasCrashNotice));
+            }
+        }
+    }
+
+    public bool HasCrashNotice => CrashNotice is not null;
 
     /// <summary>Cartes graphiques testables (mémoire dédiée), chargées à l'ouverture de l'onglet Tests.</summary>
     public ObservableCollection<TestOption<GpuAdapterInfo>> VramAdapters { get; } = [];
@@ -610,6 +674,93 @@ public sealed class WorkshopViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             RamStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
+        }
+        finally
+        {
+            await StopTestAsync();
+        }
+    }
+
+    private static string? DescribeCrash(CoreTestCheckpoint? trace) => trace is null
+        ? null
+        : T("Le dernier test cœur par cœur s'est arrêté brutalement le {0:g}, pendant le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le test.", trace.StartedAt.ToLocalTime(), trace.Core);
+
+    private async Task RunCoreTestAsync()
+    {
+        if (IsTesting)
+        {
+            return;
+        }
+
+        IReadOnlyList<CpuCore> cores;
+        try
+        {
+            cores = await Task.Run(_topology.Cores);
+        }
+        catch (Exception ex)
+        {
+            CoreStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
+            return;
+        }
+
+        if (cores.Count == 0)
+        {
+            CoreStatus = T("Windows n'a pas décrit les cœurs du processeur : le test cœur par cœur est impossible sur ce PC.");
+            return;
+        }
+
+        var plan = CoreCycleTest.Plan(CoreDuration.Value, cores.Count);
+        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        {
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        await StartTestAsync(cancellation);
+        CoreChips.Clear();
+        var hybrid = cores.Select(c => c.EfficiencyClass).Distinct().Count() > 1;
+        var topClass = cores.Max(c => c.EfficiencyClass);
+        string Name(int index)
+        {
+            var core = cores.First(c => c.Index == index);
+            return hybrid ? T("Cœur {0} ({1})", index, core.EfficiencyClass == topClass ? "P" : "E") : T("Cœur {0}", index);
+        }
+
+        try
+        {
+            CoreStatus = T("Test en cours…");
+            var progress = new Progress<CoreCycleProgress>(p =>
+            {
+                CoreProgress = p.Percent;
+                CoreStatus = T("{0} ({1}/{2}) · {3} · {4:0} % · {5} cœur(s) en erreur", Name(p.Core), p.Position + 1, p.CoreCount, p.Phase, p.Percent, p.FailedCores);
+            });
+            var logs = new Maus.Core.Platform.WindowsEventLogReader();
+            var result = await CoreCycleTest.RunAsync(_topology, _checkpoint, plan, progress, () => Live.DangerAlarm, since => WheaEvents.CountSince(logs, since), cancellation.Token);
+            CoreProgress = 100;
+            foreach (var verdict in result.Cores)
+            {
+                CoreChips.Add(new CoreChipViewModel(
+                    verdict.Froze ? T("{0} · figé", Name(verdict.Core))
+                        : verdict.Errors > 0 ? T("{0} · {1} erreur(s)", Name(verdict.Core), verdict.Errors)
+                        : verdict.Rounds > 0 ? T("{0} · stable", Name(verdict.Core)) : Name(verdict.Core),
+                    verdict.Froze || verdict.Errors > 0 ? Controls.Palette.Red : verdict.Rounds > 0 ? Controls.Palette.Green : Controls.Palette.Grey));
+            }
+
+            var failing = result.Cores.Where(c => !c.Stable).Select(c => Name(c.Core)).ToList();
+            var whea = result.WheaEvents is > 0 ? " " + T("{0} erreur(s) matérielle(s) WHEA pendant le test : même sans plantage, le processeur est à la limite.", result.WheaEvents) : string.Empty;
+            var pinning = result.Cores.Any(c => !c.Pinned) ? " " + T("Windows a refusé de fixer le test sur certains cœurs : le résultat par cœur est moins fiable.") : string.Empty;
+            CoreStatus = result.Aborted
+                ? T("Test interrompu : {0}", result.AbortReason) + whea
+                : failing.Count > 0
+                    ? T("Cœur(s) instable(s) : {0}. Remontez le Curve Optimizer de ce(s) cœur(s) de 2 ou 3 points (par exemple de −15 à −12) ou réduisez l'undervolt, puis refaites le test. Si rien ne change, revenez aux réglages d'origine du BIOS.", string.Join(", ", failing)) + whea + pinning
+                    : result.WheaEvents is > 0
+                        ? T("Aucune erreur de calcul, mais le processeur a signalé des erreurs matérielles.") + whea + " " + T("Remontez légèrement le Curve Optimizer ou l'undervolt, puis refaites le test.")
+                        : T("Tous les cœurs ont tenu : {0} cœur(s), aucune erreur de calcul, aucun gel, aucune erreur matérielle WHEA.", result.Cores.Count) + pinning + " "
+                            + T("Pour valider un réglage, laissez tourner au moins 20 minutes (idéalement une nuit), puis utilisez le PC normalement quelques jours : certains gels n'arrivent qu'au repos.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            CoreStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
         }
         finally
         {

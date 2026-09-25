@@ -168,4 +168,12 @@ public static class Ui
     public static string StopTest => T("Arrêter le test");
 
     public static string TestSafety => T("Pendant un test, MAUS surveille les températures lisibles et s'arrête de lui-même au seuil de danger. Fermez les jeux et programmes lourds pour un résultat fiable.");
+
+    public static string CoreTestTitle => T("Processeur : test cœur par cœur (Curve Optimizer, undervolt)");
+
+    public static string CoreTestIntro => T("Utile si vous avez baissé le Curve Optimizer (AMD) ou fait un undervolt (Intel) : ces réglages lâchent quand un seul cœur monte à sa fréquence maximale, au réveil et aux changements de charge, rarement sous une charge continue. MAUS teste chaque cœur à tour de rôle avec des à-coups et des pauses. Un PC réglé d'origine n'a pas besoin de ce test.");
+
+    public static string CrashTitle => T("Le PC a gelé pendant le dernier test");
+
+    public static string Understood => T("J'ai compris");
 }
