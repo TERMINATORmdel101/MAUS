@@ -14,13 +14,21 @@
 - **Rien de dangereux en automatique.** BIOS, XMP/EXPO et overclocking sont guidés, jamais exécutés.
 - **Aucune télémétrie.** MAUS n'envoie rien.
 
+## Ce que fait MAUS
+
+- **Audit** de 16 domaines de Windows 11 (modifications risquées, réparation, mises à jour, confidentialité, alimentation, effets visuels, Game Bar, BIOS, carte graphique, mémoire, santé du matériel, démarrage, sécurité, écran, overclocking, atelier), résumé par un **score de santé** et les quatre familles **M·A·U·S**.
+- **Corrections réversibles**, choisies ligne par ligne ou par profil, avec point de restauration vérifié, journal des valeurs d'origine et bouton **Annuler** (séance entière ou une seule correction).
+- **Atelier matériel**, sans pilote : fiche d'identité du PC, jauges de sécurité (températures, tensions), mesures en direct, gestionnaire des tâches qui explique chaque processus, « Pourquoi mon PC est lent ? », tests du processeur et de la mémoire vive avec arrêt automatique en cas de surchauffe.
+- **Rapport HTML** avant/après, à garder ou à imprimer.
+- **Trois langues** : français, anglais, espagnol.
+
 ## État du projet
 
 | Version | Contenu | État |
 |---|---|---|
 | V0.1 | Socle, profil matériel, mode « audit seul » des modules | Terminée |
-| V0.2 | Corrections réversibles (journal, point de restauration, Annuler) | En cours : à valider sur Windows |
-| V0.3 | Mini-benchmark, écran et HDR, publication sur le Microsoft Store | À venir |
+| V0.2 | Corrections réversibles (journal, point de restauration, Annuler), atelier matériel, nouvelle interface, trois langues | Codée : à valider sur Windows |
+| V0.3 | Test de la mémoire vidéo, écran et HDR, publication sur le Microsoft Store | À venir |
 
 Configuration requise : Windows 11 23H2 (build 22631) ou plus récent.
 
@@ -37,6 +45,7 @@ Audit en ligne de commande (lecture seule, aucun droit particulier requis ; cert
 
 ```bash
 dotnet run --project src/Maus.Cli -- --module M06
+dotnet run --project src/Maus.Cli -- --lang en --html rapport.html
 ```
 
 Corrections en ligne de commande (V0.2, invite de commandes **administrateur**) : `--plan` affiche les corrections proposées sans rien modifier, `--apply ID...` ou `--apply-recommended` les applique après confirmation (point de restauration vérifié d'abord), `--journal` liste les séances et `--revert SEANCE` remet les valeurs d'origine. À tester d'abord dans Windows Sandbox.
@@ -52,7 +61,10 @@ L'application graphique (`src/Maus.App`) demande les droits administrateur au la
 | `src/Maus.Core/Fixes` | Corrections réversibles : journal, point de restauration vérifié, moteur Apply / Verify / Revert, profils |
 | `src/Maus.Core/Hardware` | Profil matériel commun (fixe ou portable, CPU, GPU) |
 | `src/Maus.Core/Rules` et `Catalog` | Règles de registre déclaratives en JSON |
-| `src/Maus.Core/Modules` | Un dossier par module de la fiche technique (M01 à M15) |
+| `src/Maus.Core/Modules` | Un dossier par module de la fiche technique (M01 à M16) |
+| `src/Maus.Core/Workshop` | Atelier matériel : inventaire, capteurs, processus, tests |
+| `src/Maus.Core/Localization` | Traductions (le français est la langue source) |
+| `src/Maus.Core/Reporting` | Score de santé, rapports texte, JSON et HTML |
 | `src/Maus.Cli` | Audit en ligne de commande |
 | `src/Maus.App` | Interface WPF |
 | `tests` | Tests unitaires avec registre et WMI simulés |
