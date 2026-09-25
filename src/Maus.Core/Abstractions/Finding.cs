@@ -28,8 +28,11 @@ public sealed record Finding
     /// <summary>Regroupement facultatif dans l'interface (par exemple « Defender » ou « Windows Update »).</summary>
     public string? Category { get; init; }
 
-    /// <summary>Vrai si une correction réversible sera proposée (à partir de la V0.2).</summary>
+    /// <summary>Vrai si une correction réversible est proposée.</summary>
     public bool Fixable { get; init; }
+
+    /// <summary>Verdict d'origine d'un constat marqué « voulu » par l'utilisateur (affiché alors comme une information).</summary>
+    public FindingStatus? AcknowledgedFrom { get; init; }
 
     public static Finding Unknown(string id, string title, string reason, string? category = null) => new()
     {

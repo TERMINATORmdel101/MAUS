@@ -58,7 +58,7 @@ public sealed class AuditEngine
             var findings = await Task.Run(() => module.DetectAsync(context, timeout.Token), timeout.Token)
                 .WaitAsync(module.Timeout, cancellationToken)
                 .ConfigureAwait(false);
-            return new ModuleResult(module.Id, module.Title, findings, stopwatch.Elapsed);
+            return Preferences.Acknowledgements.Apply(new ModuleResult(module.Id, module.Title, findings, stopwatch.Elapsed), context.Preferences);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -26,7 +26,9 @@ public sealed class FixEngine
             var result = results.FirstOrDefault(r => r.ModuleId == module.Id);
             if (result is not null && result.Error is null)
             {
-                changes.AddRange(module.Plan(context, result.Findings));
+                // Un constat marqué « voulu » ne produit jamais de correction.
+                var wanted = result.Findings.Where(f => f.AcknowledgedFrom is not null).Select(f => f.Id).ToHashSet(StringComparer.Ordinal);
+                changes.AddRange(module.Plan(context, result.Findings).Where(c => !wanted.Contains(c.FindingId ?? c.Id)));
             }
         }
 
