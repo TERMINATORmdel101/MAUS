@@ -11,7 +11,7 @@ namespace Maus.Core.Modules.M12Startup;
 /// <c>m12-startup-catalog.json</c> et signale les entrées suspectes. Ajoute la durée du dernier démarrage,
 /// les tâches planifiées lancées à l'ouverture de session et les services tiers automatiques.
 /// </summary>
-public sealed class StartupAppsModule : IAuditModule
+public sealed class StartupAppsModule : Fixes.IFixableModule
 {
     internal const string RunPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     internal const string RunOncePath = @"Software\Microsoft\Windows\CurrentVersion\RunOnce";
@@ -63,15 +63,7 @@ public sealed class StartupAppsModule : IAuditModule
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
         var findings = new List<Finding>();
-        var entries = new List<StartupEntry>();
-        foreach (var source in RegistrySources)
-        {
-            ReadRegistrySource(context.Registry, source, entries, findings);
-        }
-
-        ReadFolderSource(context, "user-folder", "dossier Démarrage de l'utilisateur", _environment.UserStartupFolder, RegistryHive.CurrentUser, entries, findings);
-        ReadFolderSource(context, "common-folder", "dossier Démarrage commun", _environment.CommonStartupFolder, RegistryHive.LocalMachine, entries, findings);
-        ReadStoreTasks(context, entries, findings);
+        var entries = CollectEntries(context, findings);
         cancellationToken.ThrowIfCancellationRequested();
 
         var windowsDirectory = _environment.Expand("%SystemRoot%").TrimEnd('\\');
@@ -86,6 +78,67 @@ public sealed class StartupAppsModule : IAuditModule
 
         // Les constats les plus graves d'abord ; l'ordre de lecture est conservé à gravité égale.
         return Task.FromResult<IReadOnlyList<Finding>>(findings.OrderByDescending(f => f.Status.Rank()).ToList());
+    }
+
+    /// <summary>
+    /// Étape Plan : désactivation comme le Gestionnaire des tâches (valeur binaire <c>StartupApproved</c> : 03 puis la date),
+    /// sans jamais supprimer la valeur Run. Familles « sans problème » et entrées orphelines pré-cochées, le reste au choix.
+    /// </summary>
+    public IReadOnlyList<Fixes.PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
+    {
+        var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
+        var entries = CollectEntries(context, []);
+        var windowsDirectory = _environment.Expand("%SystemRoot%").TrimEnd('\\');
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        var disabled = new byte[12];
+        disabled[0] = 0x03;
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(disabled.AsSpan(4), context.Now.ToFileTime());
+
+        var changes = new List<Fixes.PlannedChange>();
+        foreach (var entry in entries)
+        {
+            var described = Describe(context.Files, entry, windowsDirectory, used);
+            if (entry.ApprovalKey is null || !entry.Approval.Enabled || entry.RunOnce
+                || !byId.TryGetValue(described.Id, out var finding) || !finding.Fixable || finding.Status == FindingStatus.Ok)
+            {
+                continue;
+            }
+
+            var match = Catalog.Value.Match(entry.MatchName, entry.Executable is null ? null : StartupParsers.FileNameOf(entry.Executable), entry.PackageName);
+            changes.Add(new Fixes.PlannedChange
+            {
+                Id = finding.Id,
+                ModuleId = Id,
+                Title = $"Ne plus lancer au démarrage : {finding.Title}",
+                Description = "Désactive l'entrée comme le Gestionnaire des tâches, sans rien désinstaller : l'application se lance toujours quand vous l'ouvrez." +
+                              (match is { } known ? $" Vous perdez : {known.Family.Loses}." : string.Empty),
+                Category = finding.Category,
+                Gain = "Ouverture de session plus rapide, moins de mémoire occupée en arrière-plan.",
+                Recommended = finding.Status == FindingStatus.Improvable,
+                Writes =
+                [
+                    new Fixes.SettingWrite(
+                        Fixes.SettingKey.Registry(entry.ApprovalHive == RegistryHive.LocalMachine ? "HKLM" : "HKCU", $@"{ApprovedPath}\{entry.ApprovalKey}", entry.Name),
+                        Fixes.SettingValue.Binary(disabled)),
+                ],
+            });
+        }
+
+        return changes;
+    }
+
+    private List<StartupEntry> CollectEntries(AuditContext context, List<Finding> findings)
+    {
+        var entries = new List<StartupEntry>();
+        foreach (var source in RegistrySources)
+        {
+            ReadRegistrySource(context.Registry, source, entries, findings);
+        }
+
+        ReadFolderSource(context, "user-folder", "dossier Démarrage de l'utilisateur", _environment.UserStartupFolder, RegistryHive.CurrentUser, entries, findings);
+        ReadFolderSource(context, "common-folder", "dossier Démarrage commun", _environment.CommonStartupFolder, RegistryHive.LocalMachine, entries, findings);
+        ReadStoreTasks(context, entries, findings);
+        return entries;
     }
 
     private void ReadRegistrySource(IRegistryReader registry, RegistrySource source, List<StartupEntry> entries, List<Finding> findings)
@@ -104,7 +157,11 @@ public sealed class StartupAppsModule : IAuditModule
                     ? new ApprovalState(true, null)
                     : StartupParsers.ParseApproval(ReadApproval(registry, source.Hive, source.ApprovedKey, name));
                 var (executable, arguments) = StartupParsers.SplitCommand(_environment.Expand(command));
-                entries.Add(new StartupEntry(source.Id, source.Label, name, name, command, executable, arguments, approval, source.ApprovedKey is null, null, null));
+                entries.Add(new StartupEntry(source.Id, source.Label, name, name, command, executable, arguments, approval, source.ApprovedKey is null, null, null)
+                {
+                    ApprovalHive = source.Hive,
+                    ApprovalKey = source.ApprovedKey,
+                });
             }
         }
         catch (MausAccessDeniedException)
@@ -155,7 +212,11 @@ public sealed class StartupAppsModule : IAuditModule
             var target = isShortcut ? _environment.ResolveShortcut(file) : file;
             var approval = StartupParsers.ParseApproval(ReadApproval(context.Registry, approvalHive, "StartupFolder", fileName));
             var command = isShortcut ? $"{file} → {target ?? "cible non lisible"}" : file;
-            entries.Add(new StartupEntry(id, label, fileName, Path.GetFileNameWithoutExtension(fileName), command, target, string.Empty, approval, false, null, null));
+            entries.Add(new StartupEntry(id, label, fileName, Path.GetFileNameWithoutExtension(fileName), command, target, string.Empty, approval, false, null, null)
+            {
+                ApprovalHive = approvalHive,
+                ApprovalKey = "StartupFolder",
+            });
         }
     }
 
@@ -560,5 +621,11 @@ public sealed class StartupAppsModule : IAuditModule
         ApprovalState Approval,
         bool RunOnce,
         string? PackageName,
-        string? Publisher);
+        string? Publisher)
+    {
+        /// <summary>Ruche et sous-clé <c>StartupApproved</c> qui portent l'état ; <c>null</c> si l'entrée ne se désactive pas ainsi (Store, RunOnce).</summary>
+        public RegistryHive ApprovalHive { get; init; }
+
+        public string? ApprovalKey { get; init; }
+    }
 }
