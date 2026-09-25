@@ -93,6 +93,28 @@ public class WindowsMemoryConfigurationTests
     }
 
     [Fact]
+    public void Profile_summary_shows_speed_primary_timings_and_voltage()
+    {
+        MemoryTiming Primary(string key, int clocks) => new(key, TimingGroup.Primary, clocks);
+        var profile = new SpdProfile(ProfileKind.Xmp, 1, "2.0", null, 3200, 0.625, [],
+            [Primary("tCL", 16), Primary("tRCD", 18), Primary("tRP", 18), Primary("tRAS", 36)], 1.35, null, null);
+
+        Assert.Equal("3200 MT/s · 16-18-18-36 · 1.35 V", MemoryDetails.ProfileSummary(profile));
+    }
+
+    [Fact]
+    public void Spd_chip_is_matched_by_part_number_then_by_order()
+    {
+        var first = Module(Profile(ProfileKind.Xmp, 3200)) with { Slot = 2, PartNumber = "PVS416G320C6" };
+        var second = Module(Profile(ProfileKind.Xmp, 3600)) with { Slot = 0, PartNumber = "F4-3600C16-8GTZN" };
+
+        Assert.Same(second, MemoryDetails.MatchModule([first, second], "F4-3600C16-8GTZN  ", 0));
+        Assert.Same(second, MemoryDetails.MatchModule([first, second], "3200 Series", 0));
+        Assert.Same(first, MemoryDetails.MatchModule([first, second], null, 1));
+        Assert.Null(MemoryDetails.MatchModule([first], null, 3));
+    }
+
+    [Fact]
     public void No_spd_profiles_means_no_comparison()
     {
         var slots = WindowsMemoryConfiguration.Parse([new CimRow(Dimm("DIMM1", 3467, 1250))]);

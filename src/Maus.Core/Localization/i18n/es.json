@@ -2819,5 +2819,12 @@
   "Vitesse appliquée : {0} MT/s, au-delà du profil le plus rapide de la puce SPD ({1} MT/s) : la mémoire a été réglée à la main dans le BIOS (overclocking). Les timings et la tension réels ne figurent dans aucun profil.": "Velocidad aplicada: {0} MT/s, por encima del perfil más rápido del chip SPD ({1} MT/s): la memoria se ajustó a mano en la BIOS (overclocking). Las latencias y la tensión reales no figuran en ningún perfil.",
   "Vitesse appliquée : {0} MT/s, celle du profil {1} : ce profil est probablement activé dans le BIOS.": "Velocidad aplicada: {0} MT/s, la del perfil {1}: este perfil probablemente está activado en la BIOS.",
   "Vitesse appliquée : {0} MT/s, la vitesse standard (JEDEC). Le profil {1} ({2} MT/s) n\u0027est pas activé dans le BIOS.": "Velocidad aplicada: {0} MT/s, la velocidad estándar (JEDEC). El perfil {1} ({2} MT/s) no está activado en la BIOS.",
-  "Vitesse appliquée : {0} MT/s, différente des profils de la puce SPD : réglage personnalisé dans le BIOS.": "Velocidad aplicada: {0} MT/s, distinta de los perfiles del chip SPD: ajuste personalizado en la BIOS."
+  "Vitesse appliquée : {0} MT/s, différente des profils de la puce SPD : réglage personnalisé dans le BIOS.": "Velocidad aplicada: {0} MT/s, distinta de los perfiles del chip SPD: ajuste personalizado en la BIOS.",
+  "Profils XMP / EXPO": "Perfiles XMP / EXPO",
+  "lisibles avec le pilote PawnIO et MAUS en administrateur": "legibles con el controlador PawnIO y MAUS como administrador",
+  "puce SPD non lue pour cette barrette": "chip SPD no leído para este módulo",
+  "aucun · standard JEDEC {0}": "ninguno · estándar JEDEC {0}",
+  "Lecture des puces SPD des barrettes (profils XMP / EXPO)…": "Leyendo los chips SPD de los módulos de memoria (perfiles XMP / EXPO)…",
+  "Profils XMP / EXPO illisibles : la carte mère bloque peut-être l\u0027accès au bus SMBus. Le reste de la fiche est lu sans pilote.": "Perfiles XMP / EXPO ilegibles: puede que la placa base bloquee el acceso al bus SMBus. El resto de la ficha se lee sin controlador.",
+  "Lu dans le matériel et le BIOS ; profils XMP / EXPO lus dans la puce SPD de chaque barrette par PawnIO, sans rien modifier.": "Leído del hardware y de la BIOS; perfiles XMP / EXPO leídos del chip SPD de cada módulo mediante PawnIO, sin modificar nada."
 }

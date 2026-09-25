@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows.Input;
 using Maus.Core.Workshop;
+using Maus.Core.Workshop.Memory;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels.Workshop;
@@ -48,7 +49,8 @@ public sealed class ComponentCardViewModel
 
     public ICommand SearchCommand { get; }
 
-    public static IReadOnlyList<ComponentCardViewModel> From(HardwareInventory inventory, SafetyLimits limits, Action<string> search)
+    /// <param name="spd">Puces SPD lues par PawnIO, ou <c>null</c> si elles ne sont pas lisibles (pilote absent, pas d'administrateur).</param>
+    public static IReadOnlyList<ComponentCardViewModel> From(HardwareInventory inventory, SafetyLimits limits, Action<string> search, IReadOnlyList<SpdModule>? spd = null)
     {
         var cards = new List<ComponentCardViewModel>();
         var cpu = inventory.Cpu;
@@ -71,8 +73,9 @@ public sealed class ComponentCardViewModel
             new(T("Date du BIOS"), inventory.Board.BiosDate?.ToString("d", Culture) ?? "—"),
         ], inventory.Board.Product is { } board ? $"{inventory.Board.Manufacturer} {board}" : null, search));
 
-        foreach (var module in inventory.Memory)
+        for (var index = 0; index < inventory.Memory.Count; index++)
         {
+            var module = inventory.Memory[index];
             var limit = limits.ForMemory(module.Generation);
             var gauge = module.ConfiguredMillivolts is { } mv && limit is not null
                 ? limit.DangerAboveMv is { } danger
@@ -85,6 +88,7 @@ public sealed class ComponentCardViewModel
                 $"{Gb(module.CapacityBytes)} DDR{module.Generation?.ToString(CultureInfo.InvariantCulture) ?? "?"} · {module.Manufacturer ?? T("fabricant inconnu")}",
             [
                 new(T("Référence"), module.PartNumber ?? "—"),
+                .. ProfileLines(spd, module.PartNumber, index),
                 new(T("Vitesse nominale / appliquée"), $"{module.RatedSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} / {module.ConfiguredSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} MT/s"),
                 new(T("Tension (min / max)"), module.MinMillivolts is null ? "—" : $"{V(module.MinMillivolts.Value)} / {V(module.MaxMillivolts ?? 0)}"),
             ], module.PartNumber, search, gauge));
@@ -149,4 +153,27 @@ public sealed class ComponentCardViewModel
     private static string Gb(long bytes) => (bytes / 1073741824.0).ToString("0.# ", Culture) + T("Go");
 
     private static string V(int millivolts) => (millivolts / 1000.0).ToString("0.00 V", Culture);
+
+    /// <summary>Profils XMP / EXPO de la barrette (vitesse, timings principaux, tension), lus dans sa puce SPD.</summary>
+    private static IEnumerable<InfoLine> ProfileLines(IReadOnlyList<SpdModule>? spd, string? partNumber, int index)
+    {
+        if (spd is null)
+        {
+            return [new(T("Profils XMP / EXPO"), T("lisibles avec le pilote PawnIO et MAUS en administrateur"))];
+        }
+
+        if (MemoryDetails.MatchModule(spd, partNumber, index) is not { } module)
+        {
+            return [new(T("Profils XMP / EXPO"), T("puce SPD non lue pour cette barrette"))];
+        }
+
+        var profiles = module.Profiles.Where(p => p.Kind != ProfileKind.Jedec).ToList();
+        if (profiles.Count == 0)
+        {
+            var jedec = module.Profiles.Where(p => p.Kind == ProfileKind.Jedec).MaxBy(p => p.SpeedMts);
+            return [new(T("Profils XMP / EXPO"), jedec is null ? T("aucun") : T("aucun · standard JEDEC {0}", MemoryDetails.ProfileSummary(jedec)))];
+        }
+
+        return profiles.Select(p => new InfoLine(MemoryDetails.ProfileName(p), MemoryDetails.ProfileSummary(p)));
+    }
 }

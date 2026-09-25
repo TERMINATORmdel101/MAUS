@@ -2819,5 +2819,12 @@
   "Vitesse appliquée : {0} MT/s, au-delà du profil le plus rapide de la puce SPD ({1} MT/s) : la mémoire a été réglée à la main dans le BIOS (overclocking). Les timings et la tension réels ne figurent dans aucun profil.": "Applied speed: {0} MT/s, above the fastest profile of the SPD chip ({1} MT/s): the memory was tuned by hand in the BIOS (overclocking). The real timings and voltage are not in any profile.",
   "Vitesse appliquée : {0} MT/s, celle du profil {1} : ce profil est probablement activé dans le BIOS.": "Applied speed: {0} MT/s, the speed of profile {1}: this profile is probably enabled in the BIOS.",
   "Vitesse appliquée : {0} MT/s, la vitesse standard (JEDEC). Le profil {1} ({2} MT/s) n\u0027est pas activé dans le BIOS.": "Applied speed: {0} MT/s, the standard speed (JEDEC). Profile {1} ({2} MT/s) is not enabled in the BIOS.",
-  "Vitesse appliquée : {0} MT/s, différente des profils de la puce SPD : réglage personnalisé dans le BIOS.": "Applied speed: {0} MT/s, different from the SPD chip profiles: custom setting in the BIOS."
+  "Vitesse appliquée : {0} MT/s, différente des profils de la puce SPD : réglage personnalisé dans le BIOS.": "Applied speed: {0} MT/s, different from the SPD chip profiles: custom setting in the BIOS.",
+  "Profils XMP / EXPO": "XMP / EXPO profiles",
+  "lisibles avec le pilote PawnIO et MAUS en administrateur": "readable with the PawnIO driver and MAUS run as administrator",
+  "puce SPD non lue pour cette barrette": "SPD chip not read for this module",
+  "aucun · standard JEDEC {0}": "none · JEDEC standard {0}",
+  "Lecture des puces SPD des barrettes (profils XMP / EXPO)…": "Reading the SPD chips of the memory modules (XMP / EXPO profiles)…",
+  "Profils XMP / EXPO illisibles : la carte mère bloque peut-être l\u0027accès au bus SMBus. Le reste de la fiche est lu sans pilote.": "XMP / EXPO profiles unreadable: the motherboard may block access to the SMBus. The rest of the sheet is read without a driver.",
+  "Lu dans le matériel et le BIOS ; profils XMP / EXPO lus dans la puce SPD de chaque barrette par PawnIO, sans rien modifier.": "Read from the hardware and the BIOS; XMP / EXPO profiles read from each module\u0027s SPD chip through PawnIO, without changing anything."
 }

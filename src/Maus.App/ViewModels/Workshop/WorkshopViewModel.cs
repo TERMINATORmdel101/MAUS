@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Maus.Core;
+using Maus.Core.Platform;
 using Maus.Core.Preferences;
 using Maus.Core.Workshop;
+using Maus.Core.Workshop.Memory;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels.Workshop;
@@ -453,18 +455,48 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             var context = _context() ?? await Task.Run(AuditContext.CreateDefault);
             var inventory = await Task.Run(() => HardwareInventoryReader.Read(context, new X86CpuIdSource(), new WindowsNvmlSource()));
-            Components.Clear();
-            foreach (var card in ComponentCardViewModel.From(inventory, SafetyLimits.Load(), reference => OpenSearch(WebSearch.ForComponent(reference))))
-            {
-                Components.Add(card);
-            }
-
+            var limits = SafetyLimits.Load();
+            ShowInventory(inventory, limits, null);
             InventoryStatus = T("Lu directement dans le matériel et le BIOS, sans pilote. « Rechercher la fiche » ouvre votre navigateur ; MAUS n'envoie rien de lui-même.");
+
+            // Profils XMP / EXPO des barrettes : puce SPD, lisible seulement avec PawnIO et en administrateur (lecture seule).
+            if (PawnIo.State(new WindowsRegistryReader()).Installed && ProcessElevation.IsElevated())
+            {
+                InventoryStatus = T("Lecture des puces SPD des barrettes (profils XMP / EXPO)…");
+                var spd = await Task.Run(ReadSpdModules);
+                ShowInventory(inventory, limits, spd);
+                InventoryStatus = spd is null
+                    ? T("Profils XMP / EXPO illisibles : la carte mère bloque peut-être l'accès au bus SMBus. Le reste de la fiche est lu sans pilote.")
+                    : T("Lu dans le matériel et le BIOS ; profils XMP / EXPO lus dans la puce SPD de chaque barrette par PawnIO, sans rien modifier.");
+            }
         }
         catch (Exception ex)
         {
             _inventoryLoaded = false;
             InventoryStatus = T("La lecture du matériel a échoué : {0}", ex.Message);
+        }
+    }
+
+    private void ShowInventory(HardwareInventory inventory, SafetyLimits limits, IReadOnlyList<SpdModule>? spd)
+    {
+        Components.Clear();
+        foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd))
+        {
+            Components.Add(card);
+        }
+    }
+
+    /// <summary>Puces SPD décodées, ou <c>null</c> si aucune n'a pu être lue.</summary>
+    private static List<SpdModule>? ReadSpdModules()
+    {
+        try
+        {
+            var modules = new PawnIoSpdSource().ReadAll().Select(SpdDecoder.Decode).OfType<SpdModule>().ToList();
+            return modules.Count > 0 ? modules : null;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return null;
         }
     }
 

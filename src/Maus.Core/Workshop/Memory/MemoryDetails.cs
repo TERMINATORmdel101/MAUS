@@ -183,6 +183,30 @@ public static class MemoryDetails
         return text.ToString();
     }
 
+    /// <summary>Résumé d'un profil sur une ligne : « 3200 MT/s · 16-18-18-36 · 1.35 V ».</summary>
+    public static string ProfileSummary(SpdProfile profile) =>
+        string.Create(CultureInfo.InvariantCulture, $"{profile.SpeedMts} MT/s · {profile.Summary}")
+        + (profile.Vdd is { } vdd ? string.Create(CultureInfo.InvariantCulture, $" · {vdd:0.00} V") : string.Empty);
+
+    /// <summary>
+    /// Puce SPD d'une barrette décrite par Windows : même référence d'abord (le BIOS recopie celle de la puce),
+    /// sinon même rang dans la liste. <c>null</c> si rien ne correspond.
+    /// </summary>
+    public static SpdModule? MatchModule(IReadOnlyList<SpdModule> modules, string? partNumber, int index)
+    {
+        var part = partNumber?.Trim();
+        if (!string.IsNullOrEmpty(part))
+        {
+            var byPart = modules.Where(m => string.Equals(m.PartNumber.Trim(), part, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (byPart.Count > 0)
+            {
+                return byPart[Math.Min(index, byPart.Count - 1)];
+            }
+        }
+
+        return index < modules.Count ? modules.OrderBy(m => m.Slot).ElementAt(index) : null;
+    }
+
     public static string GroupName(TimingGroup group) => group switch
     {
         TimingGroup.Primary => T("Primaires"),
