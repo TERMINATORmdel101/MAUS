@@ -15,6 +15,7 @@ internal static class GameBarPlanner
         var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
         bool Deviates(string id) => byId.TryGetValue(id, out var f) && f.Fixable && f.Status is FindingStatus.Improvable or FindingStatus.Warning;
 
+        var (profile, _) = GamingPackages.Choose(context.Hardware.Cpu.IsAsymmetricDualCcdX3D, GamingPackages.TryRead(context.Packages), context.Preferences.GameBarProfile);
         var changes = new List<PlannedChange>();
         void Add(string id, string title, string description, string category, params SettingWrite[] writes) => changes.Add(new PlannedChange
         {
@@ -55,7 +56,7 @@ internal static class GameBarPlanner
                 Overlay, Hkcu(GameBarUser, "UseNexusForGameBarEnabled", 0));
         }
 
-        if (Deviates("M07.gamedvr-policy") && context.Hardware.Cpu.IsAsymmetricDualCcdX3D)
+        if (Deviates("M07.gamedvr-policy") && profile == GamingProfile.X3D)
         {
             Add("M07.gamedvr-policy", "Retirer la stratégie qui bloque la Game Bar (Ryzen X3D)",
                 "La Game Bar redevient pleinement active pour placer vos jeux sur les cœurs dotés du V-Cache.",
@@ -63,7 +64,6 @@ internal static class GameBarPlanner
         }
 
         // Verrou optionnel du profil 1 : proposé non coché, jamais en profil 3.
-        var profile = GamingPackages.Propose(context.Hardware.Cpu.IsAsymmetricDualCcdX3D, GamingPackages.TryRead(context.Packages));
         if (profile == GamingProfile.NoXbox && !context.Windows.IsHomeEdition && ReadPolicy(context.Registry) != 0)
         {
             changes.Add(new PlannedChange
@@ -76,6 +76,9 @@ internal static class GameBarPlanner
                 Recommended = false,
                 Advanced = true,
                 Risk = "Si vous installez un jour l'app Xbox ou passez au Game Pass, il faudra retirer ce verrou (Annuler).",
+                Warning = context.Hardware.Cpu.IsAsymmetricDualCcdX3D
+                    ? "Votre Ryzen X3D a besoin de la Game Bar pour placer les jeux sur les cœurs dotés du V-Cache : ce verrou peut réduire vos performances en jeu."
+                    : null,
                 Writes = [new SettingWrite(SettingKey.Registry("HKLM", GameDvrPolicy, "AllowGameDVR"), SettingValue.Dword(0))],
             });
         }

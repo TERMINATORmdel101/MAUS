@@ -61,6 +61,15 @@ internal sealed record GamingPackages(
         : packages.UsesXboxApp ? GamingProfile.XboxApp
         : GamingProfile.NoXbox;
 
+    /// <summary>
+    /// Profil retenu : celui choisi par l'utilisateur s'il en a choisi un (1, 2 ou 3), sinon le profil présélectionné.
+    /// L'utilisateur garde le dernier mot, y compris sur un Ryzen X3D (avec avertissement).
+    /// </summary>
+    public static (GamingProfile? Profile, bool ChosenByUser) Choose(bool asymmetricX3D, GamingPackages? packages, int? choice) =>
+        choice is >= 1 and <= 3
+            ? ((GamingProfile)choice.Value, true)
+            : (Propose(asymmetricX3D, packages), false);
+
     private static InstalledPackage? Find(IReadOnlyList<InstalledPackage> packages, string name) =>
         packages.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 }

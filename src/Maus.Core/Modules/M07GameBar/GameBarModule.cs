@@ -27,7 +27,7 @@ public sealed class GameBarModule : IFixableModule
         var registry = context.Registry;
         var x3d = context.Hardware.Cpu.IsAsymmetricDualCcdX3D;
         var packages = GamingPackages.TryRead(context.Packages);
-        var profile = GamingPackages.Propose(x3d, packages);
+        var (profile, chosen) = GamingPackages.Choose(x3d, packages, context.Preferences.GameBarProfile);
         cancellationToken.ThrowIfCancellationRequested();
 
         var findings = new List<Finding>
@@ -39,13 +39,13 @@ public sealed class GameBarModule : IFixableModule
 
         if (x3d)
         {
-            findings.Add(DetectX3DRecommendation(registry, context.Hardware.Cpu.Name, packages));
+            findings.Add(DetectX3DRecommendation(registry, context.Hardware.Cpu.Name, packages, profile));
         }
 
-        findings.Add(DescribeProfile(profile, packages));
+        findings.Add(DescribeProfile(profile, packages, chosen));
         findings.Add(DetectCaptures(registry, profile));
         findings.Add(DetectControllerButton(registry, profile));
-        findings.Add(DetectRecordingPolicy(registry, context.Windows, x3d));
+        findings.Add(DetectRecordingPolicy(registry, context.Windows, profile == GamingProfile.X3D));
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
@@ -185,7 +185,7 @@ public sealed class GameBarModule : IFixableModule
     }
 
     /// <summary>Décision du projet : sur un X3D à deux CCD asymétrique, Game Bar et Mode Jeu sont recommandés ; l'utilisateur peut refuser.</summary>
-    private static Finding DetectX3DRecommendation(IRegistryReader registry, string cpuName, GamingPackages? packages)
+    private static Finding DetectX3DRecommendation(IRegistryReader registry, string cpuName, GamingPackages? packages, GamingProfile? profile)
     {
         const string id = "M07.x3d-vcache";
         const string title = "Ryzen X3D à deux CCD : garder la Game Bar et le Mode Jeu";
@@ -206,17 +206,19 @@ public sealed class GameBarModule : IFixableModule
                     "Sur ce processeur, un seul des deux blocs de cœurs (CCD) porte le cache 3D V-Cache. La Game Bar reconnaît les jeux " +
                     "et, avec le Mode Jeu, les place sur ce bloc, ce qui donne les meilleures performances. Un jeu non reconnu peut être " +
                     "marqué comme jeu depuis Win+G.",
-                Advice =
-                    "Recommandé : garder la Game Bar et le Mode Jeu. Vous pouvez choisir de les couper après avertissement : " +
-                    "vos jeux risquent alors de tourner sur le bloc de cœurs sans V-Cache.",
+                Advice = profile is null or GamingProfile.X3D
+                    ? "Recommandé : garder la Game Bar et le Mode Jeu. Vous pouvez choisir de les couper après avertissement : " +
+                      "vos jeux risquent alors de tourner sur le bloc de cœurs sans V-Cache."
+                    : $"Vous avez choisi le profil {(int)profile.Value} : vos jeux risquent de tourner sur le bloc de cœurs sans V-Cache. " +
+                      "Vous pouvez revenir au profil 3 à tout moment.",
             };
         });
     }
 
-    private static Finding DescribeProfile(GamingProfile? profile, GamingPackages? packages)
+    private static Finding DescribeProfile(GamingProfile? profile, GamingPackages? packages, bool chosenByUser)
     {
         const string id = "M07.profile";
-        const string title = "Profil de jeu proposé";
+        var title = chosenByUser ? "Profil de jeu choisi par vous" : "Profil de jeu proposé";
         if (profile is null)
         {
             return Finding.Unknown(id, title, "Le profil n'a pas pu être proposé : l'inventaire des applications n'a pas pu être lu.", Profile);
@@ -249,7 +251,9 @@ public sealed class GameBarModule : IFixableModule
                 : $"{label} (app Xbox : {(packages.XboxApp is null ? "absente" : "installée")} ; Services de jeu : {(packages.GamingServices is null ? "absents" : "installés")})",
             Expected = "au choix de l'utilisateur",
             Explanation = explanation,
-            Advice = "Ce profil est seulement présélectionné : vous pourrez en choisir un autre avant toute correction.",
+            Advice = chosenByUser
+                ? "Vous avez choisi ce profil : MAUS s'y tient. Vous pouvez en changer à tout moment dans l'onglet Corrections."
+                : "Ce profil est seulement présélectionné : vous pouvez en choisir un autre dans l'onglet Corrections avant toute correction.",
         };
     }
 
