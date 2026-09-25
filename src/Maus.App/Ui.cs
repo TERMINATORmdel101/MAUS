@@ -129,6 +129,20 @@ public static class Ui
 
     public static string Cancel => T("Annuler");
 
+    public static string PawnIoTitle => T("Capteurs avancés (pilote PawnIO)");
+
+    public static string InstallPawnIo => T("Installer PawnIO");
+
+    public static string UninstallPawnIo => T("Retirer PawnIO");
+
+    public static string AllSensors => T("Tous les capteurs");
+
+    public static string ComponentColumn => T("Composant");
+
+    public static string SensorColumn => T("Capteur");
+
+    public static string ValueColumn => T("Valeur");
+
     public static string HelpTitle => T("Demander de l'aide");
 
     public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");

@@ -473,7 +473,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _sampling = true;
         try
         {
-            _sensors ??= await Task.Run(() => (ISensorSource)new WindowsSensorSource());
+            _sensors ??= await Task.Run(CreateSensors);
             var snapshot = await Task.Run(_sensors.Sample);
             Live.Add(snapshot);
         }

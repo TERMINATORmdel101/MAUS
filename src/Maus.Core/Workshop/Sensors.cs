@@ -42,6 +42,18 @@ public sealed record SensorSnapshot
 
     public IReadOnlyList<GpuSensor> Gpus { get; init; } = [];
 
+    /// <summary>Température interne du processeur (pilote PawnIO requis), sinon <c>null</c>.</summary>
+    public double? CpuTemperatureC { get; init; }
+
+    /// <summary>Puissance du processeur en watts (pilote PawnIO requis).</summary>
+    public double? CpuPowerWatts { get; init; }
+
+    /// <summary>Tension des cœurs en volts (pilote PawnIO requis).</summary>
+    public double? CpuVoltage { get; init; }
+
+    /// <summary>Toutes les mesures lues par le pilote (vide sans PawnIO).</summary>
+    public IReadOnlyList<HardwareReading> Readings { get; init; } = [];
+
     public double? MemoryPercent => MemoryUsedBytes is { } used && MemoryTotalBytes is > 0 ? 100.0 * used / MemoryTotalBytes.Value : null;
 }
 
@@ -91,9 +103,28 @@ public sealed record SensorAlarm(string Id, AlarmLevel Level, string Message);
 /// <summary>Alarmes en direct : comparaison de chaque mesure à son seuil de sécurité.</summary>
 public static class SensorAlarms
 {
-    public static IReadOnlyList<SensorAlarm> Check(SensorSnapshot snapshot)
+    /// <param name="snapshot">Mesures.</param>
+    /// <param name="cpuMaxC">Température maximale du processeur selon son fabricant (catalogue des seuils), si connue.</param>
+    public static IReadOnlyList<SensorAlarm> Check(SensorSnapshot snapshot, int? cpuMaxC = null)
     {
         var alarms = new List<SensorAlarm>();
+        if (snapshot.CpuTemperatureC is { } cpu)
+        {
+            // À sa limite, le processeur ralentit de lui-même pour se protéger ; certains modèles récents y montent
+            // volontairement en pleine charge. Danger seulement au-delà (protection qui n'agit pas, ou sonde en défaut).
+            var max = cpuMaxC ?? 100;
+            if (cpu >= max + 5)
+            {
+                alarms.Add(new("cpu-hot", AlarmLevel.Danger,
+                    Localization.Texts.T("Le processeur dépasse sa limite ({0:0} °C pour {1} °C au maximum) : arrêtez la charge et vérifiez le refroidissement.", cpu, max)));
+            }
+            else if (cpu >= max - 3)
+            {
+                alarms.Add(new("cpu-warm", AlarmLevel.Attention,
+                    Localization.Texts.T("Le processeur est à sa limite de température ({0:0} °C sur {1} °C) : il ralentit pour se protéger. Normal en pleine charge pour certains modèles récents ; au repos, vérifiez le refroidissement.", cpu, max)));
+            }
+        }
+
         foreach (var gpu in snapshot.Gpus)
         {
             if (gpu.TemperatureC is not { } temperature)

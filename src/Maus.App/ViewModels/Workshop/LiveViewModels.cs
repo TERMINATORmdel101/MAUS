@@ -72,15 +72,26 @@ public sealed class LiveViewModel : ObservableObject
     public LiveViewModel()
     {
         Cpu = new(T("Processeur"), Palette.Blue);
+        CpuTemperature = new(T("Température du processeur"), Palette.Red, maximum: 0);
         Memory = new(T("Mémoire vive"), Palette.Green);
         Gpu = new(T("Carte graphique"), Palette.Red);
         GpuTemperature = new(T("Température de la carte graphique"), Palette.Gold, maximum: 0);
         Disk = new(T("Disque"), Palette.Gold);
         Network = new(T("Réseau"), Palette.Blue, maximum: 0);
-        Metrics = [Cpu, Memory, Gpu, GpuTemperature, Disk, Network];
+        Metrics = [Cpu, CpuTemperature, Memory, Gpu, GpuTemperature, Disk, Network];
     }
 
     public MetricViewModel Cpu { get; }
+
+    public MetricViewModel CpuTemperature { get; }
+
+    /// <summary>Température maximale du processeur selon le catalogue des seuils (nom du modèle), si connue.</summary>
+    public int? CpuMaxC { get; set; }
+
+    /// <summary>Toutes les mesures du pilote PawnIO, prêtes à afficher (vide sans pilote).</summary>
+    public ObservableCollection<ReadingRowViewModel> Readings { get; } = [];
+
+    public bool HasReadings => Readings.Count > 0;
 
     public MetricViewModel Memory { get; }
 
@@ -101,14 +112,38 @@ public sealed class LiveViewModel : ObservableObject
     /// <summary>Dernière alarme « danger », consultée par les tests pour s'arrêter d'eux-mêmes.</summary>
     public string? DangerAlarm { get; private set; }
 
-    public string ThermalNote => _history.Latest?.ThermalZoneC is { } c
-        ? T("Zone thermique de la carte mère : {0:0} °C (indication approximative, ce n'est pas le capteur interne du processeur).", c)
-        : T("La température interne du processeur ne se lit qu'avec un pilote : MAUS ne l'affiche pas plutôt que de l'inventer.");
+    public string ThermalNote => _history.Latest switch
+    {
+        { CpuTemperatureC: not null } => T("Température, tension et puissance du processeur lues par le pilote PawnIO."),
+        { ThermalZoneC: { } c } => T("Zone thermique de la carte mère : {0:0} °C (indication approximative, ce n'est pas le capteur interne du processeur). "
+            + "Installez le pilote PawnIO (ci-dessous) pour lire la vraie température du processeur.", c),
+        _ => T("La température interne du processeur ne se lit qu'avec un pilote : MAUS ne l'affiche pas plutôt que de l'inventer. "
+            + "Installez le pilote PawnIO (ci-dessous) pour la lire."),
+    };
 
     public void Add(SensorSnapshot snapshot)
     {
         _history.Add(snapshot);
         Cpu.Update(Percent(snapshot.CpuPercent), snapshot.CpuMhz is { } mhz ? (mhz / 1000).ToString("0.00 ", Culture) + "GHz" : string.Empty, _history.Series(s => s.CpuPercent));
+        var cpuMax = CpuMaxC ?? 100;
+        var details = new List<string>();
+        if (snapshot.CpuVoltage is { } volts)
+        {
+            details.Add(volts.ToString("0.000 ", Culture) + "V");
+        }
+
+        if (snapshot.CpuPowerWatts is { } watts)
+        {
+            details.Add(watts.ToString("0 ", Culture) + "W");
+        }
+
+        CpuTemperature.Update(
+            snapshot.CpuTemperatureC is { } cpuC ? $"{cpuC:0} °C" : "—",
+            snapshot.CpuTemperatureC is null ? T("pilote PawnIO requis") : string.Join(" · ", details),
+            _history.Series(s => s.CpuTemperatureC),
+            snapshot.CpuTemperatureC is { } cpuValue
+                ? new GaugeInfo(T("Température"), 20, cpuMax + 10, cpuMax - 10, cpuMax, cpuValue, T("limite du fabricant : {0} °C", cpuMax))
+                : null);
         Memory.Update(snapshot.MemoryUsedBytes is { } used ? Gb(used) : "—", snapshot.MemoryTotalBytes is { } total ? "/ " + Gb(total) : string.Empty, _history.Series(s => s.MemoryPercent));
 
         var gpu = snapshot.Gpus.OrderByDescending(g => g.UtilizationPercent ?? 0).FirstOrDefault();
@@ -124,7 +159,14 @@ public sealed class LiveViewModel : ObservableObject
         Disk.Update(Percent(snapshot.DiskActivePercent), T("lecture {0} · écriture {1}", Rate(snapshot.DiskReadBytesPerSecond), Rate(snapshot.DiskWriteBytesPerSecond)), _history.Series(s => s.DiskActivePercent));
         Network.Update(Rate(snapshot.NetworkBytesPerSecond), string.Empty, _history.Series(s => s.NetworkBytesPerSecond));
 
-        var alarms = SensorAlarms.Check(snapshot);
+        Readings.Clear();
+        foreach (var reading in snapshot.Readings.OrderBy(r => r.Group).ThenBy(r => r.Hardware, StringComparer.Ordinal).ThenBy(r => r.Kind))
+        {
+            Readings.Add(new ReadingRowViewModel(reading));
+        }
+
+        OnPropertyChanged(nameof(HasReadings));
+        var alarms = SensorAlarms.Check(snapshot, CpuMaxC);
         DangerAlarm = alarms.FirstOrDefault(a => a.Level == AlarmLevel.Danger)?.Message;
         Alarms.Clear();
         foreach (var alarm in alarms)
@@ -149,5 +191,25 @@ public sealed class LiveViewModel : ObservableObject
         null => "—",
         >= 1_048_576 => T("{0:0.0} Mo/s", bytesPerSecond / 1_048_576),
         _ => T("{0:0} Ko/s", bytesPerSecond / 1024),
+    };
+}
+
+/// <summary>Une ligne du tableau des capteurs PawnIO : composant, capteur, valeur avec son unité.</summary>
+public sealed class ReadingRowViewModel(HardwareReading reading)
+{
+    public string Hardware { get; } = reading.Hardware;
+
+    public string Name { get; } = reading.Name;
+
+    public string Value { get; } = reading.Kind switch
+    {
+        ReadingKind.Temperature => reading.Value.ToString("0.0 ", Culture) + "°C",
+        ReadingKind.Voltage => reading.Value.ToString("0.000 ", Culture) + "V",
+        ReadingKind.Power => reading.Value.ToString("0.0 ", Culture) + "W",
+        ReadingKind.Fan => reading.Value.ToString("0 ", Culture) + T("tr/min"),
+        ReadingKind.Clock => reading.Value.ToString("0 ", Culture) + "MHz",
+        ReadingKind.Load => reading.Value.ToString("0 ", Culture) + "%",
+        ReadingKind.Current => reading.Value.ToString("0.00 ", Culture) + "A",
+        _ => reading.Value.ToString("0.##", Culture),
     };
 }
