@@ -105,6 +105,26 @@ public static class Ui
 
     public static string ReportDetail => T("Une page HTML : ce qui a été vu, ce qui a été changé, et comment l'annuler.");
 
+    public static string SpaceTitle => T("Qu'est-ce qui prend de la place ?");
+
+    public static string SpaceDetail => T("Les dossiers et les fichiers les plus lourds, expliqués, sans rien supprimer.");
+
+    public static string HelpTitle => T("Demander de l'aide");
+
+    public static string HelpDetail => T("Un résumé de votre PC à coller sur un forum, sans données personnelles.");
+
+    public static string HelpWindowTitle => T("Résumé pour demander de l'aide");
+
+    public static string HelpIntro => T("Complétez la première ligne avec votre problème, relisez, puis copiez le texte et collez-le (Ctrl+V) sur un forum, un Discord ou dans un message. MAUS a retiré votre nom d'utilisateur, le nom du PC et les adresses e-mail ; aucun numéro de série n'y figure. Rien n'est envoyé par MAUS.");
+
+    public static string CopyText => T("Copier le texte");
+
+    public static string CloseWindow => T("Fermer");
+
+    public static string Copied => T("Copié : collez-le avec Ctrl+V.");
+
+    public static string CopyFailed => T("Le presse-papiers est occupé : réessayez, ou sélectionnez le texte (Ctrl+A) puis copiez-le (Ctrl+C).");
+
     public static string WorkshopSubtitle => T("Votre matériel, en direct, comparé à ses limites de sécurité");
 
     public static string SectionPc => T("Mon PC");

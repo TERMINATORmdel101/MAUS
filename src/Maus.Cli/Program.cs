@@ -13,6 +13,7 @@ using static Maus.Core.Localization.Texts;
 //   maus --json           audit complet, rapport JSON
 //   maus --html FICHIER   audit complet, rapport HTML (avant/après si des corrections sont appliquées)
 //   maus --module M06     un seul module (répétable)
+//   maus --summary        résumé court à coller sur un forum pour demander de l'aide (sans données personnelles)
 //   maus --lang en        langue des textes : fr, en ou es
 // Corrections (V0.2, droits administrateur requis pour appliquer ou annuler) :
 //   maus --plan                       corrections proposées, sans rien modifier
@@ -52,6 +53,7 @@ if (args.Any(a => a is "-h" or "--help" or "/?"))
     Console.WriteLine(T("Usage : maus [--json | --html FICHIER] [--module Mxx]..."));
     Console.WriteLine(T("Audit en lecture seule : MAUS ne modifie rien sur ce PC."));
     Console.WriteLine(T("  --lang fr|en|es                         langue des textes (par défaut : celle de l'application, sinon de Windows)"));
+    Console.WriteLine(T("  --summary                               résumé à coller sur un forum pour demander de l'aide (sans données personnelles)"));
     Console.WriteLine();
     Console.WriteLine(T("Corrections (droits administrateur requis pour appliquer ou annuler) :"));
     Console.WriteLine(T("  maus --plan [--module Mxx]              corrections proposées, sans rien modifier"));
@@ -189,6 +191,13 @@ if (fixMode)
     }
 
     return exitCode;
+}
+
+if (Has("--summary"))
+{
+    var summaryResults = await engine.RunAsync(context, cancellationToken: cancellation.Token);
+    Console.Write(HelpSummary.Build(AuditReport.Create(context, summaryResults), PrivacyFilter.ForCurrentUser()));
+    return 0;
 }
 
 var progress = json ? null : new Progress<ModuleResult>(r => Console.Error.WriteLine(T("  … {0} terminé ({1:0.0} s)", r.ModuleId, r.Duration.TotalSeconds)));

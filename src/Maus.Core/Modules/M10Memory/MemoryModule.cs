@@ -330,7 +330,7 @@ public sealed partial class MemoryModule : IAuditModule
         var types = dimms.Select(d => d.TypeLabel).Distinct(StringComparer.Ordinal).ToList();
         var groups = dimms
             .GroupBy(d => d.CapacityBytes)
-            .Select(g => $"{g.Count()} × {(g.Key is { } bytes ? FormatCapacity(bytes) : "capacité inconnue")}");
+            .Select(g => $"{g.Count()} × {(g.Key is { } bytes ? FormatCapacity(bytes) : T("capacité inconnue"))}");
         return new Finding
         {
             Id = "M10.capacity",

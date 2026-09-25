@@ -129,6 +129,21 @@ public sealed partial class MainViewModel
 
     private ICommand? _slowPc;
 
+    /// <summary>Affichage du résumé pour demander de l'aide ; remplaçable pour les tests.</summary>
+    public Action<string> ShowHelpSummary { get; init; } = summary =>
+        new Views.HelpSummaryWindow(summary) { Owner = System.Windows.Application.Current?.MainWindow }.ShowDialog();
+
+    /// <summary>« Demander de l'aide » : résumé du dernier audit, relu et complété par l'utilisateur avant de le copier.</summary>
+    public ICommand HelpSummaryCommand => _helpSummary ??= new ParameterCommand(_ =>
+    {
+        if (_lastContext is { } context)
+        {
+            ShowHelpSummary(HelpSummary.Build(CurrentReport(context), PrivacyFilter.ForCurrentUser()));
+        }
+    });
+
+    private ICommand? _helpSummary;
+
     /// <summary>Fermeture de la fenêtre : plus aucune mesure ni aucun test ne doit tourner en arrière-plan.</summary>
     public void Shutdown() => _workshop?.Stop();
 

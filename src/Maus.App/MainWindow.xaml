@@ -134,7 +134,7 @@
                     </Grid>
 
                     <!-- Actions rapides -->
-                    <UniformGrid Columns="3" Margin="-6,12,-6,0">
+                    <UniformGrid Columns="4" Margin="-6,12,-6,0">
                         <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding SlowPcCommand}">
                             <StackPanel>
                                 <TextBlock Style="{StaticResource CardIcon}" Text="&#xEC4A;" Foreground="{StaticResource MausGold}" />
@@ -175,6 +175,20 @@
                                 <TextBlock Style="{StaticResource CardIcon}" Text="&#xE8A5;" Foreground="{StaticResource MausGold}" />
                                 <TextBlock Text="{x:Static app:Ui.ReportTitle}" Style="{StaticResource CardTitle}" />
                                 <TextBlock Text="{x:Static app:Ui.ReportDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="34">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xEDA2;" Foreground="{StaticResource MausBlue}" />
+                                <TextBlock Text="{x:Static app:Ui.SpaceTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{x:Static app:Ui.SpaceDetail}" FontSize="12" Style="{StaticResource Muted}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding HelpSummaryCommand}" IsEnabled="{Binding HasAudit, Mode=OneWay}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE897;" Foreground="{StaticResource MausGreen}" />
+                                <TextBlock Text="{x:Static app:Ui.HelpTitle}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{x:Static app:Ui.HelpDetail}" FontSize="12" Style="{StaticResource Muted}" />
                             </StackPanel>
                         </Button>
                     </UniformGrid>

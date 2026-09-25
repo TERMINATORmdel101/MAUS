@@ -103,7 +103,7 @@ public sealed class BiosModule : IAuditModule
         {
             return bios.Denied
                 ? Finding.AdminRequired(id, title, UpdateCategory)
-                : Finding.Unknown(id, title, "Informations du BIOS illisibles (Win32_BIOS).", UpdateCategory);
+                : Finding.Unknown(id, title, T("Informations du BIOS illisibles (Win32_BIOS)."), UpdateCategory);
         }
 
         var row = bios.Rows[0];

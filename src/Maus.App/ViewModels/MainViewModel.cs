@@ -199,7 +199,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         try
         {
-            var after = AuditReport.Create(_lastContext, _results.OrderBy(r => Modules.IndexOf(Modules.First(m => m.Id == r.ModuleId))).ToList());
+            var after = CurrentReport(_lastContext);
             var input = _lastApplied is { } applied
                 ? new HtmlReportInput
                 {
@@ -218,4 +218,8 @@ public sealed partial class MainViewModel : ObservableObject
             StatusText = T("Le rapport n'a pas pu être enregistré : {0}", ex.Message);
         }
     }
+
+    /// <summary>Dernier audit, modules dans l'ordre de l'interface.</summary>
+    private AuditReport CurrentReport(AuditContext context) =>
+        AuditReport.Create(context, _results.OrderBy(r => Modules.IndexOf(Modules.First(m => m.Id == r.ModuleId))).ToList());
 }
