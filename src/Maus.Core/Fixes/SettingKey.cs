@@ -15,6 +15,9 @@ public enum SettingKind
 
     /// <summary>Animation de réduction et d'agrandissement (<c>SPI_GETANIMATION</c> / <c>SPI_SETANIMATION</c>).</summary>
     MinimizeAnimation,
+
+    /// <summary>Mode de gestion de l'alimentation actif (GUID).</summary>
+    ActivePowerScheme,
 }
 
 /// <summary>Désigne un réglage précis que MAUS sait lire, écrire et restaurer. Sérialisé tel quel dans le journal.</summary>
@@ -48,7 +51,8 @@ public sealed record SettingKey
 
     /// <summary>Réglage propre à l'utilisateur de la session (HKCU ou paramètre système) : il faut écrire dans le bon profil.</summary>
     [JsonIgnore]
-    public bool IsUserScoped => Kind != SettingKind.Registry || string.Equals(Hive, "HKCU", StringComparison.OrdinalIgnoreCase);
+    public bool IsUserScoped => Kind is SettingKind.SystemParameter or SettingKind.MinimizeAnimation
+        || Kind == SettingKind.Registry && string.Equals(Hive, "HKCU", StringComparison.OrdinalIgnoreCase);
 
     public static SettingKey Registry(string hive, string path, string name) =>
         new() { Kind = SettingKind.Registry, Hive = hive.ToUpperInvariant(), Path = path.Trim('\\'), Name = name };
@@ -58,11 +62,14 @@ public sealed record SettingKey
 
     public static SettingKey MinimizeAnimation { get; } = new() { Kind = SettingKind.MinimizeAnimation };
 
+    public static SettingKey ActivePowerScheme { get; } = new() { Kind = SettingKind.ActivePowerScheme };
+
     /// <summary>Emplacement lisible, affiché dans l'aperçu et le journal.</summary>
     public string Describe() => Kind switch
     {
         SettingKind.Registry => $@"{Hive}\{Path}\{Name}",
         SettingKind.SystemParameter => "SystemParametersInfo 0x" + SpiSet.ToString("X4", CultureInfo.InvariantCulture),
+        SettingKind.ActivePowerScheme => "Mode de gestion de l'alimentation actif",
         _ => "SystemParametersInfo SPI_SETANIMATION",
     };
 

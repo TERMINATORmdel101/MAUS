@@ -26,8 +26,11 @@ public sealed class SettingsAccessor(
     IRegistryReader registryReader,
     IRegistryWriter registryWriter,
     ISystemParametersReader parametersReader,
-    ISystemParametersWriter parametersWriter) : ISettingsAccessor
+    ISystemParametersWriter parametersWriter,
+    IPowerSchemeAccessor? power = null) : ISettingsAccessor
 {
+    private readonly IPowerSchemeAccessor _power = power ?? new Win32PowerSchemeAccessor();
+
     public SettingValue? Read(SettingKey key)
     {
         switch (key.Kind)
@@ -41,6 +44,8 @@ public sealed class SettingsAccessor(
             case SettingKind.MinimizeAnimation:
                 return SettingValue.Bool(parametersReader.GetMinimizeAnimation()
                     ?? throw new InvalidOperationException($"Paramètre système illisible : {key}"));
+            case SettingKind.ActivePowerScheme:
+                return SettingValue.Text((_power.GetActiveScheme() ?? throw new InvalidOperationException("Mode de gestion actif illisible.")).ToString("D"));
             default:
                 throw new NotSupportedException(key.Kind.ToString());
         }
@@ -70,6 +75,13 @@ public sealed class SettingsAccessor(
                 if (!parametersWriter.SetMinimizeAnimation(RequireValue(key, value).AsBool()))
                 {
                     throw new InvalidOperationException($"Windows a refusé le réglage {key}.");
+                }
+
+                break;
+            case SettingKind.ActivePowerScheme:
+                if (!Guid.TryParse(RequireValue(key, value).Data, out var scheme) || !_power.SetActiveScheme(scheme))
+                {
+                    throw new InvalidOperationException($"Windows a refusé le mode de gestion {value?.Data} (absent de ce PC ?).");
                 }
 
                 break;

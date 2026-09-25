@@ -9,7 +9,7 @@ namespace Maus.Core.Modules.M05Power;
 /// au réglage proposé pour le profil du PC : fixe, fixe Ryzen X3D à deux CCD, fixe Intel hybride ou portable.
 /// Vérifie aussi le démarrage rapide, la veille moderne et les utilitaires constructeur.
 /// </summary>
-public sealed class PowerModule : IAuditModule
+public sealed class PowerModule : Fixes.IFixableModule
 {
     internal const string SchemesKey = @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes";
     internal const string PowerKey = @"SYSTEM\CurrentControlSet\Control\Power";
@@ -92,6 +92,60 @@ public sealed class PowerModule : IAuditModule
 
         findings.Add(DescribeProfile(context.Hardware, profile, capabilities));
         return findings;
+    }
+
+    /// <summary>
+    /// Étape Plan : mode de gestion (API documentée <c>PowerSetActiveScheme</c>) et démarrage rapide.
+    /// Les modes secteur et batterie passent par des fonctions non documentées : ils restent guidés vers Paramètres pour l'instant.
+    /// Passer un fixe en « Haute performance » augmente la consommation au repos : proposé, jamais pré-coché.
+    /// </summary>
+    public IReadOnlyList<Fixes.PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
+    {
+        var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
+        var changes = new List<Fixes.PlannedChange>();
+
+        if (byId.TryGetValue("M05.power-plan", out var plan) && plan.Fixable && plan.Status == FindingStatus.Improvable)
+        {
+            var capabilities = CallPlatform(_platform.GetCapabilities);
+            var hybrid = context.Hardware.Cpu.Vendor == HardwareVendor.Intel && CallPlatform(() => _platform.GetEfficiencyClassCount()) > 1;
+            var profile = DetermineProfile(context.Hardware, hybrid, capabilities, listed: null);
+            var highPerformanceAvailable = TryRegistry(() => context.Registry.KeyExists(RegistryHive.LocalMachine, $@"{SchemesKey}\{PowerSchemes.HighPerformance:D}") ? "1" : null) is not null;
+            var target = profile == PowerProfile.Desktop && (highPerformanceAvailable || capabilities?.AoAc != true)
+                ? PowerSchemes.HighPerformance
+                : PowerSchemes.Balanced;
+            var toHighPerformance = target == PowerSchemes.HighPerformance;
+            changes.Add(new Fixes.PlannedChange
+            {
+                Id = plan.Id,
+                ModuleId = Id,
+                Title = $"Passer au mode de gestion « {PowerSchemes.Label(toHighPerformance ? SchemeKind.HighPerformance : SchemeKind.Balanced)} »",
+                Description = plan.Explanation,
+                Category = PlanCategory,
+                Gain = toHighPerformance
+                    ? "Le processeur reste plus souvent à haute fréquence. Le gain en jeu est souvent faible."
+                    : "Les modes secteur et batterie redeviennent disponibles dans Paramètres > Système > Alimentation.",
+                Risk = toHighPerformance ? "La consommation au repos augmente." : null,
+                Recommended = !toHighPerformance,
+                Writes = [new Fixes.SettingWrite(Fixes.SettingKey.ActivePowerScheme, Fixes.SettingValue.Text(target.ToString("D")))],
+            });
+        }
+
+        if (byId.TryGetValue("M05.fast-startup", out var fastStartup) && fastStartup.Fixable && fastStartup.Status == FindingStatus.Improvable)
+        {
+            changes.Add(new Fixes.PlannedChange
+            {
+                Id = fastStartup.Id,
+                ModuleId = Id,
+                Title = "Désactiver le démarrage rapide",
+                Description = "Le noyau et les pilotes repartent de zéro à chaque allumage ; la veille prolongée n'est pas touchée.",
+                Category = StartupCategory,
+                Gain = "Démarrages plus propres et mesure fiable du temps de démarrage (Module 12).",
+                Risk = "L'allumage peut être un peu plus lent.",
+                Writes = [new Fixes.SettingWrite(Fixes.SettingKey.Registry("HKLM", SessionPowerKey, "HiberbootEnabled"), Fixes.SettingValue.Dword(0))],
+            });
+        }
+
+        return changes;
     }
 
     internal static PowerProfile DetermineProfile(HardwareProfile hardware, bool isIntelHybrid, PowerCapabilities? capabilities, IReadOnlyList<ListedScheme>? listed)

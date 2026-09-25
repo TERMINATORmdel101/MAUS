@@ -3,7 +3,7 @@ using Maus.Core.Modules.M05Power;
 namespace Maus.Core.Tests.Modules.M05Power;
 
 /// <summary>API d'alimentation simulées : chaque valeur se règle, <see cref="Failure"/> fait échouer tous les appels.</summary>
-internal sealed class FakePowerPlatform : IPowerPlatform
+internal sealed class FakePowerPlatform : IPowerPlatform, Maus.Core.Platform.IPowerSchemeAccessor
 {
     public Guid? ActiveScheme { get; set; }
 
@@ -27,4 +27,18 @@ internal sealed class FakePowerPlatform : IPowerPlatform
         Failure is null ? Task.FromResult(EffectiveMode) : throw Failure;
 
     public int? GetEfficiencyClassCount() => Failure is null ? EfficiencyClasses : throw Failure;
+
+    /// <summary>Modes présents sur le PC simulé : les autres sont refusés, comme par <c>PowerSetActiveScheme</c>.</summary>
+    public HashSet<Guid> InstalledSchemes { get; } = [PowerSchemes.Balanced, PowerSchemes.HighPerformance];
+
+    public bool SetActiveScheme(Guid scheme)
+    {
+        if (!InstalledSchemes.Contains(scheme))
+        {
+            return false;
+        }
+
+        ActiveScheme = scheme;
+        return true;
+    }
 }

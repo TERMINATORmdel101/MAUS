@@ -330,13 +330,14 @@ public static class TestFixContext
         IJournalStore? journal = null,
         FakeSystemRestore? restore = null,
         FakeNotifier? notifier = null,
-        bool elevatedAsAnotherUser = false)
+        bool elevatedAsAnotherUser = false,
+        IPowerSchemeAccessor? power = null)
     {
         parameters ??= (FakeSystemParameters)audit.SystemParameters;
         return new FixContext
         {
             Audit = audit,
-            Settings = new SettingsAccessor(registry, registry, parameters, parameters),
+            Settings = new SettingsAccessor(registry, registry, parameters, parameters, power),
             Journal = journal ?? new InMemoryJournalStore(),
             SystemRestore = restore ?? new FakeSystemRestore(),
             Notifier = notifier ?? new FakeNotifier(),
