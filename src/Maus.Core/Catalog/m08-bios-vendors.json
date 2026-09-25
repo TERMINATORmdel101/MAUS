@@ -1,0 +1,75 @@
+// Module 8 — BIOS : pages officielles des fabricants et outils de mise à jour.
+// {model} est remplacé par le modèle de la carte mère ou du PC, jamais par le numéro de série.
+// oemOnly : fabricant de PC de marque (pas de carte mère vendue seule).
+{
+  "vendors": [
+    {
+      "name": "ASUS",
+      "match": [ "ASUSTeK", "ASUS" ],
+      "supportUrl": "https://www.asus.com/support/",
+      "searchUrl": "https://www.asus.com/searchresult?searchType=support&searchKey={model}",
+      "boardTool": "EZ Flash",
+      "rescueTool": "USB BIOS FlashBack",
+      "oemTool": "MyASUS"
+    },
+    {
+      "name": "MSI",
+      "match": [ "Micro-Star", "MSI" ],
+      "supportUrl": "https://www.msi.com/support",
+      "searchUrl": "https://www.msi.com/search/{model}",
+      "boardTool": "M-Flash",
+      "rescueTool": "Flash BIOS Button",
+      "oemTool": "MSI Center"
+    },
+    {
+      "name": "Gigabyte",
+      "match": [ "Gigabyte" ],
+      "supportUrl": "https://www.gigabyte.com/Support",
+      "searchUrl": "https://www.gigabyte.com/Search?kw={model}",
+      "boardTool": "Q-Flash",
+      "rescueTool": "Q-Flash Plus",
+      "oemTool": "Gigabyte Control Center"
+    },
+    {
+      "name": "ASRock",
+      "match": [ "ASRock" ],
+      "supportUrl": "https://www.asrock.com/support/index.asp",
+      "boardTool": "Instant Flash",
+      "rescueTool": "BIOS Flashback (selon le modèle)"
+    },
+    {
+      "name": "Biostar",
+      "match": [ "Biostar" ],
+      "supportUrl": "https://www.biostar.com.tw/",
+      "boardTool": "BIO-Flasher"
+    },
+    {
+      "name": "Dell",
+      "match": [ "Dell" ],
+      "oemOnly": true,
+      "supportUrl": "https://www.dell.com/support/home/",
+      "oemTool": "Dell Command Update ou SupportAssist"
+    },
+    {
+      "name": "HP",
+      "match": [ "HP", "Hewlett-Packard" ],
+      "oemOnly": true,
+      "supportUrl": "https://support.hp.com/drivers",
+      "oemTool": "HP Support Assistant"
+    },
+    {
+      "name": "Lenovo",
+      "match": [ "Lenovo" ],
+      "oemOnly": true,
+      "supportUrl": "https://pcsupport.lenovo.com/",
+      "oemTool": "Lenovo Vantage"
+    },
+    {
+      "name": "Acer",
+      "match": [ "Acer" ],
+      "oemOnly": true,
+      "supportUrl": "https://www.acer.com/support",
+      "oemTool": "Acer Care Center"
+    }
+  ]
+}
