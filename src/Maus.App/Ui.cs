@@ -188,4 +188,28 @@ public static class Ui
     public static string HonestSecurity => T("• MAUS ne coupe jamais une protection importante (antivirus, pare-feu, mises à jour, protections du processeur) ni une fonction utile de Windows pour gagner quelques pour cent.");
 
     public static string HonestWarning => T("• Méfiez-vous des outils qui promettent +30 % : la plupart de leurs réglages sont sans effet mesurable, ou retirent des fonctions de Windows dont vous aurez besoin un jour.");
+
+    public static string SectionStorage => T("Stockage");
+
+    public static string DriveLabel => T("Lecteur :");
+
+    public static string Analyze => T("Analyser");
+
+    public static string Stop => T("Arrêter");
+
+    public static string GoUp => T("Remonter");
+
+    public static string OpenInExplorer => T("Ouvrir dans l'Explorateur");
+
+    public static string StorageSense => T("Libérer de la place avec Windows");
+
+    public static string LargestTitle => T("Les plus gros fichiers");
+
+    public static string OpenEntry => T("Ouvrir");
+
+    public static string ShowEntry => T("Emplacement");
+
+    public static string DiskTestTitle => T("Disque : vitesse de lecture et d'écriture");
+
+    public static string DiskTestIntro => T("MAUS écrit un fichier temporaire, le relit puis le supprime, en contournant le cache de Windows. Un disque bien plus lent que prévu trahit un SSD presque plein ou qui chauffe, un mauvais port M.2, ou Windows installé sur un disque dur.");
 }

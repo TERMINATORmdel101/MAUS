@@ -19,9 +19,26 @@ public static class ShellLauncher
         Start($"\"{url.AbsoluteUri}\"");
     }
 
+    /// <summary>Ouvre une page des Paramètres de Windows (adresse « ms-settings: »).</summary>
+    public static void OpenSettings(string page)
+    {
+        if (page.StartsWith("ms-settings:", StringComparison.Ordinal))
+        {
+            Start(page);
+        }
+    }
+
+    public static void OpenFolder(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Start($"\"{path}\"");
+        }
+    }
+
     public static void ShowInFolder(string path)
     {
-        if (File.Exists(path))
+        if (File.Exists(path) || Directory.Exists(path))
         {
             Start($"/select,\"{path}\"");
         }

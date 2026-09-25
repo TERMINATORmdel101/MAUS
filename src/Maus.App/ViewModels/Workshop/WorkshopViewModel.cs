@@ -12,12 +12,13 @@ namespace Maus.App.ViewModels.Workshop;
 /// Atelier matériel : « Mon PC », « En direct », « Processus », « Tests ». Les mesures ne tournent que lorsque
 /// l'atelier est affiché (ou qu'un test est en cours), pour ne rien consommer le reste du temps.
 /// </summary>
-public sealed class WorkshopViewModel : ObservableObject
+public sealed partial class WorkshopViewModel : ObservableObject
 {
     public const int SectionPc = 0;
     public const int SectionLive = 1;
     public const int SectionProcesses = 2;
     public const int SectionTests = 3;
+    public const int SectionStorage = 4;
 
     private readonly Func<string, string, bool> _confirm;
     private readonly Func<AuditContext?> _context;
@@ -113,6 +114,18 @@ public sealed class WorkshopViewModel : ObservableObject
         StartRamTestCommand = new AsyncCommand(RunRamTestAsync);
         StartVramTestCommand = new AsyncCommand(RunVramTestAsync);
         StartCoreTestCommand = new AsyncCommand(RunCoreTestAsync);
+        ScanCommand = new AsyncCommand(ScanAsync);
+        UpCommand = new AsyncCommand(() => Run(GoUp));
+        OpenCurrentFolderCommand = new AsyncCommand(() => Run(() => { if (_current is { } node) { ShellLauncher.OpenFolder(node.Path); } }));
+        StorageSettingsCommand = new AsyncCommand(() => Run(() => ShellLauncher.OpenSettings("ms-settings:storagesense")));
+        StopScanCommand = new AsyncCommand(() => Run(() => _stopScan?.Invoke()));
+        StartDiskTestCommand = new AsyncCommand(RunDiskTestAsync);
+        DiskSizes =
+        [
+            new(T("1 Go (rapide)"), 1L << 30),
+            new(T("4 Go (plus fiable)"), 4L << 30),
+        ];
+        _diskSize = DiskSizes[0];
         DismissCrashCommand = new AsyncCommand(() => Run(() =>
         {
             _checkpoint.Clear();
@@ -395,6 +408,11 @@ public sealed class WorkshopViewModel : ObservableObject
         if (IsActive && Section == SectionTests && !_gpuAdaptersLoaded)
         {
             await LoadGpuAdaptersAsync();
+        }
+
+        if (IsActive && Section is SectionStorage or SectionTests && Drives.Count == 0)
+        {
+            LoadDrives();
         }
 
         var live = (IsActive && Section == SectionLive) || IsTesting || IsDiagnosing;

@@ -746,8 +746,104 @@
                                         <TextBlock Text="{Binding Workshop.VramStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
                                     </StackPanel>
                                 </Border>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xEDA2;" Foreground="{StaticResource MausGreen}" />
+                                        <TextBlock Text="{x:Static app:Ui.DiskTestTitle}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{x:Static app:Ui.DiskTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.DriveLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox MinWidth="260" Margin="0,0,16,4" ItemsSource="{Binding Workshop.Drives}" SelectedItem="{Binding Workshop.Drive}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox MinWidth="160" Margin="0,0,16,4" ItemsSource="{Binding Workshop.DiskSizes}" SelectedItem="{Binding Workshop.DiskSize}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartDiskTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                        </WrapPanel>
+                                        <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.DiskProgress, Mode=OneWay}" />
+                                        <TextBlock Text="{Binding Workshop.DiskStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Stockage : qu'est-ce qui prend de la place ? -->
+                    <TabItem Header="{x:Static app:Ui.SectionStorage}" Style="{StaticResource PillTab}">
+                        <DockPanel>
+                            <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <TextBlock Text="{x:Static app:Ui.DriveLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox MinWidth="260" Margin="0,0,12,4" ItemsSource="{Binding Workshop.Drives}" SelectedItem="{Binding Workshop.Drive}" DisplayMemberPath="Label"
+                                          IsEnabled="{Binding Workshop.IsNotScanning, Mode=OneWay}" />
+                                <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.Analyze}"
+                                        Command="{Binding Workshop.ScanCommand}" IsEnabled="{Binding Workshop.IsNotScanning, Mode=OneWay}" />
+                                <Button Style="{StaticResource DangerButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.Stop}"
+                                        Command="{Binding Workshop.StopScanCommand}" Visibility="{Binding Workshop.IsScanning, Converter={StaticResource BoolToVisibility}}" />
+                                <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.StorageSense}" Command="{Binding Workshop.StorageSettingsCommand}" />
+                            </WrapPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding Workshop.ScanStatus}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,8" />
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Left" Padding="12,4" Content="{x:Static app:Ui.GoUp}" Command="{Binding Workshop.UpCommand}" IsEnabled="{Binding Workshop.CanGoUp, Mode=OneWay}" />
+                                <Button DockPanel.Dock="Right" Padding="12,4" Content="{x:Static app:Ui.OpenInExplorer}" Command="{Binding Workshop.OpenCurrentFolderCommand}" />
+                                <TextBlock Text="{Binding Workshop.CurrentPath}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <Border DockPanel.Dock="Right" Width="330" Margin="12,0,0,0" Style="{StaticResource Card}">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="{x:Static app:Ui.LargestTitle}" Style="{StaticResource CardTitle}" />
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Workshop.LargestFiles}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type ws:SpaceEntryViewModel}">
+                                                    <DockPanel Margin="0,4">
+                                                        <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.ShowEntry}" Command="{Binding ShowCommand}" Padding="8,1" FontSize="11" VerticalAlignment="Top" />
+                                                        <StackPanel Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Size}" FontSize="12" Style="{StaticResource Muted}" />
+                                                            <TextBlock Text="{Binding Hint}" FontSize="11" Style="{StaticResource Muted}"
+                                                                       Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Border>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Workshop.SpaceEntries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type ws:SpaceEntryViewModel}">
+                                            <Border Style="{StaticResource Card}" Padding="10,6" Margin="0,0,0,6">
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource NavIcon}" Foreground="{StaticResource MausGold}" FontSize="18"
+                                                               Text="{Binding Icon}" Margin="0,0,10,0" />
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button Content="{x:Static app:Ui.OpenEntry}" Command="{Binding OpenCommand}" Padding="10,2" Margin="6,0,0,0"
+                                                                Visibility="{Binding CanOpen, Converter={StaticResource BoolToVisibility}}" />
+                                                        <Button Content="{x:Static app:Ui.ShowEntry}" Command="{Binding ShowCommand}" Padding="10,2" Margin="6,0,0,0" />
+                                                    </StackPanel>
+                                                    <StackPanel DockPanel.Dock="Right" Width="150" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock>
+                                                            <Run Text="{Binding Size, Mode=OneWay}" FontWeight="SemiBold" />
+                                                            <Run Text="  " />
+                                                            <Run Text="{Binding Percent, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                        <ProgressBar Height="5" Maximum="1" Value="{Binding Share, Mode=OneWay}" />
+                                                    </StackPanel>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Hint}" FontSize="11" Style="{StaticResource Muted}" TextWrapping="Wrap"
+                                                                   Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
                     </TabItem>
                 </TabControl>
             </DockPanel>
