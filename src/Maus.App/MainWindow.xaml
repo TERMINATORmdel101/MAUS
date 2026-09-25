@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Maus.App.ViewModels"
-        Title="MAUS — Audit Windows"
+        Title="MAUS — Audit et corrections de Windows"
         Width="1120" Height="760" MinWidth="820" MinHeight="520"
         WindowStartupLocation="CenterScreen">
     <Window.DataContext>
@@ -20,7 +20,7 @@
         <!-- En-tête -->
         <StackPanel Grid.Row="0">
             <TextBlock Text="MAUS" FontSize="28" FontWeight="SemiBold" />
-            <TextBlock Text="Mode audit seul : MAUS lit votre configuration et ne modifie rien sur votre PC."
+            <TextBlock Text="MAUS audite d'abord sans rien modifier. Les corrections ne s'appliquent qu'avec votre accord, et chacune peut être annulée."
                        FontSize="14" Opacity="0.8" TextWrapping="Wrap" />
             <TextBlock Text="{Binding SystemSummary}" FontSize="13" Opacity="0.7" Margin="0,4,0,0" TextWrapping="Wrap" />
         </StackPanel>
@@ -35,58 +35,172 @@
             <TextBlock Text="{Binding StatusText}" Margin="16,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
         </DockPanel>
 
-        <!-- Modules et constats -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="340" />
-                <ColumnDefinition Width="16" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <TabControl Grid.Row="2">
+            <!-- Onglet 1 : modules et constats -->
+            <TabItem Header="Constats">
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-            <ListBox Grid.Column="0" ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModule}"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                <ListBox.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:ModuleViewModel}">
-                        <DockPanel Margin="2,6">
-                            <Ellipse DockPanel.Dock="Left" Width="12" Height="12" Margin="0,4,10,0" VerticalAlignment="Top"
-                                     Fill="{Binding Status, Converter={StaticResource StatusToBrush}}" />
-                            <StackPanel>
-                                <TextBlock Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </DockPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-
-            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <TextBlock Text="{Binding SelectedModule.Header}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="0.75" Margin="0,0,0,12" />
-                    <ItemsControl ItemsSource="{Binding SelectedModule.Findings}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:FindingViewModel}">
-                                <Border Margin="0,0,0,10" Padding="14,10" CornerRadius="6" BorderThickness="4,1,1,1"
-                                        BorderBrush="{Binding Status, Converter={StaticResource StatusToBrush}}">
+                    <ListBox Grid.Column="0" ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModule}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:ModuleViewModel}">
+                                <DockPanel Margin="2,6">
+                                    <Ellipse DockPanel.Dock="Left" Width="12" Height="12" Margin="0,4,10,0" VerticalAlignment="Top"
+                                             Fill="{Binding Status, Converter={StaticResource StatusToBrush}}" />
                                     <StackPanel>
-                                        <DockPanel>
-                                            <TextBlock DockPanel.Dock="Right" Text="{Binding StatusLabel}" FontSize="12" FontWeight="SemiBold"
-                                                       Foreground="{Binding Status, Converter={StaticResource StatusToBrush}}" />
-                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        </DockPanel>
-                                        <TextBlock Text="{Binding Values}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap"
-                                                   Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
-                                        <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
-                                                   Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
                                     </StackPanel>
-                                </Border>
+                                </DockPanel>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </ScrollViewer>
-        </Grid>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedModule.Header}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="0.75" Margin="0,0,0,12" />
+                            <ItemsControl ItemsSource="{Binding SelectedModule.Findings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:FindingViewModel}">
+                                        <Border Margin="0,0,0,10" Padding="14,10" CornerRadius="6" BorderThickness="4,1,1,1"
+                                                BorderBrush="{Binding Status, Converter={StaticResource StatusToBrush}}">
+                                            <StackPanel>
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding StatusLabel}" FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="{Binding Status, Converter={StaticResource StatusToBrush}}" />
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                </DockPanel>
+                                                <TextBlock Text="{Binding Values}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                           Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
+                                                <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
+                                                           Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                        </Grid>
+            </TabItem>
+
+            <!-- Onglet 2 : corrections proposées -->
+            <TabItem Header="Corrections">
+                <DockPanel Margin="0,12,0,0">
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock Text="{Binding ChangesSummary}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <Border Padding="12,8" Margin="0,0,0,8" CornerRadius="6" BorderThickness="4,1,1,1" BorderBrush="#C42B1C"
+                                Visibility="{Binding IsBlocked, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding BlockingReason}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                        </Border>
+                        <WrapPanel Margin="0,0,0,8">
+                            <TextBlock Text="Profils en un clic :" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ItemsControl ItemsSource="{Binding Profiles}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:ProfileViewModel}">
+                                        <Button Content="{Binding Name}" ToolTip="{Binding Description}" Command="{Binding Command}"
+                                                Padding="12,4" Margin="0,0,8,4" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                        <CheckBox Content="Créer un point de restauration vérifié avant toute modification (recommandé)"
+                                  IsChecked="{Binding CreateRestorePoint}" Margin="0,0,0,4" />
+                        <CheckBox Content="Activer la protection du système sur C: si elle est désactivée (nécessaire pour le point de restauration)"
+                                  IsChecked="{Binding EnableProtection}" Margin="0,0,0,8" />
+                        <DockPanel>
+                            <Button DockPanel.Dock="Left" Content="{Binding ApplyLabel}" Padding="18,8"
+                                    Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply, Mode=OneWay}" />
+                            <TextBlock Text="Après les corrections, MAUS relance l'audit pour vérifier l'état réel du PC."
+                                       Margin="16,0,0,0" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
+                        </DockPanel>
+                        <Border Padding="12,8" Margin="0,10,0,0" CornerRadius="6" BorderThickness="1" BorderBrush="#808080"
+                                Visibility="{Binding HasFixReport, Converter={StaticResource BoolToVisibility}}">
+                            <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
+                                <TextBox Text="{Binding FixReport, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                         TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Changes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:ChangeViewModel}">
+                                    <Border Margin="0,0,0,8" Padding="12,8" CornerRadius="6" BorderThickness="1" BorderBrush="#808080">
+                                        <DockPanel>
+                                            <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,2,10,0" />
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Badges}" FontSize="12" Opacity="0.7" Margin="0,2,0,0" />
+                                                <TextBlock Text="{Binding Description}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Gain}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                           Visibility="{Binding HasGain, Converter={StaticResource BoolToVisibility}}" />
+                                                <TextBlock Text="{Binding Risk}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
+                                                           Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibility}}" />
+                                                <TextBlock Text="{Binding Warning}" Margin="0,4,0,0" FontWeight="SemiBold" Foreground="#C42B1C" TextWrapping="Wrap"
+                                                           Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}" />
+                                                <Expander Header="Détails techniques" Margin="0,4,0,0">
+                                                    <TextBox Text="{Binding Technical, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                             FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                                                </Expander>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </TabItem>
+
+            <!-- Onglet 3 : historique et annulation -->
+            <TabItem Header="Historique">
+                <DockPanel Margin="0,12,0,0">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Right" Content="Actualiser" Padding="12,4" Command="{Binding RefreshJournalCommand}" />
+                        <TextBlock Text="{Binding JournalSummary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Sessions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:SessionViewModel}">
+                                    <Border Margin="0,0,0,8" Padding="12,8" CornerRadius="6" BorderThickness="1" BorderBrush="#808080">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Content="Annuler cette séance" Padding="12,4"
+                                                        Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                                <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                            <Expander Header="Valeurs modifiées" Margin="0,4,0,0">
+                                                <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                         FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                                            </Expander>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
 
         <!-- Pied de page : transparence sur la fabrication -->
         <TextBlock Grid.Row="3" Text="{Binding About}" FontSize="11" Opacity="0.6" Margin="0,12,0,0" TextWrapping="Wrap" />
