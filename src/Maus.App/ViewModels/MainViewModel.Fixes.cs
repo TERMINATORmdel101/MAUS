@@ -7,6 +7,7 @@ using Maus.Core;
 using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Maus.Core.Reporting;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
@@ -33,13 +34,13 @@ public sealed partial class MainViewModel
 
     public bool CanApply => _lastContext is not null && !IsBlocked && !IsApplying && SelectedCount > 0;
 
-    public string ApplyLabel => SelectedCount == 0 ? "Aucune correction cochée" : $"Appliquer la sélection ({SelectedCount})";
+    public string ApplyLabel => SelectedCount == 0 ? T("Aucune correction cochée") : T("Appliquer la sélection ({0})", SelectedCount);
 
     public string ChangesSummary => _lastContext is null
-        ? "Lancez d'abord l'audit : les corrections proposées apparaîtront ici."
+        ? T("Lancez d'abord l'audit : les corrections proposées apparaîtront ici.")
         : Changes.Count == 0
-            ? "Aucune correction à proposer : tout ce que MAUS sait corriger est déjà en ordre (ou marqué « voulu »)."
-            : $"{Changes.Count} correction(s) proposée(s). Cochez celles que vous voulez, ou choisissez un profil. Rien n'est modifié sans votre accord.";
+            ? T("Aucune correction à proposer : tout ce que MAUS sait corriger est déjà en ordre (ou marqué « voulu »).")
+            : T("{0} correction(s) proposée(s). Cochez celles que vous voulez, ou choisissez un profil. Rien n'est modifié sans votre accord.", Changes.Count);
 
     public string? BlockingReason
     {
@@ -165,23 +166,23 @@ public sealed partial class MainViewModel
 
         var warnings = selected.Where(c => c.Warning is not null).Select(c => $"• {c.Title} : {c.Warning}").ToList();
         var message = new StringBuilder()
-            .AppendLine(CultureInfo.CurrentCulture, $"MAUS va appliquer {selected.Count} correction(s).")
+            .AppendLine(T("MAUS va appliquer {0} correction(s).", selected.Count))
             .AppendLine(CreateRestorePoint
-                ? "Un point de restauration sera d'abord créé, puis vérifié."
-                : "Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler).")
-            .AppendLine("Chaque valeur d'origine est enregistrée : l'onglet « Historique » permet de tout annuler, ou une seule correction.");
+                ? T("Un point de restauration sera d'abord créé, puis vérifié.")
+                : T("Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler)."))
+            .AppendLine(T("Chaque valeur d'origine est enregistrée : l'onglet « Historique » permet de tout annuler, ou une seule correction."));
         if (warnings.Count > 0)
         {
-            message.AppendLine().AppendLine("À lire avant de continuer :").AppendLine(string.Join(Environment.NewLine, warnings));
+            message.AppendLine().AppendLine(T("À lire avant de continuer :")).AppendLine(string.Join(Environment.NewLine, warnings));
         }
 
-        if (!Confirm("Appliquer les corrections ?", message.AppendLine().Append("Continuer ?").ToString()))
+        if (!Confirm(T("Appliquer les corrections ?"), message.AppendLine().Append(T("Continuer ?")).ToString()))
         {
             return;
         }
 
         IsApplying = true;
-        FixReport = "Corrections en cours… (la création du point de restauration peut prendre une minute)";
+        FixReport = T("Corrections en cours… (la création du point de restauration peut prendre une minute)");
         try
         {
             var context = _lastContext;
@@ -191,8 +192,8 @@ public sealed partial class MainViewModel
             var result = await Task.Run(() => engine.Apply(selected, options));
 
             if (result.Blocked && result.RestorePoint is { Succeeded: false } point &&
-                Confirm("Point de restauration impossible", point.Message + Environment.NewLine + Environment.NewLine +
-                    "Continuer sans point de restauration ? Le journal de MAUS permettra quand même d'annuler chaque correction."))
+                Confirm(T("Point de restauration impossible"), point.Message + Environment.NewLine + Environment.NewLine +
+                    T("Continuer sans point de restauration ? Le journal de MAUS permettra quand même d'annuler chaque correction.")))
             {
                 result = await Task.Run(() => engine.Apply(selected, options with { ProceedWithoutRestorePoint = true }));
             }
@@ -204,7 +205,7 @@ public sealed partial class MainViewModel
             }
 
             // Verify, second niveau : un nouvel audit relit l'état effectif (une stratégie peut être ignorée sur Famille).
-            FixReport = "Corrections faites. Vérification par un nouvel audit…";
+            FixReport = T("Corrections faites. Vérification par un nouvel audit…");
             await RunAuditAsync();
             var verified = FixVerification.CompareWithAudit(selected, result, _results, _lastContext!.Windows);
             if (result.Session is { } session)
@@ -219,7 +220,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
-            FixReport = $"Les corrections ont été interrompues : {ex.Message}. Consultez l'onglet « Historique » pour annuler ce qui a été fait.";
+            FixReport = T("Les corrections ont été interrompues : {0}. Consultez l'onglet « Historique » pour annuler ce qui a été fait.", ex.Message);
         }
         finally
         {
@@ -229,7 +230,7 @@ public sealed partial class MainViewModel
 
     private async Task RestartExplorerAsync()
     {
-        if (!Confirm("Redémarrer l'Explorateur ?", ExplorerRestart.Warning + Environment.NewLine + Environment.NewLine + "Continuer ?"))
+        if (!Confirm(T("Redémarrer l'Explorateur ?"), ExplorerRestart.Warning + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -258,10 +259,10 @@ public sealed partial class MainViewModel
 
         var byId = verified.ToDictionary(v => v.Outcome.ChangeId, StringComparer.Ordinal);
         var noEffect = verified.Count(v => v.Check == EffectCheck.NoEffect);
-        text.AppendLine(CultureInfo.CurrentCulture, $"{result.AppliedCount} correction(s) appliquée(s).");
+        text.AppendLine(T("{0} correction(s) appliquée(s).", result.AppliedCount));
         if (noEffect > 0)
         {
-            text.AppendLine(CultureInfo.CurrentCulture, $"Attention : {noEffect} correction(s) écrite(s) mais sans effet d'après le nouvel audit (détails ci-dessous).");
+            text.AppendLine(T("Attention : {0} correction(s) écrite(s) mais sans effet d'après le nouvel audit (détails ci-dessous).", noEffect));
         }
 
         foreach (var outcome in result.Changes)
@@ -269,29 +270,29 @@ public sealed partial class MainViewModel
             var (label, detail) = byId.TryGetValue(outcome.ChangeId, out var check) && outcome.Status == ChangeStatus.Applied
                 ? (check.Check switch
                 {
-                    EffectCheck.Confirmed => "Confirmé",
-                    EffectCheck.PendingRestart => "En attente",
-                    EffectCheck.NoEffect => "SANS EFFET",
-                    _ => "Appliqué",
+                    EffectCheck.Confirmed => T("Confirmé"),
+                    EffectCheck.PendingRestart => T("En attente"),
+                    EffectCheck.NoEffect => T("SANS EFFET"),
+                    _ => T("Appliqué"),
                 }, check.Message)
                 : (Labels.Of(outcome.Status), outcome.Message);
-            text.AppendLine(CultureInfo.CurrentCulture, $"• [{label}] {outcome.Title} : {detail}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"• [{label}] {outcome.Title} : {detail}");
         }
 
         switch (result.RequiredEffect)
         {
             case ChangeEffect.Restart:
-                text.AppendLine("Redémarrez le PC pour que toutes les corrections prennent effet.");
+                text.AppendLine(T("Redémarrez le PC pour que toutes les corrections prennent effet."));
                 break;
             case ChangeEffect.SignOut:
-                text.AppendLine("Fermez puis rouvrez votre session pour que toutes les corrections prennent effet.");
+                text.AppendLine(T("Fermez puis rouvrez votre session pour que toutes les corrections prennent effet."));
                 break;
             case ChangeEffect.ExplorerRestart:
-                text.AppendLine("Certaines corrections de la barre des tâches seront visibles après redémarrage de l'Explorateur (bouton ci-dessous).");
+                text.AppendLine(T("Certaines corrections de la barre des tâches seront visibles après redémarrage de l'Explorateur (bouton ci-dessous)."));
                 break;
         }
 
-        text.AppendLine("Le bouton « Enregistrer le rapport » garde une trace avant/après de cette séance.");
+        text.AppendLine(T("Le bouton « Enregistrer le rapport » garde une trace avant/après de cette séance."));
         return text.ToString().TrimEnd();
     }
 

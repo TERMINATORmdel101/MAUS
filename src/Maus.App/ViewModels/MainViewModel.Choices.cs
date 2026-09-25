@@ -1,6 +1,7 @@
 using Maus.Core;
 using Maus.Core.Fixes;
 using Maus.Core.Preferences;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
@@ -17,19 +18,57 @@ public sealed partial class MainViewModel
 
     public IReadOnlyList<ChoiceOption<int?>> GameBarOptions { get; } =
     [
-        new("Automatique : le profil détecté par MAUS", null),
-        new("Profil 1 : je n'utilise ni l'app Xbox ni le Game Pass", 1),
-        new("Profil 2 : j'utilise l'app Xbox ou le Game Pass", 2),
-        new("Profil 3 : Game Bar complète (recommandé sur Ryzen X3D)", 3),
+        new(T("Automatique : le profil détecté par MAUS"), null),
+        new(T("Profil 1 : je n'utilise ni l'app Xbox ni le Game Pass"), 1),
+        new(T("Profil 2 : j'utilise l'app Xbox ou le Game Pass"), 2),
+        new(T("Profil 3 : Game Bar complète (recommandé sur Ryzen X3D)"), 3),
     ];
 
     public IReadOnlyList<ChoiceOption<LaptopPowerChoice>> LaptopOptions { get; } =
     [
-        new("Pas encore choisi (proposition : performance sur secteur, Équilibré sur batterie)", LaptopPowerChoice.NotChosen),
-        new("Performance sur secteur, Équilibré sur batterie (recommandé)", LaptopPowerChoice.Performance),
-        new("Performance partout (autonomie réduite)", LaptopPowerChoice.PerformanceEverywhere),
-        new("Autonomie (Équilibré sur secteur, économie sur batterie)", LaptopPowerChoice.Battery),
+        new(T("Pas encore choisi (proposition : performance sur secteur, Équilibré sur batterie)"), LaptopPowerChoice.NotChosen),
+        new(T("Performance sur secteur, Équilibré sur batterie (recommandé)"), LaptopPowerChoice.Performance),
+        new(T("Performance partout (autonomie réduite)"), LaptopPowerChoice.PerformanceEverywhere),
+        new(T("Autonomie (Équilibré sur secteur, économie sur batterie)"), LaptopPowerChoice.Battery),
     ];
+
+    /// <summary>Langues proposées, chacune écrite dans sa propre langue.</summary>
+    public IReadOnlyList<ChoiceOption<string>> LanguageOptions { get; } =
+        [.. Maus.Core.Localization.Texts.Languages.Select(l => new ChoiceOption<string>(l.Name, l.Code))];
+
+    /// <summary>Changement de langue (enregistré, puis fenêtre recréée) ; remplaçable pour les tests.</summary>
+    public Action<string, bool> SwitchLanguage { get; init; } = App.SwitchLanguage;
+
+    public ChoiceOption<string> LanguageChoice
+    {
+        get => LanguageOptions.FirstOrDefault(o => o.Value == Language) ?? LanguageOptions[0];
+        set
+        {
+            if (value is null || value.Value == Language)
+            {
+                return;
+            }
+
+            _ = ChangeLanguageAsync(value.Value);
+        }
+    }
+
+    private async Task ChangeLanguageAsync(string code)
+    {
+        await Task.Yield();
+        var updated = (_lastContext?.Preferences ?? PreferencesStore.Load()) with { Language = code };
+        try
+        {
+            await Task.Run(() => PreferencesStore.Save(updated));
+        }
+        catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
+        {
+            // La langue change quand même pour cette ouverture de MAUS.
+            StatusText = T("Votre choix n'a pas pu être enregistré : {0}", ex.Message);
+        }
+
+        SwitchLanguage(code, HasAudit);
+    }
 
     public bool IsLaptop
     {
@@ -87,9 +126,8 @@ public sealed partial class MainViewModel
         // Laisse la liste déroulante terminer sa mise à jour avant une éventuelle remise en arrière.
         await Task.Yield();
         if (_lastContext is { Hardware.Cpu.IsAsymmetricDualCcdX3D: true } && chosen.Value is 1 or 2 &&
-            !Confirm("Ryzen X3D détecté", "Sur votre processeur, la Game Bar sert à placer les jeux sur les cœurs dotés du V-Cache. " +
-                "Avec ce profil, vos jeux risquent de tourner sur les cœurs sans V-Cache et d'être moins fluides." +
-                Environment.NewLine + Environment.NewLine + "Choisir ce profil quand même ?"))
+            !Confirm(T("Ryzen X3D détecté"), T("Sur votre processeur, la Game Bar sert à placer les jeux sur les cœurs dotés du V-Cache. Avec ce profil, vos jeux risquent de tourner sur les cœurs sans V-Cache et d'être moins fluides.") +
+                Environment.NewLine + Environment.NewLine + T("Choisir ce profil quand même ?")))
         {
             _loadingChoices = true;
             GameBarChoice = previous;
@@ -124,11 +162,10 @@ public sealed partial class MainViewModel
         if (acknowledge)
         {
             var warning = finding.Status == FindingStatus.Problem
-                ? "Attention : c'est un problème de sécurité ou de fiabilité. " + Environment.NewLine + Environment.NewLine
+                ? T("Attention : c'est un problème de sécurité ou de fiabilité.") + Environment.NewLine + Environment.NewLine
                 : string.Empty;
-            if (!Confirm("Marquer « voulu » ?", $"{warning}« {finding.Title} » ({finding.Current}) ne sera plus signalé, et MAUS ne proposera plus de le corriger. " +
-                    "Si la situation change, il sera de nouveau signalé. Vous pouvez retirer cette marque à tout moment." +
-                    Environment.NewLine + Environment.NewLine + "Continuer ?"))
+            if (!Confirm(T("Marquer « voulu » ?"), warning + T("« {0} » ({1}) ne sera plus signalé, et MAUS ne proposera plus de le corriger. Si la situation change, il sera de nouveau signalé. Vous pouvez retirer cette marque à tout moment.", finding.Title, finding.Current) +
+                    Environment.NewLine + Environment.NewLine + T("Continuer ?")))
             {
                 return;
             }
@@ -147,7 +184,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
         {
-            StatusText = $"Votre choix n'a pas pu être enregistré : {ex.Message}";
+            StatusText = T("Votre choix n'a pas pu être enregistré : {0}", ex.Message);
             return;
         }
 
@@ -155,7 +192,7 @@ public sealed partial class MainViewModel
         {
             _lastContext = _lastContext.WithPreferences(updated);
             await RefreshModulesAsync(moduleIds);
-            StatusText = "Choix enregistré : les constats et les corrections sont mis à jour.";
+            StatusText = T("Choix enregistré : les constats et les corrections sont mis à jour.");
         }
     }
 }

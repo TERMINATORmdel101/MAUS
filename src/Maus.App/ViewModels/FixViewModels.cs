@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows.Input;
 using Maus.Core.Fixes;
 using Maus.Core.Reporting;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
@@ -24,28 +25,28 @@ public sealed class ChangeViewModel(PlannedChange change) : ObservableObject
 
     public string Description => Change.Description;
 
-    public string? Gain => Change.Gain is null ? null : "Gain : " + Change.Gain;
+    public string? Gain => Change.Gain is null ? null : T("Gain : {0}", Change.Gain);
 
     public bool HasGain => Change.Gain is not null;
 
-    public string? Risk => Change.Risk is null ? null : "À savoir : " + Change.Risk;
+    public string? Risk => Change.Risk is null ? null : T("À savoir : {0}", Change.Risk);
 
     public bool HasRisk => Change.Risk is not null;
 
-    public string? Warning => Change.Warning is null ? null : "Attention : " + Change.Warning;
+    public string? Warning => Change.Warning is null ? null : T("Attention : {0}", Change.Warning);
 
     public bool HasWarning => Change.Warning is not null;
 
     public string Badges => string.Join("  ·  ", new[]
     {
         Change.ModuleId,
-        Change.Advanced ? "Avancé" : Change.Recommended ? "Recommandé" : "Au choix",
+        Change.Advanced ? T("Avancé") : Change.Recommended ? T("Recommandé") : T("Au choix"),
         Change.Effect == ChangeEffect.Immediate ? null : Labels.Of(Change.Effect),
     }.Where(b => b is not null));
 
     /// <summary>Aperçu technique : chaque valeur écrite, pour les curieux et les vérifications.</summary>
     public string Technical => string.Join(Environment.NewLine, Change.Writes.Select(w =>
-        $"{w.Key.Describe()}  →  {(w.Value is null ? "supprimée" : SettingValue.Display(w.Value))}"));
+        $"{w.Key.Describe()}  →  {(w.Value is null ? T("supprimée") : SettingValue.Display(w.Value))}"));
 }
 
 /// <summary>Une séance du journal, avec son bouton « Annuler » et une ligne par correction.</summary>
@@ -71,8 +72,8 @@ public sealed class SessionViewModel
     public bool CanRevert => Session.CanRevert;
 
     public string Header =>
-        $"{Session.CreatedAt.ToLocalTime().ToString("dddd d MMMM yyyy à HH:mm", CultureInfo.CurrentCulture)}  ·  " +
-        (Session.RevertedAt is not null ? "annulée" : Session.CanRevert ? "active" : "rien à annuler");
+        $"{Session.CreatedAt.ToLocalTime().ToString("f", Culture)}  ·  " +
+        (Session.RevertedAt is not null ? T("annulée") : Session.CanRevert ? T("active") : T("rien à annuler"));
 
     public string Summary
     {
@@ -81,9 +82,9 @@ public sealed class SessionViewModel
             var applied = Session.Entries.Count(e => e.State is EntryState.Applied);
             var reverted = Session.Entries.Count(e => e.State is EntryState.Reverted);
             var point = Session.RestorePoint is { } rp
-                ? $"point de restauration n° {rp.SequenceNumber}"
-                : "sans point de restauration";
-            return $"{applied} valeur(s) en place, {reverted} restaurée(s) · {point}";
+                ? T("point de restauration n° {0}", rp.SequenceNumber)
+                : T("sans point de restauration");
+            return T("{0} valeur(s) en place, {1} restaurée(s) · {2}", applied, reverted, point);
         }
     }
 }
@@ -107,11 +108,11 @@ public sealed class SessionChangeViewModel
 
     public string State => _entries.Select(e => e.State).Distinct().ToList() switch
     {
-        [EntryState.Applied] => "en place",
-        [EntryState.Reverted] => "annulée",
-        [EntryState.RevertSkipped] => "modifiée depuis",
-        [EntryState.Failed] => "échec, origine remise",
-        _ => "en partie annulée",
+        [EntryState.Applied] => T("en place"),
+        [EntryState.Reverted] => T("annulée"),
+        [EntryState.RevertSkipped] => T("modifiée depuis"),
+        [EntryState.Failed] => T("échec, origine remise"),
+        _ => T("en partie annulée"),
     };
 
     public string? Note => _entries.Select(e => e.EffectNote).FirstOrDefault(n => n is not null);

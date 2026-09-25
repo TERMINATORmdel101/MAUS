@@ -1,10 +1,12 @@
 <Window x:Class="Maus.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="clr-namespace:Maus.App"
         xmlns:vm="clr-namespace:Maus.App.ViewModels"
-        Title="MAUS — Audit et corrections de Windows"
+        Title="{x:Static app:Ui.WindowTitle}"
         Width="1120" Height="760" MinWidth="820" MinHeight="520"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/maus.ico">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
@@ -18,16 +20,22 @@
         </Grid.RowDefinitions>
 
         <!-- En-tête -->
-        <StackPanel Grid.Row="0">
-            <TextBlock Text="MAUS" FontSize="28" FontWeight="SemiBold" />
-            <TextBlock Text="MAUS audite d'abord sans rien modifier. Les corrections ne s'appliquent qu'avec votre accord, et chacune peut être annulée."
+        <DockPanel Grid.Row="0" LastChildFill="True">
+            <ComboBox DockPanel.Dock="Right" VerticalAlignment="Top" MinWidth="120"
+                      ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding LanguageChoice}" DisplayMemberPath="Label"
+                      AutomationProperties.Name="Language / Langue / Idioma" ToolTip="Language · Langue · Idioma" />
+        <StackPanel>
+            <Image Source="/Assets/maus-banner.png" Height="96" HorizontalAlignment="Left" Margin="0,0,0,6"
+                   RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="MAUS" />
+            <TextBlock Text="{x:Static app:Ui.Tagline}"
                        FontSize="14" Opacity="0.8" TextWrapping="Wrap" />
             <TextBlock Text="{Binding SystemSummary}" FontSize="13" Opacity="0.7" Margin="0,4,0,0" TextWrapping="Wrap" />
         </StackPanel>
+        </DockPanel>
 
         <!-- Lancement -->
         <DockPanel Grid.Row="1" Margin="0,16,0,12" LastChildFill="True">
-            <Button DockPanel.Dock="Left" Content="Lancer l'audit" Padding="18,8"
+            <Button DockPanel.Dock="Left" Content="{x:Static app:Ui.RunAudit}" Padding="18,8"
                     Command="{Binding RunAuditCommand}" />
             <ProgressBar DockPanel.Dock="Right" Width="180" Height="6" Margin="12,0,0,0" VerticalAlignment="Center"
                          Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
@@ -37,7 +45,7 @@
 
         <TabControl Grid.Row="2">
             <!-- Onglet 1 : modules et constats -->
-            <TabItem Header="Constats">
+            <TabItem Header="{x:Static app:Ui.TabFindings}">
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="340" />
@@ -82,11 +90,11 @@
                                                 <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
                                                            Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-                                                    <Button Content="C'est voulu" Padding="10,2" FontSize="12"
-                                                            ToolTip="Ne plus signaler ce constat tant que la situation ne change pas"
+                                                    <Button Content="{x:Static app:Ui.Wanted}" Padding="10,2" FontSize="12"
+                                                            ToolTip="{x:Static app:Ui.WantedTip}"
                                                             Command="{Binding AcknowledgeCommand}"
                                                             Visibility="{Binding CanAcknowledge, Converter={StaticResource BoolToVisibility}}" />
-                                                    <Button Content="Signaler de nouveau" Padding="10,2" FontSize="12"
+                                                    <Button Content="{x:Static app:Ui.ReportAgain}" Padding="10,2" FontSize="12"
                                                             Command="{Binding UnacknowledgeCommand}"
                                                             Visibility="{Binding IsAcknowledged, Converter={StaticResource BoolToVisibility}}" />
                                                 </StackPanel>
@@ -101,7 +109,7 @@
             </TabItem>
 
             <!-- Onglet 2 : corrections proposées -->
-            <TabItem Header="Corrections">
+            <TabItem Header="{x:Static app:Ui.TabFixes}">
                 <DockPanel Margin="0,12,0,0">
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock Text="{Binding ChangesSummary}" TextWrapping="Wrap" Margin="0,0,0,8" />
@@ -110,7 +118,7 @@
                             <TextBlock Text="{Binding BlockingReason}" TextWrapping="Wrap" FontWeight="SemiBold" />
                         </Border>
                         <WrapPanel Margin="0,0,0,8">
-                            <TextBlock Text="Profils en un clic :" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="{x:Static app:Ui.OneClickProfiles}" VerticalAlignment="Center" Margin="0,0,8,0" />
                             <ItemsControl ItemsSource="{Binding Profiles}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -125,7 +133,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </WrapPanel>
-                        <Expander Header="Vos choix" Margin="0,0,0,8" IsExpanded="True"
+                        <Expander Header="{x:Static app:Ui.YourChoices}" Margin="0,0,0,8" IsExpanded="True"
                                   Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}">
                             <Grid Margin="0,6,0,0">
                                 <Grid.ColumnDefinitions>
@@ -136,10 +144,10 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <TextBlock Text="Profil Game Bar :" VerticalAlignment="Center" Margin="0,0,12,6" />
+                                <TextBlock Text="{x:Static app:Ui.GameBarProfile}" VerticalAlignment="Center" Margin="0,0,12,6" />
                                 <ComboBox Grid.Column="1" Margin="0,0,0,6" MaxWidth="520" HorizontalAlignment="Left"
                                           ItemsSource="{Binding GameBarOptions}" SelectedItem="{Binding GameBarChoice}" DisplayMemberPath="Label" />
-                                <TextBlock Grid.Row="1" Text="Alimentation du portable :" VerticalAlignment="Center" Margin="0,0,12,0"
+                                <TextBlock Grid.Row="1" Text="{x:Static app:Ui.LaptopPower}" VerticalAlignment="Center" Margin="0,0,12,0"
                                            Visibility="{Binding IsLaptop, Converter={StaticResource BoolToVisibility}}" />
                                 <ComboBox Grid.Row="1" Grid.Column="1" MaxWidth="520" HorizontalAlignment="Left"
                                           ItemsSource="{Binding LaptopOptions}" SelectedItem="{Binding LaptopChoice}" DisplayMemberPath="Label"
@@ -149,23 +157,23 @@
                     </StackPanel>
 
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
-                        <CheckBox Content="Créer un point de restauration vérifié avant toute modification (recommandé)"
+                        <CheckBox Content="{x:Static app:Ui.CreateRestorePoint}"
                                   IsChecked="{Binding CreateRestorePoint}" Margin="0,0,0,4" />
-                        <CheckBox Content="Activer la protection du système sur C: si elle est désactivée (nécessaire pour le point de restauration)"
+                        <CheckBox Content="{x:Static app:Ui.EnableProtection}"
                                   IsChecked="{Binding EnableProtection}" Margin="0,0,0,8" />
                         <DockPanel>
                             <Button DockPanel.Dock="Left" Content="{Binding ApplyLabel}" Padding="18,8"
                                     Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply, Mode=OneWay}" />
-                            <TextBlock Text="Après les corrections, MAUS relance l'audit pour vérifier l'état réel du PC."
+                            <TextBlock Text="{x:Static app:Ui.VerifyNote}"
                                        Margin="16,0,0,0" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
                         </DockPanel>
                         <WrapPanel Margin="0,8,0,0">
-                            <Button Content="Enregistrer le rapport (HTML)" Padding="12,4" Margin="0,0,8,0" Command="{Binding SaveReportCommand}"
+                            <Button Content="{x:Static app:Ui.SaveReport}" Padding="12,4" Margin="0,0,8,0" Command="{Binding SaveReportCommand}"
                                     IsEnabled="{Binding HasAudit, Mode=OneWay}"
-                                    ToolTip="Une page à garder ou à imprimer : ce qui a été vu, ce qui a été changé, et comment l'annuler" />
-                            <Button Content="Redémarrer l'Explorateur" Padding="12,4" Command="{Binding RestartExplorerCommand}"
+                                    ToolTip="{x:Static app:Ui.SaveReportTip}" />
+                            <Button Content="{x:Static app:Ui.RestartExplorer}" Padding="12,4" Command="{Binding RestartExplorerCommand}"
                                     Visibility="{Binding NeedsExplorerRestart, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="Applique les corrections de la barre des tâches sans fermer la session" />
+                                    ToolTip="{x:Static app:Ui.RestartExplorerTip}" />
                         </WrapPanel>
                         <Border Padding="12,8" Margin="0,10,0,0" CornerRadius="6" BorderThickness="1" BorderBrush="#808080"
                                 Visibility="{Binding HasFixReport, Converter={StaticResource BoolToVisibility}}">
@@ -193,7 +201,7 @@
                                                            Visibility="{Binding HasRisk, Converter={StaticResource BoolToVisibility}}" />
                                                 <TextBlock Text="{Binding Warning}" Margin="0,4,0,0" FontWeight="SemiBold" Foreground="#C42B1C" TextWrapping="Wrap"
                                                            Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}" />
-                                                <Expander Header="Détails techniques" Margin="0,4,0,0">
+                                                <Expander Header="{x:Static app:Ui.TechnicalDetails}" Margin="0,4,0,0">
                                                     <TextBox Text="{Binding Technical, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
                                                              FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
                                                 </Expander>
@@ -208,10 +216,10 @@
             </TabItem>
 
             <!-- Onglet 3 : historique et annulation -->
-            <TabItem Header="Historique">
+            <TabItem Header="{x:Static app:Ui.TabHistory}">
                 <DockPanel Margin="0,12,0,0">
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Button DockPanel.Dock="Right" Content="Actualiser" Padding="12,4" Command="{Binding RefreshJournalCommand}" />
+                        <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Refresh}" Padding="12,4" Command="{Binding RefreshJournalCommand}" />
                         <TextBlock Text="{Binding JournalSummary}" TextWrapping="Wrap" VerticalAlignment="Center" />
                     </DockPanel>
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -221,17 +229,17 @@
                                     <Border Margin="0,0,0,8" Padding="12,8" CornerRadius="6" BorderThickness="1" BorderBrush="#808080">
                                         <StackPanel>
                                             <DockPanel>
-                                                <Button DockPanel.Dock="Right" Content="Annuler cette séance" Padding="12,4"
+                                                <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.RevertSession}" Padding="12,4"
                                                         Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
                                                 <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
                                             </DockPanel>
                                             <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                            <Expander Header="Corrections de cette séance" Margin="0,4,0,0">
+                                            <Expander Header="{x:Static app:Ui.SessionChanges}" Margin="0,4,0,0">
                                                 <ItemsControl ItemsSource="{Binding Changes}" Margin="0,6,0,0">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate DataType="{x:Type vm:SessionChangeViewModel}">
                                                             <DockPanel Margin="0,0,0,8">
-                                                                <Button DockPanel.Dock="Right" Content="Annuler" Padding="10,2" FontSize="12" VerticalAlignment="Top"
+                                                                <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Revert}" Padding="10,2" FontSize="12" VerticalAlignment="Top"
                                                                         Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
                                                                 <StackPanel Margin="0,0,10,0">
                                                                     <TextBlock TextWrapping="Wrap">

@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using Maus.Core;
 using Maus.Core.Reporting;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
@@ -19,7 +20,7 @@ public sealed class FindingViewModel
 
     public FindingStatus Status => finding.Status;
 
-    public string StatusLabel => finding.AcknowledgedFrom is { } was ? $"Voulu (était : {Labels.Of(was)})" : Labels.Of(finding.Status);
+    public string StatusLabel => finding.AcknowledgedFrom is { } was ? T("Voulu (était : {0})", Labels.Of(was)) : Labels.Of(finding.Status);
 
     /// <summary>Un écart peut être marqué « voulu » : il ne sera plus signalé tant que la situation ne change pas.</summary>
     public bool CanAcknowledge => finding.Status is FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem;
@@ -34,8 +35,8 @@ public sealed class FindingViewModel
 
     public string Values => finding switch
     {
-        { Current: not null, Expected: not null } => $"Constaté : {finding.Current}   ·   Attendu : {finding.Expected}",
-        { Current: not null } => $"Constaté : {finding.Current}",
+        { Current: not null, Expected: not null } => T("Constaté : {0}   ·   Attendu : {1}", finding.Current, finding.Expected),
+        { Current: not null } => T("Constaté : {0}", finding.Current),
         _ => string.Empty,
     };
 
@@ -70,7 +71,7 @@ public sealed class ModuleViewModel : ObservableObject
 
     public string Summary => _result switch
     {
-        null => "En attente",
+        null => T("En attente"),
         { Error: not null } => _result.Error,
         _ => Describe(_result),
     };
@@ -92,18 +93,18 @@ public sealed class ModuleViewModel : ObservableObject
     private static string Describe(ModuleResult result)
     {
         var parts = new List<string>();
-        Add(parts, result.Count(FindingStatus.Problem), "problème", "problèmes");
-        Add(parts, result.Count(FindingStatus.Warning), "à surveiller", "à surveiller");
-        Add(parts, result.Count(FindingStatus.Improvable), "optimisation", "optimisations");
-        Add(parts, result.Count(FindingStatus.Unknown), "indéterminé", "indéterminés");
-        return parts.Count == 0 ? "Tout est conforme" : string.Join(" · ", parts);
+        Add(parts, result.Count(FindingStatus.Problem), T("{0} problème"), T("{0} problèmes"));
+        Add(parts, result.Count(FindingStatus.Warning), T("{0} à surveiller"), T("{0} à surveiller"));
+        Add(parts, result.Count(FindingStatus.Improvable), T("{0} optimisation"), T("{0} optimisations"));
+        Add(parts, result.Count(FindingStatus.Unknown), T("{0} indéterminé"), T("{0} indéterminés"));
+        return parts.Count == 0 ? T("Tout est conforme") : string.Join(" · ", parts);
     }
 
     private static void Add(List<string> parts, int count, string singular, string plural)
     {
         if (count > 0)
         {
-            parts.Add($"{count} {(count == 1 ? singular : plural)}");
+            parts.Add(string.Format(Culture, count == 1 ? singular : plural, count));
         }
     }
 }

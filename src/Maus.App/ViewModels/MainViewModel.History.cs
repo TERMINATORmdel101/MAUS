@@ -3,6 +3,7 @@ using System.Windows.Input;
 using Maus.Core;
 using Maus.Core.Fixes;
 using Maus.Core.Reporting;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
@@ -14,9 +15,8 @@ public sealed partial class MainViewModel
     public ICommand RefreshJournalCommand { get; }
 
     public string JournalSummary => Sessions.Count == 0
-        ? "Aucune séance de corrections : MAUS n'a encore rien modifié sur ce PC."
-        : "Chaque séance, ou chaque correction, peut être annulée : MAUS remet les valeurs d'origine enregistrées avant d'écrire. " +
-          "Une valeur que vous (ou Windows) avez changée depuis est laissée telle quelle.";
+        ? T("Aucune séance de corrections : MAUS n'a encore rien modifié sur ce PC.")
+        : T("Chaque séance, ou chaque correction, peut être annulée : MAUS remet les valeurs d'origine enregistrées avant d'écrire. Une valeur que vous (ou Windows) avez changée depuis est laissée telle quelle.");
 
     private async Task RefreshJournalAsync()
     {
@@ -42,9 +42,9 @@ public sealed partial class MainViewModel
     private async Task RevertAsync(SessionViewModel session, string? changeId)
     {
         var what = changeId is null
-            ? $"de la séance du {session.Header}"
-            : $"de la correction « {session.Session.Entries.First(e => e.ChangeId == changeId).ChangeTitle} »";
-        if (!session.CanRevert || !Confirm("Annuler ?", $"MAUS va remettre les valeurs d'origine {what}.{Environment.NewLine}Continuer ?"))
+            ? T("MAUS va remettre les valeurs d'origine de la séance du {0}.", session.Header)
+            : T("MAUS va remettre les valeurs d'origine de la correction « {0} ».", session.Session.Entries.First(e => e.ChangeId == changeId).ChangeTitle);
+        if (!session.CanRevert || !Confirm(T("Annuler ?"), what + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -54,13 +54,13 @@ public sealed partial class MainViewModel
             var context = _lastContext ?? await Task.Run(AuditContext.CreateDefault);
             var engine = new FixEngine(await Task.Run(() => FixContext.CreateDefault(context)));
             var result = await Task.Run(() => engine.Revert(session.Session.Id, changeId: changeId));
-            FixReport = result.Error ?? "Annulation : " + Environment.NewLine + string.Join(Environment.NewLine,
+            FixReport = result.Error ?? T("Annulation :") + Environment.NewLine + string.Join(Environment.NewLine,
                 result.Entries.Select(e => $"• [{Labels.Of(e.Status)}] {e.Title} : {e.Message}"));
             await RunAuditAsync();
         }
         catch (Exception ex)
         {
-            FixReport = $"L'annulation a échoué : {ex.Message}";
+            FixReport = T("L'annulation a échoué : {0}", ex.Message);
         }
     }
 }

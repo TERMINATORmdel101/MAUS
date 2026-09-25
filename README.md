@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo/maus-logo-800.jpg" alt="MAUS" width="420"></p>
+
 # MAUS
 
 **Maintenance · Audit · Updates · Sécurité** — l'utilitaire qui audite, répare et optimise Windows 11 en toute transparence.

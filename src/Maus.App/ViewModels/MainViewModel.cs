@@ -8,6 +8,7 @@ using Maus.Core.Engine;
 using Maus.Core.Fixes;
 using Maus.Core.Preferences;
 using Maus.Core.Reporting;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
@@ -18,7 +19,7 @@ public sealed partial class MainViewModel : ObservableObject
     private List<ModuleResult> _results = [];
     private ModuleViewModel? _selectedModule;
     private bool _isRunning;
-    private string _statusText = "Prêt. Lancez l'audit : MAUS lit votre configuration sans rien modifier.";
+    private string _statusText = T("Prêt. Lancez l'audit : MAUS lit votre configuration sans rien modifier.");
     private string _systemSummary = string.Empty;
     private int _completed;
     private AuditContext? _lastContext;
@@ -52,7 +53,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             FileName = suggested,
             DefaultExt = ".html",
-            Filter = "Page web (*.html)|*.html",
+            Filter = T("Page web") + " (*.html)|*.html",
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         };
         return dialog.ShowDialog() == true ? dialog.FileName : null;
@@ -105,14 +106,14 @@ public sealed partial class MainViewModel : ObservableObject
         private set => SetProperty(ref _systemSummary, value);
     }
 
-    public string About { get; } = "Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur · Logiciel libre sous licence GPL-3.0 · " +
-                           $"version {typeof(AuditEngine).Assembly.GetName().Version?.ToString(3)}";
+    public string About { get; } = T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur · Logiciel libre sous licence GPL-3.0 · version {0}",
+        typeof(AuditEngine).Assembly.GetName().Version?.ToString(3));
 
     private async Task RunAuditAsync()
     {
         IsRunning = true;
         Completed = 0;
-        StatusText = "Lecture de la configuration…";
+        StatusText = T("Lecture de la configuration…");
         try
         {
             var context = await Task.Run(AuditContext.CreateDefault);
@@ -128,14 +129,15 @@ public sealed partial class MainViewModel : ObservableObject
                 }
 
                 Completed++;
-                StatusText = $"Audit en cours… {Completed}/{ModuleCount}";
+                StatusText = T("Audit en cours… {0}/{1}", Completed, ModuleCount);
             });
 
             _results = [.. await _engine.RunAsync(context, progress)];
             var findings = _results.SelectMany(r => r.Findings).ToList();
-            StatusText = $"Audit terminé : {findings.Count(f => f.Status == FindingStatus.Problem)} problème(s), " +
-                         $"{findings.Count(f => f.Status == FindingStatus.Warning)} à surveiller, " +
-                         $"{findings.Count(f => f.Status == FindingStatus.Improvable)} optimisation(s) possible(s).";
+            StatusText = T("Audit terminé : {0} problème(s), {1} à surveiller, {2} optimisation(s) possible(s).",
+                findings.Count(f => f.Status == FindingStatus.Problem),
+                findings.Count(f => f.Status == FindingStatus.Warning),
+                findings.Count(f => f.Status == FindingStatus.Improvable));
             OnPropertyChanged(nameof(SelectedModule));
 
             _lastContext = context;
@@ -144,7 +146,7 @@ public sealed partial class MainViewModel : ObservableObject
             var fixContext = await Task.Run(() => FixContext.CreateDefault(context));
             BlockingReason = new FixEngine(fixContext).GetBlockingReason()
                 ?? (fixContext.ElevatedAsAnotherUser
-                    ? "MAUS a été lancé avec un autre compte administrateur : les réglages de votre profil (effets visuels, confidentialité, Game Bar) seront ignorés. Relancez MAUS depuis votre propre session."
+                    ? T("MAUS a été lancé avec un autre compte administrateur : les réglages de votre profil (effets visuels, confidentialité, Game Bar) seront ignorés. Relancez MAUS depuis votre propre session.")
                     : null);
             Replan();
             await RefreshJournalAsync();
@@ -152,7 +154,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusText = $"L'audit a échoué : {ex.Message}";
+            StatusText = T("L'audit a échoué : {0}", ex.Message);
         }
         finally
         {
@@ -186,7 +188,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var path = PickReportPath($"MAUS-rapport-{DateTime.Now:yyyy-MM-dd-HHmm}.html");
+        var path = PickReportPath(T("MAUS-rapport") + $"-{DateTime.Now:yyyy-MM-dd-HHmm}.html");
         if (path is null)
         {
             return;
@@ -206,11 +208,11 @@ public sealed partial class MainViewModel : ObservableObject
                 : new HtmlReportInput { After = after };
             var html = HtmlReport.Build(input);
             await File.WriteAllTextAsync(path, html, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            StatusText = $"Rapport enregistré : {path} (ouvrez-le avec votre navigateur).";
+            StatusText = T("Rapport enregistré : {0} (ouvrez-le avec votre navigateur).", path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            StatusText = $"Le rapport n'a pas pu être enregistré : {ex.Message}";
+            StatusText = T("Le rapport n'a pas pu être enregistré : {0}", ex.Message);
         }
     }
 }

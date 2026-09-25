@@ -8,7 +8,13 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>MAUS</AssemblyName>
     <RootNamespace>Maus.App</RootNamespace>
+    <ApplicationIcon>Assets\maus.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\maus.ico" />
+    <Resource Include="Assets\maus-banner.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Maus.Core\Maus.Core.csproj" />
