@@ -168,7 +168,7 @@ public sealed partial class MemoryModule : IAuditModule
             Current = T("{0} MT/s (vitesse standard JEDEC)", configured),
             Expected = expected,
             Explanation = T("Votre mémoire est vendue pour {0} MT/s mais fonctionne à {1} MT/s : sans profil XMP ou EXPO, " +
-                "elle démarre à sa vitesse standard. Le gain d'un profil varie selon les jeux et les applications.", rated, configured) + partial,
+                "elle démarre à sa vitesse standard. Le gain d'un profil est souvent de quelques pour cent, parfois plus de 10 % dans les jeux limités par le processeur ; il varie selon les jeux et les applications.", rated, configured) + partial,
             Advice = ProfileAdvice(hardware, generation),
         };
     }

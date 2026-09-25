@@ -409,7 +409,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         var title = $"Resizable BAR : {gpu.Name}";
         var capable = catalog.IsResizableBarCapable(gpu.Vendor, gpu.Name);
         var explanation = T("Resizable BAR (Smart Access Memory chez AMD) permet au processeur d'accéder à toute la mémoire de la carte graphique d'un coup. " +
-                                   "NVIDIA annonce quelques pour cent de gain, jusqu'à 12 % dans certains jeux ; Intel le requiert pour des performances optimales sur Arc.");
+                                   "En moyenne, le gain mesuré est de 1 à 3 %, jusqu'à une dizaine de pour cent dans quelques jeux (et parfois une légère baisse) ; Intel le requiert pour des performances optimales sur Arc.");
 
         long? barMiB = null;
         if (gpu.Vendor == HardwareVendor.Nvidia)

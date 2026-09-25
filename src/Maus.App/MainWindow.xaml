@@ -276,6 +276,15 @@
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top">
                     <TextBlock Text="{Binding ChangesSummary}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                    <Expander Header="{x:Static app:Ui.HonestTitle}" IsExpanded="True" Margin="0,0,0,8">
+                        <StackPanel Margin="0,6,0,0">
+                            <TextBlock Text="{x:Static app:Ui.HonestWindows}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                            <TextBlock Text="{x:Static app:Ui.HonestHardware}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                            <TextBlock Text="{x:Static app:Ui.HonestOverclock}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                            <TextBlock Text="{x:Static app:Ui.HonestSecurity}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                            <TextBlock Text="{x:Static app:Ui.HonestWarning}" TextWrapping="Wrap" Style="{StaticResource Muted}" />
+                        </StackPanel>
+                    </Expander>
                     <Border Padding="12,8" Margin="0,0,0,8" CornerRadius="6" BorderThickness="4,1,1,1" BorderBrush="{StaticResource MausRed}"
                             Visibility="{Binding IsBlocked, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding BlockingReason}" TextWrapping="Wrap" FontWeight="SemiBold" />

@@ -1277,7 +1277,7 @@
   "Reprenez les mises à jour : Paramètres > Windows Update > Reprendre les mises à jour.": "Resume updates: Settings > Windows Update > Resume updates.",
   "Requise pour DLSS Frame Generation sur votre carte. Valeur HwSchMode = 2, non documentée par Microsoft mais écrite par l'application Paramètres.": "Required for DLSS Frame Generation on your card. Value HwSchMode = 2, not documented by Microsoft but written by the Settings app.",
   "Requête WMI non prise en charge ({0}) : {1}.": "WMI query not supported ({0}): {1}.",
-  "Resizable BAR (Smart Access Memory chez AMD) permet au processeur d'accéder à toute la mémoire de la carte graphique d'un coup. NVIDIA annonce quelques pour cent de gain, jusqu'à 12 % dans certains jeux ; Intel le requiert pour des performances optimales sur Arc.": "Resizable BAR (Smart Access Memory at AMD) lets the processor access all of the graphics card's memory at once. NVIDIA announces a few percent of gain, up to 12 % in some games; Intel requires it for optimal performance on Arc.",
+  "Resizable BAR (Smart Access Memory chez AMD) permet au processeur d'accéder à toute la mémoire de la carte graphique d'un coup. En moyenne, le gain mesuré est de 1 à 3 %, jusqu'à une dizaine de pour cent dans quelques jeux (et parfois une légère baisse) ; Intel le requiert pour des performances optimales sur Arc.": "Resizable BAR (Smart Access Memory at AMD) lets the processor access all of the graphics card's memory at once. On average the measured gain is 1 to 3 %, up to about ten percent in a few games (and sometimes a slight drop); Intel requires it for optimal performance on Arc.",
   "Restauration refusée : {0}": "Restore refused: {0}",
   "Restauré": "Restored",
   "Retirer ces entrées orphelines (voir Module 12).": "Remove these orphan entries (see Module 12).",
@@ -1388,6 +1388,7 @@
   "Source des mises à jour": "Update source",
   "Source du seuil de température : {0}.": "Temperature threshold source: {0}.",
   "Sous-système client/serveur de Windows : fenêtres et consoles. Vital, l'arrêter provoque un écran bleu.": "Windows client/server subsystem: windows and consoles. Vital; ending it causes a blue screen.",
+  "Soyons honnêtes : ce que ces corrections apportent vraiment": "Let's be honest: what these fixes really bring",
   "Spotify. Plusieurs copies sont normales.": "Spotify. Several copies are normal.",
   "Spouleur d'impression : gère les files d'attente des imprimantes.": "Print spooler: manages printer queues.",
   "Stabilité du processeur, de la mémoire vive et de la mémoire vidéo, avec arrêt automatique en cas de surchauffe.": "Stability of the processor, the RAM and the video memory, with an automatic stop if it overheats.",
@@ -1578,7 +1579,7 @@
   "Votre choix pour l'alimentation du portable": "Your choice for laptop power",
   "Votre connexion ne sert plus à envoyer des morceaux de mises à jour à d'autres PC.": "Your connection is no longer used to send pieces of updates to other PCs.",
   "Votre matériel, en direct, comparé à ses limites de sécurité": "Your hardware, live, compared with its safety limits",
-  "Votre mémoire est vendue pour {0} MT/s mais fonctionne à {1} MT/s : sans profil XMP ou EXPO, elle démarre à sa vitesse standard. Le gain d'un profil varie selon les jeux et les applications.": "Your memory is sold for {0} MT/s but runs at {1} MT/s: without an XMP or EXPO profile, it starts at its standard speed. The gain from a profile varies with games and applications.",
+  "Votre mémoire est vendue pour {0} MT/s mais fonctionne à {1} MT/s : sans profil XMP ou EXPO, elle démarre à sa vitesse standard. Le gain d'un profil est souvent de quelques pour cent, parfois plus de 10 % dans les jeux limités par le processeur ; il varie selon les jeux et les applications.": "Your memory is sold for {0} MT/s but runs at {1} MT/s: without an XMP or EXPO profile, it starts at its standard speed. The gain from a profile is often a few percent, sometimes more than 10 % in games limited by the processor; it varies with games and applications.",
   "Votre processeur Intel se règle avec Intel XTU, l'outil officiel d'Intel, ou directement dans le BIOS. ": "Your Intel processor is tuned with Intel XTU, Intel's official tool, or directly in the BIOS. ",
   "Votre écran accepte {0} Hz mais tourne à {1} Hz. Vous gagnez en fluidité partout, mais pas en images par seconde dans les jeux. En HDR, le débit du câble est limité : une fréquence plus basse donne parfois une image plus nette.": "Your display accepts {0} Hz but runs at {1} Hz. You gain smoothness everywhere, but not frames per second in games. With HDR, the cable's bandwidth is limited: a lower refresh rate sometimes gives a sharper image.",
   "Votre écran est branché sur la carte mère. L'image passe alors par le graphique intégré au processeur, bien moins puissant : jeux saccadés, fréquences élevées parfois indisponibles, et la carte graphique dédiée travaille peu ou pas du tout.": "Your display is connected to the motherboard. The image then goes through the processor's integrated graphics, which is far less powerful: stuttering games, high refresh rates sometimes unavailable, and the dedicated graphics card does little or no work.",
@@ -2353,5 +2354,10 @@
   "événement 1808 (mise à jour appliquée) le {0}": "event 1808 (update applied) on {0}",
   "événement 1808, sans 1801 ni 1795 plus récent": "event 1808, with no more recent 1801 or 1795",
   "événement {0} ({1}) le {2}": "event {0} ({1}) on {2}",
-  "événements": "events"
+  "événements": "events",
+  "• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais font rarement gagner plus de 1 à 3 % d'images par seconde dans les jeux.": "• Windows settings (visual effects, privacy, Game Bar, startup) make the PC more responsive, more private and smoother, but rarely gain more than 1 to 3 % frames per second in games.",
+  "• Les vrais gains viennent du matériel bien réglé : mémoire à sa vitesse annoncée (XMP/EXPO), écran à sa bonne fréquence, pilote graphique à jour, Windows sur un SSD, applications inutiles retirées du démarrage. MAUS les signale dans l'audit.": "• The real gains come from well-tuned hardware: memory at its rated speed (XMP/EXPO), display at its proper refresh rate, up-to-date graphics driver, Windows on an SSD, useless apps removed from startup. MAUS reports them in the audit.",
+  "• MAUS ne coupe jamais une protection importante (antivirus, pare-feu, mises à jour, protections du processeur) ni une fonction utile de Windows pour gagner quelques pour cent.": "• MAUS never turns off an important protection (antivirus, firewall, updates, processor protections) or a useful Windows feature to gain a few percent.",
+  "• Méfiez-vous des outils qui promettent +30 % : la plupart de leurs réglages sont sans effet mesurable, ou retirent des fonctions de Windows dont vous aurez besoin un jour.": "• Beware of tools that promise +30 %: most of their tweaks have no measurable effect, or remove Windows features you will need one day.",
+  "• Overclocking et undervolting : quelques pour cent, très variables d'une puce à l'autre, et seulement après des tests de stabilité (onglet Tests de l'Atelier).": "• Overclocking and undervolting: a few percent, highly variable from one chip to another, and only after stability tests (Tests tab of the Workshop)."
 }

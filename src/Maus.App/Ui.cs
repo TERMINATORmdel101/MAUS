@@ -176,4 +176,16 @@ public static class Ui
     public static string CrashTitle => T("Le PC a gelé pendant le dernier test");
 
     public static string Understood => T("J'ai compris");
+
+    public static string HonestTitle => T("Soyons honnêtes : ce que ces corrections apportent vraiment");
+
+    public static string HonestWindows => T("• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais font rarement gagner plus de 1 à 3 % d'images par seconde dans les jeux.");
+
+    public static string HonestHardware => T("• Les vrais gains viennent du matériel bien réglé : mémoire à sa vitesse annoncée (XMP/EXPO), écran à sa bonne fréquence, pilote graphique à jour, Windows sur un SSD, applications inutiles retirées du démarrage. MAUS les signale dans l'audit.");
+
+    public static string HonestOverclock => T("• Overclocking et undervolting : quelques pour cent, très variables d'une puce à l'autre, et seulement après des tests de stabilité (onglet Tests de l'Atelier).");
+
+    public static string HonestSecurity => T("• MAUS ne coupe jamais une protection importante (antivirus, pare-feu, mises à jour, protections du processeur) ni une fonction utile de Windows pour gagner quelques pour cent.");
+
+    public static string HonestWarning => T("• Méfiez-vous des outils qui promettent +30 % : la plupart de leurs réglages sont sans effet mesurable, ou retirent des fonctions de Windows dont vous aurez besoin un jour.");
 }

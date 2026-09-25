@@ -12,6 +12,7 @@
 - **Tout est réversible.** Point de restauration et sauvegarde des valeurs d'origine avant chaque changement (à partir de la V0.2).
 - **Tout est expliqué.** Chaque réglage dit ce qu'il fait, ce qu'il apporte, ce qu'il risque et comment revenir en arrière.
 - **Rien de dangereux en automatique.** BIOS, XMP/EXPO et overclocking sont guidés, jamais exécutés.
+- **Honnête sur les gains.** Les réglages de Windows font gagner quelques pour cent, pas 30 % : MAUS le dit, et ne coupe jamais une protection ou une fonction utile de Windows pour gratter un chiffre.
 - **Aucune télémétrie.** MAUS n'envoie rien.
 
 ## Ce que fait MAUS

@@ -20,6 +20,7 @@ Principes non négociables :
 3. **Tout est expliqué** en français clair : ce que fait le réglage, le gain, le risque, le retour arrière.
 4. **Rien de dangereux en automatique** : BIOS, XMP/EXPO, overclocking sont guidés (liens officiels, tutoriels), jamais exécutés.
 5. **Aucune télémétrie** de l'outil.
+6. **Honnêteté sur les gains** (demande du porteur, 25/09/2026) : n'annoncer que des optimisations reconnues comme utiles, avec des gains réalistes (« quelques pour cent », « gain faible », « aucun gain de performance »), jamais +10 % ; ne jamais retirer une fonction importante de Windows ni une protection pour un gain de performance.
 
 Décisions prises (24-25/09/2026) :
 - Windows 11 uniquement, à partir de 23H2 (build 22631). Windows 10 hors périmètre.
