@@ -214,15 +214,24 @@ public static class AppearanceManager
 
     private static void ApplyAccent(ResourceDictionary resources, AccentChoice choice, bool dark)
     {
+        // Contraste élevé : Windows impose ses couleurs, MAUS n'en remplace aucune.
+        var highContrast = SystemParameters.HighContrast;
+        if (highContrast)
+        {
+            choice = AccentChoice.Windows;
+        }
+
         var (primary, secondary) = AccentPalette.For(choice, Brands, WindowsAccent());
         var variants = AccentVariants.From(primary);
         resources["MausAccent"] = Frozen(new SolidColorBrush(ToColor(dark ? variants.Light1 : primary)));
         resources["MausAccentStrong"] = Frozen(new SolidColorBrush(ToColor(variants.OnWhiteText)));
         resources["MausAccentSoft"] = Frozen(new SolidColorBrush(WithAlpha(ToColor(primary), 0x26)));
-        resources["MausSidebarTint"] = Frozen(new LinearGradientBrush(
-            WithAlpha(ToColor(primary), dark ? (byte)0x33 : (byte)0x1F),
-            WithAlpha(ToColor(secondary ?? primary), dark ? (byte)0x33 : (byte)0x1F),
-            90));
+        resources["MausSidebarTint"] = highContrast
+            ? Brushes.Transparent
+            : Frozen(new LinearGradientBrush(
+                WithAlpha(ToColor(primary), dark ? (byte)0x33 : (byte)0x1F),
+                WithAlpha(ToColor(secondary ?? primary), dark ? (byte)0x33 : (byte)0x1F),
+                90));
 
         if (choice == AccentChoice.Windows)
         {

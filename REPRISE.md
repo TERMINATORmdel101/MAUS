@@ -2,6 +2,14 @@
 
 Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le travail **sur le PC Windows du porteur**. À lire après `CLAUDE.md` (qui reste la mémoire complète du projet). Le mettre à jour, ou le vider, une fois la reprise faite.
 
+## 0. État au 26/09/2026 (session locale sur le PC du porteur)
+
+- Fait et testé sous Windows (compilation 0 avertissement, **1 229 tests réussis**, interface ouverte en clair et en sombre par une copie `asInvoker` compilée hors du dépôt, avec `-p:ApplicationManifest=<copie>` : le manifeste du dépôt n'est plus touché) : icône, fiche mémoire sans pilote, profils XMP / EXPO, timings réels Intel (Sandy / Ivy Bridge et Skylake à Comet Lake), bouton « Installer PawnIO » dans l'onglet Mémoire, **Paramètres** (thème, couleurs selon les composants, animations, vitesse d'actualisation), **animations**, **fenêtre de surveillance** (températures, consommation, fréquences, erreurs WHEA / PCIe et Windows).
+- Version de test publiée : `publish\MAUS-0.3.3-apparence` (les dossiers plus anciens peuvent être verrouillés par un MAUS ouvert : ne jamais tuer le MAUS du porteur).
+- **À faire valider par le porteur** : PawnIO installé par lui (bouton de l'onglet Mémoire), puis « Lire la mémoire » en administrateur, comparé à CPU-Z (i7-8700K, DDR4-3467 attendue, horloge ≈ 1733 MHz). Si tout concorde, passer `verifiedOnHardware` à `true` pour `skl-cml` dans `Catalog/intel-memory-controller.json`.
+- **Générations restantes** (demande « le plus de générations Intel et AMD possible ») : Haswell / Broadwell, Ice Lake / Tiger Lake / Rocket Lake, Alder / Raptor Lake, Meteor / Arrow / Lunar Lake, compléments Skylake, revue AMD Zen. Recherches partielles sauvegardées (une ligne JSON par fait sourcé) dans `C:\Users\CARO\Documents\MAUS\.worktrees\_pdf\registers\*.partial.jsonl` ; résultat vérifié de Sandy / Ivy Bridge dans `journal-results.jsonl`. Méthode suivie : relevé, puis **second passage indépendant qui rouvre chaque source** ; un champ sans deux sources concordantes est écarté et nommé « non disponible ».
+- Limite d'utilisation hebdomadaire des agents atteinte le 26/09 (retour le 28/09, 4 h) : la relecture critique du commit « Paramètres… » par agents n'a pas pu se faire ; relecture faite à la main (contrôles Fluent vérifiés, correction du contraste élevé).
+
 ## 1. Où en est le code
 
 - Version : **0.3.2-alpha** (`Directory.Build.props`, `CHANGELOG.md`).
