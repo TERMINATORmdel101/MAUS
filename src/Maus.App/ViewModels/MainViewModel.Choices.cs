@@ -56,10 +56,9 @@ public sealed partial class MainViewModel
     private async Task ChangeLanguageAsync(string code)
     {
         await Task.Yield();
-        var updated = (_lastContext?.Preferences ?? PreferencesStore.Load()) with { Language = code };
         try
         {
-            await Task.Run(() => PreferencesStore.Save(updated));
+            await Task.Run(() => PreferencesStore.Update(p => p with { Language = code }));
         }
         catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
         {
@@ -187,8 +186,8 @@ public sealed partial class MainViewModel
 
         try
         {
-            await Task.Run(() => PreferencesStore.Save(rebound));
-            _lastContext = context.WithPreferences(rebound);
+            var saved = await Task.Run(() => PreferencesStore.Update(p => p.RebindLanguage(findings)));
+            _lastContext = context.WithPreferences(saved);
         }
         catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
         {
@@ -198,10 +197,10 @@ public sealed partial class MainViewModel
 
     private async Task UpdatePreferencesAsync(Func<UserPreferences, UserPreferences> change, params string[] moduleIds)
     {
-        var updated = change(_lastContext?.Preferences ?? PreferencesStore.Load());
+        UserPreferences updated;
         try
         {
-            await Task.Run(() => PreferencesStore.Save(updated));
+            updated = await Task.Run(() => PreferencesStore.Update(change));
         }
         catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
         {

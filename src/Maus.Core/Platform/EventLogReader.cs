@@ -29,6 +29,19 @@ public interface IEventLogReader
         DateTime since,
         int maxEvents = 200,
         bool includeMessage = false);
+
+    /// <summary>
+    /// Événements d'un journal par niveau de gravité (1 = critique, 2 = erreur, 3 = avertissement), depuis <paramref name="since"/>,
+    /// du plus récent au plus ancien. Sans implémentation (sources de test), aucun événement.
+    /// </summary>
+    /// <exception cref="MausAccessDeniedException">Journal protégé.</exception>
+    /// <exception cref="DataSourceUnavailableException">Journal absent sur ce PC.</exception>
+    IReadOnlyList<EventRecordInfo> QueryLevels(
+        string logName,
+        IReadOnlyCollection<int> levels,
+        DateTime since,
+        int maxEvents = 200,
+        bool includeMessage = false) => [];
 }
 
 public sealed class WindowsEventLogReader : IEventLogReader
@@ -41,9 +54,28 @@ public sealed class WindowsEventLogReader : IEventLogReader
         IReadOnlyCollection<int> eventIds,
         DateTime since,
         int maxEvents = 200,
-        bool includeMessage = false)
+        bool includeMessage = false) =>
+        Read(logName, BuildXPath(provider, eventIds, since), maxEvents, includeMessage);
+
+    public IReadOnlyList<EventRecordInfo> QueryLevels(
+        string logName,
+        IReadOnlyCollection<int> levels,
+        DateTime since,
+        int maxEvents = 200,
+        bool includeMessage = false) =>
+        Read(logName, BuildLevelXPath(levels, since), maxEvents, includeMessage);
+
+    /// <summary>Filtre XPath par niveau de gravité et fenêtre de temps.</summary>
+    public static string BuildLevelXPath(IReadOnlyCollection<int> levels, DateTime since)
     {
-        var query = new EventLogQuery(logName, PathType.LogName, BuildXPath(provider, eventIds, since)) { ReverseDirection = true };
+        var milliseconds = (long)Math.Max(0, (DateTime.UtcNow - since.ToUniversalTime()).TotalMilliseconds);
+        var levelFilter = levels.Count > 0 ? "(" + string.Join(" or ", levels.Select(l => $"Level={l.ToString(CultureInfo.InvariantCulture)}")) + ") and " : string.Empty;
+        return $"*[System[{levelFilter}TimeCreated[timediff(@SystemTime) <= {milliseconds.ToString(CultureInfo.InvariantCulture)}]]]";
+    }
+
+    private static List<EventRecordInfo> Read(string logName, string xpath, int maxEvents, bool includeMessage)
+    {
+        var query = new EventLogQuery(logName, PathType.LogName, xpath) { ReverseDirection = true };
         try
         {
             using var reader = new System.Diagnostics.Eventing.Reader.EventLogReader(query);

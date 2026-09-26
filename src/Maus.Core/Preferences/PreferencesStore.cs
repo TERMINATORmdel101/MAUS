@@ -55,6 +55,27 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
     }
 }
 
+public static class PreferencesStoreExtensions
+{
+    private static readonly Lock Gate = new();
+
+    /// <summary>
+    /// Lit le fichier, applique <paramref name="change"/> et enregistre, d'un seul tenant : chaque réglage part de la dernière
+    /// version enregistrée, si bien qu'un choix fait dans une fenêtre n'en écrase jamais un autre fait ailleurs.
+    /// </summary>
+    /// <returns>Les préférences enregistrées.</returns>
+    /// <exception cref="JournalUnsafeException">Le dossier ne peut pas être protégé.</exception>
+    public static UserPreferences Update(this IPreferencesStore store, Func<UserPreferences, UserPreferences> change)
+    {
+        lock (Gate)
+        {
+            var updated = change(store.Load());
+            store.Save(updated);
+            return updated;
+        }
+    }
+}
+
 /// <summary>Applique les marques « voulu » aux résultats d'un module.</summary>
 public static class Acknowledgements
 {

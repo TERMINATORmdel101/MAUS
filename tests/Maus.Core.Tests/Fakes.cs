@@ -368,13 +368,30 @@ public sealed class FakeCommands : ICommandRunner
 /// <summary>Journaux simulés : événements ajoutés par journal, filtrés comme le vrai lecteur.</summary>
 public sealed class FakeEventLogs : IEventLogReader
 {
-    private readonly List<(string Log, EventRecordInfo Record)> _events = [];
+    private readonly List<(string Log, EventRecordInfo Record, int Level)> _events = [];
     private readonly HashSet<string> _denied = new(StringComparer.OrdinalIgnoreCase);
 
-    public FakeEventLogs Add(string logName, string provider, int id, DateTime timeCreated, Dictionary<string, string>? data = null)
+    /// <param name="level">Niveau de gravité : 1 critique, 2 erreur (par défaut), 3 avertissement, 4 information.</param>
+    public FakeEventLogs Add(string logName, string provider, int id, DateTime timeCreated, Dictionary<string, string>? data = null, int level = 2, string? message = null)
     {
-        _events.Add((logName, new EventRecordInfo(id, provider, timeCreated, data ?? [])));
+        _events.Add((logName, new EventRecordInfo(id, provider, timeCreated, data ?? [], message), level));
         return this;
+    }
+
+    public IReadOnlyList<EventRecordInfo> QueryLevels(string logName, IReadOnlyCollection<int> levels, DateTime since, int maxEvents = 200, bool includeMessage = false)
+    {
+        if (_denied.Contains(logName))
+        {
+            throw new MausAccessDeniedException("refusé");
+        }
+
+        return _events
+            .Where(e => e.Log.Equals(logName, StringComparison.OrdinalIgnoreCase) && (levels.Count == 0 || levels.Contains(e.Level)))
+            .Select(e => e.Record)
+            .Where(r => r.TimeCreated >= since)
+            .OrderByDescending(r => r.TimeCreated)
+            .Take(maxEvents)
+            .ToList();
     }
 
     public FakeEventLogs Deny(string logName)

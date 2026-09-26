@@ -145,7 +145,11 @@ public sealed partial class MainViewModel
     private ICommand? _helpSummary;
 
     /// <summary>Fermeture de la fenêtre : plus aucune mesure ni aucun test ne doit tourner en arrière-plan.</summary>
-    public void Shutdown() => _workshop?.Stop();
+    public void Shutdown()
+    {
+        CloseSideWindows();
+        _workshop?.Stop();
+    }
 
     private IReadOnlyList<double> _healthTrend = [];
     private string _healthTrendText = string.Empty;

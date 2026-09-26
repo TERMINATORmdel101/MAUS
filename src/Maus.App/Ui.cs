@@ -296,4 +296,60 @@ public static class Ui
     public static string DiskTestTitle => T("Disque : vitesse de lecture et d'écriture");
 
     public static string DiskTestIntro => T("MAUS écrit un fichier temporaire, le relit puis le supprime, en contournant le cache de Windows. Un disque bien plus lent que prévu trahit un SSD presque plein ou qui chauffe, un mauvais port M.2, ou Windows installé sur un disque dur.");
+
+    public static string SettingsTitle => T("Paramètres");
+
+    public static string SettingsWindowTitle => T("Paramètres — MAUS");
+
+    public static string SettingsIntro => T("Vos choix s'appliquent tout de suite et sont gardés pour les prochaines ouvertures de MAUS.");
+
+    public static string AppearanceTitle => T("Apparence");
+
+    public static string ThemeLabel => T("Thème");
+
+    public static string AccentLabel => T("Couleurs");
+
+    public static string AccentNote => T("Seules les couleurs des boutons et de la sélection changent. Les couleurs des constats gardent leur sens : vert conforme, bleu à optimiser, or à surveiller, rouge problème.");
+
+    public static string AnimationsTitle => T("Animations");
+
+    public static string AnimationsNote => T("Transitions entre les pages, apparition des cartes, jauge du score. « Comme Windows » suit le réglage Accessibilité > Effets visuels > Effets d'animation.");
+
+    public static string RefreshTitle => T("Vitesse d'actualisation des mesures");
+
+    public static string RefreshNote => T("Vaut pour l'atelier « En direct », les tests de stabilité et la fenêtre de surveillance. Plus c'est rapide, plus les mesures elles-mêmes sollicitent un peu le processeur.");
+
+    public static string MonitorTitle => T("Fenêtre de surveillance");
+
+    public static string MonitorIntro => T("Une fenêtre à part, à garder ouverte pendant un test de stabilité ou un jeu : température, consommation et fréquence de chaque composant (actuelle, minimale, maximale), erreurs matérielles et erreurs de Windows depuis son ouverture.");
+
+    public static string MonitorOnTop => T("Toujours au premier plan");
+
+    public static string OpenMonitor => T("Ouvrir la fenêtre de surveillance");
+
+    public static string MonitorWindowTitle => T("Surveillance — MAUS");
+
+    public static string MonitorReset => T("Remettre à zéro");
+
+    public static string MonitorHardwareErrors => T("Erreurs matérielles (WHEA)");
+
+    public static string MonitorHardwareTip => T("Erreurs signalées par le processeur, la mémoire ou le bus PCI Express (journal Système, source WHEA-Logger), même corrigées : pendant un test de stabilité, il ne doit y en avoir aucune.");
+
+    public static string MonitorWindowsErrors => T("Erreurs de Windows");
+
+    public static string MonitorWindowsTip => T("Événements de niveau Critique ou Erreur des journaux Système et Application (hors WHEA) : pilotes, services, applications qui plantent.");
+
+    public static string MonitorWindowsDetail => T("journaux Système et Application");
+
+    public static string MonitorEvents => T("Voir les événements relevés");
+
+    public static string MonitorSensor => T("Mesure");
+
+    public static string MonitorCurrent => T("Actuelle");
+
+    public static string MonitorMin => T("Min.");
+
+    public static string MonitorMax => T("Max.");
+
+    public static string MonitorTestsHint => T("Pendant un test de stabilité, gardez un œil sur les températures, la consommation, les fréquences et les erreurs matérielles dans une fenêtre à part, même par-dessus un jeu.");
 }

@@ -31,6 +31,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private ISensorSource? _sensors;
     private ProcessMonitor? _processes;
     private bool _isActive;
+    private bool _monitorOpen;
     private int _section;
     private bool _inventoryLoaded;
     private bool _sampling;
@@ -64,6 +65,8 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _confirm = confirm;
         _context = context;
         _preferences = preferences;
+        _liveTimer.Interval = Appearance.AppearanceManager.Current.RefreshInterval;
+        Appearance.AppearanceManager.Changed += OnAppearanceChanged;
         _liveTimer.Tick += async (_, _) => await SampleLiveAsync();
         _processTimer.Tick += async (_, _) => await SampleProcessesAsync();
         SearchEngines =
@@ -216,7 +219,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 {
                     try
                     {
-                        _preferences.Save(_preferences.Load() with { SearchEngine = value.Value });
+                        _preferences.Update(p => p with { SearchEngine = value.Value });
                     }
                     catch (Exception ex) when (ex is Maus.Core.Fixes.JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
                     {
@@ -392,11 +395,42 @@ public sealed partial class WorkshopViewModel : ObservableObject
     public void Stop()
     {
         _isActive = false;
+        _monitorOpen = false;
         _stopTest?.Invoke();
         _stopNet?.Invoke();
         _stopScan?.Invoke();
         _liveTimer.Stop();
         _processTimer.Stop();
+        Appearance.AppearanceManager.Changed -= OnAppearanceChanged;
+    }
+
+    /// <summary>Nouvel échantillon des mesures en direct (pour la fenêtre de surveillance : aucune mesure en double).</summary>
+    public event EventHandler<SensorSnapshot>? Sampled;
+
+    /// <summary>La fenêtre de surveillance est ouverte : les mesures continuent, quel que soit l'onglet affiché.</summary>
+    public bool IsMonitorOpen
+    {
+        get => _monitorOpen;
+        set
+        {
+            if (SetProperty(ref _monitorOpen, value))
+            {
+                _ = RefreshActivityAsync();
+            }
+        }
+    }
+
+    /// <summary>Intervalle des mesures en direct, choisi dans les paramètres.</summary>
+    public TimeSpan RefreshInterval => _liveTimer.Interval;
+
+    private void OnAppearanceChanged(object? sender, EventArgs e)
+    {
+        var interval = Appearance.AppearanceManager.Current.RefreshInterval;
+        if (_liveTimer.Interval != interval)
+        {
+            _liveTimer.Interval = interval;
+            OnPropertyChanged(nameof(RefreshInterval));
+        }
     }
 
     /// <summary>Ouvre l'atelier sur une sous-partie (depuis les actions rapides de l'accueil).</summary>
@@ -424,7 +458,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             LoadDrives();
         }
 
-        var live = (IsActive && Section == SectionLive) || IsTesting || IsDiagnosing || IsRecording;
+        var live = (IsActive && Section == SectionLive) || IsTesting || IsDiagnosing || IsRecording || IsMonitorOpen;
         if (live && !_liveTimer.IsEnabled)
         {
             _liveTimer.Start();
@@ -514,6 +548,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             var snapshot = await Task.Run(_sensors.Sample);
             Live.Add(snapshot);
             OnRecordedSample(snapshot);
+            Sampled?.Invoke(this, snapshot);
         }
         catch (Exception ex)
         {

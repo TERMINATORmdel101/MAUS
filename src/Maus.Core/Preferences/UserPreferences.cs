@@ -38,6 +38,26 @@ public sealed record UserPreferences
     /// <summary>Langue de MAUS (« fr », « en », « es ») ; <c>null</c> = langue de Windows.</summary>
     public string? Language { get; init; }
 
+    /// <summary>Intervalles proposés pour les mesures en direct, en millisecondes.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public static IReadOnlyList<int> RefreshChoices { get; } = [500, 1000, 2000, 5000];
+
+    public ThemeChoice Theme { get; init; }
+
+    public AccentChoice Accent { get; init; }
+
+    public AnimationChoice Animations { get; init; }
+
+    /// <summary>Intervalle des mesures en direct (atelier, fenêtre de surveillance), en millisecondes.</summary>
+    public int RefreshMilliseconds { get; init; } = 1000;
+
+    /// <summary>La fenêtre de surveillance reste au premier plan.</summary>
+    public bool MonitorOnTop { get; init; }
+
+    /// <summary>Intervalle réellement utilisé : une valeur hors de la liste proposée (fichier modifié à la main) revient à 1 seconde.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public TimeSpan RefreshInterval => TimeSpan.FromMilliseconds(RefreshChoices.Contains(RefreshMilliseconds) ? RefreshMilliseconds : 1000);
+
     public IReadOnlyList<Acknowledgement> Acknowledged { get; init; } = [];
 
     /// <summary>Marque « voulu » la valeur actuelle du constat (remplace une marque précédente).</summary>

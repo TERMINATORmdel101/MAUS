@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Maus.App.Appearance;
 using Maus.Core;
 using Maus.Core.Engine;
 using Maus.Core.Localization;
@@ -15,12 +16,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
-        UseLanguage(FilePreferencesStore.CreateDefault().Load().Language);
+        var preferences = FilePreferencesStore.CreateDefault().Load();
+        UseLanguage(preferences.Language);
 
-        // Thème Fluent de Windows 11, clair ou sombre selon le système.
-#pragma warning disable WPF0001
-        ThemeMode = ThemeMode.System;
-#pragma warning restore WPF0001
+        // Thème Fluent de Windows 11 (clair, sombre ou comme Windows), couleur d'accentuation et animations choisies.
+        AppearanceManager.DetectComponents();
+        AppearanceManager.Apply(preferences);
         base.OnStartup(e);
 
         if (e.Args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase))

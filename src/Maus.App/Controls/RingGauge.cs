@@ -7,7 +7,11 @@ namespace Maus.App.Controls;
 public sealed class RingGauge : FrameworkElement
 {
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
-        nameof(Value), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+        nameof(Value), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, OnValueChanged));
+
+    /// <summary>Valeur dessinée : elle rejoint <see cref="Value"/> en tournant, si les animations sont permises.</summary>
+    private static readonly DependencyProperty DisplayedValueProperty = DependencyProperty.Register(
+        "DisplayedValue", typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty StrokeProperty = DependencyProperty.Register(
         nameof(Stroke), typeof(Brush), typeof(RingGauge), new FrameworkPropertyMetadata(Palette.Green, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -55,7 +59,7 @@ public sealed class RingGauge : FrameworkElement
         var radius = (size - Thickness) / 2;
         drawingContext.DrawEllipse(null, new Pen(Track, Thickness), center, radius, radius);
 
-        var sweep = Math.Clamp(Value, 0, 100) / 100 * 360;
+        var sweep = Math.Clamp((double)GetValue(DisplayedValueProperty), 0, 100) / 100 * 360;
         if (sweep <= 0)
         {
             return;
@@ -73,6 +77,14 @@ public sealed class RingGauge : FrameworkElement
         var figure = new PathFigure { StartPoint = start, IsClosed = false };
         figure.Segments.Add(new ArcSegment(end, new Size(radius, radius), 0, sweep > 180, SweepDirection.Clockwise, true));
         drawingContext.DrawGeometry(null, pen, new PathGeometry([figure]));
+    }
+
+    private static void OnValueChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (element is RingGauge gauge)
+        {
+            Appearance.Motion.To(gauge, DisplayedValueProperty, (double)e.NewValue, TimeSpan.FromMilliseconds(800));
+        }
     }
 
     private static Point PointOnCircle(Point center, double radius, double degrees)
