@@ -2911,5 +2911,10 @@
   "Zone thermique ACPI (approximative)": "Zona térmica ACPI (aproximada)",
   "dont PCI Express : {0}": "de ellos PCI Express: {0}",
   "journaux Système et Application": "registros Sistema y Aplicación",
-  "Événements de niveau Critique ou Erreur des journaux Système et Application (hors WHEA) : pilotes, services, applications qui plantent.": "Eventos de nivel Crítico o Error de los registros Sistema y Aplicación (sin WHEA): controladores, servicios, aplicaciones que se bloquean."
+  "Événements de niveau Critique ou Erreur des journaux Système et Application (hors WHEA) : pilotes, services, applications qui plantent.": "Eventos de nivel Crítico o Error de los registros Sistema y Aplicación (sin WHEA): controladores, servicios, aplicaciones que se bloquean.",
+  "Délai entre deux ouvertures de lignes dans des banques différentes.": "Retardo entre dos activaciones de filas en bancos diferentes.",
+  "Délai entre une écriture et une lecture.": "Retardo entre una escritura y una lectura.",
+  "Délai après une commande de réglage de la mémoire (MRS) avant la commande suivante.": "Retardo tras un comando de ajuste de la memoria (MRS) antes del comando siguiente.",
+  "Délai de sortie de l'autorafraîchissement avant une commande qui a besoin du DLL de la mémoire.": "Retardo tras salir del autorrefresco antes de un comando que necesita el DLL de la memoria.",
+  "Durée d'un calibrage complet des résistances de sortie de la mémoire (ZQ).": "Duración de una calibración completa de las resistencias de salida de la memoria (ZQ)."
 }

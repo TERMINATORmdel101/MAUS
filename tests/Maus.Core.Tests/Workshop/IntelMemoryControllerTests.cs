@@ -128,6 +128,42 @@ public class IntelMemoryControllerTests
     }
 
     [Fact]
+    public void Reads_an_ivy_bridge_controller_with_its_own_clock_registers()
+    {
+        var registers = new Dictionary<int, ulong>
+        {
+            [0x5004] = 0x0808,
+            [0x5008] = 0,
+            [0x4000] = 9 | (9 << 4) | (9 << 8) | (7 << 12) | (24UL << 16),
+            [0x4004] = 5 | (5 << 4) | (4 << 8) | (5 << 12) | (24 << 16) | (10 << 24) | (2UL << 30),
+            [0x4298] = 6240 | (208UL << 16),
+            [0x42A4] = 512 | (256 << 16) | (4UL << 28),
+            [0x5E04] = 8,
+            [0x5E00] = 0,
+        };
+        var family = IntelMemoryController.FamilyFor(6, 0x3A)!;
+
+        var report = IntelMemoryController.Read(family, 6, 0x3A, new FakeMchbar(registers), null)!;
+
+        Assert.Equal("snb-ivb", family.Id);
+        Assert.Equal(["A"], report.Channels);
+        Assert.Equal("DDR3", report.MemoryType);
+        Assert.Contains(report.Settings, s => s is { Key: "CommandRate", Value: "2N" });
+        int? Timing(string key) => report.Timings.Single(t => t.Key == key).Clocks;
+        Assert.Equal((9, 9, 9, 24), (Timing("tCL"), Timing("tRCD"), Timing("tRP"), Timing("tRAS")));
+        Assert.Equal((7, 5, 5, 4, 24, 10), (Timing("tCWL"), Timing("tRRD"), Timing("tWTR"), Timing("tCKE"), Timing("tFAW"), Timing("tWR")));
+        Assert.Equal((208, 6240, 12, 512, 256), (Timing("tRFC"), Timing("tREFI"), Timing("tMOD"), Timing("tXSDLL"), Timing("tZQOPER")));
+        Assert.Equal(1066.7, report.DclkMhz!.Value, 1);
+
+        registers[0x5E00] = 1 << 8;
+        registers[0x5E04] = 9;
+        Assert.Equal(900, IntelMemoryController.Read(family, 6, 0x3A, new FakeMchbar(registers), null)!.DclkMhz!.Value, 3);
+
+        registers[0x5E04] = 13;
+        Assert.Null(IntelMemoryController.Read(family, 6, 0x3A, new FakeMchbar(registers), null)!.DclkMhz);
+    }
+
+    [Fact]
     public void Extract_reads_documented_bit_ranges()
     {
         Assert.Equal(0x3UL, IntelMemoryController.Extract(0b1100, "3:2"));

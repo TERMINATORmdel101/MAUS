@@ -83,6 +83,11 @@ public sealed record ImcClock
     /// <summary>Facteur appliqué au produit (0,5 quand le registre donne une horloge double de DCLK).</summary>
     public double Scale { get; init; } = 1;
 
+    /// <summary>Rapports plausibles d'après les sources ; une valeur hors de cette plage est tenue pour inconnue.</summary>
+    public int? MinRatio { get; init; }
+
+    public int? MaxRatio { get; init; }
+
     public IReadOnlyList<string> Sources { get; init; } = [];
 }
 
@@ -302,7 +307,7 @@ public static class IntelMemoryController
     private static ImcClockValue? ReadClock(ImcClock clock, Func<int, int, ulong> raw)
     {
         var ratio = (int)Extract(raw(Hex(clock.Offset), clock.Size), clock.Bits);
-        if (ratio <= 0)
+        if (ratio <= 0 || ratio < clock.MinRatio || ratio > clock.MaxRatio)
         {
             return null;
         }

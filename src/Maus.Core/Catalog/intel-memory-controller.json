@@ -4,6 +4,78 @@
 // « verifiedOnHardware » ne passe à true qu'après comparaison avec CPU-Z sur un vrai processeur de la famille.
 [
   {
+    "id": "snb-ivb",
+    "displayName": "Intel Core 2e et 3e génération (Sandy Bridge, Ivy Bridge)",
+    "cpuModels": [ "0x2A", "0x3A" ],
+    "mchbarWindowBytes": 32768,
+    "sources": [
+      "Intel, Desktop 2nd Generation Intel Core Processor Family Datasheet, Volume 2, document 324642-003 (septembre 2011), §2.13 et §2.16",
+      "Intel, Desktop 3rd Generation Intel Core Processor Family Datasheet, Volume 2, document 326765-005 (novembre 2013), §2.13 et §2.16",
+      "coreboot src/northbridge/intel/sandybridge : registers/mchbar.h, raminit_common.h et .c, raminit_native.c, raminit_shared.c ; util/inteltool/ivy_memory.c",
+      "memtest86+ system/imc/x86/intel_snb.c ; CoreFreq x86_64/intel_reg.h et corefreqd.c",
+      "Linux drivers/edac/ie31200_edac.c (registres MAD_DIMM) et arch/x86/include/asm/intel-family.h (modèles 0x2A et 0x3A)",
+      "PawnIO.Modules 0.2.11, IntelMCHBAR.p : fenêtre MCHBAR de 32 Ko"
+    ],
+    "memoryTypes": [ "DDR3" ],
+    "channels": [
+      { "name": "A", "base": "0x4000", "presenceOffset": "0x5004", "presenceMask": "0x0000FFFF" },
+      { "name": "B", "base": "0x4400", "presenceOffset": "0x5008", "presenceMask": "0x0000FFFF" }
+    ],
+    "settings": [
+      {
+        "key": "CommandRate", "offset": "0x004", "bits": "31:30",
+        "values": { "0": "1N", "2": "2N", "3": "3N" },
+        "sources": [ "326765-005 §2.13.2 TC_RAP, CMD_STRETCH 31:30 (00 1N, 10 2N, 11 3N)", "coreboot raminit_common.h tc_rap_reg.tCMD [31..30]" ]
+      }
+    ],
+    "clocks": [
+      {
+        "key": "DCLK", "offset": "0x5E04", "bits": "4:0", "minRatio": 3, "maxRatio": 12,
+        "referenceOffset": "0x5E00", "referenceBits": "8", "referenceMhz": { "0": 133.333333, "1": 100 },
+        "sources": [
+          "Rapport appliqué : MC_BIOS_DATA (5E04h), coreboot raminit_native.c dram_freq() et memtest86+ intel_snb.c (masque 0x1F) ; plage 3 à 12 d'après coreboot get_FRQ()",
+          "Référence : MC_BIOS_REQ (5E00h) bit 8, 1 = 100 MHz, 0 = 133,33 MHz, d'après coreboot (raminit_native.c, raminit_shared.c) et CoreFreq (intel_reg.h, PLL_REF100)"
+        ]
+      }
+    ],
+    "fields": [
+      { "key": "tCL", "group": "Primary", "register": "TC_DBP", "offset": "0x000", "bits": "11:8",
+        "sources": [ "324642-003 et 326765-005 §2.13.1 TC_DBP, tCL 11:8", "coreboot tc_dbp_reg.tAA [11..8]", "memtest86+ intel_snb.c" ] },
+      { "key": "tRCD", "group": "Primary", "register": "TC_DBP", "offset": "0x000", "bits": "3:0",
+        "sources": [ "324642-003 et 326765-005 §2.13.1 TC_DBP, tRCD 3:0", "coreboot tc_dbp_reg.tRCD [3..0]", "memtest86+ intel_snb.c" ] },
+      { "key": "tRP", "group": "Primary", "register": "TC_DBP", "offset": "0x000", "bits": "7:4",
+        "sources": [ "324642-003 et 326765-005 §2.13.1 TC_DBP, tRP 7:4", "coreboot tc_dbp_reg.tRP [7..4]", "memtest86+ intel_snb.c" ] },
+      { "key": "tRAS", "group": "Primary", "register": "TC_DBP", "offset": "0x000", "bits": "23:16",
+        "sources": [ "326765-005 §2.13.1 TC_DBP, tRAS 23:16 (réservé dans 324642-003, mais lu sur Sandy Bridge par memtest86+, CoreFreq et coreboot)", "coreboot tc_dbp_reg.tRAS [23..16]", "memtest86+ intel_snb.c" ] },
+      { "key": "tCWL", "group": "Secondary", "register": "TC_DBP", "offset": "0x000", "bits": "15:12",
+        "sources": [ "326765-005 §2.13.1 TC_DBP, tWCL 15:12", "coreboot tc_dbp_reg.tCWL [15..12]", "inteltool ivy_memory.c" ] },
+      { "key": "tRRD", "group": "Secondary", "register": "TC_RAP", "offset": "0x004", "bits": "3:0",
+        "sources": [ "324642-003 et 326765-005 §2.13.2 TC_RAP, tRRD 3:0", "coreboot tc_rap_reg.tRRD [3..0]" ] },
+      { "key": "tRTP", "group": "Secondary", "register": "TC_RAP", "offset": "0x004", "bits": "7:4",
+        "sources": [ "324642-003 et 326765-005 §2.13.2 TC_RAP, tRTP 7:4", "coreboot tc_rap_reg.tRTP [7..4]" ] },
+      { "key": "tCKE", "group": "Secondary", "register": "TC_RAP", "offset": "0x004", "bits": "11:8",
+        "sources": [ "326765-005 §2.13.2 TC_RAP, tCKE 11:8", "coreboot tc_rap_reg.tCKE [11..8]" ] },
+      { "key": "tWTR", "group": "Secondary", "register": "TC_RAP", "offset": "0x004", "bits": "15:12",
+        "sources": [ "324642-003 et 326765-005 §2.13.2 TC_RAP, tWTR 15:12", "coreboot tc_rap_reg.tWTR [15..12]" ] },
+      { "key": "tFAW", "group": "Secondary", "register": "TC_RAP", "offset": "0x004", "bits": "23:16",
+        "sources": [ "324642-003 et 326765-005 §2.13.2 TC_RAP, tFAW 23:16", "coreboot tc_rap_reg.tFAW [23..16]" ] },
+      { "key": "tWR", "group": "Secondary", "register": "TC_RAP", "offset": "0x004", "bits": "28:24",
+        "sources": [ "326765-005 §2.13.2 TC_RAP, tWR 28:24 (le bit 29 est CMD_3ST)", "coreboot tc_rap_reg.tWR [28..24]" ] },
+      { "key": "tRFC", "group": "Secondary", "register": "TC_RFTP", "offset": "0x298", "bits": "24:16",
+        "sources": [ "326765-005 §2.13.9 et 324642-003 §2.13.7 TC_RFTP (4298h, canal B 4698h), tRFC 24:16", "coreboot tc_rftp_reg.tRFC [24..16]" ] },
+      { "key": "tREFI", "group": "Secondary", "register": "TC_RFTP", "offset": "0x298", "bits": "15:0",
+        "sources": [ "326765-005 §2.13.9 et 324642-003 §2.13.7 TC_RFTP, tREFI 15:0", "coreboot tc_rftp_reg.tREFI [15..0]" ] },
+      { "key": "tMOD", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x2A4", "bits": "31:28", "add": 8,
+        "sources": [ "326765-005 §2.13.4 TC_SRFTP (42A4h), tMOD 31:28, « valeur réelle = 8 + valeur programmée »", "coreboot tc_srftp_reg.tMOD = tMOD − 8" ] },
+      { "key": "tXSDLL", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x2A4", "bits": "11:0",
+        "sources": [ "326765-005 §2.13.4 TC_SRFTP, tXSDLL 11:0", "coreboot tc_srftp_reg.tXSDLL [11..0]" ] },
+      { "key": "tZQOPER", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x2A4", "bits": "25:16",
+        "sources": [ "326765-005 §2.13.4 TC_SRFTP, tZQOPER 25:16", "coreboot tc_srftp_reg.tZQOPER [25..16]" ] }
+    ],
+    "unavailable": [ "tRC", "tXP", "tXPDLL", "tAONPD", "tRDRD", "tRDWR", "tWRRD", "tWRWR", "tCCD" ],
+    "verifiedOnHardware": false
+  },
+  {
     "id": "skl-cml",
     "displayName": "Intel Core 6e à 10e génération (Skylake, Kaby Lake, Coffee Lake, Comet Lake)",
     "cpuModels": [ "0x4E", "0x5E", "0x8E", "0x9E", "0xA5", "0xA6" ],
