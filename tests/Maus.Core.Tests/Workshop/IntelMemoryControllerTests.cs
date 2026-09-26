@@ -8,6 +8,11 @@ public class IntelMemoryControllerTests
     private const int CoffeeLake = 0x9E;
     private const int SkylakeDesktop = 0x5E;
 
+    /// <summary>Fenêtres MCHBAR du module IntelMCHBAR : 32 Ko jusqu'à Comet Lake, 64 Ko Ice Lake et Rocket Lake, 128 Ko ensuite.</summary>
+    private static readonly int[] MchbarWindows = [0x8000, 0x10000, 0x20000];
+
+    private static readonly string[] Confidences = ["dual", "single"];
+
     /// <summary>
     /// Registres d'un i7-8700K en DDR4-3467 (rapport 13 × 133,33 MHz), 16-19-19-39, 2N, tRFC 607, deux canaux garnis,
     /// ring à 4,3 GHz (plage 0,8 à 4,3 GHz). Valeurs composées bit à bit d'après la fiche Intel 336465-001.
@@ -140,7 +145,7 @@ public class IntelMemoryControllerTests
             Assert.NotEmpty(family.Sources);
             Assert.NotEmpty(family.CpuModels);
             Assert.NotEmpty(family.Channels);
-            Assert.Contains(family.MchbarWindowBytes, new[] { 0x8000, 0x10000, 0x20000 });
+            Assert.Contains(family.MchbarWindowBytes, MchbarWindows);
             foreach (var model in family.CpuModels)
             {
                 Assert.True(models.Add(model), $"{family.Id} : modèle {model} déjà dans une autre famille");
@@ -170,7 +175,7 @@ public class IntelMemoryControllerTests
                 foreach (var field in family.Fields)
                 {
                     Assert.NotEmpty(field.Sources);
-                    Assert.Contains(field.Confidence, new[] { "dual", "single" });
+                    Assert.Contains(field.Confidence, Confidences);
                     InWindow(channelBase + IntelMemoryController.Hex(field.Offset), field.Size, $"{field.Key} canal {channel.Name}");
                     ValidBits(field.Bits, field.Size, field.Key);
                 }

@@ -960,6 +960,8 @@
                                             Command="{Binding Workshop.ReadMemoryCommand}" IsEnabled="{Binding Workshop.IsNotReadingMemory, Mode=OneWay}" />
                                     <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.CopyMemory}" Command="{Binding Workshop.CopyMemoryCommand}"
                                             IsEnabled="{Binding Workshop.HasMemoryReport, Mode=OneWay}" />
+                                    <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.InstallPawnIo}"
+                                            Command="{Binding Workshop.InstallPawnIoCommand}" Visibility="{Binding Workshop.IsMemoryDriverMissing, Converter={StaticResource BoolToVisibility}}" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding Workshop.MemoryStatus}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,8" />
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding Workshop.HasMemoryConfiguration, Converter={StaticResource BoolToVisibility}}">

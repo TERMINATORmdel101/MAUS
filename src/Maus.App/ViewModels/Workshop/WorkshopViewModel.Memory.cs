@@ -68,6 +68,7 @@ public sealed partial class WorkshopViewModel
     public const int SectionMemory = 5;
 
     private bool _isReadingMemory;
+    private bool _memoryDriverMissing;
     private string _memoryStatus = T("« Lire la mémoire » interroge la puce SPD de chaque barrette et le contrôleur mémoire (AMD Ryzen, Intel Core). Lecture seule, quelques secondes.");
     private string _memoryClocks = string.Empty;
     private string _memorySettings = string.Empty;
@@ -153,6 +154,13 @@ public sealed partial class WorkshopViewModel
 
     public bool HasMemoryReport => _memoryReport is not null;
 
+    /// <summary>PawnIO absent, constaté à la lecture : le bouton d'installation s'affiche dans l'onglet Mémoire.</summary>
+    public bool IsMemoryDriverMissing
+    {
+        get => _memoryDriverMissing;
+        private set => SetProperty(ref _memoryDriverMissing, value);
+    }
+
     public ICommand ReadMemoryCommand => _readMemory ??= new AsyncCommand(ReadMemoryAsync);
 
     public ICommand CopyMemoryCommand => _copyMemory ??= new AsyncCommand(() => Run(() =>
@@ -183,7 +191,15 @@ public sealed partial class WorkshopViewModel
         MemoryConfiguration = WindowsMemoryConfiguration.Describe(_memorySlots);
 
         var registry = new WindowsRegistryReader();
-        if (!PawnIo.State(registry).Installed || !ProcessElevation.IsElevated())
+        var installed = PawnIo.State(registry).Installed;
+        IsMemoryDriverMissing = !installed;
+        if (!installed)
+        {
+            MemoryStatus = T("Pour lire les puces des barrettes et les timings réels, il faut le pilote libre PawnIO : bouton « Installer PawnIO » ci-dessus, puis relancez MAUS en administrateur. La vitesse et la tension appliquées, lues sans pilote, sont déjà affichées ci-dessous.");
+            return;
+        }
+
+        if (!ProcessElevation.IsElevated())
         {
             MemoryStatus = PawnIoMemoryDetails.DriverRequired;
             return;

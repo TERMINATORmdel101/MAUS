@@ -2844,5 +2844,6 @@
   "canaux {0}": "channels {0}",
   "commande {0}": "command {0}",
   "mode {0}": "mode {0}",
-  "« Lire la mémoire » interroge la puce SPD de chaque barrette et le contrôleur mémoire (AMD Ryzen, Intel Core). Lecture seule, quelques secondes.": "\"Read the memory\" queries the SPD chip of each module and the memory controller (AMD Ryzen, Intel Core). Read-only, a few seconds."
+  "« Lire la mémoire » interroge la puce SPD de chaque barrette et le contrôleur mémoire (AMD Ryzen, Intel Core). Lecture seule, quelques secondes.": "\"Read the memory\" queries the SPD chip of each module and the memory controller (AMD Ryzen, Intel Core). Read-only, a few seconds.",
+  "Pour lire les puces des barrettes et les timings réels, il faut le pilote libre PawnIO : bouton « Installer PawnIO » ci-dessus, puis relancez MAUS en administrateur. La vitesse et la tension appliquées, lues sans pilote, sont déjà affichées ci-dessous.": "To read the memory modules' chips and the actual timings, MAUS needs the free PawnIO driver: \"Install PawnIO\" button above, then restart MAUS as administrator. The applied speed and voltage, read without a driver, are already shown below."
 }
