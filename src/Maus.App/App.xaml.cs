@@ -32,8 +32,20 @@ public partial class App : Application
             return;
         }
 
+        // Une seule fenêtre de MAUS à la fois : deux MAUS ouverts se disputeraient le pilote et le bus des barrettes.
+        s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
+        if (!first)
+        {
+            Maus.Core.Platform.SingleInstance.BringExistingToFront();
+            Shutdown(0);
+            return;
+        }
+
         ShowMainWindow();
     }
+
+    /// <summary>Tenu tant que MAUS est ouvert (signale aux lancements suivants qu'une fenêtre existe déjà).</summary>
+    private static Mutex? s_singleInstance;
 
     private static void ShowMainWindow()
     {

@@ -67,8 +67,12 @@ public sealed partial class WorkshopViewModel
 {
     public const int SectionMemory = 5;
 
+    /// <summary>Au-delà, la lecture est tenue pour bloquée (4 barrettes DDR5 se lisent en une vingtaine de secondes).</summary>
+    private static readonly TimeSpan MemoryReadTimeout = TimeSpan.FromSeconds(90);
+
     private bool _isReadingMemory;
     private bool _memoryDriverMissing;
+    private Task? _pendingMemoryRead;
     private string _memoryStatus = T("« Lire la mémoire » interroge la puce SPD de chaque barrette et le contrôleur mémoire (AMD Ryzen, Intel Core). Lecture seule, quelques secondes.");
     private string _memoryClocks = string.Empty;
     private string _memorySettings = string.Empty;
@@ -205,17 +209,37 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
+        if (_pendingMemoryRead is { IsCompleted: false })
+        {
+            MemoryStatus = T("La lecture précédente est toujours bloquée. Fermez toutes les fenêtres de MAUS et les logiciels de surveillance, puis relancez MAUS.");
+            return;
+        }
+
         IsReadingMemory = true;
         MemoryStatus = T("Lecture en cours (jusqu'à une vingtaine de secondes avec 4 barrettes)…");
+        var log = new StepLogFile("lecture-memoire.txt");
         try
         {
             var cpu = CpuIdParser.Read(new X86CpuIdSource());
-            var report = await Task.Run(() => PawnIoMemoryDetails.Read(cpu, null));
+            var reading = Task.Run(() => PawnIoMemoryDetails.Read(cpu, null, log.Write));
+            _pendingMemoryRead = reading;
+            if (await Task.WhenAny(reading, Task.Delay(MemoryReadTimeout)) != reading)
+            {
+                // La lecture continue en arrière-plan (on ne peut pas interrompre un appel au pilote) ; l'interface, elle, reste libre.
+                log.Write("délai dépassé : lecture abandonnée par l'interface");
+                MemoryStatus = T("La lecture ne se termine pas au bout de {0} secondes : un autre programme bloque probablement le bus des barrettes (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère). Fermez-les, fermez MAUS, puis relancez-le. Étapes de la lecture : {1}",
+                    (int)MemoryReadTimeout.TotalSeconds, log.Path ?? "—");
+                return;
+            }
+
+            var report = await reading;
+            log.Write("lecture terminée");
             Show(report);
             MemoryStatus = T("Lu le {0:g}. Survolez un timing pour savoir ce qu'il mesure. MAUS ne modifie aucun réglage mémoire : cela se fait dans le BIOS.", DateTime.Now);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
+            log.Write($"échec : ({ex.GetType().Name}) {ex.Message}");
             MemoryStatus = T("La lecture a échoué : {0}", ex.Message);
         }
         finally

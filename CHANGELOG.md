@@ -14,6 +14,8 @@ Toutes les versions *alpha* sont codées sous Linux et testées avec des simulat
 - Animations discrètes : transitions de page, apparition des cartes, jauge du score (coupées si Windows ou vous les désactivez).
 - Fenêtre de surveillance indépendante, façon HWMonitor simplifié : température, consommation, fréquence et charge de chaque composant (actuelles, minimales, maximales), erreurs matérielles WHEA (dont PCI Express) et erreurs de Windows depuis son ouverture, option « toujours au premier plan ».
 - Les préférences ne s'écrasent plus entre fenêtres (écriture « lire, modifier, écrire »).
+- Lecture de la mémoire qui ne se terminait jamais : un verrou du bus des barrettes laissé « abandonné » (MAUS fermé en pleine lecture) était gardé pour toujours par le MAUS suivant, et la lecture attendait 2 secondes par octet. Le verrou est maintenant récupéré puis rendu ; si un autre programme garde le bus plus de 10 secondes, MAUS le dit ; l'interface abandonne une lecture bloquée au bout de 90 secondes et un journal des étapes est écrit dans `%LOCALAPPDATA%\MAUS\logs\lecture-memoire.txt`. Même correction pour le verrou PCI (Ryzen).
+- Une seule fenêtre de MAUS à la fois : le relancer ramène la fenêtre déjà ouverte.
 - Licences livrées avec l'application (dossier `licenses`).
 
 ## 0.3.2-alpha — 25/09/2026

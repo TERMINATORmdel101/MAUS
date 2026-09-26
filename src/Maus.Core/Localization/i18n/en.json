@@ -2916,5 +2916,9 @@
   "Délai entre une écriture et une lecture.": "Delay between a write and a read.",
   "Délai après une commande de réglage de la mémoire (MRS) avant la commande suivante.": "Delay after a memory mode-register command (MRS) before the next command.",
   "Délai de sortie de l'autorafraîchissement avant une commande qui a besoin du DLL de la mémoire.": "Delay after exiting self-refresh before a command that needs the memory DLL.",
-  "Durée d'un calibrage complet des résistances de sortie de la mémoire (ZQ).": "Duration of a full calibration of the memory output resistors (ZQ)."
+  "Durée d'un calibrage complet des résistances de sortie de la mémoire (ZQ).": "Duration of a full calibration of the memory output resistors (ZQ).",
+  "Une lecture des puces des barrettes est déjà en cours dans MAUS : attendez qu'elle se termine.": "A read of the memory module chips is already running in MAUS: wait for it to finish.",
+  "Le bus des barrettes est occupé par un autre programme (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère…). Fermez-le, puis relancez la lecture.": "The memory module bus is held by another program (another MAUS window, HWiNFO, CPU-Z, RGB lighting or motherboard software…). Close it, then read again.",
+  "La lecture précédente est toujours bloquée. Fermez toutes les fenêtres de MAUS et les logiciels de surveillance, puis relancez MAUS.": "The previous read is still stuck. Close every MAUS window and monitoring software, then restart MAUS.",
+  "La lecture ne se termine pas au bout de {0} secondes : un autre programme bloque probablement le bus des barrettes (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère). Fermez-les, fermez MAUS, puis relancez-le. Étapes de la lecture : {1}": "The read has not finished after {0} seconds: another program is probably holding the memory module bus (another MAUS window, HWiNFO, CPU-Z, RGB lighting or motherboard software). Close them, close MAUS, then restart it. Steps of the read: {1}"
 }
