@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Maus.Core.Workshop.Memory.PawnIo;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Workshop.Memory;
@@ -15,15 +16,20 @@ public sealed record MemoryDetailReport(
     IReadOnlyList<SpdModule> Modules,
     LiveMemoryTimings? Live,
     MemoryClocks? Clocks,
-    IReadOnlyList<string> Notes);
+    IReadOnlyList<string> Notes,
+    IntelMemoryReport? Intel = null);
+
+/// <summary>Accès au contrôleur mémoire d'un processeur Intel : identité CPUID et ouverture des modules PawnIO de lecture.</summary>
+public sealed record IntelControllerAccess(int CpuFamily, int CpuModel, Func<IMchbarReader> OpenMchbar, Func<IMsrReader?> OpenMsr);
 
 public static class MemoryDetails
 {
     /// <summary>
     /// Lit tout ce qui est lisible ; chaque partie qui échoue devient une note, jamais une erreur bloquante.
-    /// <paramref name="smn"/> et <paramref name="pm"/> sont <c>null</c> hors processeur AMD Ryzen.
+    /// <paramref name="smn"/> et <paramref name="pm"/> sont <c>null</c> hors processeur AMD Ryzen,
+    /// <paramref name="intel"/> est <c>null</c> hors processeur Intel.
     /// </summary>
-    public static MemoryDetailReport Read(ISpdSource spd, ISmnReader? smn, IPmTableReader? pm, bool? ddr5Hint)
+    public static MemoryDetailReport Read(ISpdSource spd, ISmnReader? smn, IPmTableReader? pm, bool? ddr5Hint, IntelControllerAccess? intel = null)
     {
         var notes = new List<string>();
         var modules = new List<SpdModule>();
@@ -59,9 +65,14 @@ public static class MemoryDetails
         var ddr5 = modules.Count > 0 ? modules[0].MemoryType == "DDR5" : ddr5Hint ?? false;
         LiveMemoryTimings? live = null;
         MemoryClocks? clocks = null;
-        if (smn is null)
+        IntelMemoryReport? intelReport = null;
+        if (intel is not null)
         {
-            notes.Add(T("Timings réellement appliqués : lisibles seulement sur processeur AMD Ryzen. Sur Intel, ils sont dans le contrôleur mémoire, que PawnIO n'ouvre pas par sécurité : MAUS affiche la vitesse et la tension réelles données par Windows, et les timings des profils SPD. Pour voir les timings réels sur Intel, CPU-Z (gratuit, cpuid.com, onglet Memory) les affiche."));
+            intelReport = ReadIntel(intel, notes);
+        }
+        else if (smn is null)
+        {
+            notes.Add(T("Timings réellement appliqués : lisibles seulement sur processeur AMD Ryzen ou Intel Core. Pour ce processeur, MAUS affiche la vitesse et la tension réelles données par Windows, et les timings des profils SPD."));
         }
         else
         {
@@ -99,7 +110,67 @@ public static class MemoryDetails
             }
         }
 
-        return new MemoryDetailReport(modules, live, clocks, notes);
+        return new MemoryDetailReport(modules, live, clocks, notes, intelReport);
+    }
+
+    /// <summary>Contrôleur mémoire Intel : carte des registres de la génération, puis lecture seule par PawnIO.</summary>
+    private static IntelMemoryReport? ReadIntel(IntelControllerAccess intel, List<string> notes)
+    {
+        var family = IntelMemoryController.FamilyFor(intel.CpuFamily, intel.CpuModel);
+        if (family is null)
+        {
+            notes.Add(T("Timings réels : ce processeur Intel (famille {0:X}h, modèle {1:X2}h) n'est pas encore dans la carte des registres de MAUS. CPU-Z (gratuit, cpuid.com, onglet Memory) les affiche.", intel.CpuFamily, intel.CpuModel));
+            return null;
+        }
+
+        IMchbarReader? mchbar = null;
+        IMsrReader? msr = null;
+        try
+        {
+            mchbar = intel.OpenMchbar();
+            try
+            {
+                msr = intel.OpenMsr();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                notes.Add(T("Plage de fréquence du ring illisible : {0}", ex.Message));
+            }
+
+            var report = IntelMemoryController.Read(family, intel.CpuFamily, intel.CpuModel, mchbar, msr);
+            if (report is null)
+            {
+                notes.Add(T("Timings réels illisibles : le contrôleur mémoire ne signale aucun canal garni."));
+                return null;
+            }
+
+            if (!report.VerifiedOnHardware)
+            {
+                notes.Add(T("Timings réels Intel ({0}) : carte des registres tirée des documents publiés, pas encore comparée à CPU-Z sur un processeur de cette génération. Comparez avec CPU-Z (onglet Memory) et signalez tout écart.", family.DisplayName));
+            }
+
+            if (report.ChannelsDiffer)
+            {
+                notes.Add(T("Les canaux n'ont pas tous les mêmes timings : ceux du premier canal sont affichés, tous les canaux figurent dans la fiche copiée."));
+            }
+
+            if (report.Unavailable.Count > 0)
+            {
+                notes.Add(T("Non publiés par Intel pour cette génération, donc non affichés : {0}.", string.Join(", ", report.Unavailable)));
+            }
+
+            return report;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            notes.Add(T("Timings réels illisibles : {0}", ex.Message));
+            return null;
+        }
+        finally
+        {
+            (msr as IDisposable)?.Dispose();
+            (mchbar as IDisposable)?.Dispose();
+        }
     }
 
     /// <summary>Ce que mesure un timing, en une phrase ; <c>null</c> pour les réglages très techniques.</summary>
@@ -119,7 +190,8 @@ public static class MemoryDetails
         "tWTRS" => T("Délai entre une écriture et une lecture dans des groupes de banques différents."),
         "tWTRL" => T("Délai entre une écriture et une lecture dans le même groupe de banques."),
         "tWR" => T("Temps de récupération après une écriture, avant de refermer la ligne."),
-        "tRTP" => T("Délai entre une lecture et la fermeture de la ligne."),
+        "tRTP" or "tRDPRE" => T("Délai entre une lecture et la fermeture de la ligne."),
+        "tWRPRE" => T("Délai minimal entre une écriture et la fermeture de la ligne dans la même banque."),
         "tCWL" => T("Latence d'écriture : l'équivalent de la latence CAS pour les écritures."),
         "tRFC" or "tRFC2" or "tRFC4" or "tRFCsb" => T("Durée d'un rafraîchissement : la mémoire est indisponible pendant ce temps. Dépend de la densité des puces."),
         "tREFI" => T("Intervalle entre deux rafraîchissements : plus il est long, moins la mémoire est interrompue (mais plus elle chauffe)."),
@@ -161,6 +233,30 @@ public static class MemoryDetails
             }
         }
 
+        if (report.Intel is { } intel)
+        {
+            Line();
+            Line(T("Contrôleur Intel : {0}", intel.Family));
+            Line(IntelClocks(intel));
+            Line(IntelSettings(intel));
+            foreach (var channel in intel.ChannelsDiffer ? intel.PerChannel : intel.PerChannel.Take(1))
+            {
+                if (intel.ChannelsDiffer)
+                {
+                    Line(T("Canal {0} :", channel.Channel));
+                }
+
+                foreach (var group in Enum.GetValues<TimingGroup>())
+                {
+                    var timings = channel.Timings.Where(t => t.Group == group).ToList();
+                    if (timings.Count > 0)
+                    {
+                        Line(GroupName(group) + " : " + Timings(timings));
+                    }
+                }
+            }
+        }
+
         foreach (var module in report.Modules)
         {
             Line();
@@ -181,6 +277,52 @@ public static class MemoryDetails
         }
 
         return text.ToString();
+    }
+
+    /// <summary>Horloges du contrôleur Intel sur une ligne : « Horloge mémoire 1733 MHz (3467 MT/s) · ring 4300 MHz (800 à 4300) ».</summary>
+    public static string IntelClocks(IntelMemoryReport report)
+    {
+        var parts = new List<string>();
+        foreach (var clock in report.Clocks)
+        {
+            parts.Add(clock.Key switch
+            {
+                "DCLK" => T("Horloge mémoire {0} ({1} MT/s)", Mhz(clock.Mhz), (clock.Mhz * 2).ToString("0", CultureInfo.InvariantCulture)),
+                "RING" => T("Ring {0}", Mhz(clock.Mhz)) + (report.RingMinMhz is { } min && report.RingMaxMhz is { } max ? T(" (plage {0} à {1})", Mhz(min), Mhz(max)) : string.Empty),
+                "SA" => T("Agent système {0}", Mhz(clock.Mhz)),
+                _ => $"{clock.Key} {Mhz(clock.Mhz)}",
+            });
+        }
+
+        if (!report.Clocks.Any(c => c.Key == "RING") && report.RingMaxMhz is { } ringMax)
+        {
+            parts.Add(T("Ring : plage {0} à {1}", Mhz(report.RingMinMhz), Mhz(ringMax)));
+        }
+
+        return parts.Count > 0 ? string.Join(" · ", parts) : T("Horloges du contrôleur illisibles");
+    }
+
+    /// <summary>Réglages du contrôleur Intel sur une ligne : « DDR4 · canaux A, B · commande 2N ».</summary>
+    public static string IntelSettings(IntelMemoryReport report)
+    {
+        var parts = new List<string>();
+        if (report.MemoryType is { } type)
+        {
+            parts.Add(report.DclkMhz is { } dclk ? string.Create(CultureInfo.InvariantCulture, $"{type}-{dclk * 2:0}") : type);
+        }
+
+        parts.Add(T("canaux {0}", string.Join(", ", report.Channels)));
+        foreach (var setting in report.Settings)
+        {
+            parts.Add(setting.Key switch
+            {
+                "CommandRate" => T("commande {0}", setting.Value),
+                "Gear" => T("mode {0}", setting.Value),
+                _ => $"{setting.Key} {setting.Value}",
+            });
+        }
+
+        return string.Join(" · ", parts);
     }
 
     /// <summary>Résumé d'un profil sur une ligne : « 3200 MT/s · 16-18-18-36 · 1.35 V ».</summary>

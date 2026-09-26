@@ -20,4 +20,11 @@
     <ProjectReference Include="..\Maus.Core\Maus.Core.csproj" />
   </ItemGroup>
 
+  <!-- Licences livrées avec l'application : celle de MAUS, les composants tiers et le texte de la LGPL-2.1 des modules PawnIO. -->
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="licenses\LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="licenses\THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\licenses\LGPL-2.1.txt" Link="licenses\LGPL-2.1.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

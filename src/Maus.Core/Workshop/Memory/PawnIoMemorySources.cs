@@ -2,6 +2,7 @@ using LibreHardwareMonitor.Hardware;
 using LibreHardwareMonitor.PawnIo;
 using RAMSPDToolkit.I2CSMBus;
 using RAMSPDToolkit.SPD;
+using Maus.Core.Workshop.Memory.PawnIo;
 using RAMSPDToolkit.SPD.Interop.Shared;
 using static Maus.Core.Localization.Texts;
 
@@ -142,12 +143,21 @@ public sealed class PawnIoPmTableReader : IPmTableReader, IDisposable
     public void Dispose() => _smu.Close();
 }
 
-/// <summary>Lecture réelle, sur Windows avec PawnIO : SPD, puis registres et table PM si le processeur est un AMD Ryzen.</summary>
+/// <summary>
+/// Lecture réelle, sur Windows avec PawnIO : SPD, puis registres et table PM si le processeur est un AMD Ryzen,
+/// ou registres du contrôleur mémoire (modules officiels IntelMCHBAR et IntelMSR, lecture seule) s'il est Intel.
+/// </summary>
 public static class PawnIoMemoryDetails
 {
-    public static MemoryDetailReport Read(bool isAmdZen, bool? ddr5Hint)
+    public static MemoryDetailReport Read(CpuIdInfo? cpu, bool? ddr5Hint)
     {
-        if (!isAmdZen)
+        if (cpu is { IsIntel: true })
+        {
+            var intel = new IntelControllerAccess(cpu.Family, cpu.Model, () => new PawnIoMchbarReader(), () => new PawnIoMsrReader());
+            return MemoryDetails.Read(new PawnIoSpdSource(), null, null, ddr5Hint, intel);
+        }
+
+        if (cpu is not { IsAmd: true, Family: >= 0x17 })
         {
             return MemoryDetails.Read(new PawnIoSpdSource(), null, null, ddr5Hint);
         }

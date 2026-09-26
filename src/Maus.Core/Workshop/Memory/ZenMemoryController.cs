@@ -44,7 +44,7 @@ public sealed record MemoryClocks(double? FclkMhz, double? UclkMhz, double? Mclk
 /// Contrôleur mémoire des processeurs AMD Ryzen (Zen 2 à Zen 5) : canaux actifs, timings primaires, secondaires et tertiaires,
 /// réglages (GDM, 1T/2T, Power Down, BGS), horloges FCLK / UCLK / MCLK. Carte des registres UMC et des tables PM reprise de
 /// ZenStates-Core (GPL-3.0, https://github.com/irusanov/ZenStates-Core), faits matériels vérifiés par ses utilisateurs ;
-/// MAUS les relit sans rien écrire. Intel : les registres du contrôleur ne sont pas accessibles par PawnIO.
+/// MAUS les relit sans rien écrire. Intel : voir <see cref="IntelMemoryController"/>.
 /// </summary>
 public static class ZenMemoryController
 {

@@ -1,0 +1,74 @@
+// Cartes des registres des contrôleurs mémoire Intel Core, lus en lecture seule par le module officiel PawnIO IntelMCHBAR.
+// Chaque champ cite sa source publiée. Pas de source = champ absent : MAUS ne devine aucun registre.
+// Décalages en hexadécimal ; ceux des champs sont relatifs à la base du canal, ceux des horloges et de la présence sont absolus.
+// « verifiedOnHardware » ne passe à true qu'après comparaison avec CPU-Z sur un vrai processeur de la famille.
+[
+  {
+    "id": "skl-cml",
+    "displayName": "Intel Core 6e à 10e génération (Skylake, Kaby Lake, Coffee Lake, Comet Lake)",
+    "cpuModels": [ "0x4E", "0x5E", "0x8E", "0x9E", "0xA5", "0xA6" ],
+    "mchbarWindowBytes": 32768,
+    "sources": [
+      "Intel, 8th Generation Intel Processor Family for S-Processor Platforms Datasheet, Volume 2 of 2, octobre 2017, document 336465-001, chapitre 7 (MCHBAR Registers)",
+      "memtest86+ 7.x, system/imc/x86/intel_skl.c (GPL-2.0) : bases des canaux, registres de présence et famille de modèles CPUID",
+      "Linux drivers/platform/x86/intel/uncore-frequency/uncore-frequency.c : MSR 0x620 (bornes du ring, bits 6:0 et 14:8) et 0x621 (ring courant, bits 6:0), × 100 MHz, pour Kaby Lake et Comet Lake",
+      "Linux arch/x86/include/asm/intel-family.h : numéros de modèle",
+      "PawnIO.Modules 0.2.11, IntelMCHBAR.p : fenêtre MCHBAR de 32 Ko jusqu'à Comet Lake, lectures de 4 octets alignées sur 4, de 8 octets alignées sur 8"
+    ],
+    "channels": [
+      { "name": "A", "base": "0x4000", "presenceOffset": "0x500C", "presenceMask": "0x003F003F" },
+      { "name": "B", "base": "0x4400", "presenceOffset": "0x5010", "presenceMask": "0x003F003F" }
+    ],
+    "memoryTypes": [ "DDR4", "DDR3", "LPDDR3" ],
+    "settings": [
+      {
+        "key": "MemoryType", "offset": "0x01C", "bits": "1:0",
+        "values": { "0": "DDR4", "1": "DDR3", "2": "LPDDR3" },
+        "sources": [ "336465-001 §7.2 SC_GS_CFG, DRAM_technology (00 DDR4, 01 DDR3, 10 LPDDR3)" ]
+      },
+      {
+        "key": "CommandRate", "offset": "0x01C", "bits": "3:2",
+        "values": { "0": "1N", "1": "2N", "2": "3N", "3": "N:1" },
+        "sources": [ "336465-001 §7.2 SC_GS_CFG, CMD_stretch (00 1N, 01 2N, 10 3N, 11 N:1)" ]
+      }
+    ],
+    "clocks": [
+      {
+        "key": "DCLK", "offset": "0x5918", "bits": "6:0",
+        "referenceBits": "7", "referenceMhz": { "0": 133.333333, "1": 100 },
+        "sources": [ "336465-001 §7.73 SA_PERF_STATUS (5918h) : QCLK_RATIO 6:0, QCLK_REFERENCE bit 7 (0 = 133 MHz, 1 = 100 MHz), valeurs courantes" ]
+      },
+      {
+        "key": "RING", "offset": "0x5918", "bits": "31:24", "multiplierMhz": 100,
+        "sources": [ "336465-001 §7.73 SA_PERF_STATUS (5918h) : UCLK_RATIO 31:24, horloge du ring, référence 100 MHz" ]
+      },
+      {
+        "key": "SA", "offset": "0x5918", "bits": "15:8", "multiplierMhz": 100,
+        "sources": [ "336465-001 §7.73 SA_PERF_STATUS (5918h) : FCLK_RATIO 15:8, horloge de l'agent système, référence 100 MHz" ]
+      }
+    ],
+    "uncoreMsrModels": [ "0x8E", "0x9E", "0xA5", "0xA6" ],
+    "fields": [
+      { "key": "tCL", "group": "Primary", "register": "TC_ODT", "offset": "0x070", "bits": "20:16",
+        "sources": [ "336465-001 §7.3 TC_ODT, tCL 20:16 (cycles DCLK)", "memtest86+ intel_skl.c" ] },
+      { "key": "tRCD", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "bits": "5:0",
+        "sources": [ "336465-001 §7.1 TC_PRE, tRP 5:0 « tRP (and tRCD) » : une seule valeur pour les deux", "memtest86+ intel_skl.c" ] },
+      { "key": "tRP", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "bits": "5:0",
+        "sources": [ "336465-001 §7.1 TC_PRE, tRP 5:0", "memtest86+ intel_skl.c" ] },
+      { "key": "tRAS", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "bits": "14:8",
+        "sources": [ "336465-001 §7.1 TC_PRE, tRAS 14:8", "memtest86+ intel_skl.c" ] },
+      { "key": "tCWL", "group": "Secondary", "register": "TC_ODT", "offset": "0x070", "bits": "25:21", "confidence": "single",
+        "sources": [ "336465-001 §7.3 TC_ODT, tCWL 25:21" ] },
+      { "key": "tRDPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "bits": "19:16", "confidence": "single",
+        "sources": [ "336465-001 §7.1 TC_PRE, tRDPRE 19:16 « RD to PRE same bank minimum delay »" ] },
+      { "key": "tWRPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "bits": "30:24", "confidence": "single",
+        "sources": [ "336465-001 §7.1 TC_PRE, tWRPRE 30:24 « WR to PRE same bank minimum delay »" ] },
+      { "key": "tRFC", "group": "Secondary", "register": "TC_RFTP", "offset": "0x23C", "bits": "25:16", "confidence": "single",
+        "sources": [ "336465-001 §7.5 Refresh timing parameters (423Ch), tRFC 25:16" ] },
+      { "key": "tREFI", "group": "Secondary", "register": "TC_RFTP", "offset": "0x23C", "bits": "15:0", "confidence": "single",
+        "sources": [ "336465-001 §7.5 Refresh timing parameters (423Ch), tREFI 15:0" ] }
+    ],
+    "unavailable": [ "tRRD_S", "tRRD_L", "tFAW", "tWTR_S", "tWTR_L", "tWR", "tRTP", "tCKE", "tXP", "tRDRD", "tRDWR", "tWRRD", "tWRWR" ],
+    "verifiedOnHardware": false
+  }
+]

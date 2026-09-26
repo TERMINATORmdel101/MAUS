@@ -68,7 +68,7 @@ public sealed partial class WorkshopViewModel
     public const int SectionMemory = 5;
 
     private bool _isReadingMemory;
-    private string _memoryStatus = T("« Lire la mémoire » interroge la puce SPD de chaque barrette et, sur processeur AMD Ryzen, le contrôleur mémoire. Lecture seule, quelques secondes.");
+    private string _memoryStatus = T("« Lire la mémoire » interroge la puce SPD de chaque barrette et le contrôleur mémoire (AMD Ryzen, Intel Core). Lecture seule, quelques secondes.");
     private string _memoryClocks = string.Empty;
     private string _memorySettings = string.Empty;
     private string _memoryNotes = string.Empty;
@@ -194,8 +194,7 @@ public sealed partial class WorkshopViewModel
         try
         {
             var cpu = CpuIdParser.Read(new X86CpuIdSource());
-            var amdZen = cpu is { IsAmd: true, Family: >= 0x17 };
-            var report = await Task.Run(() => PawnIoMemoryDetails.Read(amdZen, null));
+            var report = await Task.Run(() => PawnIoMemoryDetails.Read(cpu, null));
             Show(report);
             MemoryStatus = T("Lu le {0:g}. Survolez un timing pour savoir ce qu'il mesure. MAUS ne modifie aucun réglage mémoire : cela se fait dans le BIOS.", DateTime.Now);
         }
@@ -221,9 +220,24 @@ public sealed partial class WorkshopViewModel
               + T("Tensions : SoC {0} · VDDP {1} · VDDG IOD {2} · VDDG CCD {3}", Volts(clocks.SocVolts), Volts(clocks.VddpVolts), Volts(clocks.VddgIodVolts), Volts(clocks.VddgCcdVolts))
             : report.Live is { } onlyLive
                 ? T("MCLK {0:0} MHz (d'après le coefficient du contrôleur, BCLK de 100 MHz supposée)", onlyLive.MclkMhz)
-                : string.Empty;
+                : report.Intel is { } intelClocks
+                    ? MemoryDetails.IntelClocks(intelClocks)
+                    : string.Empty;
 
-        if (report.Live is { } live)
+        if (report.Intel is { } intel)
+        {
+            MemorySettings = MemoryDetails.IntelSettings(intel)
+                + (intel.ChannelsDiffer ? Environment.NewLine + T("Attention : les canaux n'ont pas tous les mêmes timings ; ceux du premier canal sont affichés.") : string.Empty);
+            foreach (var group in Enum.GetValues<TimingGroup>())
+            {
+                var timings = intel.Timings.Where(t => t.Group == group).ToList();
+                if (timings.Count > 0)
+                {
+                    LiveTimingBlocks.Add(new TimingBlockViewModel(MemoryDetails.GroupName(group), null, timings));
+                }
+            }
+        }
+        else if (report.Live is { } live)
         {
             var s = live.Settings;
             MemorySettings = T("{0}-{1} · canaux {2} · GDM {3} · commande {4} · Power Down {5} · BGS {6} · BGS Alt {7} · rafraîchissement {8}",

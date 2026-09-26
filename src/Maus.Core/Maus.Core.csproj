@@ -10,6 +10,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Catalog\*.json" LogicalName="Maus.Core.Catalog.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Localization\i18n\*.json" LogicalName="Maus.Core.Localization.i18n.%(Filename)%(Extension)" />
+    <!-- Modules officiels PawnIO.Modules 0.2.11 (LGPL-2.1), dont MAUS n'appelle que les fonctions de lecture : voir THIRD-PARTY-NOTICES.md. -->
+    <EmbeddedResource Include="Workshop\Memory\PawnIo\*.bin" LogicalName="Maus.Core.PawnIo.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,6 +2,14 @@
 
 Toutes les versions *alpha* sont codées sous Linux et testées avec des simulations (faux registre, faux WMI…) : **aucune n'a encore été validée sur un vrai PC Windows.**
 
+## En cours (après la 0.3.2-alpha)
+
+- Icône lisible par Windows (plantage au démarrage corrigé) et logo complet à toutes les tailles.
+- Fiche mémoire sans pilote : vitesse et tension réellement appliquées (d'après Windows), comparées aux profils de la puce SPD (profil XMP activé, réglage manuel, standard JEDEC).
+- « Mon PC » : profils XMP / EXPO sous la référence de chaque barrette.
+- Timings réels sur Intel Core 6e à 10e génération (Skylake à Comet Lake), par les modules officiels PawnIO IntelMCHBAR et IntelMSR, en lecture seule : tCL, tRCD, tRP, tRAS, tCWL, tRDPRE, tWRPRE, tRFC, tREFI, type de mémoire, command rate, horloge mémoire, ring et agent système. Carte des registres sourcée (fiche Intel 336465-001), pas encore comparée à CPU-Z sur un vrai processeur.
+- Licences livrées avec l'application (dossier `licenses`).
+
 ## 0.3.2-alpha — 25/09/2026
 
 **Aucune donnée inventée** (demande du porteur) : chaque valeur affichée comme une limite ou une référence cite sa source, sinon elle n'est pas affichée.
