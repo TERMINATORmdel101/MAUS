@@ -290,13 +290,22 @@ public sealed partial class WorkshopViewModel : ObservableObject
     /// Avertissement des charges vectorielles larges (AVX, FMA, AVX-512), qui font consommer et chauffer davantage ;
     /// et, sans PawnIO, rappel que la température du processeur n'est pas lue. Vide pour les autres charges.
     /// </summary>
-    private string HeavyWarning(TestOption<CpuStressMode> mode) =>
+    private static string HeavyWarning(TestOption<CpuStressMode> mode) =>
         mode.Value is not (CpuStressMode.Avx or CpuStressMode.Fma or CpuStressMode.Avx512)
             ? string.Empty
-            : Environment.NewLine + Environment.NewLine + T("Charge « {0} » : les calculs vectoriels font consommer et chauffer le processeur davantage que le mélange automatique. Gardez un œil sur la température affichée pendant le test.", mode.Label)
-              + (Live.Samples.LastOrDefault()?.CpuTemperatureC is null
-                  ? " " + T("Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température.")
-                  : string.Empty);
+            : Environment.NewLine + Environment.NewLine + T("Charge « {0} » : les calculs vectoriels font consommer et chauffer le processeur davantage que le mélange automatique. Gardez un œil sur la température affichée pendant le test.", mode.Label);
+
+    /// <summary>
+    /// La température du processeur n'est lue qu'avec PawnIO : sans elle, l'arrêt automatique ne se fait pas sur la chaleur du
+    /// processeur. Dernière mesure si les capteurs ont déjà tourné, sinon présence du pilote. Vide si la température est lue.
+    /// </summary>
+    private string TemperatureCaveat()
+    {
+        var unreadable = Live.Samples.LastOrDefault() is { } sample ? sample.CpuTemperatureC is null : !IsPawnIoInstalled;
+        return unreadable
+            ? Environment.NewLine + Environment.NewLine + T("Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température.")
+            : string.Empty;
+    }
 
     /// <summary>Mesures montrées pendant un test : processeur (tests processeur, mémoire, cœur par cœur) ou carte graphique (mémoire vidéo).</summary>
     public MetricViewModel TestLoad => _graphicsTest ? Live.Gpu : Live.Cpu;
@@ -327,7 +336,19 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
     }
 
-    public bool IsIdle => !IsTesting;
+    /// <summary>Aucun test en cours ni en préparation : les boutons « Démarrer » sont actifs.</summary>
+    public bool IsIdle => !IsTesting && !_preparing;
+
+    /// <summary>Un test prépare son lancement (lecture des cœurs, des programmes actifs, confirmation) : aucun autre ne part.</summary>
+    private bool _preparing;
+
+    private bool Busy => IsTesting || _preparing;
+
+    private void SetPreparing(bool value)
+    {
+        _preparing = value;
+        OnPropertyChanged(nameof(IsIdle));
+    }
 
     public double CpuProgress
     {
@@ -449,6 +470,13 @@ public sealed partial class WorkshopViewModel : ObservableObject
     {
         _isActive = false;
         _monitorOpen = false;
+        if (_stopTest is not null)
+        {
+            // MAUS fermé pendant un test : arrêt voulu, pas un gel. La trace est effacée tout de suite, car la fermeture
+            // n'attend pas la fin du test et laisserait croire au prochain lancement que le PC a planté.
+            _checkpoint.Clear();
+        }
+
         _stopTest?.Invoke();
         _stopNet?.Invoke();
         _stopScan?.Invoke();
@@ -748,14 +776,14 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
     private async Task RunCpuTestAsync()
     {
-        if (IsTesting)
+        if (Busy)
         {
             return;
         }
 
         var duration = CpuDuration.Value;
         var mode = CpuMode.Value;
-        var heavyWarning = HeavyWarning(CpuMode);
+        var heavyWarning = HeavyWarning(CpuMode) + TemperatureCaveat();
         if (!_confirm(T("Lancer le test du processeur ?"), T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + heavyWarning + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
@@ -804,7 +832,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
     private async Task RunRamTestAsync()
     {
-        if (IsTesting)
+        if (Busy)
         {
             return;
         }
@@ -857,18 +885,32 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private static string? DescribeCrash(CoreTestCheckpoint? trace) => trace switch
     {
         null => null,
-        { Phase: 2 } => T("Le dernier programme complet s'est arrêté brutalement le {0:g}, pendant la phase des transitoires (tous les cœurs chargés puis arrêtés en même temps) : le PC a gelé ou redémarré. Le réglage global est trop bas pour les brusques variations de charge : remontez l'ensemble du Curve Optimizer de 2 ou 3 points (ou réduisez l'undervolt), puis refaites le programme.", trace.StartedAt.ToLocalTime()),
-        { Phase: 1 } => T("Le dernier programme complet s'est arrêté brutalement le {0:g}, pendant la phase cœur par cœur, sur le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le programme.", trace.StartedAt.ToLocalTime(), trace.Core),
-        _ => T("Le dernier test cœur par cœur s'est arrêté brutalement le {0:g}, pendant le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le test.", trace.StartedAt.ToLocalTime(), trace.Core),
+        { Phase: 2 } => T("Le dernier programme complet, lancé le {0:g}, s'est arrêté brutalement pendant la phase des transitoires (tous les cœurs chargés puis arrêtés en même temps) : le PC a gelé ou redémarré. Le réglage global est trop bas pour les brusques variations de charge : remontez l'ensemble du Curve Optimizer de 2 ou 3 points (ou réduisez l'undervolt), puis refaites le programme.", trace.StartedAt.ToLocalTime()),
+        { Phase: 1 } => T("Le dernier programme complet, lancé le {0:g}, s'est arrêté brutalement pendant la phase cœur par cœur, sur le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le programme.", trace.StartedAt.ToLocalTime(), trace.Core),
+        _ => T("Le dernier test cœur par cœur, lancé le {0:g}, s'est arrêté brutalement pendant le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le test.", trace.StartedAt.ToLocalTime(), trace.Core),
     };
 
     private async Task RunCoreTestAsync()
     {
-        if (IsTesting)
+        if (Busy)
         {
             return;
         }
 
+        // Occupé dès le clic : la lecture des cœurs et la confirmation prennent du temps, aucun autre test ne doit partir.
+        SetPreparing(true);
+        try
+        {
+            await CoreTestAsync();
+        }
+        finally
+        {
+            SetPreparing(false);
+        }
+    }
+
+    private async Task CoreTestAsync()
+    {
         IReadOnlyList<CpuCore> cores;
         try
         {
@@ -887,7 +929,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
 
         var plan = CoreCycleTest.Plan(CoreDuration.Value, cores.Count) with { Load = CoreMode.Value };
-        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + HeavyWarning(CoreMode) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + HeavyWarning(CoreMode) + TemperatureCaveat() + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -970,7 +1012,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
     private async Task RunVramTestAsync()
     {
-        if (IsTesting || VramAdapter is not { Value: var adapter })
+        if (Busy || VramAdapter is not { Value: var adapter })
         {
             return;
         }

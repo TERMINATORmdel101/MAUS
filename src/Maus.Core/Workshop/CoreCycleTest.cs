@@ -219,6 +219,11 @@ public static class CoreCycleTest
                     Pause(IdlePhase);
                 }
             }
+            catch (Exception)
+            {
+                // Une exception dans un fil d'arrière-plan fermerait MAUS : elle compte comme une erreur de ce cœur.
+                Interlocked.Increment(ref _errors);
+            }
             finally
             {
                 Finished = true;

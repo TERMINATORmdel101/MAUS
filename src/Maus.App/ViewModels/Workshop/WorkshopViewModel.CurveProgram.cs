@@ -61,11 +61,25 @@ public sealed partial class WorkshopViewModel
 
     private async Task RunCurveProgramAsync()
     {
-        if (IsTesting)
+        if (Busy)
         {
             return;
         }
 
+        // Occupé dès le clic : lecture des cœurs, des programmes actifs et confirmation prennent du temps.
+        SetPreparing(true);
+        try
+        {
+            await CurveProgramAsync();
+        }
+        finally
+        {
+            SetPreparing(false);
+        }
+    }
+
+    private async Task CurveProgramAsync()
+    {
         IReadOnlyList<CpuCore> cores;
         try
         {
@@ -84,16 +98,21 @@ public sealed partial class WorkshopViewModel
         }
 
         var total = CurveProgram.Value;
+        CurveStatus = T("Recherche des programmes qui utilisent le processeur…");
         var busy = await BusyProgramsAsync();
+        CurveStatus = string.Empty;
         var warning = T("Pendant {0}, le PC sera INUTILISABLE : tous les cœurs vont être poussés tour à tour, puis tous ensemble par à-coups. Enregistrez votre travail et fermez vos programmes avant de continuer.", FormatDuration(total))
             + Environment.NewLine + Environment.NewLine
             + T("Phase 1 ({0}) : un cœur à la fois, pic de charge d'une seconde, chute au repos, réveil vérifié, cœur suivant. Phase 2 ({0}) : tous les fils en charge 5 à 10 secondes, arrêt simultané, 2 secondes de repos, et on recommence.", FormatDuration(total / 2))
             + Environment.NewLine + Environment.NewLine
-            + T("MAUS ne ferme, ne suspend et ne ralentit aucun autre programme (cela pourrait provoquer de faux plantages) : c'est à vous de les fermer. Pendant le programme, MAUS passe en priorité haute (jamais « temps réel », qui empêcherait Windows d'écrire sur le disque et de répondre à la souris) et empêche la mise en veille.")
+            + T("MAUS ne ferme et ne suspend aucun autre programme (cela pourrait provoquer de faux plantages) : c'est à vous de les fermer. Pendant le programme, MAUS passe en priorité haute : pendant les rafales de la phase 2, les autres programmes seront presque à l'arrêt, c'est voulu. Jamais de priorité « temps réel » : elle peut empêcher Windows de vider ses caches disque et bloquer la souris. La mise en veille est suspendue jusqu'à la fin.")
+            + Environment.NewLine + Environment.NewLine
+            + T("Si vos ventilateurs sont pilotés par un logiciel plutôt que par le BIOS, ce logiciel peut réagir en retard pendant les rafales : pour un test long, préférez une courbe de ventilation réglée dans le BIOS.")
             + (busy.Count > 0 ? Environment.NewLine + Environment.NewLine + T("Programmes qui utilisent le processeur en ce moment : {0}.", string.Join(", ", busy)) : string.Empty)
             + HeavyWarning(CoreMode)
+            + TemperatureCaveat()
             + Environment.NewLine + Environment.NewLine
-            + T("Si le PC gèle ou redémarre, MAUS dira au prochain lancement dans quelle phase et sur quel cœur. Le programme s'arrête tout seul en cas de surchauffe, et à tout moment avec « Arrêter le test ».")
+            + T("Si le PC gèle ou redémarre, MAUS dira au prochain lancement dans quelle phase et sur quel cœur. Le programme s'arrête à tout moment avec « Arrêter le test ».")
             + Environment.NewLine + Environment.NewLine + T("Lancer le programme complet ?");
         if (!_confirm(T("Programme complet Curve Optimizer"), warning))
         {
@@ -178,7 +197,16 @@ public sealed partial class WorkshopViewModel
                     ? string.Join(" ", advice) + whea + " " + T("Puis refaites le programme.")
                     : result.WheaEvents is > 0
                         ? T("Aucune erreur de calcul, mais le processeur a signalé des erreurs matérielles.") + whea + " " + T("Remontez légèrement le Curve Optimizer ou l'undervolt, puis refaites le programme.")
-                        : T("Programme complet réussi : {0} cœur(s) stables en phase 1, {1} rafales sans erreur en phase 2, aucune erreur matérielle WHEA. Utilisez ensuite le PC normalement quelques jours : certains gels n'arrivent qu'au repos.", result.Cores.Count, result.Bursts);
+                        : T("Programme complet réussi : {0} cœur(s) stables en phase 1, {1} rafales sans erreur en phase 2.", result.Cores.Count, result.Bursts) + " "
+                          + (result.WheaEvents is null
+                              ? T("Le journal des erreurs matérielles (WHEA) n'a pas pu être lu : regardez-le dans l'Observateur d'événements avant de conclure.")
+                              : T("Aucune erreur matérielle WHEA."))
+                          + " " + T("Utilisez ensuite le PC normalement quelques jours : certains gels n'arrivent qu'au repos.");
+
+            if (result.Cores.Any(c => !c.Pinned))
+            {
+                CurveStatus += " " + T("Windows a refusé de fixer le test sur certains cœurs : le résultat par cœur est moins fiable.");
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

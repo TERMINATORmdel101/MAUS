@@ -245,7 +245,7 @@ public sealed partial class WorkshopViewModel
 
     private async Task RunDiskTestAsync()
     {
-        if (IsTesting || Drive is not { Value: var root })
+        if (Busy || Drive is not { Value: var root })
         {
             return;
         }

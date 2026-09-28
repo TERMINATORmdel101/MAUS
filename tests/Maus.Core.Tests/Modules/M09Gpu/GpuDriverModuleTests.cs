@@ -155,7 +155,7 @@ public class GpuDriverModuleTests
 
         var link = Get(findings, "M09.pcie-link.nvidia");
         Assert.Equal(FindingStatus.Info, link.Status);
-        Assert.StartsWith("x8 (maximum permis par la carte et ce PC", link.Expected, StringComparison.Ordinal);
+        Assert.StartsWith("x8 (maximum annoncé par nvidia-smi)", link.Expected, StringComparison.Ordinal);
         Assert.Contains(advice, link.Advice, StringComparison.Ordinal);
     }
 

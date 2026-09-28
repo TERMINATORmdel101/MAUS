@@ -10,8 +10,9 @@ internal sealed record NvidiaSmiGpu(int? BusNumber, string DriverVersion, string
 /// <summary>
 /// Largeur du lien PCIe d'une carte NVIDIA, lue dans <c>nvidia-smi --query-gpu=pci.bus_id,pcie.link.width.current,pcie.link.width.max</c>.
 /// D'après <c>nvidia-smi --help-query-gpu</c> : <c>pcie.link.width.max</c> est la largeur maximale « possible avec cette carte et
-/// cette configuration du système » (limite du slot, du processeur ou du câblage du portable comprise) ; la largeur actuelle
-/// « peut baisser quand la carte n'est pas utilisée ».
+/// cette configuration du système » ; la largeur actuelle « peut baisser quand la carte n'est pas utilisée ». Mais des relevés
+/// publiés sur des portables (forum NVIDIA, RTX 3060 Laptop) montrent la largeur maximale de la puce, pas celle du câblage :
+/// sources en désaccord, donc la valeur est affichée comme « annoncée par nvidia-smi », et un portable n'est jamais alarmé.
 /// </summary>
 internal sealed record NvidiaPcieLink(int? BusNumber, int? Width, int? SystemMaxWidth);
 

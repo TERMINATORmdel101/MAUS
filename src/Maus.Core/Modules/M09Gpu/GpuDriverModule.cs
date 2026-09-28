@@ -348,7 +348,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             Severity = Severity.Medium,
             Current = T("x{0}, {1} au moment de l'audit", width, speed),
             Expected = systemMax is not null
-                ? T("x{0} (maximum permis par la carte et ce PC, d'après nvidia-smi)", expected)
+                ? T("x{0} (maximum annoncé par nvidia-smi)", expected)
                 : T("x{0} (vitesse maximale de la carte : {1})", expected, maxSpeed),
             Explanation = T("La carte graphique échange avec le processeur par des lignes PCIe. Windows donne le maximum de la carte, pas celui du slot, du processeur " +
                           "ou du câblage d'un portable : une largeur plus petite peut donc être normale (portable, slot x8 ou x4, lignes partagées avec un SSD M.2) " +

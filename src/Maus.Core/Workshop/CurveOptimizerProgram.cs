@@ -129,7 +129,8 @@ public static class CurveOptimizerProgram
             while (!worker.Finished)
             {
                 await Task.Delay(50, CancellationToken.None).ConfigureAwait(false);
-                Report(1, core.Index, position, worker.Errors > 0 ? 1 : 0);
+                // Le cœur en cours ne compte qu'une fois : il peut déjà être en erreur depuis un tour précédent.
+                Report(1, core.Index, position, worker.Errors > 0 && verdicts[core.Index].Stable ? 1 : 0);
                 if (Check() is { } reason)
                 {
                     abortReason = reason;
@@ -272,6 +273,11 @@ public static class CurveOptimizerProgram
                     Verify();
                 }
             }
+            catch (Exception)
+            {
+                // Une exception dans un fil d'arrière-plan fermerait MAUS : elle compte comme une erreur de ce cœur.
+                Interlocked.Increment(ref _errors);
+            }
             finally
             {
                 _finished = true;
@@ -411,21 +417,29 @@ public static class CurveOptimizerProgram
                     return;
                 }
 
-                while (!_exit && Stopwatch.GetTimestamp() < Interlocked.Read(ref _deadline))
+                try
                 {
-                    var result = _kernel();
-                    var count = Interlocked.Increment(ref _rounds);
-                    if (_options.Fault is { } fault)
+                    while (!_exit && Stopwatch.GetTimestamp() < Interlocked.Read(ref _deadline))
                     {
-                        result = fault(index, count, result);
-                    }
+                        var result = _kernel();
+                        var count = Interlocked.Increment(ref _rounds);
+                        if (_options.Fault is { } fault)
+                        {
+                            result = fault(index, count, result);
+                        }
 
-                    if (result != _reference)
-                    {
-                        Interlocked.Increment(ref _errors);
-                    }
+                        if (result != _reference)
+                        {
+                            Interlocked.Increment(ref _errors);
+                        }
 
-                    Interlocked.Exchange(ref _heartbeats[index], Stopwatch.GetTimestamp());
+                        Interlocked.Exchange(ref _heartbeats[index], Stopwatch.GetTimestamp());
+                    }
+                }
+                catch (Exception)
+                {
+                    // Une exception dans un fil d'arrière-plan fermerait MAUS : elle compte comme une erreur de la rafale.
+                    Interlocked.Increment(ref _errors);
                 }
 
                 // Fil arrivé à l'échéance : il n'est plus surveillé jusqu'à la rafale suivante.
