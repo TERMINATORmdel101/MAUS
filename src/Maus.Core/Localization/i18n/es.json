@@ -2998,5 +2998,22 @@
   "La carte peut aller jusqu'à x{0}, mais son slot ou le processeur la limitent à x{1}. Si la carte mère a un autre slot x16 relié au processeur (voir son manuel), la carte y aurait toutes ses lignes.": "La tarjeta puede llegar a x{0}, pero su ranura o el procesador la limitan a x{1}. Si la placa base tiene otra ranura x16 conectada al procesador (consulte su manual), la tarjeta tendría allí todas sus líneas.",
   "Largeur du lien PCIe illisible. Sur un portable, la carte graphique dédiée peut être en veille quand elle ne sert pas : relancez l'audit pendant un jeu pour la lire.": "Anchura del enlace PCIe ilegible. En un portátil, la tarjeta gráfica dedicada puede estar en reposo cuando no se usa: vuelva a lanzar la auditoría durante un juego para leerla.",
   "Sur un portable, le fabricant relie souvent la carte graphique avec moins de lignes que son maximum, et le lien peut se réduire quand la carte ne travaille pas. Ce n'est pas une panne et il n'y a rien à démonter. Pour en avoir le cœur net, regardez la largeur pendant un jeu (GPU-Z, champ « Bus Interface »).": "En un portátil, el fabricante suele conectar la tarjeta gráfica con menos líneas que su máximo, y el enlace puede reducirse cuando la tarjeta no trabaja. No es una avería y no hay nada que desmontar. Para salir de dudas, mire la anchura durante un juego (GPU-Z, campo «Bus Interface»).",
-  "x{0} (maximum permis par la carte et ce PC, d'après nvidia-smi)": "x{0} (máximo permitido por la tarjeta y este PC, según nvidia-smi)"
+  "x{0} (maximum permis par la carte et ce PC, d'après nvidia-smi)": "x{0} (máximo permitido por la tarjeta y este PC, según nvidia-smi)",
+  "AVX (256 bits)": "AVX (256 bits)",
+  "AVX (256 bits, pleine cadence) : pas d'AVX-512 sur ce processeur": "AVX (256 bits, a pleno ritmo): este procesador no tiene AVX-512",
+  "AVX : calculs vectoriels, chauffe davantage": "AVX: cálculos vectoriales, calienta más",
+  "AVX-512 (512 bits)": "AVX-512 (512 bits)",
+  "AVX2 et FMA (256 bits)": "AVX2 y FMA (256 bits)",
+  "AVX2 et FMA (256 bits, pleine cadence) : pas d'AVX-512 sur ce processeur": "AVX2 y FMA (256 bits, a pleno ritmo): este procesador no tiene AVX-512",
+  "Automatique : mélange de calculs (recommandé)": "Automático: mezcla de cálculos (recomendado)",
+  "Charge :": "Carga:",
+  "Charge « {0} » : les calculs vectoriels font consommer et chauffer le processeur davantage que le mélange automatique. Gardez un œil sur la température affichée pendant le test.": "Carga «{0}»: los cálculos vectoriales hacen que el procesador consuma y se caliente más que con la mezcla automática. Vigile la temperatura que se muestra durante la prueba.",
+  "Instructions : {0}": "Instrucciones: {0}",
+  "Processeur (tous les cœurs, charge AVX)": "Procesador (todos los núcleos, carga AVX)",
+  "Processeur (tous les cœurs, charge très lourde)": "Procesador (todos los núcleos, carga muy pesada)",
+  "Très lourd : AVX à pleine cadence, charge maximale": "Muy pesada: AVX a pleno ritmo, carga máxima",
+  "Très lourd : AVX-512, charge maximale": "Muy pesada: AVX-512, carga máxima",
+  "calculs vectoriels de .NET : pas d'AVX sur ce processeur": "cálculos vectoriales de .NET: este procesador no tiene AVX",
+  "mélange : SHA-256, matrices, nombres premiers": "mezcla: SHA-256, matrices, números primos",
+  "Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température.": "Sin el controlador PawnIO, MAUS no lee la temperatura del procesador: no puede detener la prueba por ese motivo. El procesador se protege solo reduciendo su velocidad, pero instale PawnIO (pestaña En directo) para seguir su temperatura."
 }

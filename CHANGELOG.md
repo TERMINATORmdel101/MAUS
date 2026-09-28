@@ -28,6 +28,12 @@ Numérotation choisie par le porteur : la 0.3.3-alpha est suivie de la 3.9.1.
 - Étalonnage de la tension de la mémoire sur les cartes mères que LibreHardwareMonitor ne décrit pas : vous tapez la tension réglée dans le BIOS, MAUS propose les entrées qui la mesurent, vous choisissez ; présenté comme « étalonné par vous ».
 - Fenêtre de surveillance : mini-courbe par mesure, relevé (à la main ou pendant un test de stabilité) avec bilan et export CSV.
 
+**Retours du porteur sur la 3.9.1 (28/09/2026)**
+
+- Lien PCIe des cartes graphiques : plus de fausse alerte sur les portables. Windows ne donne que le maximum de la carte, pas celui du slot, du processeur ou du câblage du portable (le port racine ne publie pas sa largeur, constaté sur le PC du porteur). Portable : largeur réduite = information, jamais de conseil de démontage ; carte NVIDIA : référence = `nvidia-smi` (`pcie.link.width.max`, « maximum possible avec cette carte et ce système ») ; boîtier externe Thunderbolt / USB4 non jugé ; PC de bureau : « à améliorer », avec d'abord une vérification en charge (NVIDIA indique que la largeur peut baisser au repos).
+- Test du processeur : pendant le test, la barre sous les cartes affiche la charge et la **température du processeur** (et non plus celle de la carte graphique) ; le test de la mémoire vidéo affiche celles de la carte graphique.
+- Test du processeur : choix de la charge. **Automatique** (mélange SHA-256, matrices, nombres premiers, comme avant), **AVX** (calculs vectoriels 256 bits, avec FMA si le processeur l'a) et **Très lourd** (AVX-512 si le processeur l'a, sinon AVX à pleine cadence). Chaque charge est vérifiée contre une référence (toute erreur de calcul = instabilité), a son propre historique de score et affiche les instructions réellement utilisées. Les charges vectorielles préviennent qu'elles chauffent davantage, et que sans PawnIO la température du processeur n'est pas lue.
+
 **Sécurité (revue des fonctions qui modifient le PC)**
 
 - Corrections : une erreur imprévue de Windows pendant une écriture (clé de registre en cours de suppression, valeur refusée…) défait désormais toute la correction ; avant, elle pouvait laisser les premières écritures en place sans retour arrière.

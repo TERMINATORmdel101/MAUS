@@ -247,6 +247,8 @@ public static class Ui
 
     public static string SizeLabel => T("Quantité :");
 
+    public static string LoadLabel => T("Charge :");
+
     public static string Start => T("Démarrer");
 
     public static string StopTest => T("Arrêter le test");

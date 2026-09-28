@@ -22,6 +22,43 @@ public class StabilityTests
         Assert.False(result.Aborted);
     }
 
+    [Theory]
+    [InlineData(CpuStressMode.Avx)]
+    [InlineData(CpuStressMode.Heavy)]
+    public void Vector_loads_are_deterministic_and_bounded(CpuStressMode mode)
+    {
+        var first = CpuStress.Round(mode);
+
+        Assert.Equal(first, CpuStress.Round(mode));
+        Assert.NotEqual(0UL, first);
+        Assert.False(string.IsNullOrWhiteSpace(CpuStress.Instructions(mode)));
+    }
+
+    [Theory]
+    [InlineData(CpuStressMode.Automatic, "cpu-multi")]
+    [InlineData(CpuStressMode.Avx, "cpu-avx")]
+    [InlineData(CpuStressMode.Heavy, "cpu-heavy")]
+    public async Task Every_load_mode_runs_verified_rounds_and_keeps_its_own_score(CpuStressMode mode, string kind)
+    {
+        var result = await CpuTest.RunAsync(new CpuTestOptions(TimeSpan.FromMilliseconds(300), Threads: 2, mode));
+
+        Assert.True(result.Stable);
+        Assert.True(result.Rounds > 0);
+        Assert.Equal(mode, result.Mode);
+        Assert.Equal(kind, ScoreTrends.CpuKind(mode));
+        Assert.NotEqual(kind, ScoreTrends.Label(kind));
+    }
+
+    [Fact]
+    public async Task A_wrong_vector_result_marks_the_cpu_unstable()
+    {
+        var options = new CpuTestOptions(TimeSpan.FromMilliseconds(300), Threads: 2, CpuStressMode.Heavy) { Fault = (thread, round, value) => thread == 0 && round == 1 ? value ^ 4 : value };
+
+        var result = await CpuTest.RunAsync(options);
+
+        Assert.Equal(1, result.Errors);
+    }
+
     [Fact]
     public async Task A_single_wrong_result_marks_the_cpu_unstable()
     {

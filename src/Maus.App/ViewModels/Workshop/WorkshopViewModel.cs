@@ -252,6 +252,45 @@ public sealed partial class WorkshopViewModel : ObservableObject
         set => SetProperty(ref _cpuDuration, value);
     }
 
+    /// <summary>Types de charge proposés : AVX et « très lourd » seulement si le processeur a l'AVX.</summary>
+    public IReadOnlyList<TestOption<CpuStressMode>> CpuModes { get; } = BuildCpuModes();
+
+    private TestOption<CpuStressMode>? _cpuMode;
+
+    public TestOption<CpuStressMode> CpuMode
+    {
+        get => _cpuMode ?? CpuModes[0];
+        set
+        {
+            if (SetProperty(ref _cpuMode, value))
+            {
+                OnPropertyChanged(nameof(CpuModeDetail));
+            }
+        }
+    }
+
+    /// <summary>Instructions réellement utilisées par la charge choisie, sur ce processeur.</summary>
+    public string CpuModeDetail => T("Instructions : {0}", CpuStress.Instructions(CpuMode.Value));
+
+    private static List<TestOption<CpuStressMode>> BuildCpuModes()
+    {
+        var modes = new List<TestOption<CpuStressMode>> { new(T("Automatique : mélange de calculs (recommandé)"), CpuStressMode.Automatic) };
+        if (CpuStress.AvxSupported)
+        {
+            modes.Add(new(T("AVX : calculs vectoriels, chauffe davantage"), CpuStressMode.Avx));
+            modes.Add(new(CpuStress.Avx512Supported ? T("Très lourd : AVX-512, charge maximale") : T("Très lourd : AVX à pleine cadence, charge maximale"), CpuStressMode.Heavy));
+        }
+
+        return modes;
+    }
+
+    /// <summary>Mesures montrées pendant un test : processeur (tests processeur, mémoire, cœur par cœur) ou carte graphique (mémoire vidéo).</summary>
+    public MetricViewModel TestLoad => _graphicsTest ? Live.Gpu : Live.Cpu;
+
+    public MetricViewModel TestTemperature => _graphicsTest ? Live.GpuTemperature : Live.CpuTemperature;
+
+    private bool _graphicsTest;
+
     public IReadOnlyList<TestOption<long>> RamSizes { get; }
 
     private TestOption<long> _ramSize;
@@ -701,7 +740,14 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
 
         var duration = CpuDuration.Value;
-        if (!_confirm(T("Lancer le test du processeur ?"), T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        var mode = CpuMode.Value;
+        var heavyWarning = mode == CpuStressMode.Automatic
+            ? string.Empty
+            : Environment.NewLine + Environment.NewLine + T("Charge « {0} » : les calculs vectoriels font consommer et chauffer le processeur davantage que le mélange automatique. Gardez un œil sur la température affichée pendant le test.", CpuMode.Label)
+              + (Live.Samples.LastOrDefault()?.CpuTemperatureC is null
+                  ? " " + T("Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température.")
+                  : string.Empty);
+        if (!_confirm(T("Lancer le test du processeur ?"), T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + heavyWarning + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -716,11 +762,12 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 CpuProgress = Math.Min(100, 100 * p.Elapsed.TotalSeconds / duration.TotalSeconds);
                 CpuStatus = T("{0:0} s · {1} tours vérifiés · {2} erreur(s)", p.Elapsed.TotalSeconds, p.Rounds, p.Errors);
             });
-            var result = await CpuTest.RunAsync(new CpuTestOptions(duration, Environment.ProcessorCount), progress, () => Live.DangerAlarm, cancellation.Token);
+            var result = await CpuTest.RunAsync(new CpuTestOptions(duration, Environment.ProcessorCount, mode), progress, () => Live.DangerAlarm, cancellation.Token);
             CpuProgress = 100;
             var history = BenchmarkHistory.CreateDefault();
             var previous = history.Load();
-            var entry = new BenchmarkEntry("cpu-multi", result.Score, result.Stable, DateTimeOffset.Now);
+            // Un score par type de charge : ils ne se comparent pas entre eux.
+            var entry = new BenchmarkEntry(ScoreTrends.CpuKind(mode), result.Score, result.Stable, DateTimeOffset.Now);
             if (!result.Aborted)
             {
                 history.Add(entry);
@@ -733,6 +780,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 ? T("Test interrompu : {0}", result.AbortReason)
                 : result.Stable
                     ? T("Stable : aucune erreur de calcul en {0:0} s. Score : {1:0.0} tours par seconde.", result.Duration.TotalSeconds, result.Score) + comparison
+                      + " " + T("Instructions : {0}", CpuStress.Instructions(result.Mode)) + "."
                     : T("INSTABLE : {0} erreur(s) de calcul. Revenez aux réglages d'origine du BIOS (surcadençage, tension) et vérifiez le refroidissement.", result.Errors);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -922,7 +970,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
 
         using var cancellation = new CancellationTokenSource();
-        await StartTestAsync(cancellation);
+        await StartTestAsync(cancellation, graphics: true);
         try
         {
             VramStatus = T("Test en cours…");
@@ -956,9 +1004,12 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
     }
 
-    private async Task StartTestAsync(CancellationTokenSource cancellation)
+    private async Task StartTestAsync(CancellationTokenSource cancellation, bool graphics = false)
     {
         _stopTest = cancellation.Cancel;
+        _graphicsTest = graphics;
+        OnPropertyChanged(nameof(TestLoad));
+        OnPropertyChanged(nameof(TestTemperature));
         IsTesting = true;
         await RefreshActivityAsync();
     }

@@ -740,6 +740,12 @@
                                             <TextBlock Text="{x:Static app:Ui.CpuTestTitle}" Style="{StaticResource CardTitle}" />
                                             <TextBlock Text="{x:Static app:Ui.CpuTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
                                             <DockPanel Margin="0,12,0,0">
+                                                <TextBlock Text="{x:Static app:Ui.LoadLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                <ComboBox ItemsSource="{Binding Workshop.CpuModes}" SelectedItem="{Binding Workshop.CpuMode}" DisplayMemberPath="Label"
+                                                          IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" AutomationProperties.Name="{x:Static app:Ui.LoadLabel}" />
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Workshop.CpuModeDetail}" FontSize="12" Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                            <DockPanel Margin="0,8,0,0">
                                                 <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                                 <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="8,0,0,0"
                                                         Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartCpuTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
@@ -772,13 +778,15 @@
                                 <DockPanel Margin="0,12,0,0" Visibility="{Binding Workshop.IsTesting, Converter={StaticResource BoolToVisibility}}">
                                     <Button DockPanel.Dock="Left" Style="{StaticResource DangerButton}" Content="{x:Static app:Ui.StopTest}" Command="{Binding Workshop.StopTestCommand}" />
                                     <TextBlock VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap">
-                                        <Run Text="{Binding Workshop.Live.Cpu.Title, Mode=OneWay}" />
+                                        <Run Text="{Binding Workshop.TestLoad.Title, Mode=OneWay}" />
                                         <Run Text=" : " />
-                                        <Run Text="{Binding Workshop.Live.Cpu.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                        <Run Text="{Binding Workshop.TestLoad.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                        <Run Text="{Binding Workshop.TestLoad.DetailSuffix, Mode=OneWay}" />
                                         <Run Text="   ·   " />
-                                        <Run Text="{Binding Workshop.Live.GpuTemperature.Title, Mode=OneWay}" />
+                                        <Run Text="{Binding Workshop.TestTemperature.Title, Mode=OneWay}" />
                                         <Run Text=" : " />
-                                        <Run Text="{Binding Workshop.Live.GpuTemperature.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                        <Run Text="{Binding Workshop.TestTemperature.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                        <Run Text="{Binding Workshop.TestTemperature.DetailSuffix, Mode=OneWay}" />
                                     </TextBlock>
                                 </DockPanel>
 

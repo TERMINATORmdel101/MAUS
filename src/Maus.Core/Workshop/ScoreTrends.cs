@@ -20,11 +20,21 @@ public static class ScoreTrends
     {
         HealthKind => T("Score de santé"),
         "cpu-multi" => T("Processeur (tous les cœurs)"),
+        "cpu-avx" => T("Processeur (tous les cœurs, charge AVX)"),
+        "cpu-heavy" => T("Processeur (tous les cœurs, charge très lourde)"),
         "cpu-single" => T("Processeur (un cœur)"),
         "ram" => T("Mémoire vive (débit de copie)"),
         "vram" => T("Mémoire vidéo (débit de relecture)"),
         "disk-read" => T("Disque (lecture)"),
         _ => kind,
+    };
+
+    /// <summary>Type de score du test processeur : un par charge, car leurs tours n'ont pas la même durée.</summary>
+    public static string CpuKind(CpuStressMode mode) => mode switch
+    {
+        CpuStressMode.Avx => "cpu-avx",
+        CpuStressMode.Heavy => "cpu-heavy",
+        _ => "cpu-multi",
     };
 
     public static string Unit(string kind) => kind switch

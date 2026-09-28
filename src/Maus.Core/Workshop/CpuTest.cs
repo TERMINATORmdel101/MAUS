@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 
 namespace Maus.Core.Workshop;
 
-public sealed record CpuTestOptions(TimeSpan Duration, int Threads)
+public sealed record CpuTestOptions(TimeSpan Duration, int Threads, CpuStressMode Mode = CpuStressMode.Automatic)
 {
     /// <summary>Pour les tests : altère le résultat d'un tour (fil, numéro de tour, résultat) pour simuler une erreur de calcul.</summary>
     internal Func<int, long, ulong, ulong>? Fault { get; init; }
@@ -13,7 +13,7 @@ public sealed record CpuTestOptions(TimeSpan Duration, int Threads)
 public sealed record CpuTestProgress(TimeSpan Elapsed, long Rounds, int Errors);
 
 /// <summary>Résultat d'un test processeur : score (tours de calcul vérifiés par seconde) et erreurs de calcul.</summary>
-public sealed record CpuTestResult(int Threads, TimeSpan Duration, long Rounds, int Errors, bool Aborted, string? AbortReason)
+public sealed record CpuTestResult(int Threads, TimeSpan Duration, long Rounds, int Errors, bool Aborted, string? AbortReason, CpuStressMode Mode = CpuStressMode.Automatic)
 {
     /// <summary>Score : tours vérifiés par seconde, arrondi (comparable d'un passage à l'autre sur le même PC).</summary>
     public double Score => Duration.TotalSeconds > 0 ? Math.Round(Rounds / Duration.TotalSeconds, 1) : 0;
@@ -24,8 +24,9 @@ public sealed record CpuTestResult(int Threads, TimeSpan Duration, long Rounds, 
 
 /// <summary>
 /// Test de stabilité et de performance du processeur, lancé uniquement par l'utilisateur. Chaque tour enchaîne un
-/// hachage SHA-256, un calcul de matrices et un crible de nombres premiers, et compare le résultat à une référence
-/// calculée au début : un résultat différent trahit une instabilité (surcadençage, tension trop basse, surchauffe).
+/// hachage SHA-256, un calcul de matrices et un crible de nombres premiers (mode automatique), ou une charge vectorielle
+/// AVX / AVX-512 (voir <see cref="CpuStress"/>), et compare le résultat à une référence calculée au début : un résultat
+/// différent trahit une instabilité (surcadençage, tension trop basse, surchauffe).
 /// </summary>
 public static class CpuTest
 {
@@ -40,7 +41,9 @@ public static class CpuTest
         CancellationToken cancellationToken = default)
     {
         var fault = options.Fault;
-        var reference = Round(0);
+        // Mode « automatique » : le tour mixte ; modes AVX et très lourd : charge vectorielle (voir CpuStress).
+        Func<ulong> round = options.Mode == CpuStressMode.Automatic ? () => Round(0) : () => CpuStress.Round(options.Mode);
+        var reference = round();
         long rounds = 0;
         var errors = 0;
         string? abortReason = null;
@@ -52,7 +55,7 @@ public static class CpuTest
             long local = 0;
             while (!stop.IsCancellationRequested && clock.Elapsed < options.Duration)
             {
-                var result = Round(0);
+                var result = round();
                 if (fault is not null)
                 {
                     result = fault(thread, local, result);
@@ -95,7 +98,8 @@ public static class CpuTest
         var cancelled = cancellationToken.IsCancellationRequested;
         return new CpuTestResult(options.Threads, clock.Elapsed, rounds, errors,
             Aborted: abortReason is not null || cancelled,
-            AbortReason: abortReason ?? (cancelled ? Localization.Texts.T("Test arrêté par l'utilisateur.") : null));
+            AbortReason: abortReason ?? (cancelled ? Localization.Texts.T("Test arrêté par l'utilisateur.") : null),
+            Mode: options.Mode);
     }
 
     /// <summary>Un tour de calcul déterministe : même entrée, même résultat, sur tout processeur sain.</summary>

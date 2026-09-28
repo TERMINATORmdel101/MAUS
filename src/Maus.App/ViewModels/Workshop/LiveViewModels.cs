@@ -29,8 +29,17 @@ public sealed class MetricViewModel(string title, Brush stroke, double maximum =
     public string Detail
     {
         get => _detail;
-        private set => SetProperty(ref _detail, value);
+        private set
+        {
+            if (SetProperty(ref _detail, value))
+            {
+                OnPropertyChanged(nameof(DetailSuffix));
+            }
+        }
     }
+
+    /// <summary>Détail entre parenthèses après la valeur (« 4,70 GHz », « 1,250 V · 95 W »), vide s'il n'y en a pas.</summary>
+    public string DetailSuffix => string.IsNullOrWhiteSpace(Detail) ? string.Empty : " (" + Detail + ")";
 
     public IReadOnlyList<double> Series
     {
