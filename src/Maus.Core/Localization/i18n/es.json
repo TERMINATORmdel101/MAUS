@@ -2974,5 +2974,19 @@
   "{0} erreur(s) de Windows pendant le relevé : voyez la liste des événements pour savoir si elles ont un lien avec le test.": "{0} error(es) de Windows durante el registro: consulte la lista de eventos para saber si están relacionados con la prueba.",
   "{0} erreur(s) matérielle(s) (WHEA) pendant le relevé, dont {1} du bus PCI Express : le PC n'est pas stable dans ces conditions (réglage trop poussé, température, alimentation ou matériel à vérifier).": "{0} error(es) de hardware (WHEA) durante el registro, de ellos {1} del bus PCI Express: el PC no es estable en estas condiciones (ajuste demasiado forzado, temperatura, fuente de alimentación o hardware que revisar).",
   "{0} × {1} : {2} V (mesure brute {3} V)": "{0} × {1}: {2} V (medida bruta {3} V)",
-  "Étalonnée par vous le {0:d} : entrée « {1} »{2}, pour {3} V réglés dans le BIOS.": "Calibrada por usted el {0:d}: entrada «{1}»{2}, para {3} V ajustados en la BIOS."
+  "Étalonnée par vous le {0:d} : entrée « {1} »{2}, pour {3} V réglés dans le BIOS.": "Calibrada por usted el {0:d}: entrada «{1}»{2}, para {3} V ajustados en la BIOS.",
+  "Délai de réveil de la mémoire quand son DLL était arrêté pendant la veille.": "Retardo de reactivación de la memoria cuando su DLL estaba detenido durante el reposo.",
+  "Délai de sortie de l'autorafraîchissement avant la première commande.": "Retardo tras salir del autorrefresco antes del primer comando.",
+  "Délai entre deux lectures successives": "Retardo entre dos lecturas consecutivas",
+  "Délai entre deux écritures successives": "Retardo entre dos escrituras consecutivas",
+  "Délai pour passer d'une lecture à une écriture": "Retardo para pasar de una lectura a una escritura",
+  "Délai pour passer d'une écriture à une lecture": "Retardo para pasar de una escritura a una lectura",
+  "Horloge mémoire réelle non affichée : son codage n'est pas établi de façon sûre pour ce processeur ou ce mode, et MAUS ne la devine pas.": "Reloj de memoria real no mostrado: su codificación no está establecida de forma segura para este procesador o este modo, y MAUS no lo adivina.",
+  "UCLK plus haute que MCLK : impossible en fonctionnement normal, la table d'énergie (version 0x{0:X6}) est peut-être mal interprétée par MAUS. Fiez-vous plutôt aux timings et à la vitesse appliquée.": "UCLK más alta que MCLK: imposible en funcionamiento normal, puede que MAUS interprete mal la tabla de energía (versión 0x{0:X6}). Fíese más bien de los timings y de la velocidad aplicada.",
+  "dans des groupes de banques différents": "en grupos de bancos diferentes",
+  "dans le même groupe de banques": "en el mismo grupo de bancos",
+  "sur le même rang": "en el mismo rango",
+  "sur un autre rang de la même barrette": "en otro rango del mismo módulo",
+  "sur une autre barrette": "en otro módulo",
+  "{0}, {1}.": "{0}, {1}."
 }

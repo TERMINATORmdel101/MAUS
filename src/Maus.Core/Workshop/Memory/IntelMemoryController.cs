@@ -53,6 +53,9 @@ public sealed record ImcSetting
     /// <summary>Valeur numérique → libellé (« 0 » → « DDR4 ») ; une valeur absente de la table n'est pas affichée.</summary>
     public IReadOnlyDictionary<string, string> Values { get; init; } = new Dictionary<string, string>();
 
+    /// <summary>Modèles CPUID concernés, quand la famille en couvre d'autres pour lesquels ce registre n'est pas établi (vide : tous).</summary>
+    public IReadOnlyList<string> CpuModels { get; init; } = [];
+
     public IReadOnlyList<string> Sources { get; init; } = [];
 }
 
@@ -83,10 +86,23 @@ public sealed record ImcClock
     /// <summary>Facteur appliqué au produit (0,5 quand le registre donne une horloge double de DCLK).</summary>
     public double Scale { get; init; } = 1;
 
+    /// <summary>
+    /// Bits du mode « gear » (Ice Lake et après), lus à <see cref="GearOffset"/> : le produit est multiplié par le facteur
+    /// de <see cref="GearFactors"/>. Un mode absent de la table rend l'horloge inconnue plutôt que fausse.
+    /// </summary>
+    public string? GearBits { get; init; }
+
+    public string? GearOffset { get; init; }
+
+    public IReadOnlyDictionary<string, double> GearFactors { get; init; } = new Dictionary<string, double>();
+
     /// <summary>Rapports plausibles d'après les sources ; une valeur hors de cette plage est tenue pour inconnue.</summary>
     public int? MinRatio { get; init; }
 
     public int? MaxRatio { get; init; }
+
+    /// <summary>Modèles CPUID concernés, quand la famille en couvre d'autres pour lesquels ce registre n'est pas établi (vide : tous).</summary>
+    public IReadOnlyList<string> CpuModels { get; init; } = [];
 
     public IReadOnlyList<string> Sources { get; init; } = [];
 }
@@ -207,7 +223,10 @@ public static class IntelMemoryController
             return null;
         }
 
+        bool ForThisCpu(IReadOnlyList<string> models) => models.Count == 0 || models.Any(m => Matches(m, cpuFamily, cpuModel));
+
         var clocks = family.Clocks
+            .Where(c => ForThisCpu(c.CpuModels))
             .Select(c => ReadClock(c, Raw))
             .OfType<ImcClockValue>()
             .ToList();
@@ -217,6 +236,7 @@ public static class IntelMemoryController
         {
             var baseOffset = Hex(channel.Base);
             var settings = family.Settings
+                .Where(s => ForThisCpu(s.CpuModels))
                 .Select(s => Decode(s, s.PerChannel ? baseOffset : 0, Raw) is { } value ? new ImcSettingValue(s.Key, value) : null)
                 .OfType<ImcSettingValue>()
                 .ToList();
@@ -295,7 +315,9 @@ public static class IntelMemoryController
         }
 
         var mask = channel.PresenceMask is null ? uint.MaxValue : (ulong)(uint)Hex(channel.PresenceMask);
-        return (raw(Hex(channel.PresenceOffset), 4) & mask) != 0;
+        // Contrôleur absent (deuxième contrôleur des Core 11e génération et après) : le registre se lit tout à un.
+        var value = raw(Hex(channel.PresenceOffset), 4);
+        return value != uint.MaxValue && (value & mask) != 0;
     }
 
     private static string? Decode(ImcSetting setting, int baseOffset, Func<int, int, ulong> raw)
@@ -319,7 +341,17 @@ public static class IntelMemoryController
             reference = clock.ReferenceMhz.TryGetValue(selector, out var mhz) ? mhz : null;
         }
 
-        return reference is { } r ? new ImcClockValue(clock.Key, ratio, ratio * r * clock.Scale) : null;
+        var gear = 1.0;
+        if (clock.GearBits is { } gearBits)
+        {
+            var selector = Extract(raw(Hex(clock.GearOffset ?? clock.Offset), 4), gearBits).ToString(CultureInfo.InvariantCulture);
+            if (!clock.GearFactors.TryGetValue(selector, out gear))
+            {
+                return null;
+            }
+        }
+
+        return reference is { } r ? new ImcClockValue(clock.Key, ratio, ratio * r * gear * clock.Scale) : null;
     }
 
     /// <summary>Durée en nanosecondes des timings de rafraîchissement, les seuls qu'on compare habituellement en temps.</summary>

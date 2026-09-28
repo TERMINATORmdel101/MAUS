@@ -38,6 +38,9 @@ public sealed record MemoryClocks(double? FclkMhz, double? UclkMhz, double? Mclk
     public string? UclkMode => UclkMhz is { } u && MclkMhz is { } m && m > 0
         ? Math.Abs(u - m) / m < 0.05 ? "1:1" : Math.Abs((u * 2) - m) / m < 0.05 ? "1:2" : null
         : null;
+
+    /// <summary>UCLK nettement plus haute que MCLK : impossible en fonctionnement normal, signe d'une table PM mal interprétée.</summary>
+    public bool UclkAboveMclk => UclkMhz is { } u && MclkMhz is { } m && m > 0 && u > m * 1.05;
 }
 
 /// <summary>
@@ -243,10 +246,11 @@ public static class ZenMemoryController
         new(0x380905, 0x5D0, 0xC0, 0xC8, 0xCC, 0xB4, 0x224, 0x228, 0x22C),
         new(0x000300, 0x948, 0xC0, 0xC8, 0xCC, 0xB4, 0x224, 0x228, 0x22C),
 
-        // APU Zen 2 (Renoir) et Zen 3 (Cezanne)
-        new(0x370000, 0x884, 0x4B4, 0x4B8, 0x4BC, 0x190, 0x72C, -1, -1),
-        new(0x370001, 0x88C, 0x5A4, 0x5A8, 0x5AC, 0x190, 0x81C, -1, -1),
-        new(0x370002, 0x8AC, 0x5AC, 0x5B0, 0x5B4, 0x198, 0x824, -1, -1),
+        // APU Zen 1 et Zen+ (Raven Ridge, Picasso) : ZenStates-Core, ryzen_monitor_ng et TuxTimings concordent.
+        new(0x1E0004, 0x2A4, 0x298, 0x29C, 0x2A0, 0x104, 0xF0, -1, -1),
+
+        // APU Zen 2 (Renoir) et Zen 3 (Cezanne). Versions 0x370000 à 0x370002 retirées : ZenStates-Core et RyzenAdj
+        // placent FCLK et MCLK à des endroits différents ; la disposition générique (« à vérifier ») s'applique.
         new(0x370003, 0x8C8, 0x5CC, 0x5D0, 0x5D4, 0x198, 0x844, -1, -1),
         new(0x370004, 0x8C8, 0x5CC, 0x5D0, 0x5D4, 0x198, 0x844, -1, -1),
         new(0x370005, 0x8C0, 0x5E8, 0x5EC, 0x5F0, 0x198, 0x86C, -1, -1),
@@ -300,6 +304,7 @@ public static class ZenMemoryController
             0x24 => (version & 0x7) switch { 0 => 0x000200, 1 or 2 or 4 => 0x000202, _ => 0x000203 },
             0x38 => 0x000300,
             0x37 => 0x370005,
+            0x1E => 0x1E0004,
             0x40 or 0x45 => 0x400005,
             0x54 => 0x000400,
             0x62 => 0x000620,

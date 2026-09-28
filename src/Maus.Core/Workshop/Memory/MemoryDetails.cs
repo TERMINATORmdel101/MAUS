@@ -103,6 +103,11 @@ public static class MemoryDetails
                 {
                     notes.Add(T("FCLK et UCLK : table d'énergie lue avec la disposition générique de sa famille (version 0x{0:X6}), valeurs à vérifier.", clocks.TableVersion));
                 }
+
+                if (clocks?.UclkAboveMclk == true)
+                {
+                    notes.Add(T("UCLK plus haute que MCLK : impossible en fonctionnement normal, la table d'énergie (version 0x{0:X6}) est peut-être mal interprétée par MAUS. Fiez-vous plutôt aux timings et à la vitesse appliquée.", clocks.TableVersion));
+                }
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
@@ -147,6 +152,11 @@ public static class MemoryDetails
             if (!report.VerifiedOnHardware)
             {
                 notes.Add(T("Timings réels Intel ({0}) : carte des registres tirée des documents publiés, pas encore comparée à CPU-Z sur un processeur de cette génération. Comparez avec CPU-Z (onglet Memory) et signalez tout écart.", family.DisplayName));
+            }
+
+            if (report.DclkMhz is null)
+            {
+                notes.Add(T("Horloge mémoire réelle non affichée : son codage n'est pas établi de façon sûre pour ce processeur ou ce mode, et MAUS ne la devine pas."));
             }
 
             if (report.ChannelsDiffer)
@@ -205,8 +215,41 @@ public static class MemoryDetails
         "tRDWR" => T("Délai pour passer d'une lecture à une écriture."),
         "tWRRD" => T("Délai pour passer d'une écriture à une lecture sur un autre rang ou une autre barrette."),
         "tCKE" or "tXP" => T("Délais de mise en veille et de réveil de la mémoire."),
-        _ => null,
+        "tRRD_S" => T("Délai entre deux ouvertures de lignes dans des groupes de banques différents."),
+        "tRRD_L" => T("Délai entre deux ouvertures de lignes dans le même groupe de banques."),
+        "tXPDLL" => T("Délai de réveil de la mémoire quand son DLL était arrêté pendant la veille."),
+        "tXSR" => T("Délai de sortie de l'autorafraîchissement avant la première commande."),
+        _ => Turnaround(key),
     };
+
+    /// <summary>Délais de retournement Intel (tRDRD_sg, tWRRD_dr…) : le sens des deux accès, puis où a lieu le second.</summary>
+    private static string? Turnaround(string key)
+    {
+        var parts = key.Split('_');
+        if (parts.Length != 2)
+        {
+            return null;
+        }
+
+        var what = parts[0] switch
+        {
+            "tRDRD" => T("Délai entre deux lectures successives"),
+            "tWRWR" => T("Délai entre deux écritures successives"),
+            "tRDWR" => T("Délai pour passer d'une lecture à une écriture"),
+            "tWRRD" => T("Délai pour passer d'une écriture à une lecture"),
+            _ => null,
+        };
+        var where = parts[1] switch
+        {
+            "sg" => T("dans le même groupe de banques"),
+            "dg" => T("dans des groupes de banques différents"),
+            "sr" => T("sur le même rang"),
+            "dr" => T("sur un autre rang de la même barrette"),
+            "dd" => T("sur une autre barrette"),
+            _ => null,
+        };
+        return what is null || where is null ? null : T("{0}, {1}.", what, where);
+    }
 
     /// <summary>Rapport texte complet, à copier dans un forum ou à comparer avant/après un réglage.</summary>
     public static string ToText(MemoryDetailReport report)

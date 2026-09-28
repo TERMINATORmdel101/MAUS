@@ -167,6 +167,186 @@ public class IntelMemoryControllerTests
         Assert.Contains(details.Notes, n => n.Contains("pas encore comparée à CPU-Z", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(0x3C, "hsw-bdw")]
+    [InlineData(0x47, "hsw-bdw")]
+    [InlineData(0x7E, "icl-rkl")]
+    [InlineData(0xA7, "icl-rkl")]
+    [InlineData(0x8C, "tgl")]
+    [InlineData(0x97, "adl-rpl")]
+    [InlineData(0xB7, "adl-rpl")]
+    [InlineData(0xBF, "adl-rpl")]
+    [InlineData(0xAA, "mtl-arl-lnl")]
+    [InlineData(0xC6, "mtl-arl-lnl")]
+    [InlineData(0xBD, "mtl-arl-lnl")]
+    public void Catalog_covers_every_core_generation_from_haswell(int model, string family)
+    {
+        Assert.Equal(family, IntelMemoryController.FamilyFor(6, model)?.Id);
+        Assert.False(IntelMemoryController.FamilyFor(6, model)!.VerifiedOnHardware);
+    }
+
+    /// <summary>
+    /// Alder Lake en DDR5-6000 : contrôleur 0 garni (deux sous-canaux), contrôleur 1 absent (registres tout à un),
+    /// 30-36-36-76, gear 2, 2N. Valeurs composées bit à bit d'après la fiche Intel 655259.
+    /// </summary>
+    private static Dictionary<int, ulong> AlderLakeRegisters(int gear = 1)
+    {
+        var registers = new Dictionary<int, ulong>
+        {
+            [0xD800] = 1,
+            [0xD80C] = 0x20,
+            [0xD810] = 0x20,
+            [0x1D80C] = 0xFFFF_FFFF,
+            [0x1D810] = 0xFFFF_FFFF,
+            [0x5918] = (30 << 2) | (1 << 10) | (48UL << 24),
+            [0x5E04] = 30 | (1 << 8) | ((ulong)gear << 12),
+        };
+
+        foreach (var channel in new[] { 0xE000, 0xE800 })
+        {
+            registers[channel + 0x000] = 36 | (12 << 13) | (90UL << 32) | (76UL << 42) | (36UL << 51);
+            registers[channel + 0x070] = (30 << 16) | (28UL << 24);
+            registers[channel + 0x088] = 0b01_000;
+            registers[channel + 0x008] = 32 | (8 << 9) | (4 << 15);
+            registers[channel + 0x43C] = 3900 | (884UL << 18);
+        }
+
+        return registers;
+    }
+
+    [Fact]
+    public void Reads_alder_lake_ddr5_with_gear_and_skips_the_absent_controller()
+    {
+        var family = IntelMemoryController.FamilyFor(6, 0x97)!;
+
+        var report = IntelMemoryController.Read(family, 6, 0x97, new FakeMchbar(AlderLakeRegisters()), null)!;
+
+        Assert.Equal(["MC0-A", "MC0-B"], report.Channels);
+        Assert.Equal("DDR5", report.MemoryType);
+        Assert.Contains(report.Settings, s => s is { Key: "CommandRate", Value: "2N" });
+        Assert.Contains(report.Settings, s => s is { Key: "Gear", Value: "Gear 2" });
+        Assert.Equal(3000, report.DclkMhz!.Value, 3);
+        Assert.Equal(4800, report.RingMhz);
+        int? Timing(string key) => report.Timings.Single(t => t.Key == key).Clocks;
+        Assert.Equal((30, 36, 36, 76), (Timing("tCL"), Timing("tRCD"), Timing("tRP"), Timing("tRAS")));
+        Assert.Equal((28, 12, 90), (Timing("tCWL"), Timing("tRDPRE"), Timing("tWRPRE")));
+        Assert.Equal((32, 8, 4), (Timing("tFAW"), Timing("tRRD_L"), Timing("tRRD_S")));
+        Assert.Equal((884, 3900), (Timing("tRFC"), Timing("tREFI")));
+        Assert.Equal(294.7, report.Timings.Single(t => t.Key == "tRFC").Nanoseconds!.Value, 1);
+
+        Assert.Equal(6000, IntelMemoryController.Read(family, 6, 0x97, new FakeMchbar(AlderLakeRegisters(gear: 2)), null)!.DclkMhz!.Value, 3);
+        Assert.Null(IntelMemoryController.Read(family, 6, 0x97, new FakeMchbar(AlderLakeRegisters(gear: 3)), null)!.DclkMhz);
+    }
+
+    [Fact]
+    public void Tiger_lake_reads_its_second_controller_and_64_bit_timing_register()
+    {
+        var registers = new Dictionary<int, ulong>
+        {
+            [0x5000] = 0,
+            [0x500C] = 0x10,
+            [0x5010] = 0,
+            [0x1500C] = 0x10,
+            [0x15010] = 0,
+            [0x5E04] = 32 | (1 << 8),
+        };
+        foreach (var channel in new[] { 0x4000, 0x14000 })
+        {
+            registers[channel + 0x000] = 22 | (52UL << 33) | (22UL << 41);
+            registers[channel + 0x070] = 22 << 16;
+        }
+
+        var family = IntelMemoryController.FamilyFor(6, 0x8C)!;
+        var report = IntelMemoryController.Read(family, 6, 0x8C, new FakeMchbar(registers), null)!;
+
+        Assert.Equal(["MC0-A", "MC1-A"], report.Channels);
+        Assert.Equal("DDR4", report.MemoryType);
+        Assert.Contains(report.Settings, s => s is { Key: "Gear", Value: "Gear 1" });
+        Assert.Equal(1600, report.DclkMhz);
+        int? Timing(string key) => report.Timings.Single(t => t.Key == key).Clocks;
+        Assert.Equal((22, 22, 22, 52), (Timing("tCL"), Timing("tRCD"), Timing("tRP"), Timing("tRAS")));
+    }
+
+    [Fact]
+    public void Meteor_lake_clock_is_shown_in_gear_2_only_and_lunar_lake_gets_timings_without_clock()
+    {
+        var registers = new Dictionary<int, ulong>
+        {
+            [0xD80C] = 0x20,
+            [0xD810] = 0,
+            [0x1D80C] = 0xFFFF_FFFF,
+            [0x1D810] = 0xFFFF_FFFF,
+            [0x13D10] = 84,
+            [0xE000] = 40 | (90UL << 45),
+            [0xE138] = 40UL << 22,
+            [0xE070] = 40 << 16,
+            [0xE088] = 1 << 3,
+        };
+        var family = IntelMemoryController.FamilyFor(6, 0xAA)!;
+
+        var meteor = IntelMemoryController.Read(family, 6, 0xAA, new FakeMchbar(registers), null)!;
+        Assert.Equal(2800, meteor.DclkMhz!.Value, 1);
+        Assert.Contains(meteor.Settings, s => s is { Key: "CommandRate", Value: "2N" });
+        Assert.Contains(meteor.Settings, s => s is { Key: "Gear", Value: "Gear 2" });
+        int? Timing(string key) => meteor.Timings.Single(t => t.Key == key).Clocks;
+        Assert.Equal((40, 40, 40, 90), (Timing("tCL"), Timing("tRCD"), Timing("tRP"), Timing("tRAS")));
+
+        registers[0x13D10] = 84 | (1 << 8);
+        Assert.Null(IntelMemoryController.Read(family, 6, 0xAA, new FakeMchbar(registers), null)!.DclkMhz);
+
+        var lunar = IntelMemoryController.Read(family, 6, 0xBD, new FakeMchbar(registers), null)!;
+        Assert.Null(lunar.DclkMhz);
+        Assert.Empty(lunar.Settings);
+        Assert.Equal(40, lunar.Timings.Single(t => t.Key == "tCL").Clocks);
+    }
+
+    [Fact]
+    public void Haswell_gets_timings_without_the_disputed_clock_and_command_rate_only_where_documented()
+    {
+        var registers = new Dictionary<int, ulong>
+        {
+            [0x5000] = 0,
+            [0x5004] = 0x10,
+            [0x5008] = 0x10,
+            [0x4000] = 9 | (9 << 5) | (24 << 10),
+            [0x4004] = 5 | (24 << 4) | (2UL << 30),
+            [0x4014] = 9 | (7 << 5),
+            [0x4298] = 6240 | (208UL << 16),
+        };
+        registers[0x4400] = registers[0x4000];
+        registers[0x4404] = registers[0x4004];
+        registers[0x4414] = registers[0x4014];
+        registers[0x4698] = registers[0x4298];
+        var family = IntelMemoryController.FamilyFor(6, 0x3C)!;
+
+        var haswell = IntelMemoryController.Read(family, 6, 0x3C, new FakeMchbar(registers), null)!;
+        Assert.Equal("DDR3", haswell.MemoryType);
+        Assert.Contains(haswell.Settings, s => s is { Key: "CommandRate", Value: "2N" });
+        Assert.Null(haswell.DclkMhz);
+        int? Timing(string key) => haswell.Timings.Single(t => t.Key == key).Clocks;
+        Assert.Equal((9, 9, 9, 24, 7), (Timing("tCL"), Timing("tRCD"), Timing("tRP"), Timing("tRAS"), Timing("tCWL")));
+        Assert.Equal((208, 6240), (Timing("tRFC"), Timing("tREFI")));
+        Assert.DoesNotContain(haswell.Timings, t => t.Key is "tRRD" or "tRDPRE");
+
+        var broadwell = IntelMemoryController.Read(family, 6, 0x47, new FakeMchbar(registers), null)!;
+        Assert.DoesNotContain(broadwell.Settings, s => s.Key == "CommandRate");
+
+        var details = MemoryDetails.Read(new NoSpd(), null, null, null, new IntelControllerAccess(6, 0x3C, () => new FakeMchbar(registers), () => null));
+        Assert.Contains(details.Notes, n => n.StartsWith("Horloge mémoire réelle non affichée", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Turnaround_timings_are_described_in_plain_words()
+    {
+        Assert.Equal("Délai entre deux lectures successives, dans le même groupe de banques.", MemoryDetails.Describe("tRDRD_sg"));
+        Assert.Equal("Délai pour passer d'une écriture à une lecture, sur une autre barrette.", MemoryDetails.Describe("tWRRD_dd"));
+        Assert.Null(MemoryDetails.Describe("tRDRD_xx"));
+        foreach (var key in IntelMemoryController.Families.SelectMany(f => f.Fields).Select(f => f.Key).Distinct())
+        {
+            Assert.True(MemoryDetails.Describe(key) is not null || key is "tZQOPER" or "tMOD", $"{key} sans description");
+        }
+    }
+
     [Fact]
     public void Extract_reads_documented_bit_ranges()
     {
@@ -247,6 +427,21 @@ public class IntelMemoryControllerTests
                 {
                     InWindow(IntelMemoryController.Hex(referenceOffset), 4, clock.Key + " référence");
                 }
+
+                if (clock.GearBits is not null)
+                {
+                    Assert.NotEmpty(clock.GearFactors);
+                    InWindow(IntelMemoryController.Hex(clock.GearOffset ?? clock.Offset), 4, clock.Key + " gear");
+                }
+
+                Assert.All(clock.CpuModels, m => Assert.Contains(m, family.CpuModels));
+            }
+
+            Assert.All(family.Settings.SelectMany(s => s.CpuModels), m => Assert.Contains(m, family.CpuModels));
+            Assert.All(family.UncoreMsrModels, m => Assert.Contains(m, family.CpuModels));
+            foreach (var field in family.Fields)
+            {
+                Assert.True(field.Confidence == "single" || field.Sources.Count >= 2, $"{family.Id} {field.Key} : « dual » avec une seule source");
             }
         }
     }

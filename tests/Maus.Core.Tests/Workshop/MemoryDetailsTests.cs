@@ -332,6 +332,31 @@ public class MemoryDetailsTests
         Assert.Null(ZenMemoryController.ReadClocks(new FakePm(0x999999, [])));
     }
 
+    [Fact]
+    public void Raven_ridge_apus_have_their_own_table_and_renoir_conflicts_fall_back_to_generic()
+    {
+        var raven = ZenMemoryController.ReadClocks(new FakePm(0x1E0004, new() { [0x298] = 1467, [0x29C] = 1467, [0x2A0] = 1467, [0x104] = 1.05f }))!;
+        Assert.False(raven.GenericLayout);
+        Assert.Equal(1467.0, raven.MclkMhz);
+        Assert.Equal(1.05, raven.SocVolts);
+
+        // Renoir 0x370000 à 0x370002 : sources en désaccord, lu avec la disposition générique et signalé « à vérifier ».
+        Assert.True(ZenMemoryController.ReadClocks(new FakePm(0x370002, new() { [0x5E8] = 1600, [0x5EC] = 1600, [0x5F0] = 1600 }))!.GenericLayout);
+        Assert.True(ZenMemoryController.LayoutFor(0x1E0005)!.Value.Generic);
+    }
+
+    [Fact]
+    public void Uclk_above_mclk_is_flagged_as_a_misread_table()
+    {
+        var swapped = ZenMemoryController.ReadClocks(new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 3000, [0x138] = 1500 }))!;
+        Assert.True(swapped.UclkAboveMclk);
+        Assert.Null(swapped.UclkMode);
+        Assert.False(ZenMemoryController.ReadClocks(new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 1500, [0x138] = 3000 }))!.UclkAboveMclk);
+
+        var report = MemoryDetails.Read(new FakeSpd(), null, new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 3000, [0x138] = 1500 }), ddr5Hint: null);
+        Assert.Contains(report.Notes, n => n.StartsWith("UCLK plus haute que MCLK", StringComparison.Ordinal));
+    }
+
     private sealed class FakeSpd(params SpdImage[] images) : ISpdSource
     {
         public IReadOnlyList<SpdImage> ReadAll() => images;

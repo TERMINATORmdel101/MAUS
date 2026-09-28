@@ -1,6 +1,8 @@
 // Cartes des registres des contrôleurs mémoire Intel Core, lus en lecture seule par le module officiel PawnIO IntelMCHBAR.
 // Chaque champ cite sa source publiée. Pas de source = champ absent : MAUS ne devine aucun registre.
 // Décalages en hexadécimal ; ceux des champs sont relatifs à la base du canal, ceux des horloges et de la présence sont absolus.
+// « cpuModels » sur un réglage ou une horloge : lu seulement pour ces modèles (registre non établi pour les autres).
+// « gearBits » : le produit rapport × référence est multiplié par le facteur du mode gear lu ; mode inconnu = horloge non affichée.
 // « verifiedOnHardware » ne passe à true qu'après comparaison avec CPU-Z sur un vrai processeur de la famille.
 [
   {
@@ -144,5 +146,589 @@
     // Vérifié le 26/09/2026 sur un i7-8700K (Coffee Lake, modèle 0x9E), DDR4-3467 réglée à la main : vitesse et timings
     // lus par MAUS confirmés par le porteur (seule la tension, lue alors dans la table SMBIOS du BIOS, était fausse).
     "verifiedOnHardware": true
+  },
+  {
+    "id": "hsw-bdw",
+    "displayName": "Intel Core 4e et 5e génération (Haswell, Broadwell)",
+    "cpuModels": [ "0x3C", "0x45", "0x46", "0x3D", "0x47" ],
+    "mchbarWindowBytes": 32768,
+    "sources": [
+      "Intel, Desktop 4th Generation Intel Core Processor Family Datasheet, Volume 2, document 328898-003 (copies de synthèse des registres, 4C00h à 4FFFh)",
+      "Intel, 4th Generation Intel Core (U et Y) Datasheet, Volume 2, document 329002-002 ; 5th Generation Intel Core (Broadwell U et Y) Datasheet, Volume 2, document 330835-003",
+      "coreboot src/northbridge/intel/haswell : registers/mchbar.h (canal n à 4000h + 400h × n), native_raminit/reg_structs.h (champs des registres TC_*), raminit_shared.c",
+      "memtest86+ 7.x, system/imc/x86/intel_hsw.c (tCL, tRCD, tRP, tRAS) ; CoreFreq x86_64/intel_reg.h (HSW_DDR_*, HSW_TC_REFRESH_TIMING)",
+      "Linux drivers/edac/ie31200_edac.c (MAD_DIMM 5004h et 5008h) et arch/x86/include/asm/intel-family.h (modèles 0x3C, 0x45, 0x46, 0x3D, 0x47)",
+      "Linux drivers/platform/x86/intel/uncore-frequency/uncore-frequency.c : MSR 0x620 et 0x621 pour Broadwell G (0x47) seulement",
+      "PawnIO.Modules 0.2.11, IntelMCHBAR.p : fenêtre MCHBAR de 32 Ko"
+    ],
+    "memoryTypes": [ "DDR3", "LPDDR3" ],
+    "channels": [
+      { "name": "A", "base": "0x4000", "presenceOffset": "0x5004", "presenceMask": "0x0000FFFF" },
+      { "name": "B", "base": "0x4400", "presenceOffset": "0x5008", "presenceMask": "0x0000FFFF" }
+    ],
+    "settings": [
+      {
+        "key": "MemoryType", "offset": "0x5000", "perChannel": false, "bits": "10",
+        "values": { "0": "DDR3", "1": "LPDDR3" },
+        "sources": [ "329002-002 §4.2.15 et 330835-003 §4.2.12 MAD_CHNL (5000h), bit 10 LPDDR", "coreboot reg_structs.h mad_chnl_reg.lpddr_mode (bit 10)" ]
+      },
+      {
+        // La fiche Broadwell 330835-003 marque les bits 31:23 de 4C04h réservés : réglage lu sur Haswell seulement.
+        "key": "CommandRate", "offset": "0x004", "bits": "31:30", "cpuModels": [ "0x3C", "0x45", "0x46" ],
+        "values": { "0": "1N", "2": "2N", "3": "3N" },
+        "sources": [ "328898-003 TC_BANK_RANK_A (4C04h), CMD_Stretch 31:30 (00 1N, 10 2N, 11 3N)", "coreboot tc_bank_rank_a_reg.cmd_stretch [31..30]", "CoreFreq HSW_DDR_TIMING.CMD_Stretch 31:30" ]
+      }
+    ],
+    // Horloge mémoire absente : le bit qui choisit la référence (100 ou 133 MHz) est placé à trois endroits différents
+    // par coreboot (5E00h bit 4), memtest86+ (5E04h bit 8) et CoreFreq (5E00h bit 8). Sources en désaccord : rien n'est lu.
+    "clocks": [],
+    "uncoreMsrModels": [ "0x47" ],
+    "fields": [
+      { "key": "tCL", "group": "Primary", "register": "TC_BANK_RANK_D", "offset": "0x014", "bits": "4:0",
+        "sources": [ "328898-003 4C14h, CAS Latency 4:0", "coreboot tc_bank_rank_d_reg.tAA [4..0]", "memtest86+ intel_hsw.c (4014h & 1Fh)", "CoreFreq HSW_DDR_RANK_TIMING.tCL" ] },
+      { "key": "tRCD", "group": "Primary", "register": "TC_BANK", "offset": "0x000", "bits": "4:0",
+        "sources": [ "coreboot tc_bank_reg.tRCD [4..0]", "memtest86+ intel_hsw.c (4000h & 1Fh)" ] },
+      { "key": "tRP", "group": "Primary", "register": "TC_BANK", "offset": "0x000", "bits": "9:5",
+        "sources": [ "coreboot tc_bank_reg.tRP [9..5]", "memtest86+ intel_hsw.c ((4000h >> 5) & 1Fh)" ] },
+      { "key": "tRAS", "group": "Primary", "register": "TC_BANK", "offset": "0x000", "bits": "15:10",
+        "sources": [ "coreboot tc_bank_reg.tRAS [15..10]", "memtest86+ intel_hsw.c ((4000h >> 10) & 3Fh)" ] },
+      { "key": "tCWL", "group": "Secondary", "register": "TC_BANK_RANK_D", "offset": "0x014", "bits": "9:5",
+        "sources": [ "328898-003 4C14h, Write CAS latency 9:5", "coreboot tc_bank_rank_d_reg.tCWL [9..5]", "CoreFreq HSW_DDR_RANK_TIMING.tCWL" ] },
+      { "key": "tWRPRE", "group": "Secondary", "register": "TC_BANK", "offset": "0x000", "bits": "25:20", "confidence": "single",
+        "sources": [ "coreboot tc_bank_reg.tWRPRE [25..20]" ] },
+      { "key": "tFAW", "group": "Secondary", "register": "TC_BANK_RANK_A", "offset": "0x004", "bits": "11:4", "confidence": "single",
+        "sources": [ "coreboot tc_bank_rank_a_reg.tFAW [11..4]" ] },
+      { "key": "tCKE", "group": "Secondary", "register": "TC_BANK_RANK_A", "offset": "0x004", "bits": "3:0", "confidence": "single",
+        "sources": [ "coreboot tc_bank_rank_a_reg.tCKE [3..0]" ] },
+      { "key": "tRFC", "group": "Secondary", "register": "TC_RFTP", "offset": "0x298", "bits": "24:16",
+        "sources": [ "328898-003 et 330835-003 TC_RFTP (4E98h), tRFC 24:16", "coreboot tc_rftp_reg.tRFC [24..16]", "CoreFreq HSW_TC_REFRESH_TIMING.tRFC" ] },
+      { "key": "tREFI", "group": "Secondary", "register": "TC_RFTP", "offset": "0x298", "bits": "15:0",
+        "sources": [ "328898-003 et 330835-003 TC_RFTP (4E98h), tREFI 15:0", "coreboot tc_rftp_reg.tREFI [15..0]", "CoreFreq HSW_TC_REFRESH_TIMING.tREFI" ] },
+      { "key": "tRDRD_sr", "group": "Tertiary", "register": "TC_BANK_RANK_A", "offset": "0x004", "bits": "14:12",
+        "sources": [ "330835-003 4C04h, tRDRD 14:12", "coreboot tc_bank_rank_a_reg.tRDRD_sr", "CoreFreq HSW_DDR_TIMING.tsrRdTRd" ] },
+      { "key": "tRDRD_dr", "group": "Tertiary", "register": "TC_BANK_RANK_A", "offset": "0x004", "bits": "18:15",
+        "sources": [ "330835-003 4C04h, tRDRD_dr 18:15", "coreboot tc_bank_rank_a_reg.tRDRD_dr", "CoreFreq HSW_DDR_TIMING.tdrRdTRd" ] },
+      { "key": "tRDRD_dd", "group": "Tertiary", "register": "TC_BANK_RANK_A", "offset": "0x004", "bits": "22:19",
+        "sources": [ "330835-003 4C04h, tRDRD_dd 22:19", "coreboot tc_bank_rank_a_reg.tRDRD_dd", "CoreFreq HSW_DDR_TIMING.tddRdTRd" ] },
+      { "key": "tWRRD_sr", "group": "Tertiary", "register": "TC_BANK_RANK_B", "offset": "0x008", "bits": "5:0",
+        "sources": [ "330835-003 4C08h, tWRRD 5:0", "coreboot tc_bank_rank_b_reg.tWRRD_sr", "CoreFreq HSW_DDR_RANK_TIMING_A.tsrWrTRd" ] },
+      { "key": "tWRRD_dr", "group": "Tertiary", "register": "TC_BANK_RANK_B", "offset": "0x008", "bits": "9:6",
+        "sources": [ "330835-003 4C08h, tWRRD_dr 9:6", "coreboot tc_bank_rank_b_reg.tWRRD_dr", "CoreFreq HSW_DDR_RANK_TIMING_A.tdrWrTRd" ] },
+      { "key": "tWRRD_dd", "group": "Tertiary", "register": "TC_BANK_RANK_B", "offset": "0x008", "bits": "13:10",
+        "sources": [ "330835-003 4C08h, tWRRD_dd 13:10", "coreboot tc_bank_rank_b_reg.tWRRD_dd", "CoreFreq HSW_DDR_RANK_TIMING_A.tddWrTRd" ] },
+      { "key": "tWRWR_sr", "group": "Tertiary", "register": "TC_BANK_RANK_B", "offset": "0x008", "bits": "16:14",
+        "sources": [ "330835-003 4C08h, tWRWR 16:14", "coreboot tc_bank_rank_b_reg.tWRWR_sr", "CoreFreq HSW_DDR_RANK_TIMING_A.tsrWrTWr" ] },
+      { "key": "tWRWR_dr", "group": "Tertiary", "register": "TC_BANK_RANK_B", "offset": "0x008", "bits": "20:17",
+        "sources": [ "330835-003 4C08h, tWRWR_dr 20:17", "coreboot tc_bank_rank_b_reg.tWRWR_dr", "CoreFreq HSW_DDR_RANK_TIMING_A.tdrWrTWr" ] },
+      { "key": "tWRWR_dd", "group": "Tertiary", "register": "TC_BANK_RANK_B", "offset": "0x008", "bits": "24:21",
+        "sources": [ "330835-003 4C08h, tWRWR_dd 24:21", "coreboot tc_bank_rank_b_reg.tWRWR_dd", "CoreFreq HSW_DDR_RANK_TIMING_A.tddWrTWr" ] },
+      { "key": "tRDWR_sr", "group": "Tertiary", "register": "TC_BANK_RANK_C", "offset": "0x00C", "bits": "18:14",
+        "sources": [ "330835-003 4C0Ch, tRDWR 18:14", "coreboot tc_bank_rank_c_reg.tRDWR_sr", "CoreFreq HSW_DDR_RANK_TIMING_B.tsrRdTWr" ] },
+      { "key": "tRDWR_dr", "group": "Tertiary", "register": "TC_BANK_RANK_C", "offset": "0x00C", "bits": "23:19",
+        "sources": [ "330835-003 4C0Ch, tRDWR_dr 23:19", "coreboot tc_bank_rank_c_reg.tRDWR_dr", "CoreFreq HSW_DDR_RANK_TIMING_B.tdrRdTWr" ] },
+      { "key": "tRDWR_dd", "group": "Tertiary", "register": "TC_BANK_RANK_C", "offset": "0x00C", "bits": "28:24",
+        "sources": [ "330835-003 4C0Ch, tRDWR_dd 28:24", "coreboot tc_bank_rank_c_reg.tRDWR_dd", "CoreFreq HSW_DDR_RANK_TIMING_B.tddRdTWr" ] },
+      { "key": "tXPDLL", "group": "Tertiary", "register": "TC_BANK_RANK_C", "offset": "0x00C", "bits": "5:0", "confidence": "single",
+        "sources": [ "coreboot tc_bank_rank_c_reg.tXPDLL [5..0]" ] },
+      { "key": "tXP", "group": "Tertiary", "register": "TC_BANK_RANK_C", "offset": "0x00C", "bits": "9:6", "confidence": "single",
+        "sources": [ "coreboot tc_bank_rank_c_reg.tXP [9..6]" ] },
+      { "key": "tXSDLL", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x2A4", "bits": "11:0", "confidence": "single",
+        "sources": [ "coreboot registers/mchbar.h TC_SRFTP (42A4h) et tc_srftp_reg.tXSDLL [11..0]" ] },
+      { "key": "tZQOPER", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x2A4", "bits": "25:16", "confidence": "single",
+        "sources": [ "coreboot tc_srftp_reg.tZQOPER [25..16]" ] }
+    ],
+    // tRRD et tRDPRE : coreboot les place en 29:26 et 19:16, CoreFreq met tRRD en 19:16 (disposition qu'il dit devinée).
+    "unavailable": [ "tRRD", "tRDPRE", "tWR", "tRTP", "tWTR", "tRC" ],
+    "verifiedOnHardware": false
+  },
+  {
+    "id": "icl-rkl",
+    "displayName": "Intel Core 10e génération mobile et 11e génération de bureau (Ice Lake, Rocket Lake)",
+    "cpuModels": [ "0x7D", "0x7E", "0xA7" ],
+    "mchbarWindowBytes": 65536,
+    "sources": [
+      "Intel, 10th Generation Intel Core Processor Families (Ice Lake U et Y) Datasheet, Volume 2 of 2, document 341078-004 (septembre 2021), §3.2 et §3.3",
+      "Intel, 11th Generation Intel Core Processor (Rocket Lake S) Datasheet, Volume 2 of 2, document 636761-004 (septembre 2021), §3.2 et §3.3 : mêmes champs que 341078",
+      "memtest86+ 7.x, system/imc/x86/intel_icl.c (utilisé pour Rocket Lake) : canaux 4000h et 4400h, MAD_DIMM 500Ch et 5010h, tCL, tRCD, tRP, tRAS, horloge MC_BIOS_DATA",
+      "CoreFreq x86_64/intel_reg.h et corefreqk.c (RKL_IMC_*, Query_RKL_IMC)",
+      "Linux drivers/platform/x86/intel/uncore-frequency/uncore-frequency.c (Ice Lake, Rocket Lake) et arch/x86/include/asm/intel-family.h",
+      "PawnIO.Modules 0.2.11, IntelMCHBAR.p : fenêtre MCHBAR de 64 Ko pour Ice Lake et Rocket Lake"
+    ],
+    "memoryTypes": [ "DDR4", "LPDDR4" ],
+    "channels": [
+      { "name": "A", "base": "0x4000", "presenceOffset": "0x500C", "presenceMask": "0x007F007F" },
+      { "name": "B", "base": "0x4400", "presenceOffset": "0x5010", "presenceMask": "0x007F007F" }
+    ],
+    "settings": [
+      {
+        "key": "MemoryType", "offset": "0x5000", "perChannel": false, "bits": "2:0",
+        "values": { "0": "DDR4", "3": "LPDDR4" },
+        "sources": [ "341078-004 MAD_INTER_CHANNEL (5000h), DDR_TYPE 2:0 (0 DDR4, 3 LPDDR4)", "636761-004 MAD_INTER_CHANNEL, DDR_TYPE 2:0 (0 DDR4)" ]
+      },
+      {
+        "key": "CommandRate", "offset": "0x088", "bits": "4:3",
+        "values": { "0": "1N", "1": "2N", "2": "3N", "3": "N:1" },
+        "sources": [ "341078-004 et 636761-004 SC_GS_CFG (4088h), CMD_STRETCH 4:3 (00 1N, 01 2N, 10 3N, 11 N:1)", "CoreFreq RKL_IMC_SC_GS_CFG" ]
+      },
+      {
+        "key": "Gear", "offset": "0x088", "bits": "31",
+        "values": { "0": "Gear 1", "1": "Gear 2" },
+        "sources": [ "341078-004 et 636761-004 SC_GS_CFG (4088h), GEAR2 bit 31", "CoreFreq RKL_IMC_SC_GS_CFG.GEAR2" ]
+      }
+    ],
+    "clocks": [
+      {
+        // Débit en MT/s = rapport × référence × gear (memtest86+) ; horloge mémoire (DCLK) = la moitié.
+        "key": "DCLK", "offset": "0x5E04", "bits": "7:0", "scale": 0.5,
+        "referenceBits": "11:8", "referenceMhz": { "0": 133.333333, "1": 100 },
+        "gearBits": "16", "gearFactors": { "0": 1, "1": 2 },
+        "sources": [
+          "341078-004 et 636761-004 MC_BIOS_DATA (5E04h) : MC_FREQ 7:0, MC_FREQ_TYPE 11:8 (0 = 133 MHz, 1 = 100 MHz), GEAR_TYPE bit 16 ; valeur réglée au démarrage",
+          "memtest86+ intel_icl.c : débit = (5E04h & FFh) × BCLK, × 2 si le bit 16 est à 1, × 4/3 si les bits 11:8 valent 0"
+        ]
+      },
+      {
+        "key": "RING", "offset": "0x5918", "bits": "31:24", "multiplierMhz": 100,
+        "sources": [ "341078-004 et 636761-004 SA_PERF_STATUS (5918h), UCLK_RATIO 31:24, ring = rapport × BCLK", "CoreFreq RKL_SA_PERF_STATUS" ]
+      }
+    ],
+    "uncoreMsrModels": [ "0x7D", "0x7E", "0xA7" ],
+    "fields": [
+      { "key": "tCL", "group": "Primary", "register": "TC_ODT", "offset": "0x070", "bits": "21:16",
+        "sources": [ "341078-004 et 636761-004 TC_ODT (4070h), tCL 21:16", "memtest86+ intel_icl.c", "CoreFreq RKL_IMC_CR_TC_ODT" ] },
+      { "key": "tRCD", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "bits": "5:0",
+        "sources": [ "341078-004 et 636761-004 TC_PRE (4000h), tRP 5:0 « (and tRCD) » : une seule valeur pour les deux", "memtest86+ intel_icl.c (tRCD = tRP)" ] },
+      { "key": "tRP", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "bits": "5:0",
+        "sources": [ "341078-004 et 636761-004 TC_PRE, tRP 5:0", "memtest86+ intel_icl.c", "CoreFreq RKL_IMC_CR_TC_PRE" ] },
+      { "key": "tRAS", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "bits": "15:9",
+        "sources": [ "341078-004 et 636761-004 TC_PRE, tRAS 15:9", "memtest86+ intel_icl.c", "CoreFreq RKL_IMC_CR_TC_PRE" ] },
+      { "key": "tCWL", "group": "Secondary", "register": "TC_ODT", "offset": "0x070", "bits": "27:22",
+        "sources": [ "341078-004 et 636761-004 TC_ODT, tCWL 27:22", "CoreFreq RKL_IMC_CR_TC_ODT" ] },
+      { "key": "tRDPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "bits": "20:16",
+        "sources": [ "341078-004 et 636761-004 TC_PRE, tRDPRE 20:16", "CoreFreq RKL_IMC_CR_TC_PRE" ] },
+      { "key": "tWRPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "bits": "31:24",
+        "sources": [ "341078-004 et 636761-004 TC_PRE, tWRPRE 31:24", "CoreFreq RKL_IMC_CR_TC_PRE" ] },
+      { "key": "tFAW", "group": "Secondary", "register": "TC_ACT", "offset": "0x004", "bits": "6:0",
+        "sources": [ "341078-004 et 636761-004 TC_ACT (4004h), tFAW 6:0", "CoreFreq TC_ACT (structure Skylake reprise pour Rocket Lake)" ] },
+      { "key": "tRRD_L", "group": "Secondary", "register": "TC_ACT", "offset": "0x004", "bits": "12:8",
+        "sources": [ "341078-004 et 636761-004 TC_ACT, tRRD_SG 12:8", "CoreFreq TC_ACT.tRRD_SG" ] },
+      { "key": "tRRD_S", "group": "Secondary", "register": "TC_ACT", "offset": "0x004", "bits": "17:13",
+        "sources": [ "341078-004 et 636761-004 TC_ACT, tRRD_DG 17:13", "CoreFreq TC_ACT.tRRD_DG" ] },
+      { "key": "tRFC", "group": "Secondary", "register": "TC_RFTP", "offset": "0x23C", "bits": "25:16",
+        "sources": [ "341078-004 et 636761-004 TC_RFTP (423Ch), tRFC 25:16", "CoreFreq RKL_IMC_REFRESH_TC" ] },
+      { "key": "tREFI", "group": "Secondary", "register": "TC_RFTP", "offset": "0x23C", "bits": "15:0",
+        "sources": [ "341078-004 et 636761-004 TC_RFTP, tREFI 15:0", "CoreFreq RKL_IMC_REFRESH_TC" ] },
+      { "key": "tRDRD_sg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "5:0",
+        "sources": [ "341078-004 et 636761-004 TC_RDRD (400Ch), SG 5:0", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDRD_dg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "13:8",
+        "sources": [ "341078-004 et 636761-004 TC_RDRD, DG 13:8", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDRD_dr", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "21:16",
+        "sources": [ "341078-004 et 636761-004 TC_RDRD, DR 21:16", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDRD_dd", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "29:24",
+        "sources": [ "341078-004 et 636761-004 TC_RDRD, DD 29:24", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDWR_sg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "5:0",
+        "sources": [ "341078-004 et 636761-004 TC_RDWR (4010h), SG 5:0", "CoreFreq TC_RDWR" ] },
+      { "key": "tRDWR_dg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "13:8",
+        "sources": [ "341078-004 et 636761-004 TC_RDWR, DG 13:8", "CoreFreq TC_RDWR" ] },
+      { "key": "tRDWR_dr", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "21:16",
+        "sources": [ "341078-004 et 636761-004 TC_RDWR, DR 21:16", "CoreFreq TC_RDWR" ] },
+      { "key": "tRDWR_dd", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "29:24",
+        "sources": [ "341078-004 et 636761-004 TC_RDWR, DD 29:24", "CoreFreq TC_RDWR" ] },
+      { "key": "tWRRD_sg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "7:0",
+        "sources": [ "341078-004 et 636761-004 TC_WRRD (4014h), SG 7:0", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRRD_dg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "14:8",
+        "sources": [ "341078-004 et 636761-004 TC_WRRD, DG 14:8", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRRD_dr", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "21:16",
+        "sources": [ "341078-004 et 636761-004 TC_WRRD, DR 21:16", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRRD_dd", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "29:24",
+        "sources": [ "341078-004 et 636761-004 TC_WRRD, DD 29:24", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRWR_sg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "5:0",
+        "sources": [ "341078-004 et 636761-004 TC_WRWR (4018h), SG 5:0", "CoreFreq TC_WRWR" ] },
+      { "key": "tWRWR_dg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "13:8",
+        "sources": [ "341078-004 et 636761-004 TC_WRWR, DG 13:8", "CoreFreq TC_WRWR" ] },
+      { "key": "tWRWR_dr", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "21:16",
+        "sources": [ "341078-004 et 636761-004 TC_WRWR, DR 21:16", "CoreFreq TC_WRWR" ] },
+      { "key": "tWRWR_dd", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "29:24",
+        "sources": [ "341078-004 et 636761-004 TC_WRWR, DD 29:24", "CoreFreq TC_WRWR" ] },
+      { "key": "tCKE", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "4:0",
+        "sources": [ "341078-004 et 636761-004 TC_PWRDN (4050h), tCKE 4:0", "CoreFreq RKL_IMC_TC_PWDEN" ] },
+      { "key": "tXP", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "12:8",
+        "sources": [ "341078-004 et 636761-004 TC_PWRDN, tXP 12:8", "CoreFreq RKL_IMC_TC_PWDEN" ] },
+      { "key": "tXPDLL", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "21:16",
+        "sources": [ "341078-004 et 636761-004 TC_PWRDN, tXPDLL 21:16", "CoreFreq RKL_IMC_TC_PWDEN" ] },
+      { "key": "tXSDLL", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x240", "bits": "11:0", "confidence": "single",
+        "sources": [ "341078-004 et 636761-004 TC_SRFTP (4240h), tXSDLL 11:0" ] },
+      { "key": "tXSR", "group": "Tertiary", "register": "TC_SREXITTP", "offset": "0x2C4", "bits": "9:0",
+        "sources": [ "341078-004 et 636761-004 TC_SREXITTP (42C4h), tXSR 9:0", "CoreFreq Query_RKL_IMC (lecture de 42C4h)" ] }
+    ],
+    "unavailable": [ "tWR", "tRTP", "tWTR_S", "tWTR_L", "tRC" ],
+    "verifiedOnHardware": false
+  },
+  {
+    "id": "tgl",
+    "displayName": "Intel Core 11e génération mobile (Tiger Lake)",
+    "cpuModels": [ "0x8C", "0x8D" ],
+    "mchbarWindowBytes": 131072,
+    "sources": [
+      "Intel, 11th Generation Intel Core Processor (UP3, UP4 et H35) Datasheet, Volume 2a of 2, document 631122-003 (septembre 2021), §3.2 et §3.3 : deux contrôleurs (MC0 à 4000h, MC1 à 14000h), deux canaux chacun",
+      "CoreFreq x86_64/intel_reg.h et corefreqk.c (TGL_IMC_*, Query_TGL_IMC)",
+      "Linux drivers/edac/igen6_edac.c (tgl_cfg : deux contrôleurs espacés de 10000h, contrôleur absent si 5000h se lit FFFFFFFFh)",
+      "Linux drivers/gpu/drm/i915 intel_bw.c et mchbar_regs.h (DG1 : même disposition de TC_PRE et même codage de l'horloge)",
+      "Linux drivers/platform/x86/intel/uncore-frequency/uncore-frequency.c (Tiger Lake) et arch/x86/include/asm/intel-family.h",
+      "PawnIO.Modules 0.2.11, IntelMCHBAR.p : fenêtre MCHBAR de 128 Ko à partir de Tiger Lake"
+    ],
+    "memoryTypes": [ "DDR4", "DDR5", "LPDDR4", "LPDDR5" ],
+    "channels": [
+      { "name": "MC0-A", "base": "0x4000", "presenceOffset": "0x500C", "presenceMask": "0x007F007F" },
+      { "name": "MC0-B", "base": "0x4400", "presenceOffset": "0x5010", "presenceMask": "0x007F007F" },
+      { "name": "MC1-A", "base": "0x14000", "presenceOffset": "0x1500C", "presenceMask": "0x007F007F" },
+      { "name": "MC1-B", "base": "0x14400", "presenceOffset": "0x15010", "presenceMask": "0x007F007F" }
+    ],
+    "settings": [
+      {
+        "key": "MemoryType", "offset": "0x5000", "perChannel": false, "bits": "2:0",
+        "values": { "0": "DDR4", "1": "DDR5", "2": "LPDDR5", "3": "LPDDR4" },
+        "sources": [ "631122-003 MAD_INTER_CHANNEL (5000h), DDR_TYPE 2:0", "Linux igen6_edac.c (types de mémoire du champ DDR_TYPE)" ]
+      },
+      {
+        "key": "CommandRate", "offset": "0x088", "bits": "4:3",
+        "values": { "0": "1N", "1": "2N", "2": "3N", "3": "N:1" },
+        "sources": [ "631122-003 SC_GS_CFG (4088h), CMD_STRETCH 4:3", "CoreFreq TGL_IMC_SC_GS_CFG" ]
+      },
+      {
+        "key": "Gear", "offset": "0x088", "bits": "31",
+        "values": { "0": "Gear 1", "1": "Gear 2" },
+        "sources": [ "631122-003 SC_GS_CFG, GEAR2 bit 31", "CoreFreq TGL_IMC_SC_GS_CFG.GEAR2" ]
+      }
+    ],
+    "clocks": [
+      {
+        "key": "DCLK", "offset": "0x5E04", "bits": "7:0", "scale": 0.5,
+        "referenceBits": "11:8", "referenceMhz": { "0": 133.333333, "1": 100 },
+        "gearBits": "16", "gearFactors": { "0": 1, "1": 2 },
+        "sources": [
+          "631122-003 MC_BIOS_DATA (5E04h) : MC_FREQ 7:0, MC_FREQ_TYPE 11:8, GEAR_TYPE bit 16",
+          "Linux i915 intel_bw.c, dg1_mchbar_read_qgv_point_info() : QCLK × référence × gear",
+          "memtest86+ intel_icl.c : même formule pour la génération précédente"
+        ]
+      },
+      {
+        "key": "RING", "offset": "0x5918", "bits": "31:24", "multiplierMhz": 100,
+        "sources": [ "631122-003 SA_PERF_STATUS (5918h), UCLK_RATIO 31:24", "CoreFreq RKL_SA_PERF_STATUS (même registre)" ]
+      }
+    ],
+    "uncoreMsrModels": [ "0x8C", "0x8D" ],
+    "fields": [
+      { "key": "tCL", "group": "Primary", "register": "TC_ODT", "offset": "0x070", "bits": "22:16",
+        "sources": [ "631122-003 TC_ODT (4070h), tCL 22:16", "CoreFreq TGL_IMC_CR_TC_ODT" ] },
+      { "key": "tRCD", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "47:41",
+        "sources": [ "631122-003 TC_PRE (4000h, 64 bits), tRCD 47:41", "CoreFreq TGL_IMC_CR_TC_PRE", "Linux i915 mchbar_regs.h DG1 (4004h, bits 15:9)" ] },
+      { "key": "tRP", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "6:0",
+        "sources": [ "631122-003 TC_PRE, tRP 6:0", "CoreFreq TGL_IMC_CR_TC_PRE", "Linux i915 mchbar_regs.h DG1" ] },
+      { "key": "tRAS", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "40:33",
+        "sources": [ "631122-003 TC_PRE, tRAS 40:33", "CoreFreq TGL_IMC_CR_TC_PRE", "Linux i915 mchbar_regs.h DG1 (4004h, bits 8:1)" ] },
+      { "key": "tCWL", "group": "Secondary", "register": "TC_ODT", "offset": "0x070", "bits": "29:23",
+        "sources": [ "631122-003 TC_ODT, tCWL 29:23", "CoreFreq TGL_IMC_CR_TC_ODT" ] },
+      { "key": "tRDPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "16:11",
+        "sources": [ "631122-003 TC_PRE, tRDPRE 16:11", "CoreFreq TGL_IMC_CR_TC_PRE", "Linux i915 mchbar_regs.h DG1" ] },
+      { "key": "tWRPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "29:21",
+        "sources": [ "631122-003 TC_PRE, tWRPRE 29:21", "CoreFreq TGL_IMC_CR_TC_PRE" ] },
+      { "key": "tFAW", "group": "Secondary", "register": "TC_ACT", "offset": "0x008", "bits": "7:0",
+        "sources": [ "631122-003 TC_ACT (4008h), tFAW 7:0", "CoreFreq TGL_IMC_CR_TC_ACT" ] },
+      { "key": "tRRD_L", "group": "Secondary", "register": "TC_ACT", "offset": "0x008", "bits": "13:8",
+        "sources": [ "631122-003 TC_ACT, tRRD_SG 13:8", "CoreFreq TGL_IMC_CR_TC_ACT" ] },
+      { "key": "tRRD_S", "group": "Secondary", "register": "TC_ACT", "offset": "0x008", "bits": "19:14",
+        "sources": [ "631122-003 TC_ACT, tRRD_DG 19:14", "CoreFreq TGL_IMC_CR_TC_ACT" ] },
+      { "key": "tRFC", "group": "Secondary", "register": "TC_RFTP", "offset": "0x23C", "bits": "28:17",
+        "sources": [ "631122-003 TC_RFTP (423Ch), tRFC 28:17", "CoreFreq TGL_IMC_REFRESH_TC" ] },
+      { "key": "tREFI", "group": "Secondary", "register": "TC_RFTP", "offset": "0x23C", "bits": "16:0",
+        "sources": [ "631122-003 TC_RFTP, tREFI 16:0", "CoreFreq TGL_IMC_REFRESH_TC" ] },
+      { "key": "tRDRD_sg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "5:0",
+        "sources": [ "631122-003 TC_RDRD (400Ch), SG 5:0", "CoreFreq TGL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDRD_dg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "13:8",
+        "sources": [ "631122-003 TC_RDRD, DG 13:8", "CoreFreq TGL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDRD_dr", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "22:16",
+        "sources": [ "631122-003 TC_RDRD, DR 22:16", "CoreFreq TGL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDRD_dd", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "30:24",
+        "sources": [ "631122-003 TC_RDRD, DD 30:24", "CoreFreq TGL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDWR_sg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "6:0",
+        "sources": [ "631122-003 TC_RDWR (4010h), SG 6:0", "CoreFreq TGL_IMC_CR_TC_RDWR" ] },
+      { "key": "tRDWR_dg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "14:8",
+        "sources": [ "631122-003 TC_RDWR, DG 14:8", "CoreFreq TGL_IMC_CR_TC_RDWR" ] },
+      { "key": "tRDWR_dr", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "22:16",
+        "sources": [ "631122-003 TC_RDWR, DR 22:16", "CoreFreq TGL_IMC_CR_TC_RDWR" ] },
+      { "key": "tRDWR_dd", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "30:24",
+        "sources": [ "631122-003 TC_RDWR, DD 30:24", "CoreFreq TGL_IMC_CR_TC_RDWR" ] },
+      { "key": "tWRRD_sg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "7:0",
+        "sources": [ "631122-003 TC_WRRD (4014h), SG 7:0", "CoreFreq TGL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRRD_dg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "15:8",
+        "sources": [ "631122-003 TC_WRRD, DG 15:8", "CoreFreq TGL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRRD_dr", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "21:16",
+        "sources": [ "631122-003 TC_WRRD, DR 21:16", "CoreFreq TGL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRRD_dd", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "29:24",
+        "sources": [ "631122-003 TC_WRRD, DD 29:24", "CoreFreq TGL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRWR_sg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "5:0",
+        "sources": [ "631122-003 TC_WRWR (4018h), SG 5:0", "CoreFreq TGL_IMC_CR_TC_WRWR" ] },
+      { "key": "tWRWR_dg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "13:8",
+        "sources": [ "631122-003 TC_WRWR, DG 13:8", "CoreFreq TGL_IMC_CR_TC_WRWR" ] },
+      { "key": "tWRWR_dr", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "21:16",
+        "sources": [ "631122-003 TC_WRWR, DR 21:16", "CoreFreq TGL_IMC_CR_TC_WRWR" ] },
+      { "key": "tWRWR_dd", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "30:24",
+        "sources": [ "631122-003 TC_WRWR, DD 30:24", "CoreFreq TGL_IMC_CR_TC_WRWR" ] },
+      { "key": "tCKE", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "5:0",
+        "sources": [ "631122-003 TC_PWRDN (4050h), tCKE 5:0", "CoreFreq TGL_IMC_TC_PWDEN" ] },
+      { "key": "tXP", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "13:8",
+        "sources": [ "631122-003 TC_PWRDN, tXP 13:8", "CoreFreq TGL_IMC_TC_PWDEN" ] },
+      { "key": "tXPDLL", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "21:16",
+        "sources": [ "631122-003 TC_PWRDN, tXPDLL 21:16", "CoreFreq TGL_IMC_TC_PWDEN" ] },
+      { "key": "tXSDLL", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x240", "bits": "11:0", "confidence": "single",
+        "sources": [ "631122-003 TC_SRFTP (4240h), tXSDLL 11:0" ] },
+      { "key": "tXSR", "group": "Tertiary", "register": "TC_SREXITTP", "offset": "0x2C0", "size": 8, "bits": "11:0",
+        "sources": [ "631122-003 TC_SREXITTP (42C0h, 64 bits), tXSR 11:0", "CoreFreq TGL_IMC_SREXITTP" ] }
+    ],
+    "unavailable": [ "tWR", "tRTP", "tWTR_S", "tWTR_L", "tRC" ],
+    "verifiedOnHardware": false
+  },
+  {
+    "id": "adl-rpl",
+    "displayName": "Intel Core 12e, 13e et 14e génération (Alder Lake, Raptor Lake)",
+    "cpuModels": [ "0x97", "0x9A", "0xB7", "0xBA", "0xBF" ],
+    "mchbarWindowBytes": 131072,
+    "sources": [
+      "Intel, 12th Generation Intel Core Processors Datasheet, Volume 2 of 2, document 655259 (Intel EDC 767626, révision 1.3, 13/07/2023) : registres MCHBAR E000h à E4C0h, D800h à D810h, 5918h, 5E04h",
+      "Intel, 13th Generation Intel Core Processor Datasheet, Volume 2 of 2 (Intel EDC 764981 et 767624) : mêmes champs que la 12e génération",
+      "memtest86+ 7.x, system/imc/x86/intel_adl.c : contrôleur 1 à +10000h, canal 1 à +800h, contrôleur absent si MAD_DIMM se lit FFFFFFFFh, tCL, tRCD, tRP, tRAS et horloge",
+      "CoreFreq x86_64/intel_reg.h et corefreqk.c (ADL_IMC_*, Query_ADL_IMC, utilisé aussi pour Raptor Lake)",
+      "Linux drivers/edac/igen6_edac.c (adl_cfg) ; drivers/platform/x86/intel/uncore-frequency/uncore-frequency.c ; arch/x86/include/asm/intel-family.h",
+      "Relevé réel publié : CoreFreq, discussion 425 (i7-12700H, DDR5-4800) : 5E04h = 39B81118h, rapport 24 × 100 MHz × gear 2 = 4800 MT/s",
+      "PawnIO.Modules 0.2.11, IntelMCHBAR.p : fenêtre MCHBAR de 128 Ko"
+    ],
+    "memoryTypes": [ "DDR4", "DDR5", "LPDDR4", "LPDDR5" ],
+    "channels": [
+      { "name": "MC0-A", "base": "0xE000", "presenceOffset": "0xD80C", "presenceMask": "0x007F007F" },
+      { "name": "MC0-B", "base": "0xE800", "presenceOffset": "0xD810", "presenceMask": "0x007F007F" },
+      { "name": "MC1-A", "base": "0x1E000", "presenceOffset": "0x1D80C", "presenceMask": "0x007F007F" },
+      { "name": "MC1-B", "base": "0x1E800", "presenceOffset": "0x1D810", "presenceMask": "0x007F007F" }
+    ],
+    "settings": [
+      {
+        "key": "MemoryType", "offset": "0xD800", "perChannel": false, "bits": "2:0",
+        "values": { "0": "DDR4", "1": "DDR5", "2": "LPDDR5", "3": "LPDDR4" },
+        "sources": [ "655259 MAD_INTER_CHANNEL (D800h), DDR_TYPE 2:0 (0 DDR4, 1 DDR5, 2 LPDDR5, 3 LPDDR4)", "CoreFreq ADL_IMC_MAD_INTER_CHANNEL", "memtest86+ intel_adl.c (D800h & 7)" ]
+      },
+      {
+        "key": "CommandRate", "offset": "0x088", "bits": "4:3",
+        "values": { "0": "1N", "1": "2N", "2": "3N", "3": "N:1" },
+        "sources": [ "655259 SC_GS_CFG (E088h), CMD_stretch 4:3 (00 1N, 01 2N, 10 3N, 11 N:1)", "CoreFreq ADL_IMC_SC_GS_CFG" ]
+      },
+      {
+        "key": "Gear", "offset": "0x5E04", "perChannel": false, "bits": "13:12",
+        "values": { "0": "Gear 1", "1": "Gear 2", "2": "Gear 4" },
+        "sources": [ "655259 MC_BIOS_DATA (5E04h), GEAR 13:12 (0 Gear 1, 1 Gear 2, 2 Gear 4)", "memtest86+ intel_adl.c ((5E04h >> 12) & 3)" ]
+      }
+    ],
+    "clocks": [
+      {
+        // Débit en MT/s = rapport × référence × gear (memtest86+, relevé de l'i7-12700H) ; horloge mémoire = la moitié.
+        "key": "DCLK", "offset": "0x5918", "bits": "9:2", "scale": 0.5,
+        "referenceOffset": "0x5E04", "referenceBits": "11:8", "referenceMhz": { "0": 133.333333, "1": 100 },
+        "gearOffset": "0x5E04", "gearBits": "13:12", "gearFactors": { "0": 1, "1": 2, "2": 4 },
+        "sources": [
+          "655259 SA_PERF_STATUS (5918h), QCLK_RATIO 9:2 ; MC_BIOS_DATA (5E04h), MC_PLL_REF 11:8 (0 = 133 MHz, 1 = 100 MHz) et GEAR 13:12",
+          "memtest86+ intel_adl.c : débit = ((5918h >> 2) & FFh) × BCLK, décalé du gear (5E04h bits 13:12), × 4/3 si 5E04h bits 11:8 valent 0",
+          "Relevé CoreFreq discussion 425 : i7-12700H en DDR5-4800, rapport 24, référence 100 MHz, gear 2"
+        ]
+      },
+      {
+        "key": "RING", "offset": "0x5918", "bits": "31:24", "multiplierMhz": 100,
+        "sources": [ "655259 SA_PERF_STATUS (5918h), UCLK_RATIO 31:24 (ring, référence 100 MHz)", "CoreFreq RKL_SA_PERF_STATUS (même registre)" ]
+      }
+    ],
+    "uncoreMsrModels": [ "0x97", "0x9A", "0xB7", "0xBA", "0xBF" ],
+    "fields": [
+      { "key": "tCL", "group": "Primary", "register": "TC_ODT", "offset": "0x070", "bits": "22:16",
+        "sources": [ "655259 TC_ODT (E070h), tCL 22:16", "memtest86+ intel_adl.c", "CoreFreq ADL_IMC_CR_TC_ODT" ] },
+      { "key": "tRCD", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "58:51",
+        "sources": [ "655259 TC_PRE (E000h, 64 bits), tRCD 58:51", "memtest86+ intel_adl.c (E004h, bits 26:19)", "CoreFreq ADL_IMC_CR_TC_PRE" ] },
+      { "key": "tRP", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "7:0",
+        "sources": [ "655259 TC_PRE, tRP 7:0", "memtest86+ intel_adl.c", "CoreFreq ADL_IMC_CR_TC_PRE" ] },
+      { "key": "tRAS", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "50:42",
+        "sources": [ "655259 TC_PRE, tRAS 50:42", "memtest86+ intel_adl.c (E004h, bits 18:10)", "CoreFreq ADL_IMC_CR_TC_PRE" ] },
+      { "key": "tCWL", "group": "Secondary", "register": "TC_ODT", "offset": "0x070", "bits": "31:24",
+        "sources": [ "655259 TC_ODT, tCWL 31:24", "CoreFreq ADL_IMC_CR_TC_ODT" ] },
+      { "key": "tRDPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "19:13",
+        "sources": [ "655259 TC_PRE, tRDPRE 19:13", "CoreFreq ADL_IMC_CR_TC_PRE" ] },
+      { "key": "tWRPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "41:32",
+        "sources": [ "655259 TC_PRE, tWRPRE 41:32", "CoreFreq ADL_IMC_CR_TC_PRE" ] },
+      { "key": "tFAW", "group": "Secondary", "register": "TC_ACT", "offset": "0x008", "bits": "8:0",
+        "sources": [ "655259 TC_ACT (E008h), tFAW 8:0", "CoreFreq ADL_IMC_CR_TC_ACT" ] },
+      { "key": "tRRD_L", "group": "Secondary", "register": "TC_ACT", "offset": "0x008", "bits": "14:9",
+        "sources": [ "655259 TC_ACT, tRRD_sg 14:9", "CoreFreq ADL_IMC_CR_TC_ACT" ] },
+      { "key": "tRRD_S", "group": "Secondary", "register": "TC_ACT", "offset": "0x008", "bits": "21:15",
+        "sources": [ "655259 TC_ACT, tRRD_dg 21:15", "CoreFreq ADL_IMC_CR_TC_ACT" ] },
+      { "key": "tRFC", "group": "Secondary", "register": "TC_RFTP", "offset": "0x43C", "bits": "30:18",
+        "sources": [ "655259 TC_RFTP (E43Ch), tRFC 30:18", "CoreFreq ADL_IMC_REFRESH_TC" ] },
+      { "key": "tREFI", "group": "Secondary", "register": "TC_RFTP", "offset": "0x43C", "bits": "17:0",
+        "sources": [ "655259 TC_RFTP, tREFI 17:0", "CoreFreq ADL_IMC_REFRESH_TC" ] },
+      { "key": "tRDRD_sg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "6:0",
+        "sources": [ "655259 TC_RDRD (E00Ch), tRDRD_sg 6:0", "CoreFreq ADL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDRD_dg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "14:8",
+        "sources": [ "655259 TC_RDRD, tRDRD_dg 14:8", "CoreFreq ADL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDRD_dr", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "23:16",
+        "sources": [ "655259 TC_RDRD, tRDRD_dr 23:16", "CoreFreq ADL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDRD_dd", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "31:24",
+        "sources": [ "655259 TC_RDRD, tRDRD_dd 31:24", "CoreFreq ADL_IMC_CR_TC_RDRD" ] },
+      { "key": "tRDWR_sg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "7:0",
+        "sources": [ "655259 TC_RDWR (E010h), tRDWR_sg 7:0", "CoreFreq ADL_IMC_CR_TC_RDWR" ] },
+      { "key": "tRDWR_dg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "15:8",
+        "sources": [ "655259 TC_RDWR, tRDWR_dg 15:8", "CoreFreq ADL_IMC_CR_TC_RDWR" ] },
+      { "key": "tRDWR_dr", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "23:16",
+        "sources": [ "655259 TC_RDWR, tRDWR_dr 23:16", "CoreFreq ADL_IMC_CR_TC_RDWR" ] },
+      { "key": "tRDWR_dd", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "31:24",
+        "sources": [ "655259 TC_RDWR, tRDWR_dd 31:24", "CoreFreq ADL_IMC_CR_TC_RDWR" ] },
+      { "key": "tWRRD_sg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "8:0",
+        "sources": [ "655259 TC_WRRD (E014h), tWRRD_sg 8:0", "CoreFreq ADL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRRD_dg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "17:9",
+        "sources": [ "655259 TC_WRRD, tWRRD_dg 17:9", "CoreFreq ADL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRRD_dr", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "24:18",
+        "sources": [ "655259 TC_WRRD, tWRRD_dr 24:18", "CoreFreq ADL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRRD_dd", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "31:25",
+        "sources": [ "655259 TC_WRRD, tWRRD_dd 31:25", "CoreFreq ADL_IMC_CR_TC_WRRD" ] },
+      { "key": "tWRWR_sg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "6:0",
+        "sources": [ "655259 TC_WRWR (E018h), tWRWR_sg 6:0", "CoreFreq ADL_IMC_CR_TC_WRWR" ] },
+      { "key": "tWRWR_dg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "14:8",
+        "sources": [ "655259 TC_WRWR, tWRWR_dg 14:8", "CoreFreq ADL_IMC_CR_TC_WRWR" ] },
+      { "key": "tWRWR_dr", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "22:16",
+        "sources": [ "655259 TC_WRWR, tWRWR_dr 22:16", "CoreFreq ADL_IMC_CR_TC_WRWR" ] },
+      { "key": "tWRWR_dd", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "31:24",
+        "sources": [ "655259 TC_WRWR, tWRWR_dd 31:24", "CoreFreq ADL_IMC_CR_TC_WRWR" ] },
+      { "key": "tCKE", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "6:0",
+        "sources": [ "655259 TC_PWRDN (E050h), tCKE 6:0", "CoreFreq ADL_IMC_TC_PWDEN" ] },
+      { "key": "tXP", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "13:7",
+        "sources": [ "655259 TC_PWRDN, tXP 13:7", "CoreFreq ADL_IMC_TC_PWDEN" ] },
+      { "key": "tXPDLL", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "20:14",
+        "sources": [ "655259 TC_PWRDN, tXPDLL 20:14", "CoreFreq ADL_IMC_TC_PWDEN" ] },
+      { "key": "tXSDLL", "group": "Tertiary", "register": "TC_SRFTP", "offset": "0x440", "bits": "12:0", "confidence": "single",
+        "sources": [ "655259 TC_SRFTP (E440h), tXSDLL 12:0" ] },
+      { "key": "tXSR", "group": "Tertiary", "register": "TC_SREXITTP", "offset": "0x4C0", "size": 8, "bits": "12:0",
+        "sources": [ "655259 TC_SREXITTP (E4C0h, 64 bits), tXSR 12:0", "CoreFreq ADL_IMC_SREXITTP" ] }
+    ],
+    "unavailable": [ "tWR", "tRTP", "tWTR_S", "tWTR_L", "tRC" ],
+    "verifiedOnHardware": false
+  },
+  {
+    "id": "mtl-arl-lnl",
+    "displayName": "Intel Core Ultra séries 1 et 2 (Meteor Lake, Arrow Lake, Lunar Lake)",
+    "cpuModels": [ "0xAA", "0xAC", "0xB5", "0xC5", "0xC6", "0xBD" ],
+    "mchbarWindowBytes": 131072,
+    "sources": [
+      "Intel, Core Ultra (Meteor Lake) CFG and MEM Registers, document 795258 (Intel EDC)",
+      "Intel, Core Ultra 200S et 200HX (Arrow Lake S et HX) CFG and MEM Registers, document 835538 ; Core Ultra 200H et 200U, document 844345 ; Core Ultra série 2 (Lunar Lake), document 831649 : mêmes champs TC_* que Meteor Lake",
+      "memtest86+ 7.x, system/imc/x86/intel_mtl.c (Meteor Lake, Arrow Lake S, Lunar Lake) : contrôleur 1 à +10000h, canal 1 à +800h, contrôleur absent si D80Ch se lit FFFFFFFFh, tCL, tRCD, tRP, tRAS",
+      "CoreFreq x86_64/intel_reg.h, corefreqk.c et corefreqd.c (MTL_IMC, MTL_CAP ; utilisés pour Meteor Lake, Arrow Lake et Lunar Lake)",
+      "Linux drivers/platform/x86/intel/uncore-frequency/uncore-frequency.c (Meteor Lake, Arrow Lake S et H, Lunar Lake) et arch/x86/include/asm/intel-family.h",
+      "PawnIO.Modules 0.2.11, IntelMCHBAR.p : fenêtre MCHBAR de 128 Ko, modèles AAh, ACh, B5h, BDh, C5h et C6h acceptés"
+    ],
+    "memoryTypes": [ "DDR5", "LPDDR5" ],
+    "channels": [
+      { "name": "MC0-A", "base": "0xE000", "presenceOffset": "0xD80C", "presenceMask": "0x007F007F" },
+      { "name": "MC0-B", "base": "0xE800", "presenceOffset": "0xD810", "presenceMask": "0x007F007F" },
+      { "name": "MC1-A", "base": "0x1E000", "presenceOffset": "0x1D80C", "presenceMask": "0x007F007F" },
+      { "name": "MC1-B", "base": "0x1E800", "presenceOffset": "0x1D810", "presenceMask": "0x007F007F" }
+    ],
+    "settings": [
+      {
+        // Lunar Lake : page SC_GS_CFG absente de 831649, réglages lus sur Meteor Lake et Arrow Lake seulement.
+        "key": "CommandRate", "offset": "0x088", "bits": "3", "cpuModels": [ "0xAA", "0xAC", "0xB5", "0xC5", "0xC6" ],
+        "values": { "0": "1N", "1": "2N" },
+        "sources": [ "795258 et 835538 SC_GS_CFG (E088h), cmd_stretch bit 3 (0 1N, 1 2N)", "CoreFreq MTL_IMC_SC_GS_CFG.CMD_Stretch" ]
+      },
+      {
+        "key": "Gear", "offset": "0x088", "bits": "31", "cpuModels": [ "0xAA", "0xAC", "0xB5", "0xC5", "0xC6" ],
+        "values": { "0": "Gear 2", "1": "Gear 4" },
+        "sources": [ "795258 et 835538 SC_GS_CFG (E088h), gear_mode bit 31 (0 Gear 2, 1 Gear 4)", "CoreFreq MTL_IMC_SC_GS_CFG.GEAR" ]
+      }
+    ],
+    "clocks": [
+      {
+        // En gear 2, Intel et CoreFreq s'accordent : débit = 2 × rapport × 33,33 MHz. En gear 4, Intel dit × 4 et CoreFreq
+        // × 2 : sources en désaccord, l'horloge n'est pas affichée. Lunar Lake code l'horloge ailleurs (non retenu).
+        "key": "DCLK", "offset": "0x13D10", "bits": "7:0", "multiplierMhz": 33.333333, "scale": 0.5,
+        "gearBits": "8", "gearFactors": { "0": 2 }, "cpuModels": [ "0xAA", "0xAC", "0xB5", "0xC5", "0xC6" ],
+        "sources": [
+          "795258, 835538 et 844345 MEMSS_PMA_CR_BIOS_DATA (13D10h) : QCLK_RATIO 7:0 (référence 33,33 MHz), GEAR_TYPE bit 8 (0 Gear 2, 1 Gear 4)",
+          "CoreFreq corefreqd.c MTL_CAP : débit = 2 × QCLK_RATIO × BCLK / 3"
+        ]
+      }
+    ],
+    "uncoreMsrModels": [ "0xAA", "0xAC", "0xC5", "0xC6", "0xBD" ],
+    "fields": [
+      { "key": "tCL", "group": "Primary", "register": "TC_CAS", "offset": "0x070", "bits": "22:16",
+        "sources": [ "795258, 835538, 844345 et 831649 TC_CAS (E070h), tCL 22:16", "memtest86+ intel_mtl.c", "CoreFreq MTL_IMC_CR_TC_CAS" ] },
+      { "key": "tRCD", "group": "Primary", "register": "TC_ACT", "offset": "0x138", "size": 8, "bits": "29:22",
+        "sources": [ "795258 et suivants TC_ACT (E138h, 64 bits), tRCD 29:22", "memtest86+ intel_mtl.c", "CoreFreq MTL_IMC_CR_TC_ACT" ] },
+      { "key": "tRP", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "7:0",
+        "sources": [ "795258 et suivants TC_PRE (E000h, 64 bits), tRPpb 7:0", "memtest86+ intel_mtl.c", "CoreFreq MTL_IMC_CR_TC_PRE" ] },
+      { "key": "tRAS", "group": "Primary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "53:45",
+        "sources": [ "795258 et suivants TC_PRE, tRAS 53:45", "memtest86+ intel_mtl.c (E004h, bits 21:13)", "CoreFreq MTL_IMC_CR_TC_PRE" ] },
+      { "key": "tCWL", "group": "Secondary", "register": "TC_CAS", "offset": "0x070", "bits": "31:24",
+        "sources": [ "795258 et suivants TC_CAS, tCWL 31:24", "CoreFreq MTL_IMC_CR_TC_CAS" ] },
+      { "key": "tRDPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "26:20",
+        "sources": [ "795258 et suivants TC_PRE, tRDPRE 26:20", "CoreFreq MTL_IMC_CR_TC_PRE" ] },
+      { "key": "tWRPRE", "group": "Secondary", "register": "TC_PRE", "offset": "0x000", "size": 8, "bits": "42:33",
+        "sources": [ "795258 et suivants TC_PRE, tWRPRE 42:33", "CoreFreq MTL_IMC_CR_TC_PRE" ] },
+      { "key": "tFAW", "group": "Secondary", "register": "TC_ACT", "offset": "0x138", "size": 8, "bits": "8:0",
+        "sources": [ "795258 et suivants TC_ACT, tFAW 8:0", "CoreFreq MTL_IMC_CR_TC_ACT" ] },
+      { "key": "tRRD_L", "group": "Secondary", "register": "TC_ACT", "offset": "0x138", "size": 8, "bits": "14:9",
+        "sources": [ "795258 et suivants TC_ACT, tRRD_sg 14:9", "CoreFreq MTL_IMC_CR_TC_ACT" ] },
+      { "key": "tRRD_S", "group": "Secondary", "register": "TC_ACT", "offset": "0x138", "size": 8, "bits": "21:15",
+        "sources": [ "795258 et suivants TC_ACT, tRRD_dg 21:15", "CoreFreq MTL_IMC_CR_TC_ACT" ] },
+      { "key": "tRFC", "group": "Secondary", "register": "TC_RFTP", "offset": "0x4A0", "size": 8, "bits": "30:18",
+        "sources": [ "795258 et suivants TC_RFTP (E4A0h), tRFC 30:18", "CoreFreq MTL_IMC_REFRESH_TC" ] },
+      { "key": "tREFI", "group": "Secondary", "register": "TC_RFTP", "offset": "0x4A0", "size": 8, "bits": "17:0",
+        "sources": [ "795258 et suivants TC_RFTP, tREFI 17:0", "CoreFreq MTL_IMC_REFRESH_TC" ] },
+      { "key": "tRDRD_sg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "6:0",
+        "sources": [ "795258 et suivants TC_RDRD (E00Ch), sg 6:0", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDRD_dg", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "14:8",
+        "sources": [ "795258 et suivants TC_RDRD, dg 14:8", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDRD_dr", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "23:16",
+        "sources": [ "795258 et suivants TC_RDRD, dr 23:16", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDRD_dd", "group": "Tertiary", "register": "TC_RDRD", "offset": "0x00C", "bits": "31:24",
+        "sources": [ "795258 et suivants TC_RDRD, dd 31:24", "CoreFreq TC_RDRD" ] },
+      { "key": "tRDWR_sg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "7:0",
+        "sources": [ "795258 et suivants TC_RDWR (E010h), sg 7:0", "CoreFreq TC_RDWR" ] },
+      { "key": "tRDWR_dg", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "15:8",
+        "sources": [ "795258 et suivants TC_RDWR, dg 15:8", "CoreFreq TC_RDWR" ] },
+      { "key": "tRDWR_dr", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "23:16",
+        "sources": [ "795258 et suivants TC_RDWR, dr 23:16", "CoreFreq TC_RDWR" ] },
+      { "key": "tRDWR_dd", "group": "Tertiary", "register": "TC_RDWR", "offset": "0x010", "bits": "31:24",
+        "sources": [ "795258 et suivants TC_RDWR, dd 31:24", "CoreFreq TC_RDWR" ] },
+      { "key": "tWRRD_sg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "8:0",
+        "sources": [ "795258 et suivants TC_WRRD (E014h), sg 8:0", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRRD_dg", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "17:9",
+        "sources": [ "795258 et suivants TC_WRRD, dg 17:9", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRRD_dr", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "24:18",
+        "sources": [ "795258 et suivants TC_WRRD, dr 24:18", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRRD_dd", "group": "Tertiary", "register": "TC_WRRD", "offset": "0x014", "bits": "31:25",
+        "sources": [ "795258 et suivants TC_WRRD, dd 31:25", "CoreFreq TC_WRRD" ] },
+      { "key": "tWRWR_sg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "6:0",
+        "sources": [ "795258 et suivants TC_WRWR (E018h), sg 6:0", "CoreFreq TC_WRWR" ] },
+      { "key": "tWRWR_dg", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "14:8",
+        "sources": [ "795258 et suivants TC_WRWR, dg 14:8", "CoreFreq TC_WRWR" ] },
+      { "key": "tWRWR_dr", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "22:16",
+        "sources": [ "795258 et suivants TC_WRWR, dr 22:16", "CoreFreq TC_WRWR" ] },
+      { "key": "tWRWR_dd", "group": "Tertiary", "register": "TC_WRWR", "offset": "0x018", "bits": "31:24",
+        "sources": [ "795258 et suivants TC_WRWR, dd 31:24", "CoreFreq TC_WRWR" ] },
+      { "key": "tCKE", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "6:0",
+        "sources": [ "795258 et suivants TC_PWRDN (E050h), tCKE 6:0", "CoreFreq MTL_IMC_TC_PWDEN" ] },
+      { "key": "tXP", "group": "Tertiary", "register": "TC_PWRDN", "offset": "0x050", "bits": "13:7",
+        "sources": [ "795258 et suivants TC_PWRDN, tXP 13:7", "CoreFreq MTL_IMC_TC_PWDEN" ] },
+      { "key": "tXSR", "group": "Tertiary", "register": "TC_SREXITTP", "offset": "0x4C0", "size": 8, "bits": "12:0",
+        "sources": [ "795258 et suivants TC_SREXITTP (E4C0h), tXSR 12:0", "CoreFreq MTL_IMC_SREXITTP" ] },
+      { "key": "tXSDLL", "group": "Tertiary", "register": "TC_SREXITTP", "offset": "0x4C0", "size": 8, "bits": "63:51",
+        "sources": [ "795258 TC_SREXITTP, tXSDLL 63:51", "CoreFreq MTL_IMC_SREXITTP" ] }
+    ],
+    "unavailable": [ "tWR", "tRTP", "tWTR_S", "tWTR_L", "tRC" ],
+    "verifiedOnHardware": false
   }
 ]

@@ -2974,5 +2974,19 @@
   "{0} erreur(s) de Windows pendant le relevé : voyez la liste des événements pour savoir si elles ont un lien avec le test.": "{0} Windows error(s) during the recording: see the list of events to know whether they are related to the test.",
   "{0} erreur(s) matérielle(s) (WHEA) pendant le relevé, dont {1} du bus PCI Express : le PC n'est pas stable dans ces conditions (réglage trop poussé, température, alimentation ou matériel à vérifier).": "{0} hardware error(s) (WHEA) during the recording, including {1} from the PCI Express bus: the PC is not stable in these conditions (setting pushed too far, temperature, power supply or hardware to check).",
   "{0} × {1} : {2} V (mesure brute {3} V)": "{0} × {1}: {2} V (raw reading {3} V)",
-  "Étalonnée par vous le {0:d} : entrée « {1} »{2}, pour {3} V réglés dans le BIOS.": "Calibrated by you on {0:d}: input \"{1}\"{2}, for {3} V set in the BIOS."
+  "Étalonnée par vous le {0:d} : entrée « {1} »{2}, pour {3} V réglés dans le BIOS.": "Calibrated by you on {0:d}: input \"{1}\"{2}, for {3} V set in the BIOS.",
+  "Délai de réveil de la mémoire quand son DLL était arrêté pendant la veille.": "Wake-up delay of the memory when its DLL was stopped during power-down.",
+  "Délai de sortie de l'autorafraîchissement avant la première commande.": "Delay after leaving self-refresh before the first command.",
+  "Délai entre deux lectures successives": "Delay between two consecutive reads",
+  "Délai entre deux écritures successives": "Delay between two consecutive writes",
+  "Délai pour passer d'une lecture à une écriture": "Delay to switch from a read to a write",
+  "Délai pour passer d'une écriture à une lecture": "Delay to switch from a write to a read",
+  "Horloge mémoire réelle non affichée : son codage n'est pas établi de façon sûre pour ce processeur ou ce mode, et MAUS ne la devine pas.": "Actual memory clock not shown: its encoding is not reliably established for this processor or mode, and MAUS does not guess it.",
+  "UCLK plus haute que MCLK : impossible en fonctionnement normal, la table d'énergie (version 0x{0:X6}) est peut-être mal interprétée par MAUS. Fiez-vous plutôt aux timings et à la vitesse appliquée.": "UCLK higher than MCLK: impossible in normal operation, the power table (version 0x{0:X6}) may be misread by MAUS. Rely on the timings and the applied speed instead.",
+  "dans des groupes de banques différents": "in different bank groups",
+  "dans le même groupe de banques": "in the same bank group",
+  "sur le même rang": "on the same rank",
+  "sur un autre rang de la même barrette": "on another rank of the same module",
+  "sur une autre barrette": "on another module",
+  "{0}, {1}.": "{0}, {1}."
 }
