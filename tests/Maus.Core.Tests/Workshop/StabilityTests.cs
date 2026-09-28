@@ -23,9 +23,13 @@ public class StabilityTests
     }
 
     [Theory]
+    [InlineData(CpuStressMode.Scalar)]
+    [InlineData(CpuStressMode.Sse)]
     [InlineData(CpuStressMode.Avx)]
-    [InlineData(CpuStressMode.Heavy)]
-    public void Vector_loads_are_deterministic_and_bounded(CpuStressMode mode)
+    [InlineData(CpuStressMode.Fma)]
+    [InlineData(CpuStressMode.Avx512)]
+    [InlineData(CpuStressMode.Memory)]
+    public void Every_load_is_deterministic_and_named(CpuStressMode mode)
     {
         var first = CpuStress.Round(mode);
 
@@ -34,10 +38,25 @@ public class StabilityTests
         Assert.False(string.IsNullOrWhiteSpace(CpuStress.Instructions(mode)));
     }
 
+    [Fact]
+    public void Only_loads_the_processor_announces_are_offered()
+    {
+        var available = CpuStress.Available();
+
+        Assert.Equal(CpuStressMode.Automatic, available[0]);
+        Assert.Contains(CpuStressMode.Sse, available);
+        Assert.Equal(System.Runtime.Intrinsics.X86.Avx512F.IsSupported, available.Contains(CpuStressMode.Avx512));
+        Assert.Equal(System.Runtime.Intrinsics.X86.Fma.IsSupported, available.Contains(CpuStressMode.Fma));
+    }
+
     [Theory]
     [InlineData(CpuStressMode.Automatic, "cpu-multi")]
+    [InlineData(CpuStressMode.Scalar, "cpu-int")]
+    [InlineData(CpuStressMode.Sse, "cpu-sse")]
     [InlineData(CpuStressMode.Avx, "cpu-avx")]
-    [InlineData(CpuStressMode.Heavy, "cpu-heavy")]
+    [InlineData(CpuStressMode.Fma, "cpu-fma")]
+    [InlineData(CpuStressMode.Avx512, "cpu-avx512")]
+    [InlineData(CpuStressMode.Memory, "cpu-memory")]
     public async Task Every_load_mode_runs_verified_rounds_and_keeps_its_own_score(CpuStressMode mode, string kind)
     {
         var result = await CpuTest.RunAsync(new CpuTestOptions(TimeSpan.FromMilliseconds(300), Threads: 2, mode));
@@ -52,7 +71,7 @@ public class StabilityTests
     [Fact]
     public async Task A_wrong_vector_result_marks_the_cpu_unstable()
     {
-        var options = new CpuTestOptions(TimeSpan.FromMilliseconds(300), Threads: 2, CpuStressMode.Heavy) { Fault = (thread, round, value) => thread == 0 && round == 1 ? value ^ 4 : value };
+        var options = new CpuTestOptions(TimeSpan.FromMilliseconds(300), Threads: 2, CpuStressMode.Fma) { Fault = (thread, round, value) => thread == 0 && round == 1 ? value ^ 4 : value };
 
         var result = await CpuTest.RunAsync(options);
 

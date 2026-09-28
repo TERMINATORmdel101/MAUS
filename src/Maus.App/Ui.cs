@@ -257,6 +257,12 @@ public static class Ui
 
     public static string CoreTestTitle => T("Processeur : test cœur par cœur (Curve Optimizer, undervolt)");
 
+    public static string CurveProgramTitle => T("Programme complet Curve Optimizer (plusieurs heures)");
+
+    public static string CurveProgramIntro => T("Phase 1 : chaque cœur à son tour, pic de charge d'une seconde, chute au repos, réveil vérifié. Phase 2 : tous les cœurs chargés 5 à 10 secondes puis arrêtés au même instant, en boucle (la brusque chute de charge fait remonter la tension). Le PC est inutilisable pendant le programme ; la charge choisie ci-dessus sert aux deux phases.");
+
+    public static string StartProgram => T("Lancer le programme");
+
     public static string CoreTestIntro => T("Utile si vous avez baissé le Curve Optimizer (AMD) ou fait un undervolt (Intel) : ces réglages lâchent quand un seul cœur monte à sa fréquence maximale, au réveil et aux changements de charge, rarement sous une charge continue. MAUS teste chaque cœur à tour de rôle avec des à-coups et des pauses. Un PC réglé d'origine n'a pas besoin de ce test.");
 
     public static string CrashTitle => T("Le PC a gelé pendant le dernier test");

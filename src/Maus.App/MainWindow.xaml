@@ -796,6 +796,12 @@
                                         <TextBlock Text="{x:Static app:Ui.CoreTestTitle}" Style="{StaticResource CardTitle}" />
                                         <TextBlock Text="{x:Static app:Ui.CoreTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
                                         <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.LoadLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox MinWidth="260" Margin="0,0,12,4" ItemsSource="{Binding Workshop.CpuModes}" SelectedItem="{Binding Workshop.CoreMode}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" AutomationProperties.Name="{x:Static app:Ui.LoadLabel}" />
+                                            <TextBlock Text="{Binding Workshop.CoreModeDetail}" FontSize="12" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,0,4" />
+                                        </WrapPanel>
+                                        <WrapPanel Margin="0,4,0,0">
                                             <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                             <ComboBox MinWidth="220" Margin="0,0,16,4" ItemsSource="{Binding Workshop.CoreDurations}" SelectedItem="{Binding Workshop.CoreDuration}"
                                                       DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
@@ -804,6 +810,19 @@
                                         </WrapPanel>
                                         <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.CoreProgress, Mode=OneWay}" />
                                         <TextBlock Text="{Binding Workshop.CoreStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                                        <!-- Programme complet : phase cœur par cœur puis phase de transitoires, sur plusieurs heures. -->
+                                        <TextBlock Text="{x:Static app:Ui.CurveProgramTitle}" FontWeight="SemiBold" Margin="0,16,0,0" />
+                                        <TextBlock Text="{x:Static app:Ui.CurveProgramIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox MinWidth="220" Margin="0,0,16,4" ItemsSource="{Binding Workshop.CurvePrograms}" SelectedItem="{Binding Workshop.CurveProgram}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" AutomationProperties.Name="{x:Static app:Ui.CurveProgramTitle}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                    Content="{x:Static app:Ui.StartProgram}" Command="{Binding Workshop.StartCurveProgramCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                        </WrapPanel>
+                                        <ProgressBar Height="10" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.CurveProgress, Mode=OneWay}" />
+                                        <TextBlock Text="{Binding Workshop.CurveStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
                                         <ItemsControl ItemsSource="{Binding Workshop.CoreChips}" Margin="0,8,0,0">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>

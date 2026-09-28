@@ -20,8 +20,12 @@ public static class ScoreTrends
     {
         HealthKind => T("Score de santé"),
         "cpu-multi" => T("Processeur (tous les cœurs)"),
-        "cpu-avx" => T("Processeur (tous les cœurs, charge AVX)"),
-        "cpu-heavy" => T("Processeur (tous les cœurs, charge très lourde)"),
+        "cpu-int" => T("Processeur (tous les cœurs, calculs entiers)"),
+        "cpu-sse" => T("Processeur (tous les cœurs, SSE2)"),
+        "cpu-avx" => T("Processeur (tous les cœurs, AVX)"),
+        "cpu-fma" => T("Processeur (tous les cœurs, AVX2 et FMA)"),
+        "cpu-avx512" => T("Processeur (tous les cœurs, AVX-512)"),
+        "cpu-memory" => T("Processeur (tous les cœurs, caches et mémoire)"),
         "cpu-single" => T("Processeur (un cœur)"),
         "ram" => T("Mémoire vive (débit de copie)"),
         "vram" => T("Mémoire vidéo (débit de relecture)"),
@@ -32,8 +36,12 @@ public static class ScoreTrends
     /// <summary>Type de score du test processeur : un par charge, car leurs tours n'ont pas la même durée.</summary>
     public static string CpuKind(CpuStressMode mode) => mode switch
     {
+        CpuStressMode.Scalar => "cpu-int",
+        CpuStressMode.Sse => "cpu-sse",
         CpuStressMode.Avx => "cpu-avx",
-        CpuStressMode.Heavy => "cpu-heavy",
+        CpuStressMode.Fma => "cpu-fma",
+        CpuStressMode.Avx512 => "cpu-avx512",
+        CpuStressMode.Memory => "cpu-memory",
         _ => "cpu-multi",
     };
 

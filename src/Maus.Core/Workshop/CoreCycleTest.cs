@@ -16,8 +16,12 @@ public interface ICoreTopology
     bool PinCurrentThread(CpuCore core);
 }
 
-/// <summary>Trace écrite avant chaque cœur : si le PC gèle ou redémarre, elle dit au lancement suivant quel cœur était testé.</summary>
-public sealed record CoreTestCheckpoint(DateTimeOffset StartedAt, int Core, int Position, int CoreCount);
+/// <summary>
+/// Trace écrite avant chaque cœur : si le PC gèle ou redémarre, elle dit au lancement suivant quel cœur était testé.
+/// <paramref name="Phase"/> : 0 = test cœur par cœur, 1 = programme complet phase cœur par cœur, 2 = programme complet phase
+/// de transitoires (tous les cœurs à la fois, <paramref name="Core"/> vaut alors −1).
+/// </summary>
+public sealed record CoreTestCheckpoint(DateTimeOffset StartedAt, int Core, int Position, int CoreCount, int Phase = 0);
 
 public interface ICoreTestCheckpoint
 {
@@ -28,7 +32,7 @@ public interface ICoreTestCheckpoint
     void Clear();
 }
 
-public sealed record CoreCycleOptions(TimeSpan PerCore, int Rounds = 1)
+public sealed record CoreCycleOptions(TimeSpan PerCore, int Rounds = 1, CpuStressMode Load = CpuStressMode.Automatic)
 {
     /// <summary>Un cœur qui ne donne plus signe de vie pendant ce délai est déclaré figé.</summary>
     public TimeSpan FreezeAfter { get; init; } = TimeSpan.FromSeconds(10);
@@ -79,7 +83,8 @@ public static class CoreCycleTest
         var started = DateTimeOffset.Now;
         var clock = Stopwatch.StartNew();
         var cores = topology.Cores();
-        var reference = CpuTest.Round(0);
+        var kernel = CpuStress.Kernel(options.Load);
+        var reference = kernel();
         var verdicts = cores.ToDictionary(c => c.Index, c => new CoreVerdict(c.Index, 0, 0, false, true));
         string? abortReason = null;
         var total = Math.Max(1, cores.Count * options.Rounds);
@@ -91,7 +96,7 @@ public static class CoreCycleTest
             {
                 var core = cores[position];
                 checkpoint?.Save(new CoreTestCheckpoint(started, core.Index, position, cores.Count));
-                var worker = new Worker(core, topology, options, reference);
+                var worker = new Worker(core, topology, options, kernel, reference);
                 var thread = new Thread(worker.Run) { IsBackground = true, Name = $"MAUS core {core.Index}" };
                 thread.Start();
                 var coreClock = Stopwatch.StartNew();
@@ -162,7 +167,7 @@ public static class CoreCycleTest
     }
 
     /// <summary>Fil de calcul d'un cœur : il signale régulièrement qu'il est vivant (battement).</summary>
-    private sealed class Worker(CpuCore core, ICoreTopology topology, CoreCycleOptions options, ulong reference)
+    private sealed class Worker(CpuCore core, ICoreTopology topology, CoreCycleOptions options, Func<ulong> kernel, ulong reference)
     {
         private volatile bool _stopping;
         private long _heartbeat = Stopwatch.GetTimestamp();
@@ -225,7 +230,7 @@ public static class CoreCycleTest
             var watch = Stopwatch.StartNew();
             while (watch.Elapsed < duration && !_stopping)
             {
-                var result = CpuTest.Round(0);
+                var result = kernel();
                 var count = Interlocked.Increment(ref _rounds);
                 if (options.Fault is { } fault)
                 {

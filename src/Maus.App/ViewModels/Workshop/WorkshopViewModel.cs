@@ -272,17 +272,31 @@ public sealed partial class WorkshopViewModel : ObservableObject
     /// <summary>Instructions réellement utilisées par la charge choisie, sur ce processeur.</summary>
     public string CpuModeDetail => T("Instructions : {0}", CpuStress.Instructions(CpuMode.Value));
 
-    private static List<TestOption<CpuStressMode>> BuildCpuModes()
-    {
-        var modes = new List<TestOption<CpuStressMode>> { new(T("Automatique : mélange de calculs (recommandé)"), CpuStressMode.Automatic) };
-        if (CpuStress.AvxSupported)
-        {
-            modes.Add(new(T("AVX : calculs vectoriels, chauffe davantage"), CpuStressMode.Avx));
-            modes.Add(new(CpuStress.Avx512Supported ? T("Très lourd : AVX-512, charge maximale") : T("Très lourd : AVX à pleine cadence, charge maximale"), CpuStressMode.Heavy));
-        }
+    private static List<TestOption<CpuStressMode>> BuildCpuModes() =>
+        CpuStress.Available().Select(mode => new TestOption<CpuStressMode>(ModeLabel(mode), mode)).ToList();
 
-        return modes;
-    }
+    private static string ModeLabel(CpuStressMode mode) => mode switch
+    {
+        CpuStressMode.Scalar => T("Entiers : calculs sans vecteurs"),
+        CpuStressMode.Sse => T("SSE2 : vecteurs 128 bits"),
+        CpuStressMode.Avx => T("AVX : vecteurs 256 bits"),
+        CpuStressMode.Fma => T("AVX2 + FMA : vecteurs 256 bits, charge lourde"),
+        CpuStressMode.Avx512 => T("AVX-512 : vecteurs 512 bits, charge la plus lourde"),
+        CpuStressMode.Memory => T("Caches et mémoire : grands tableaux"),
+        _ => T("Automatique : mélange de calculs (recommandé)"),
+    };
+
+    /// <summary>
+    /// Avertissement des charges vectorielles larges (AVX, FMA, AVX-512), qui font consommer et chauffer davantage ;
+    /// et, sans PawnIO, rappel que la température du processeur n'est pas lue. Vide pour les autres charges.
+    /// </summary>
+    private string HeavyWarning(TestOption<CpuStressMode> mode) =>
+        mode.Value is not (CpuStressMode.Avx or CpuStressMode.Fma or CpuStressMode.Avx512)
+            ? string.Empty
+            : Environment.NewLine + Environment.NewLine + T("Charge « {0} » : les calculs vectoriels font consommer et chauffer le processeur davantage que le mélange automatique. Gardez un œil sur la température affichée pendant le test.", mode.Label)
+              + (Live.Samples.LastOrDefault()?.CpuTemperatureC is null
+                  ? " " + T("Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température.")
+                  : string.Empty);
 
     /// <summary>Mesures montrées pendant un test : processeur (tests processeur, mémoire, cœur par cœur) ou carte graphique (mémoire vidéo).</summary>
     public MetricViewModel TestLoad => _graphicsTest ? Live.Gpu : Live.Cpu;
@@ -741,12 +755,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
         var duration = CpuDuration.Value;
         var mode = CpuMode.Value;
-        var heavyWarning = mode == CpuStressMode.Automatic
-            ? string.Empty
-            : Environment.NewLine + Environment.NewLine + T("Charge « {0} » : les calculs vectoriels font consommer et chauffer le processeur davantage que le mélange automatique. Gardez un œil sur la température affichée pendant le test.", CpuMode.Label)
-              + (Live.Samples.LastOrDefault()?.CpuTemperatureC is null
-                  ? " " + T("Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température.")
-                  : string.Empty);
+        var heavyWarning = HeavyWarning(CpuMode);
         if (!_confirm(T("Lancer le test du processeur ?"), T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + heavyWarning + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
@@ -845,9 +854,13 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
     }
 
-    private static string? DescribeCrash(CoreTestCheckpoint? trace) => trace is null
-        ? null
-        : T("Le dernier test cœur par cœur s'est arrêté brutalement le {0:g}, pendant le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le test.", trace.StartedAt.ToLocalTime(), trace.Core);
+    private static string? DescribeCrash(CoreTestCheckpoint? trace) => trace switch
+    {
+        null => null,
+        { Phase: 2 } => T("Le dernier programme complet s'est arrêté brutalement le {0:g}, pendant la phase des transitoires (tous les cœurs chargés puis arrêtés en même temps) : le PC a gelé ou redémarré. Le réglage global est trop bas pour les brusques variations de charge : remontez l'ensemble du Curve Optimizer de 2 ou 3 points (ou réduisez l'undervolt), puis refaites le programme.", trace.StartedAt.ToLocalTime()),
+        { Phase: 1 } => T("Le dernier programme complet s'est arrêté brutalement le {0:g}, pendant la phase cœur par cœur, sur le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le programme.", trace.StartedAt.ToLocalTime(), trace.Core),
+        _ => T("Le dernier test cœur par cœur s'est arrêté brutalement le {0:g}, pendant le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le test.", trace.StartedAt.ToLocalTime(), trace.Core),
+    };
 
     private async Task RunCoreTestAsync()
     {
@@ -873,8 +886,8 @@ public sealed partial class WorkshopViewModel : ObservableObject
             return;
         }
 
-        var plan = CoreCycleTest.Plan(CoreDuration.Value, cores.Count);
-        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        var plan = CoreCycleTest.Plan(CoreDuration.Value, cores.Count) with { Load = CoreMode.Value };
+        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + HeavyWarning(CoreMode) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -1007,6 +1020,8 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private async Task StartTestAsync(CancellationTokenSource cancellation, bool graphics = false)
     {
         _stopTest = cancellation.Cancel;
+        // Pas de mise en veille programmée pendant un test (appelé et levé sur le fil de l'interface).
+        KeepAwake.Begin();
         _graphicsTest = graphics;
         OnPropertyChanged(nameof(TestLoad));
         OnPropertyChanged(nameof(TestTemperature));
@@ -1018,6 +1033,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
     {
         IsTesting = false;
         _stopTest = null;
+        KeepAwake.End();
         LoadScoreHistory();
         await RefreshActivityAsync();
     }
