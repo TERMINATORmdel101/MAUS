@@ -72,6 +72,7 @@ public sealed partial class WorkshopViewModel
 
     private bool _isReadingMemory;
     private bool _memoryDriverMissing;
+    private string _dramVoltage = string.Empty;
     private Task? _pendingMemoryRead;
     private string _memoryStatus = T("« Lire la mémoire » interroge la puce SPD de chaque barrette et le contrôleur mémoire (AMD Ryzen, Intel Core). Lecture seule, quelques secondes.");
     private string _memoryClocks = string.Empty;
@@ -190,16 +191,17 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        // Sans pilote et sans droits particuliers : vitesse et tension réellement appliquées, pour tous les processeurs.
+        // Sans pilote et sans droits particuliers : vitesse appliquée et tension déclarée par le BIOS, pour tous les processeurs.
         _memorySlots = await Task.Run(() => WindowsMemoryConfiguration.Read(new WmiCimReader()));
-        MemoryConfiguration = WindowsMemoryConfiguration.Describe(_memorySlots);
+        _dramVoltage = T("La tension donnée par Windows est celle que le BIOS déclare, souvent la tension par défaut plutôt que celle que vous avez réglée. La tension mesurée se lit avec le pilote PawnIO, si la carte mère la communique.");
+        ShowMemoryConfiguration(null);
 
         var registry = new WindowsRegistryReader();
         var installed = PawnIo.State(registry).Installed;
         IsMemoryDriverMissing = !installed;
         if (!installed)
         {
-            MemoryStatus = T("Pour lire les puces des barrettes et les timings réels, il faut le pilote libre PawnIO : bouton « Installer PawnIO » ci-dessus, puis relancez MAUS en administrateur. La vitesse et la tension appliquées, lues sans pilote, sont déjà affichées ci-dessous.");
+            MemoryStatus = T("Pour lire les puces des barrettes et les timings réels, il faut le pilote libre PawnIO : bouton « Installer PawnIO » ci-dessus, puis relancez MAUS en administrateur. La vitesse appliquée et la tension déclarée par le BIOS, lues sans pilote, sont déjà affichées ci-dessous.");
             return;
         }
 
@@ -208,6 +210,9 @@ public sealed partial class WorkshopViewModel
             MemoryStatus = PawnIoMemoryDetails.DriverRequired;
             return;
         }
+
+        _dramVoltage = await ReadDramVoltageAsync();
+        ShowMemoryConfiguration(null);
 
         if (_pendingMemoryRead is { IsCompleted: false })
         {
@@ -299,12 +304,49 @@ public sealed partial class WorkshopViewModel
             MemoryModules.Add(new MemoryModuleViewModel(module));
         }
 
-        if (WindowsMemoryConfiguration.CompareWithSpd(_memorySlots, report.Modules) is { } comparison)
+        ShowMemoryConfiguration(WindowsMemoryConfiguration.CompareWithSpd(_memorySlots, report.Modules));
+        MemoryNotes = string.Join(Environment.NewLine, report.Notes.Select(n => "• " + n));
+    }
+
+    /// <summary>Carte « Vitesse appliquée et tension » : Windows, tension mesurée si possible, comparaison aux profils.</summary>
+    private void ShowMemoryConfiguration(string? comparison)
+    {
+        var text = WindowsMemoryConfiguration.Describe(_memorySlots);
+        if (_dramVoltage.Length > 0)
         {
-            MemoryConfiguration = WindowsMemoryConfiguration.Describe(_memorySlots) + Environment.NewLine + Environment.NewLine + comparison;
+            text += Environment.NewLine + Environment.NewLine + _dramVoltage;
         }
 
-        MemoryNotes = string.Join(Environment.NewLine, report.Notes.Select(n => "• " + n));
+        if (comparison is not null)
+        {
+            text += Environment.NewLine + Environment.NewLine + comparison;
+        }
+
+        MemoryConfiguration = text;
+    }
+
+    /// <summary>
+    /// Tension de la mémoire mesurée par la puce de surveillance de la carte mère (pilote PawnIO, lecture seule), si
+    /// LibreHardwareMonitor sait laquelle de ses entrées la porte sur ce modèle. Jamais devinée.
+    /// </summary>
+    private static async Task<string> ReadDramVoltageAsync()
+    {
+        try
+        {
+            var readings = await Task.Run(() =>
+            {
+                using var sensors = new LhmAdvancedSensors();
+                return sensors.Read();
+            }).WaitAsync(TimeSpan.FromSeconds(20));
+
+            return AdvancedReadings.DramVoltage(readings) is { } dram
+                ? T("Tension de la mémoire mesurée par la carte mère (capteur « {0} ») : {1} V.", dram.Name, dram.Value.ToString("0.000", CultureInfo.InvariantCulture))
+                : T("Tension réellement appliquée : la puce de surveillance de cette carte mère ne dit pas à MAUS laquelle de ses entrées porte la tension de la mémoire (modèle non décrit par LibreHardwareMonitor), et MAUS ne la devine pas. La valeur de Windows ci-dessus est celle déclarée par le BIOS : vérifiez la tension réglée dans le BIOS ou avec l'outil du fabricant de la carte mère.");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return T("Tension mesurée illisible : {0}", ex.Message);
+        }
     }
 
     private static string OnOff(bool value) => value ? T("activé") : T("désactivé");

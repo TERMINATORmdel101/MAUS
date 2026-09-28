@@ -32,6 +32,9 @@ public partial class App : Application
             return;
         }
 
+        // MAUS s'arrête quand sa fenêtre principale se ferme, même si une fenêtre annexe traîne encore.
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+
         // Une seule fenêtre de MAUS à la fois : deux MAUS ouverts se disputeraient le pilote et le bus des barrettes.
         s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
         if (!first)
@@ -46,6 +49,16 @@ public partial class App : Application
 
     /// <summary>Tenu tant que MAUS est ouvert (signale aux lancements suivants qu'une fenêtre existe déjà).</summary>
     private static Mutex? s_singleInstance;
+
+    /// <summary>
+    /// Fin de MAUS : le processus se termine vraiment. Un fil d'une bibliothèque tierce ne doit jamais le garder en vie
+    /// sans fenêtre, verrous du matériel pris (constaté chez le porteur : un MAUS invisible bloquait le bus des barrettes).
+    /// </summary>
+    protected override void OnExit(ExitEventArgs e)
+    {
+        base.OnExit(e);
+        Environment.Exit(e.ApplicationExitCode);
+    }
 
     private static void ShowMainWindow()
     {
@@ -88,7 +101,7 @@ public partial class App : Application
             {
                 if (notification.OpenRequested)
                 {
-                    ShutdownMode = ShutdownMode.OnLastWindowClose;
+                    ShutdownMode = ShutdownMode.OnMainWindowClose;
                     ShowMainWindow();
                     if (Current.MainWindow?.DataContext is ViewModels.MainViewModel model && model.RunAuditCommand.CanExecute(null))
                     {

@@ -402,6 +402,22 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _liveTimer.Stop();
         _processTimer.Stop();
         Appearance.AppearanceManager.Changed -= OnAppearanceChanged;
+
+        // Referme le pilote (LibreHardwareMonitor) une fois la dernière mesure terminée.
+        var sensors = _sensors;
+        _sensors = null;
+        if (sensors is not null)
+        {
+            _ = Task.Run(async () =>
+            {
+                while (_sampling)
+                {
+                    await Task.Delay(50);
+                }
+
+                sensors.Dispose();
+            });
+        }
     }
 
     /// <summary>Nouvel échantillon des mesures en direct (pour la fenêtre de surveillance : aucune mesure en double).</summary>
@@ -549,6 +565,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             Live.Add(snapshot);
             OnRecordedSample(snapshot);
             Sampled?.Invoke(this, snapshot);
+            CheckAdvancedSensors();
         }
         catch (Exception ex)
         {

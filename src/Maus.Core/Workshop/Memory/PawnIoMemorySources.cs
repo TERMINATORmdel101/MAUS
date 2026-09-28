@@ -23,24 +23,43 @@ public sealed class PawnIoSpdSource : ISpdSource
     /// <summary>Attente maximale du bus : au-delà, un autre programme le garde et la lecture ramperait (2 s par octet).</summary>
     private static readonly TimeSpan BusWait = TimeSpan.FromSeconds(10);
 
-    /// <summary>Une seule lecture des puces à la fois dans MAUS (« Mon PC » et « Mémoire » peuvent la demander ensemble).</summary>
+    /// <summary>Attente maximale d'une lecture des puces (celle qu'on lance ou celle déjà en cours).</summary>
+    private static readonly TimeSpan ReadWait = TimeSpan.FromSeconds(75);
+
     private static readonly Lock ReadGate = new();
+
+    /// <summary>
+    /// Lecture partagée : « Mon PC » et « Mémoire » attendent la même, et le résultat sert jusqu'à la fermeture de MAUS
+    /// (les barrettes ne changent pas sans redémarrer le PC). Une lecture qui a échoué est refaite à la demande suivante.
+    /// </summary>
+    private static Task<List<SpdImage>>? s_read;
 
     public IReadOnlyList<SpdImage> ReadAll()
     {
-        if (!ReadGate.TryEnter(TimeSpan.FromSeconds(60)))
+        Task<List<SpdImage>> read;
+        lock (ReadGate)
         {
-            throw new SmbusBusyException(T("Une lecture des puces des barrettes est déjà en cours dans MAUS : attendez qu'elle se termine."));
+            if (s_read is null || s_read.IsFaulted || s_read.IsCanceled)
+            {
+                s_read = Task.Run(ReadLocked);
+            }
+
+            read = s_read;
         }
 
         try
         {
-            return ReadLocked();
+            if (!read.Wait(ReadWait))
+            {
+                throw new SmbusBusyException(T("La lecture des puces des barrettes ne se termine pas : le bus SMBus est très lent ou bloqué par un autre programme (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère…)."));
+            }
         }
-        finally
+        catch (AggregateException ex) when (ex.InnerException is not null)
         {
-            ReadGate.Exit();
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
         }
+
+        return read.Result;
     }
 
     private static List<SpdImage> ReadLocked()
@@ -51,7 +70,9 @@ public sealed class PawnIoSpdSource : ISpdSource
         var locked = TryAcquire(smbus, BusWait);
         if (smbus is not null && !locked)
         {
-            throw new SmbusBusyException(T("Le bus des barrettes est occupé par un autre programme (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère…). Fermez-le, puis relancez la lecture."));
+            throw new SmbusBusyException(Platform.SingleInstance.OtherInterfaceProcesses() > 0
+                ? T("Le bus des barrettes est gardé par un autre MAUS qui tourne encore, peut-être sans fenêtre visible (une ancienne version restée ouverte). Fermez-le : Gestionnaire des tâches, onglet Détails, « MAUS.exe », Fin de tâche ; puis relancez la lecture.")
+                : T("Le bus des barrettes est occupé par un autre programme (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère…). Fermez-le, puis relancez la lecture."));
         }
 
         var computer = new Computer { IsMemoryEnabled = true };

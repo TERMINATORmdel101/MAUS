@@ -141,6 +141,8 @@
         "sources": [ "336465-001 §7.5 Refresh timing parameters (423Ch), tREFI 15:0" ] }
     ],
     "unavailable": [ "tRRD_S", "tRRD_L", "tFAW", "tWTR_S", "tWTR_L", "tWR", "tRTP", "tCKE", "tXP", "tRDRD", "tRDWR", "tWRRD", "tWRWR" ],
-    "verifiedOnHardware": false
+    // Vérifié le 26/09/2026 sur un i7-8700K (Coffee Lake, modèle 0x9E), DDR4-3467 réglée à la main : vitesse et timings
+    // lus par MAUS confirmés par le porteur (seule la tension, lue alors dans la table SMBIOS du BIOS, était fausse).
+    "verifiedOnHardware": true
   }
 ]

@@ -60,7 +60,7 @@ public class IntelMemoryControllerTests
         Assert.Equal("DDR4", report.MemoryType);
         Assert.Contains(report.Settings, s => s is { Key: "CommandRate", Value: "2N" });
         Assert.False(report.ChannelsDiffer);
-        Assert.False(report.VerifiedOnHardware);
+        Assert.True(report.VerifiedOnHardware);
 
         int? Timing(string key) => report.Timings.Single(t => t.Key == key).Clocks;
         Assert.Equal(16, Timing("tCL"));
@@ -161,6 +161,10 @@ public class IntelMemoryControllerTests
 
         registers[0x5E04] = 13;
         Assert.Null(IntelMemoryController.Read(family, 6, 0x3A, new FakeMchbar(registers), null)!.DclkMhz);
+
+        // Génération pas encore comparée à CPU-Z sur un vrai processeur : la fiche le dit.
+        var details = MemoryDetails.Read(new NoSpd(), null, null, null, new IntelControllerAccess(6, 0x3A, () => new FakeMchbar(registers), () => null));
+        Assert.Contains(details.Notes, n => n.Contains("pas encore comparée à CPU-Z", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -248,14 +252,14 @@ public class IntelMemoryControllerTests
     }
 
     [Fact]
-    public void Memory_details_show_intel_timings_and_flag_unverified_maps()
+    public void Memory_details_show_intel_timings_and_flag_only_unverified_maps()
     {
         var intel = new IntelControllerAccess(6, CoffeeLake, () => new FakeMchbar(CoffeeLakeRegisters()), () => new FakeMsr { [0x620] = 43 | (8 << 8), [0x621] = 43 });
 
         var report = MemoryDetails.Read(new NoSpd(), null, null, null, intel);
 
         Assert.NotNull(report.Intel);
-        Assert.Contains(report.Notes, n => n.Contains("pas encore comparée à CPU-Z", StringComparison.Ordinal));
+        Assert.DoesNotContain(report.Notes, n => n.Contains("pas encore comparée à CPU-Z", StringComparison.Ordinal));
         Assert.Contains(report.Notes, n => n.Contains("tFAW", StringComparison.Ordinal));
         var text = MemoryDetails.ToText(report);
         Assert.Contains("Horloge mémoire 1733 MHz (3467 MT/s)", text, StringComparison.Ordinal);

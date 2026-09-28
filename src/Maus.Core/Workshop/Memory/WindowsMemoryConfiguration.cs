@@ -17,9 +17,9 @@ public sealed record MemorySlotConfiguration(
     string? MemoryType);
 
 /// <summary>
-/// Vitesse et tension réelles de la mémoire, lues sans pilote par WMI (<c>Win32_PhysicalMemory</c>). C'est la seule
-/// source de valeurs réellement appliquées sur processeur Intel : les timings réels y restent dans le contrôleur mémoire,
-/// que PawnIO n'ouvre pas.
+/// Vitesse appliquée et tension déclarée de la mémoire, lues sans pilote par WMI (<c>Win32_PhysicalMemory</c>, table SMBIOS
+/// du BIOS). La vitesse est fiable ; la tension est celle que le BIOS inscrit dans sa table, souvent la tension par défaut
+/// plutôt que celle réglée (constaté chez le porteur : 1,25 V déclarés pour 1,45 V réglés), donc jamais présentée comme mesurée.
 /// </summary>
 public static class WindowsMemoryConfiguration
 {
@@ -77,7 +77,7 @@ public static class WindowsMemoryConfiguration
                 slot.CapacityBytes / (1024.0 * 1024 * 1024),
                 slot.MemoryType ?? string.Empty,
                 slot.ConfiguredMts is { } mts ? T("{0} MT/s appliqués", mts) : T("vitesse inconnue"),
-                slot.ConfiguredVolts is { } volts ? T("{0} V appliqués", volts.ToString("0.000", CultureInfo.InvariantCulture)) : T("tension non déclarée par le BIOS")));
+                slot.ConfiguredVolts is { } volts ? T("{0} V déclarés par le BIOS", volts.ToString("0.000", CultureInfo.InvariantCulture)) : T("tension non déclarée par le BIOS")));
         }
 
         return text.ToString();

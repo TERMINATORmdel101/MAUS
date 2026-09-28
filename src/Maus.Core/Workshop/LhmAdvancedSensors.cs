@@ -4,8 +4,10 @@ namespace Maus.Core.Workshop;
 
 /// <summary>
 /// Lecture par LibreHardwareMonitorLib (MPL-2.0), qui passe par le pilote PawnIO et ses modules signés. Seuls le
-/// processeur, la carte mère et la mémoire sont ouverts : les cartes graphiques et les disques ont déjà leurs mesures
-/// sans pilote. À n'ouvrir que si PawnIO est installé et MAUS lancé en administrateur.
+/// processeur et la carte mère sont ouverts : les cartes graphiques, les disques et l'occupation de la mémoire ont déjà
+/// leurs mesures sans pilote. La mémoire n'est pas ouverte ici : LibreHardwareMonitor la lirait par le bus SMBus des
+/// barrettes à chaque mesure, un bus lent et partagé avec d'autres logiciels, qui figeait les mesures en direct chez le
+/// porteur (MSI Z390). À n'ouvrir que si PawnIO est installé et MAUS lancé en administrateur.
 /// </summary>
 public sealed class LhmAdvancedSensors : IAdvancedSensors
 {
@@ -13,7 +15,6 @@ public sealed class LhmAdvancedSensors : IAdvancedSensors
     {
         IsCpuEnabled = true,
         IsMotherboardEnabled = true,
-        IsMemoryEnabled = true,
     };
 
     public LhmAdvancedSensors()

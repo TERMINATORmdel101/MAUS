@@ -79,9 +79,9 @@ public sealed class ComponentCardViewModel
             var limit = limits.ForMemory(module.Generation);
             var gauge = module.ConfiguredMillivolts is { } mv && limit is not null
                 ? limit.DangerAboveMv is { } danger
-                    ? new GaugeInfo(T("Tension"), limit.NominalMv - 200, danger + 150, limit.ElevatedAboveMv, danger, mv,
+                    ? new GaugeInfo(T("Tension déclarée par le BIOS"), limit.NominalMv - 200, danger + 150, limit.ElevatedAboveMv, danger, mv,
                         T("{0} · élevée au-delà de {1} · maximum absolu {2}", V(mv), V(limit.ElevatedAboveMv), V(danger)))
-                    : new GaugeInfo(T("Tension"), limit.NominalMv - 200, limit.ElevatedAboveMv + 150, limit.ElevatedAboveMv, limit.ElevatedAboveMv + 150, mv,
+                    : new GaugeInfo(T("Tension déclarée par le BIOS"), limit.NominalMv - 200, limit.ElevatedAboveMv + 150, limit.ElevatedAboveMv, limit.ElevatedAboveMv + 150, mv,
                         T("{0} · élevée au-delà de {1}", V(mv), V(limit.ElevatedAboveMv)))
                 : null;
             cards.Add(new ComponentCardViewModel("R", T("Mémoire vive · {0}", module.Slot),
@@ -90,7 +90,7 @@ public sealed class ComponentCardViewModel
                 new(T("Référence"), module.PartNumber ?? "—"),
                 .. ProfileLines(spd, module.PartNumber, index),
                 new(T("Vitesse nominale / appliquée"), $"{module.RatedSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} / {module.ConfiguredSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} MT/s"),
-                new(T("Tension (min / max)"), module.MinMillivolts is null ? "—" : $"{V(module.MinMillivolts.Value)} / {V(module.MaxMillivolts ?? 0)}"),
+                new(T("Tension déclarée (min / max)"), module.MinMillivolts is null ? "—" : $"{V(module.MinMillivolts.Value)} / {V(module.MaxMillivolts ?? 0)}"),
             ], module.PartNumber, search, gauge));
         }
 

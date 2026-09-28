@@ -115,6 +115,17 @@ public static class AdvancedReadings
     public static double? CpuPower(IReadOnlyList<HardwareReading> readings) =>
         Named(readings.Where(r => r.Group == ReadingGroup.Cpu && r.Kind == ReadingKind.Power && r.Value is > 0 and < 1000).ToList(), "Package", "CPU Package");
 
+    /// <summary>
+    /// Tension de la mémoire mesurée par la puce de surveillance de la carte mère, si LibreHardwareMonitor sait laquelle de
+    /// ses entrées la porte sur ce modèle (capteurs nommés « DRAM », « VDIMM », « DIMM »… dans ses tables par carte mère).
+    /// Sur une carte non décrite, ses entrées restent anonymes (« Voltage #5 ») : aucune n'est devinée.
+    /// </summary>
+    public static HardwareReading? DramVoltage(IReadOnlyList<HardwareReading> readings) =>
+        readings.FirstOrDefault(r => r.Group == ReadingGroup.Motherboard && r.Kind == ReadingKind.Voltage && r.Value is > 0.8 and < 2.2
+            && (r.Name.Equals("DRAM", StringComparison.OrdinalIgnoreCase)
+                || r.Name.Equals("VDIMM", StringComparison.OrdinalIgnoreCase)
+                || r.Name.StartsWith("DIMM", StringComparison.OrdinalIgnoreCase)));
+
     /// <summary>Tension des cœurs : mesurée par le régulateur si elle est publiée, sinon la plus haute tension demandée (VID).</summary>
     public static double? CpuVoltage(IReadOnlyList<HardwareReading> readings)
     {
@@ -138,36 +149,123 @@ public static class AdvancedReadings
     }
 }
 
-/// <summary>Ajoute les capteurs avancés (PawnIO) aux mesures sans pilote.</summary>
-public sealed class CombinedSensorSource(ISensorSource basic, IAdvancedSensors advanced) : ISensorSource
+/// <summary>
+/// Ajoute les capteurs avancés (PawnIO) aux mesures sans pilote, sans jamais les faire attendre : le pilote s'ouvre en
+/// arrière-plan, chaque lecture du pilote a un temps limité, et une lecture qui traîne laisse passer les mesures sans
+/// pilote. Des valeurs du pilote trop anciennes ne sont plus affichées : jamais une température figée présentée comme actuelle.
+/// </summary>
+public sealed class CombinedSensorSource : ISensorSource
 {
+    /// <summary>Âge au-delà duquel les dernières valeurs du pilote ne sont plus affichées.</summary>
+    public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(6);
+
+    private readonly ISensorSource _basic;
+    private readonly Task<IAdvancedSensors> _opening;
+    private readonly TimeSpan _wait;
+    private Task<IReadOnlyList<HardwareReading>>? _reading;
+    private IReadOnlyList<HardwareReading> _latest = [];
+    private DateTimeOffset _latestAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _readingStartedAt;
+
+    /// <summary>Capteurs déjà ouverts.</summary>
+    public CombinedSensorSource(ISensorSource basic, IAdvancedSensors advanced, TimeSpan? wait = null)
+        : this(basic, Task.FromResult(advanced), wait)
+    {
+    }
+
+    /// <summary>Capteurs ouverts en arrière-plan par <paramref name="open"/> (l'ouverture du pilote peut prendre du temps).</summary>
+    public CombinedSensorSource(ISensorSource basic, Func<IAdvancedSensors> open, TimeSpan? wait = null)
+        : this(basic, Task.Run(open), wait)
+    {
+    }
+
+    private CombinedSensorSource(ISensorSource basic, Task<IAdvancedSensors> opening, TimeSpan? wait)
+    {
+        _basic = basic;
+        _opening = opening;
+        _wait = wait ?? TimeSpan.FromSeconds(1.5);
+    }
+
+    /// <summary>Le pilote est encore en cours d'ouverture.</summary>
+    public bool IsOpening => !_opening.IsCompleted;
+
+    /// <summary>Raison de l'échec d'ouverture du pilote, ou <c>null</c>.</summary>
+    public string? Failure => _opening.IsFaulted ? _opening.Exception?.InnerException?.Message : null;
+
+    /// <summary>La dernière lecture du pilote ne répond pas depuis plus de <see cref="MaxAge"/>.</summary>
+    public bool IsStalled { get; private set; }
+
     public SensorSnapshot Sample()
     {
-        var snapshot = basic.Sample();
-        IReadOnlyList<HardwareReading> readings;
-        try
+        var snapshot = _basic.Sample();
+        if (!_opening.IsCompletedSuccessfully)
         {
-            readings = advanced.Read();
+            return snapshot;
         }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
+
+        if (_reading is null)
         {
-            // Pilote retiré ou en panne : les mesures sans pilote continuent.
+            _reading = Task.Run(_opening.Result.Read);
+            _readingStartedAt = snapshot.At;
+        }
+
+        if (Completes(_reading, _wait))
+        {
+            if (_reading.IsCompletedSuccessfully)
+            {
+                _latest = _reading.Result;
+                _latestAt = snapshot.At;
+            }
+            else
+            {
+                // Pilote retiré ou en panne : les mesures sans pilote continuent.
+                _latest = [];
+            }
+
+            _reading = null;
+        }
+
+        IsStalled = _reading is not null && snapshot.At - _readingStartedAt > MaxAge;
+        if (_latest.Count == 0 || snapshot.At - _latestAt > MaxAge)
+        {
             return snapshot;
         }
 
         return snapshot with
         {
-            CpuTemperatureC = AdvancedReadings.CpuTemperature(readings),
-            CpuPowerWatts = AdvancedReadings.CpuPower(readings),
-            CpuVoltage = AdvancedReadings.CpuVoltage(readings),
-            CpuTjMaxC = AdvancedReadings.CpuTjMax(readings),
-            Readings = readings,
+            CpuTemperatureC = AdvancedReadings.CpuTemperature(_latest),
+            CpuPowerWatts = AdvancedReadings.CpuPower(_latest),
+            CpuVoltage = AdvancedReadings.CpuVoltage(_latest),
+            CpuTjMaxC = AdvancedReadings.CpuTjMax(_latest),
+            Readings = _latest,
         };
     }
 
     public void Dispose()
     {
-        advanced.Dispose();
-        basic.Dispose();
+        if (_opening.IsCompletedSuccessfully)
+        {
+            // Une lecture en cours finit avant la fermeture du pilote (quelques secondes au plus).
+            if (_reading is { } reading)
+            {
+                Completes(reading, TimeSpan.FromSeconds(5));
+            }
+
+            _opening.Result.Dispose();
+        }
+
+        _basic.Dispose();
+    }
+
+    private static bool Completes(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            return task.Wait(timeout);
+        }
+        catch (AggregateException)
+        {
+            return true;
+        }
     }
 }

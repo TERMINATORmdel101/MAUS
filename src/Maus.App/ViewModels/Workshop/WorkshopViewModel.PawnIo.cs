@@ -64,16 +64,26 @@ public sealed partial class WorkshopViewModel
             return basic;
         }
 
-        try
+        // Le pilote s'ouvre en arrière-plan : les mesures sans pilote s'affichent tout de suite.
+        PawnIoStatus = T("PawnIO {0} installé : température, tension et puissance du processeur, sondes et ventilateurs de la carte mère lus par LibreHardwareMonitor (bibliothèque libre, MPL-2.0).", version ?? "?");
+        return new CombinedSensorSource(basic, () => new LhmAdvancedSensors());
+    }
+
+    /// <summary>Après chaque mesure : signale un pilote qui n'a pas pu s'ouvrir ou qui ne répond plus.</summary>
+    private void CheckAdvancedSensors()
+    {
+        if (_sensors is not CombinedSensorSource combined)
         {
-            var advanced = new LhmAdvancedSensors();
-            PawnIoStatus = T("PawnIO {0} installé : température, tension et puissance du processeur, sondes et ventilateurs de la carte mère lus par LibreHardwareMonitor (bibliothèque libre, MPL-2.0).", version ?? "?");
-            return new CombinedSensorSource(basic, advanced);
+            return;
         }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
+
+        if (combined.Failure is { } failure)
         {
-            PawnIoStatus = T("PawnIO est installé mais n'a pas pu être utilisé : {0}", ex.Message);
-            return basic;
+            PawnIoStatus = T("PawnIO est installé mais n'a pas pu être utilisé : {0}", failure);
+        }
+        else if (combined.IsStalled)
+        {
+            PawnIoStatus = T("Le pilote PawnIO ne répond plus depuis quelques secondes : les mesures sans pilote continuent. Un autre logiciel de surveillance l'occupe peut-être.");
         }
     }
 
