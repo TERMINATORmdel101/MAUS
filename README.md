@@ -32,7 +32,7 @@
 
 ## État du projet
 
-Version actuelle : **3.9.1** (voir [CHANGELOG.md](CHANGELOG.md)). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
+Version actuelle : **4.0.0** (voir [CHANGELOG.md](CHANGELOG.md)). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
 
 | Version | Contenu | État |
 |---|---|---|
@@ -41,6 +41,7 @@ Version actuelle : **3.9.1** (voir [CHANGELOG.md](CHANGELOG.md)). Tout est test�
 | 0.3.2-alpha | Capteurs avancés (PawnIO), fiche mémoire complète, relevé de partie, historique des scores, audit hebdomadaire, nettoyage « aucune donnée inventée » | Codée : à valider sur Windows |
 | 0.3.3-alpha | Thème clair / sombre, couleurs selon les composants, animations, fenêtre de surveillance (températures, consommations, fréquences, erreurs WHEA / PCIe et Windows), timings réels Intel Sandy Bridge et Skylake à Comet Lake, tension mémoire honnête | Testée sur le PC du porteur |
 | 3.9.1 | Timings réels sur tous les Intel Core depuis Haswell (jusqu'aux Core Ultra), APU Ryzen Raven Ridge, comparaison de fiches mémoire, étalonnage de la tension, relevé avec bilan, revue de sécurité | Timings vérifiés sur Coffee Lake ; autres générations à comparer à CPU-Z |
+| 4.0.0 | Sept charges pour les tests du processeur (dont AVX2 + FMA et AVX-512), programme complet de validation du Curve Optimizer (cœur par cœur puis transitoires, 1 h ou 4 h), température du processeur pendant les tests, plus de fausse alerte PCIe sur portable, anti-veille pendant les tests | Codée et relue ; programme à essayer sur un vrai Ryzen |
 | Suite | Écran et HDR, publication sur le Microsoft Store | À venir |
 
 **Aucune donnée inventée.** Chaque seuil (température, tension) cite sa source publiée dans `src/Maus.Core/Catalog/hw-safety-limits.json`. Sans source, MAUS n'affiche pas de seuil et ne déclenche pas d'alarme.

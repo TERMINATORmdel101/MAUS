@@ -10,5 +10,5 @@ public class AppVersionTests
         Assert.Equal(expected, AppVersion.Clean(informational));
 
     [Fact]
-    public void Current_version_is_3_9_1() => Assert.Equal("3.9.1", AppVersion.Display);
+    public void Current_version_is_4_0_0() => Assert.Equal("4.0.0", AppVersion.Display);
 }
