@@ -15,30 +15,45 @@ public static class TaskSchedulerClient
 {
     private static readonly XNamespace TaskNs = "http://schemas.microsoft.com/windows/2004/02/mit/task";
 
-    /// <summary>Jour de la tâche existante, ou <c>null</c> si elle n'existe pas (ou est illisible).</summary>
-    public static async Task<DayOfWeek?> GetDayAsync()
+    /// <summary>
+    /// Jour de la tâche existante (<c>null</c> si elle n'existe pas) et programme qu'elle lance (<c>null</c> si illisible).
+    /// </summary>
+    public static async Task<(DayOfWeek? Day, string? Command)> GetAsync()
     {
         var (code, output) = await RunAsync([.. ScheduledAudit.QueryArguments(), "/XML"]);
         if (code != 0)
         {
-            return null;
+            return (null, null);
         }
 
         try
         {
-            var day = XDocument.Parse(output).Descendants(TaskNs + "DaysOfWeek").Elements().FirstOrDefault()?.Name.LocalName;
-            return Enum.TryParse<DayOfWeek>(day, out var parsed) ? parsed : DayOfWeek.Sunday;
+            var document = XDocument.Parse(output);
+            var day = document.Descendants(TaskNs + "DaysOfWeek").Elements().FirstOrDefault()?.Name.LocalName;
+            var command = document.Descendants(TaskNs + "Command").FirstOrDefault()?.Value.Trim('"', ' ');
+            return (Enum.TryParse<DayOfWeek>(day, out var parsed) ? parsed : DayOfWeek.Sunday, command);
         }
         catch (System.Xml.XmlException)
         {
-            return DayOfWeek.Sunday;
+            return (DayOfWeek.Sunday, null);
         }
     }
+
+    /// <summary>Chemin de MAUS.exe qu'utiliserait la tâche.</summary>
+    public static string Executable => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "MAUS.exe");
+
+    /// <summary>Raison de ne pas créer la tâche depuis ce dossier (voir <see cref="ScheduledAudit.Refusal"/>), ou <c>null</c>.</summary>
+    public static string? Refusal(string? executable = null) => ScheduledAudit.Refusal(executable ?? Executable, ScheduledAudit.ProtectedRoots());
 
     /// <summary>Crée (ou remplace) la tâche ; renvoie le message d'erreur, ou <c>null</c> si tout va bien.</summary>
     public static async Task<string?> CreateAsync(DayOfWeek day)
     {
-        var executable = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "MAUS.exe");
+        var executable = Executable;
+        if (Refusal(executable) is { } refusal)
+        {
+            return refusal;
+        }
+
         var xml = ScheduledAudit.TaskXml(executable, day, WindowsIdentity.GetCurrent().Name, DateTime.Now);
         var path = Path.Combine(Path.GetTempPath(), $"maus-task-{Guid.NewGuid():N}.xml");
         try

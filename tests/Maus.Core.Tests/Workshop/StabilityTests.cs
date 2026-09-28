@@ -56,6 +56,18 @@ public class StabilityTests
     }
 
     [Fact]
+    public async Task Ram_test_stops_itself_on_an_overheat_alarm()
+    {
+        var checks = 0;
+
+        var result = await MemoryTest.RunAsync(new MemoryTestOptions(256L << 20), abortCheck: () => ++checks >= 2 ? "trop chaud" : null);
+
+        Assert.True(result.Aborted);
+        Assert.Equal("trop chaud", result.AbortReason);
+        Assert.Null(result.CopyGigabytesPerSecond);
+    }
+
+    [Fact]
     public async Task Flipped_bit_is_found_with_its_offset()
     {
         var options = new MemoryTestOptions(8L << 20) { Fault = (block, pattern) => { if (pattern == 2) { block[1000] ^= 1UL << 7; } } };

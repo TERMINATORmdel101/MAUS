@@ -198,7 +198,7 @@ public sealed class FixEngine
             {
                 before = _context.Settings.Read(write.Key);
             }
-            catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException)
+            catch (Exception ex) when (IsSettingFailure(ex))
             {
                 return Outcome(ChangeStatus.Skipped, T("Valeur d'origine illisible ({0}) : rien n'a été modifié.", write.Key));
             }
@@ -234,7 +234,7 @@ public sealed class FixEngine
                 entry.State = EntryState.Applied;
                 entry.AppliedAt = _context.Audit.Now;
             }
-            catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException or UnauthorizedAccessException)
+            catch (Exception ex) when (IsSettingFailure(ex))
             {
                 entry.Error = ex.Message;
                 RollBack(entries);
@@ -291,7 +291,7 @@ public sealed class FixEngine
         {
             Restore(entry);
         }
-        catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsSettingFailure(ex))
         {
             entry.Error = ex.Message;
             return Outcome(RevertStatus.Failed, T("Restauration refusée : {0}", ex.Message));
@@ -320,7 +320,7 @@ public sealed class FixEngine
                 {
                     Restore(entry);
                 }
-                catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException or UnauthorizedAccessException)
+                catch (Exception ex) when (IsSettingFailure(ex))
                 {
                     entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + T("retour arrière refusé : ") + ex.Message;
                 }
@@ -342,6 +342,12 @@ public sealed class FixEngine
         }
     }
 
+    /// <summary>
+    /// Échec d'une lecture ou d'une écriture de réglage. Toute erreur compte (droits, clé en cours de suppression, valeur
+    /// refusée…), sauf le manque de mémoire : aucune ne doit sortir d'une correction sans que ses écritures soient défaites.
+    /// </summary>
+    private static bool IsSettingFailure(Exception ex) => ex is not OutOfMemoryException;
+
     private SettingValue? TryRead(SettingKey key, out bool readable)
     {
         try
@@ -349,7 +355,7 @@ public sealed class FixEngine
             readable = true;
             return _context.Settings.Read(key);
         }
-        catch (Exception ex) when (ex is MausAccessDeniedException or InvalidOperationException)
+        catch (Exception ex) when (IsSettingFailure(ex))
         {
             readable = false;
             return null;

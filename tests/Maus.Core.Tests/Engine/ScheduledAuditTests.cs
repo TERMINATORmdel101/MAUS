@@ -24,6 +24,29 @@ public class ScheduledAuditTests
         Assert.Equal("7", xml.Descendants(Ns + "Priority").Single().Value);
     }
 
+    [Theory]
+    [InlineData(@"C:\Program Files\MAUS\MAUS.exe", true)]
+    [InlineData(@"C:\Program Files\WindowsApps\MAUS_3.9.1.0_x64__abc\MAUS.exe", true)]
+    [InlineData(@"C:\Program Files (x86)\MAUS\MAUS.exe", true)]
+    [InlineData(@"C:\Users\Alex\Downloads\MAUS\MAUS.exe", false)]
+    [InlineData(@"C:\Users\Alex\Documents\MAUS\publish\MAUS-3.9.1\MAUS.exe", false)]
+    [InlineData(@"C:\Program Files\..\Users\Alex\MAUS.exe", false)]
+    [InlineData(@"C:\Program FilesEvil\MAUS.exe", false)]
+    [InlineData(@"E:\MAUS.exe", false)]
+    [InlineData("MAUS.exe", false)]
+    public void Task_is_only_offered_when_maus_sits_in_an_admin_only_folder(string executable, bool allowed)
+    {
+        string[] roots = [@"C:\Program Files", @"C:\Program Files (x86)"];
+
+        var refusal = ScheduledAudit.Refusal(executable, roots);
+
+        Assert.Equal(allowed, refusal is null);
+        if (!allowed)
+        {
+            Assert.Contains("dossier protégé", refusal, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public void Same_day_after_noon_waits_for_next_week()
     {

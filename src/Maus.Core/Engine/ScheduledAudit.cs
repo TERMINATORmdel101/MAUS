@@ -76,6 +76,32 @@ public static class ScheduledAudit
             """;
     }
 
+    /// <summary>
+    /// Raison de refuser la tâche, ou <c>null</c>. Elle lance MAUS avec les droits les plus élevés sans rien demander :
+    /// son exécutable doit être dans un dossier que seul un administrateur peut modifier (Program Files, dont celui des
+    /// applications du Microsoft Store). Ailleurs (Téléchargements, Bureau, clé USB), n'importe quel programme ouvert par
+    /// l'utilisateur pourrait remplacer MAUS.exe et obtenir ainsi les droits administrateur à la prochaine exécution.
+    /// </summary>
+    /// <param name="executable">Chemin complet de MAUS.exe.</param>
+    /// <param name="protectedRoots">Dossiers réservés aux administrateurs (voir <see cref="ProtectedRoots"/>).</param>
+    public static string? Refusal(string executable, IReadOnlyList<string> protectedRoots)
+    {
+        var isProtected = Path.IsPathFullyQualified(executable)
+            && !executable.Contains("..", StringComparison.Ordinal)
+            && protectedRoots.Any(root => root.Length > 0 && executable.StartsWith(root.TrimEnd('\\') + @"\", StringComparison.OrdinalIgnoreCase));
+        return isProtected
+            ? null
+            : T("L'audit automatique n'est proposé que si MAUS est installé dans un dossier protégé (Program Files, ou par le Microsoft Store). Depuis {0}, un autre programme pourrait remplacer MAUS.exe et profiter des droits administrateur de la tâche.",
+                Path.GetDirectoryName(executable) ?? executable);
+    }
+
+    /// <summary>Program Files (64 et 32 bits) : modifiables par les seuls administrateurs, WindowsApps compris.</summary>
+    public static IReadOnlyList<string> ProtectedRoots() =>
+    [
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+    ];
+
     public static IReadOnlyList<string> CreateArguments(string xmlPath) => ["/Create", "/TN", TaskName, "/XML", xmlPath, "/F"];
 
     public static IReadOnlyList<string> DeleteArguments() => ["/Delete", "/TN", TaskName, "/F"];

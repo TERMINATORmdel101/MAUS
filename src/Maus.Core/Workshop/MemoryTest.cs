@@ -21,7 +21,8 @@ public sealed record MemoryTestResult(
     double? CopyGigabytesPerSecond,
     double? LatencyNanoseconds,
     TimeSpan Duration,
-    bool Aborted)
+    bool Aborted,
+    string? AbortReason = null)
 {
     public bool Stable => Errors == 0;
 }
@@ -42,10 +43,11 @@ public static unsafe class MemoryTest
     public static Task<MemoryTestResult> RunAsync(
         MemoryTestOptions options,
         IProgress<MemoryTestProgress>? progress = null,
+        Func<string?>? abortCheck = null,
         CancellationToken cancellationToken = default) =>
-        Task.Factory.StartNew(() => Run(options, progress, cancellationToken), cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        Task.Factory.StartNew(() => Run(options, progress, abortCheck, cancellationToken), cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
-    private static MemoryTestResult Run(MemoryTestOptions options, IProgress<MemoryTestProgress>? progress, CancellationToken cancellationToken)
+    private static MemoryTestResult Run(MemoryTestOptions options, IProgress<MemoryTestProgress>? progress, Func<string?>? abortCheck, CancellationToken cancellationToken)
     {
         var fault = options.Fault;
         var clock = Stopwatch.StartNew();
@@ -53,6 +55,7 @@ public static unsafe class MemoryTest
         long errors = 0;
         var offsets = new List<long>();
         var aborted = false;
+        string? abortReason = null;
         try
         {
             for (var remaining = options.Bytes & ~7L; remaining > 0; remaining -= ChunkBytes)
@@ -101,6 +104,13 @@ public static unsafe class MemoryTest
 
                         baseIndex += span.Length;
                         cancellationToken.ThrowIfCancellationRequested();
+
+                        // Arrêt automatique en cas de surchauffe (alarme « danger » des capteurs), vérifié à chaque bloc de 64 Mo.
+                        if (abortCheck?.Invoke() is { } reason)
+                        {
+                            abortReason = reason;
+                            throw new OperationCanceledException(reason);
+                        }
                     }
 
                     step++;
@@ -122,7 +132,7 @@ public static unsafe class MemoryTest
 
         var (bandwidth, latency) = aborted ? (null, null) : Measure(Math.Min(options.Bytes, 256L << 20));
         clock.Stop();
-        return new MemoryTestResult(options.Bytes & ~7L, errors, offsets, bandwidth, latency, clock.Elapsed, aborted);
+        return new MemoryTestResult(options.Bytes & ~7L, errors, offsets, bandwidth, latency, clock.Elapsed, aborted, abortReason);
     }
 
     /// <summary>Débit de copie (Go/s) et latence d'accès aléatoire (ns, parcours de pointeurs dans un grand tableau).</summary>

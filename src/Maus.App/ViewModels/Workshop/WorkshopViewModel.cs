@@ -769,7 +769,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 RamProgress = p.Percent;
                 RamStatus = T("{0} · {1:0} % · {2} erreur(s)", p.Step, p.Percent, p.Errors);
             });
-            var result = await MemoryTest.RunAsync(new MemoryTestOptions(bytes), progress, cancellation.Token);
+            var result = await MemoryTest.RunAsync(new MemoryTestOptions(bytes), progress, () => Live.DangerAlarm, cancellation.Token);
             RamProgress = 100;
             if (!result.Aborted)
             {
@@ -778,7 +778,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             }
 
             RamStatus = result.Aborted
-                ? T("Test interrompu.")
+                ? result.AbortReason is { } reason ? T("Test interrompu : {0}", reason) : T("Test interrompu.")
                 : result.Stable
                     ? T("Aucune erreur sur {0:0.0} Go. Débit de copie : {1:0.0} Go/s · latence : {2:0.0} ns. (Un test sous Windows ne couvre pas la mémoire déjà utilisée : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)", result.TestedBytes / 1073741824.0, result.CopyGigabytesPerSecond, result.LatencyNanoseconds)
                     : T("ERREURS : {0} valeur(s) relue(s) différente(s). Revenez au profil mémoire d'origine dans le BIOS (voir Module 10), puis refaites le test ; si les erreurs restent, une barrette est probablement défaillante.", result.Errors);

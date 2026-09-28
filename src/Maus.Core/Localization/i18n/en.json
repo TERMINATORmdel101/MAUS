@@ -2988,5 +2988,7 @@
   "sur le même rang": "on the same rank",
   "sur un autre rang de la même barrette": "on another rank of the same module",
   "sur une autre barrette": "on another module",
-  "{0}, {1}.": "{0}, {1}."
+  "{0}, {1}.": "{0}, {1}.",
+  "L'audit automatique n'est proposé que si MAUS est installé dans un dossier protégé (Program Files, ou par le Microsoft Store). Depuis {0}, un autre programme pourrait remplacer MAUS.exe et profiter des droits administrateur de la tâche.": "Automatic audits are only offered when MAUS is installed in a protected folder (Program Files, or through the Microsoft Store). From {0}, another program could replace MAUS.exe and take advantage of the task's administrator rights.",
+  "La tâche d'audit automatique lance MAUS depuis un dossier non protégé ({0}) avec les droits administrateur : choisissez « Désactivé » pour la retirer, puis installez MAUS dans Program Files avant de la recréer.": "The automatic audit task starts MAUS from an unprotected folder ({0}) with administrator rights: choose \"Off\" to remove it, then install MAUS in Program Files before creating it again."
 }

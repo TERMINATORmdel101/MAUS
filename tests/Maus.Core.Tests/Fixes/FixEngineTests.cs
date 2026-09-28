@@ -171,6 +171,26 @@ public class FixEngineTests
         Assert.All(journal.Load(result.Session!.Id)!.Entries, e => Assert.Equal(EntryState.Failed, e.State));
     }
 
+    [Theory]
+    [InlineData("io")]
+    [InlineData("argument")]
+    public void Unexpected_windows_error_rolls_the_change_back_instead_of_escaping(string kind)
+    {
+        var (engine, registry, _, journal, _, _) = Setup();
+        Exception failure = kind == "io"
+            ? new IOException("Opération non conforme sur une clé de Registre marquée pour suppression.")
+            : new ArgumentException("Valeur trop longue.");
+        registry.FailWrite(RegistryHive.LocalMachine, Policy, failure);
+
+        var result = engine.Apply(
+            [Change("M06.pair", new SettingWrite(TaskView, SettingValue.Dword(0)), new SettingWrite(Widgets, SettingValue.Dword(0)))],
+            new ApplyOptions());
+
+        Assert.Equal(ChangeStatus.Failed, result.Changes.Single().Status);
+        Assert.Equal(1, registry.GetDword(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton"));
+        Assert.All(journal.Load(result.Session!.Id)!.Entries, e => Assert.Equal(EntryState.Failed, e.State));
+    }
+
     [Fact]
     public void Value_not_kept_by_windows_is_rolled_back()
     {

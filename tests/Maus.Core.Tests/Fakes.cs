@@ -14,6 +14,7 @@ public sealed class FakeRegistry : IRegistryReader, IRegistryWriter
     private readonly HashSet<string> _denied = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _writeDenied = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _writeIgnored = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Exception> _writeFailures = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Écritures reçues, dans l'ordre (« set HKCU\chemin\nom=valeur », « delete … »).</summary>
     public List<string> Writes { get; } = [];
@@ -22,6 +23,13 @@ public sealed class FakeRegistry : IRegistryReader, IRegistryWriter
     public FakeRegistry DenyWrite(RegistryHive hive, string path)
     {
         _writeDenied.Add(KeyOf(hive, path));
+        return this;
+    }
+
+    /// <summary>Fait échouer l'écriture sous cette clé avec une erreur Windows imprévue (clé en cours de suppression…).</summary>
+    public FakeRegistry FailWrite(RegistryHive hive, string path, Exception exception)
+    {
+        _writeFailures[KeyOf(hive, path)] = exception;
         return this;
     }
 
@@ -90,6 +98,11 @@ public sealed class FakeRegistry : IRegistryReader, IRegistryWriter
 
     private void ThrowIfWriteDenied(RegistryHive hive, string path)
     {
+        if (_writeFailures.TryGetValue(KeyOf(hive, path), out var failure))
+        {
+            throw failure;
+        }
+
         if (_writeDenied.Contains(KeyOf(hive, path)))
         {
             throw new MausAccessDeniedException("écriture refusée");
