@@ -211,7 +211,9 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
+        Maus.Core.Diagnostics.Breadcrumbs.Add("Mémoire : tension mesurée par la carte mère");
         _dramVoltage = await ReadDramVoltageAsync();
+        Maus.Core.Diagnostics.Breadcrumbs.Add("Mémoire : tension lue");
         ShowMemoryConfiguration(null);
 
         if (_pendingMemoryRead is { IsCompleted: false })
@@ -255,6 +257,7 @@ public sealed partial class WorkshopViewModel
 
     private void Show(MemoryDetailReport report)
     {
+        Maus.Core.Diagnostics.Breadcrumbs.Add($"fiche mémoire : affichage ({report.Modules.Count} barrette(s), contrôleur {(report.Intel is null && report.Live is null ? "non lu" : "lu")})");
         _memoryReport = report;
         OnPropertyChanged(nameof(HasMemoryReport));
         LiveTimingBlocks.Clear();

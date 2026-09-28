@@ -10,6 +10,10 @@
         Width="1240" Height="820" MinWidth="960" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/maus.ico">
+    <Window.Resources>
+        <!-- Tous les textes de la fenêtre prennent la couleur de texte du thème (blanc en thème sombre), sauf couleur voulue. -->
+        <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
+    </Window.Resources>
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
@@ -38,7 +42,7 @@
                         </Border>
                     </Border>
                     <DockPanel Grid.Column="1" Margin="28,22,28,12">
-                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding About}" FontSize="11" Opacity="0.6" Margin="0,12,0,0" TextWrapping="Wrap" />
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding About}" FontSize="11" Opacity="{DynamicResource MutedOpacity}" Margin="0,12,0,0" TextWrapping="Wrap" />
                         <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" />
                     </DockPanel>
                 </Grid>
@@ -89,7 +93,7 @@
                                         <TextBlock Text="{Binding ScoreText}" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                         <TextBlock Text="{Binding ScoreWord}" FontWeight="SemiBold" HorizontalAlignment="Center"
                                                    Foreground="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
-                                        <TextBlock Text="{x:Static app:Ui.HealthCaption}" FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{x:Static app:Ui.HealthCaption}" FontSize="11" Opacity="{DynamicResource MutedOpacity}" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </Grid>
                                 <TextBlock Text="{Binding ScoreDetail}" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,12,0,4" />
@@ -239,7 +243,7 @@
                                          Fill="{Binding Status, Converter={StaticResource StatusToBrush}}" />
                                 <StackPanel>
                                     <TextBlock Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </DockPanel>
                         </DataTemplate>
@@ -249,7 +253,7 @@
                 <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <TextBlock Text="{Binding SelectedModule.Header}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="0.75" Margin="0,0,0,12" />
+                        <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="{DynamicResource MutedOpacity}" Margin="0,0,0,12" />
                         <ItemsControl ItemsSource="{Binding SelectedModule.Findings}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:FindingViewModel}">
@@ -261,7 +265,7 @@
                                                            Foreground="{Binding Status, Converter={StaticResource StatusToBrush}}" />
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
                                             </DockPanel>
-                                            <TextBlock Text="{Binding Values}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap"
+                                            <TextBlock Text="{Binding Values}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,4,0,0" TextWrapping="Wrap"
                                                        Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
                                             <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
                                             <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
@@ -365,7 +369,7 @@
                         <Button DockPanel.Dock="Left" Style="{StaticResource PrimaryButton}" Content="{Binding ApplyLabel}"
                                 Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply, Mode=OneWay}" />
                         <TextBlock Text="{x:Static app:Ui.VerifyNote}"
-                                   Margin="16,0,0,0" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
+                                   Margin="16,0,0,0" VerticalAlignment="Center" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
                     </DockPanel>
                     <WrapPanel Margin="0,8,0,0">
                         <Button Content="{x:Static app:Ui.SaveReport}" Padding="12,4" Margin="0,0,8,0" Command="{Binding SaveReportCommand}"
@@ -397,7 +401,7 @@
                                         <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,2,10,0" />
                                         <StackPanel>
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding Badges}" FontSize="12" Opacity="0.7" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding Badges}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,2,0,0" />
                                             <TextBlock Text="{Binding Description}" Margin="0,4,0,0" TextWrapping="Wrap" />
                                             <TextBlock Text="{Binding Gain}" Margin="0,4,0,0" TextWrapping="Wrap"
                                                        Visibility="{Binding HasGain, Converter={StaticResource BoolToVisibility}}" />
@@ -1097,7 +1101,7 @@
                                                     Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
                                             <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
                                         </DockPanel>
-                                        <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.8" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,4,0,0" TextWrapping="Wrap" />
                                         <Expander Header="{x:Static app:Ui.SessionChanges}" Margin="0,4,0,0">
                                             <ItemsControl ItemsSource="{Binding Changes}" Margin="0,6,0,0">
                                                 <ItemsControl.ItemTemplate>

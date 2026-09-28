@@ -2,7 +2,7 @@
 
 Toutes les versions *alpha* sont codées sous Linux et testées avec des simulations (faux registre, faux WMI…) : **aucune n'a encore été validée sur un vrai PC Windows.**
 
-## En cours (après la 0.3.2-alpha)
+## 0.3.3-alpha — 28/09/2026 (testée sur le PC Windows du porteur)
 
 - Icône lisible par Windows (plantage au démarrage corrigé) et logo complet à toutes les tailles.
 - Fiche mémoire sans pilote : vitesse et tension réellement appliquées (d'après Windows), comparées aux profils de la puce SPD (profil XMP activé, réglage manuel, standard JEDEC).
@@ -20,6 +20,10 @@ Toutes les versions *alpha* sont codées sous Linux et testées avec des simulat
 - Tension de la mémoire : celle donnée par Windows est maintenant présentée comme « déclarée par le BIOS » (chez le porteur : 1,25 V déclarés pour 1,45 V réglés). Avec PawnIO, la tension mesurée par la carte mère est affichée quand LibreHardwareMonitor sait quelle entrée la porte (« DRAM », « VDIMM », « DIMM ») ; sinon MAUS le dit, sans deviner.
 - MAUS se termine vraiment quand sa fenêtre principale se ferme (un MAUS invisible gardait le bus des barrettes).
 - Carte des registres Skylake à Comet Lake vérifiée sur un vrai processeur (i7-8700K du porteur, 26/09/2026).
+- Thème sombre : tous les textes en blanc (certaines pages héritaient du noir par défaut de Windows, les textes secondaires étaient grisés).
+- Lecture des puces SPD sans LibreHardwareMonitor : MAUS charge lui-même le module officiel PawnIO du bus SMBus (plus de détection concurrente en arrière-plan), avec un garde-fou qui ne laisse passer que les lectures et le choix de page SPD (MAUS ne peut ni modifier une barrette, ni toucher à son contrôleur d'alimentation DDR5), et une horloge système à 1 ms pendant la lecture.
+- Garde de l'interface : si la fenêtre ne répond plus 5 secondes, les dernières actions sont écrites dans `%LOCALAPPDATA%\MAUS\logs\interface-bloquee.txt`.
+- Un MAUS resté sans fenêtre (bloqué) n'empêche plus d'ouvrir MAUS : il est proposé de le fermer.
 - Licences livrées avec l'application (dossier `licenses`).
 
 ## 0.3.2-alpha — 25/09/2026

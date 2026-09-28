@@ -499,6 +499,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
     private async Task LoadInventoryAsync()
     {
+        Maus.Core.Diagnostics.Breadcrumbs.Add("Mon PC : lecture du matériel");
         _inventoryLoaded = true;
         InventoryStatus = T("Lecture du matériel…");
         try
@@ -558,6 +559,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
 
         _sampling = true;
+        var started = DateTime.UtcNow;
         try
         {
             _sensors ??= await Task.Run(CreateSensors);
@@ -566,6 +568,10 @@ public sealed partial class WorkshopViewModel : ObservableObject
             OnRecordedSample(snapshot);
             Sampled?.Invoke(this, snapshot);
             CheckAdvancedSensors();
+            if (DateTime.UtcNow - started > TimeSpan.FromMilliseconds(700))
+            {
+                Maus.Core.Diagnostics.Breadcrumbs.Add($"mesure en direct lente : {(DateTime.UtcNow - started).TotalSeconds:0.0} s");
+            }
         }
         catch (Exception ex)
         {

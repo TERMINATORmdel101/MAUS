@@ -7,6 +7,10 @@
         Width="600" Height="720" MinWidth="480" MinHeight="420"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Icon="/Assets/maus.ico">
+    <Window.Resources>
+        <!-- Tous les textes de la fenêtre prennent la couleur de texte du thème (blanc en thème sombre), sauf couleur voulue. -->
+        <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
+    </Window.Resources>
     <DockPanel>
         <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
             <DockPanel>

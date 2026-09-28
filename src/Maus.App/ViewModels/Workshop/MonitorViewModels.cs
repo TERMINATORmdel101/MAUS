@@ -95,9 +95,9 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
     private bool _readingErrors;
     private string _hardwareErrors = "—";
     private string _hardwareDetail = string.Empty;
-    private Brush _hardwareBrush = Palette.Grey;
+    private Brush _hardwareBrush = Views.ScoreToBrushConverter.ThemeText();
     private string _windowsErrors = "—";
-    private Brush _windowsBrush = Palette.Grey;
+    private Brush _windowsBrush = Views.ScoreToBrushConverter.ThemeText();
     private string _status = string.Empty;
     private string _errorsStatus = string.Empty;
 

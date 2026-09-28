@@ -2932,5 +2932,7 @@
   "Tension mesurée illisible : {0}": "Tensión medida ilegible: {0}",
   "Tension réellement appliquée : la puce de surveillance de cette carte mère ne dit pas à MAUS laquelle de ses entrées porte la tension de la mémoire (modèle non décrit par LibreHardwareMonitor), et MAUS ne la devine pas. La valeur de Windows ci-dessus est celle déclarée par le BIOS : vérifiez la tension réglée dans le BIOS ou avec l'outil du fabricant de la carte mère.": "Tensión realmente aplicada: el chip de supervisión de esta placa base no indica a MAUS cuál de sus entradas lleva la tensión de la memoria (modelo no descrito por LibreHardwareMonitor), y MAUS no la adivina. El valor de Windows de arriba es el declarado por la BIOS: compruebe la tensión ajustada en la BIOS o con la herramienta del fabricante de la placa base.",
   "Vitesse appliquée et tension de la mémoire": "Velocidad aplicada y tensión de la memoria",
-  "{0} V déclarés par le BIOS": "{0} V declarados por la BIOS"
+  "{0} V déclarés par le BIOS": "{0} V declarados por la BIOS",
+  "Le pilote du bus des barrettes n'a pas pu être chargé.": "No se pudo cargar el controlador del bus de los módulos de memoria.",
+  "Un autre MAUS est déjà en cours d'exécution, mais sans fenêtre : il est sans doute bloqué, et il peut empêcher la lecture de la mémoire. Le fermer et ouvrir celui-ci ?": "Ya hay otro MAUS en ejecución, pero sin ventana: probablemente está bloqueado y puede impedir la lectura de la memoria. ¿Cerrarlo y abrir este?"
 }

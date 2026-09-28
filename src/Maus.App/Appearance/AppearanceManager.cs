@@ -188,6 +188,9 @@ public static class AppearanceManager
 #pragma warning restore WPF0001
 
         ApplyAccent(application.Resources, preferences.Accent, IsDark);
+
+        // Thème sombre : tous les textes en blanc plein (demande du porteur) ; thème clair : textes secondaires atténués.
+        application.Resources["MutedOpacity"] = IsDark ? 1.0 : 0.72;
         Motion.IsEnabled = preferences.Animations switch
         {
             AnimationChoice.On => true,

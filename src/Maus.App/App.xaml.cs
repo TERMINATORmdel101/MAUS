@@ -37,18 +37,53 @@ public partial class App : Application
 
         // Une seule fenêtre de MAUS à la fois : deux MAUS ouverts se disputeraient le pilote et le bus des barrettes.
         s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
-        if (!first)
+        if (!first && !TakeOverFromWindowlessInstance())
         {
-            Maus.Core.Platform.SingleInstance.BringExistingToFront();
             Shutdown(0);
             return;
         }
 
         ShowMainWindow();
+        UiWatchdog.Start(Dispatcher);
     }
 
     /// <summary>Tenu tant que MAUS est ouvert (signale aux lancements suivants qu'une fenêtre existe déjà).</summary>
     private static Mutex? s_singleInstance;
+
+    /// <summary>
+    /// Un autre MAUS tourne. S'il a une fenêtre, elle revient devant et ce lancement s'arrête. S'il n'en a aucune (MAUS
+    /// bloqué), l'utilisateur peut le fermer et continuer avec celui-ci.
+    /// </summary>
+    /// <returns><c>true</c> si ce MAUS peut démarrer.</returns>
+    private static bool TakeOverFromWindowlessInstance()
+    {
+        if (Maus.Core.Platform.SingleInstance.BringExistingToFront())
+        {
+            return false;
+        }
+
+        var answer = MessageBox.Show(
+            Texts.T("Un autre MAUS est déjà en cours d'exécution, mais sans fenêtre : il est sans doute bloqué, et il peut empêcher la lecture de la mémoire. Le fermer et ouvrir celui-ci ?"),
+            "MAUS",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Yes);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return false;
+        }
+
+        Maus.Core.Platform.SingleInstance.CloseWindowlessOthers();
+        try
+        {
+            // Le MAUS fermé tenait ce verrou : Windows le rend « abandonné », il est alors à nous.
+            return s_singleInstance!.WaitOne(TimeSpan.FromSeconds(10));
+        }
+        catch (AbandonedMutexException)
+        {
+            return true;
+        }
+    }
 
     /// <summary>
     /// Fin de MAUS : le processus se termine vraiment. Un fil d'une bibliothèque tierce ne doit jamais le garder en vie

@@ -27,15 +27,18 @@ public sealed class ScoreToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
     {
-        int and < 0 => Palette.Grey,
         int and >= 75 => Palette.Green,
         int and >= 50 => Palette.Gold,
-        int => Palette.Red,
-        _ => Palette.Grey,
+        int and >= 0 => Palette.Red,
+        _ => ThemeText(),
     };
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
+
+    /// <summary>Pas encore de score : couleur du texte du thème (blanc en thème sombre), pas un gris qui passerait pour un verdict.</summary>
+    internal static Brush ThemeText() =>
+        System.Windows.Application.Current?.TryFindResource("TextFillColorPrimaryBrush") as Brush ?? Palette.Grey;
 }
 
 /// <summary>

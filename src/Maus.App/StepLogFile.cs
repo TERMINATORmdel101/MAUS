@@ -32,6 +32,7 @@ public sealed class StepLogFile
 
     public void Write(string step)
     {
+        Maus.Core.Diagnostics.Breadcrumbs.Add(step);
         if (Path is null)
         {
             return;

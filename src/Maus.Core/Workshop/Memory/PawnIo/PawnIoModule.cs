@@ -94,6 +94,33 @@ public sealed partial class PawnIoModule : IDisposable
         return output;
     }
 
+    /// <summary>
+    /// Même appel, au format attendu par RAMSPDToolkit : code HRESULT (0 = réussi) au lieu d'une exception, et nombre de
+    /// valeurs réellement renvoyées (comme <c>PawnIo.ExecuteHr</c> de LibreHardwareMonitor).
+    /// </summary>
+    public unsafe int ExecuteHr(string function, long[] input, uint inputCount, long[] output, uint outputCount, out uint returned)
+    {
+        var request = new byte[FunctionNameLength + (inputCount * sizeof(long))];
+        Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
+        MemoryMarshal.AsBytes(input.AsSpan(0, (int)inputCount)).CopyTo(request.AsSpan(FunctionNameLength));
+        var buffer = new byte[outputCount * sizeof(long)];
+
+        fixed (byte* pIn = request)
+        fixed (byte* pOut = buffer)
+        {
+            if (!DeviceIoControl(_handle, ExecuteCode, pIn, (uint)request.Length, buffer.Length == 0 ? null : pOut, (uint)buffer.Length, out var bytes, 0))
+            {
+                returned = 0;
+                var error = Marshal.GetLastPInvokeError();
+                return error <= 0 ? error : unchecked((int)(((uint)error & 0xFFFF) | (7u << 16) | 0x80000000));
+            }
+
+            Buffer.BlockCopy(buffer, 0, output, 0, (int)Math.Min(bytes, (uint)(output.Length * sizeof(long))));
+            returned = bytes / sizeof(long);
+            return 0;
+        }
+    }
+
     public void Dispose() => _handle.Dispose();
 
     [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]

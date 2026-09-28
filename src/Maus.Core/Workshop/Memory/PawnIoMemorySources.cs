@@ -4,6 +4,7 @@ using RAMSPDToolkit.I2CSMBus;
 using RAMSPDToolkit.SPD;
 using Maus.Core.Workshop.Memory.PawnIo;
 using RAMSPDToolkit.SPD.Interop.Shared;
+using RAMSPDToolkit.Windows.Driver;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Workshop.Memory;
@@ -75,15 +76,20 @@ public sealed class PawnIoSpdSource : ISpdSource
                 : T("Le bus des barrettes est occupé par un autre programme (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère…). Fermez-le, puis relancez la lecture."));
         }
 
-        var computer = new Computer { IsMemoryEnabled = true };
+        // Horloge système à 1 ms pendant la lecture : la bibliothèque attend chaque échange par pauses de 0,25 ms, que
+        // Windows arrondit sinon à 15,6 ms (lecture 10 à 15 fois plus lente).
+        using var fineTimer = Platform.TimerResolution.OneMillisecond();
         try
         {
-            computer.Open();
+            Step("pilote SMBus : chargement");
+            EnsureDriver();
             if (SMBusManager.RegisteredSMBuses.Count == 0)
             {
+                Step("bus SMBus : détection");
                 SMBusManager.DetectSMBuses();
             }
 
+            Step($"bus SMBus : {SMBusManager.RegisteredSMBuses.Count} trouvé(s)");
             var images = new List<SpdImage>();
             foreach (var bus in SMBusManager.RegisteredSMBuses)
             {
@@ -95,6 +101,7 @@ public sealed class PawnIoSpdSource : ISpdSource
                     }
 
                     var length = accessor.MemoryType() is SPDMemoryType.SPD_DDR5_SDRAM or SPDMemoryType.SPD_LPDDR5_SDRAM ? 1024 : 512;
+                    Step($"barrette à l'adresse 0x{address:X2} : lecture de {length} octets");
                     var bytes = new byte[length];
                     for (var i = 0; i < length; i++)
                     {
@@ -102,6 +109,7 @@ public sealed class PawnIoSpdSource : ISpdSource
                     }
 
                     images.Add(new SpdImage(accessor.Index, bytes, Safe(accessor.GetModuleManufacturerString), Safe(accessor.GetDRAMManufacturerString)));
+                    Step($"barrette à l'adresse 0x{address:X2} : lue");
                 }
             }
 
@@ -109,11 +117,34 @@ public sealed class PawnIoSpdSource : ISpdSource
         }
         finally
         {
-            computer.Close();
             if (locked)
             {
                 smbus!.ReleaseMutex();
             }
+        }
+    }
+
+    /// <summary>Journal des étapes (diagnostic), fourni par l'appelant ; rien par défaut.</summary>
+    public static Action<string>? StepLog { get; set; }
+
+    private static void Step(string step)
+    {
+        Diagnostics.Breadcrumbs.Add(step);
+        StepLog?.Invoke(step);
+    }
+
+    /// <summary>Pilote SMBus de MAUS (modules PawnIO officiels, écritures filtrées), chargé une fois par session.</summary>
+    private static void EnsureDriver()
+    {
+        if (DriverManager.Driver is not SpdBusDriver)
+        {
+            DriverManager.Driver = new SpdBusDriver();
+            SMBusManager.UseWMI = false;
+        }
+
+        if (!DriverManager.LoadDriver())
+        {
+            throw new SmbusBusyException(T("Le pilote du bus des barrettes n'a pas pu être chargé."));
         }
     }
 
@@ -230,6 +261,7 @@ public static class PawnIoMemoryDetails
     public static MemoryDetailReport Read(CpuIdInfo? cpu, bool? ddr5Hint, Action<string>? log = null)
     {
         log ??= _ => { };
+        PawnIoSpdSource.StepLog = log;
         log($"processeur : {cpu?.Vendor} famille 0x{cpu?.Family:X} modèle 0x{cpu?.Model:X2}");
         ISpdSource spd = new LoggedSpdSource(new PawnIoSpdSource(), log);
         if (cpu is { IsIntel: true })

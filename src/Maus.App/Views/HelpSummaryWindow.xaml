@@ -6,13 +6,17 @@
         Width="720" Height="620" MinWidth="480" MinHeight="400"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Icon="/Assets/maus.ico">
+    <Window.Resources>
+        <!-- Tous les textes de la fenêtre prennent la couleur de texte du thème (blanc en thème sombre), sauf couleur voulue. -->
+        <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
+    </Window.Resources>
     <DockPanel Margin="24">
         <TextBlock DockPanel.Dock="Top" Text="{x:Static app:Ui.HelpWindowTitle}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock DockPanel.Dock="Top" Margin="0,8,0,12" Opacity="0.8" TextWrapping="Wrap" Text="{x:Static app:Ui.HelpIntro}" />
+        <TextBlock DockPanel.Dock="Top" Margin="0,8,0,12" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" Text="{x:Static app:Ui.HelpIntro}" />
         <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="True">
             <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.CloseWindow}" Padding="16,6" IsCancel="True" />
             <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.CopyText}" Padding="16,6" Margin="0,0,8,0" IsDefault="True" Click="OnCopy" />
-            <TextBlock x:Name="CopyStatus" VerticalAlignment="Center" Opacity="0.8" TextWrapping="Wrap" Margin="0,0,12,0" />
+            <TextBlock x:Name="CopyStatus" VerticalAlignment="Center" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" Margin="0,0,12,0" />
         </DockPanel>
         <TextBox x:Name="Summary" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                  FontFamily="Cascadia Mono, Consolas" FontSize="13" Padding="8" />

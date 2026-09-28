@@ -27,7 +27,8 @@ public static partial class SingleInstance
         return others;
     }
 
-    public static void BringExistingToFront()
+    /// <summary>Ramène devant la fenêtre de l'autre MAUS ; <c>false</c> s'il n'en a aucune (MAUS bloqué, resté sans fenêtre).</summary>
+    public static bool BringExistingToFront()
     {
         using var current = Process.GetCurrentProcess();
         foreach (var process in Process.GetProcessesByName(current.ProcessName))
@@ -45,9 +46,45 @@ public static partial class SingleInstance
                 }
 
                 SetForegroundWindow(process.MainWindowHandle);
-                return;
+                return true;
             }
         }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Ferme les autres MAUS restés sans fenêtre (à la demande de l'utilisateur) et attend leur fin, 10 secondes au plus.
+    /// Un MAUS qui a une fenêtre n'est jamais fermé ici.
+    /// </summary>
+    /// <returns>Le nombre de MAUS fermés.</returns>
+    public static int CloseWindowlessOthers()
+    {
+        using var current = Process.GetCurrentProcess();
+        var closed = 0;
+        foreach (var process in Process.GetProcessesByName(current.ProcessName))
+        {
+            using (process)
+            {
+                if (process.Id == current.Id || process.MainWindowHandle != 0)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    process.Kill();
+                    process.WaitForExit(TimeSpan.FromSeconds(10));
+                    closed++;
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+                {
+                    // Déjà terminé, ou refusé : l'utilisateur le fermera depuis le Gestionnaire des tâches.
+                }
+            }
+        }
+
+        return closed;
     }
 
     [LibraryImport("user32.dll")]

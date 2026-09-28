@@ -8,8 +8,10 @@
         WindowStartupLocation="Manual"
         Icon="/Assets/maus.ico">
     <Window.Resources>
+        <!-- Tous les textes de la fenêtre prennent la couleur de texte du thème (blanc en thème sombre), sauf couleur voulue. -->
+        <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
         <!-- Colonnes alignées d'un composant à l'autre : nom, actuelle, minimale, maximale. -->
-        <Style x:Key="ValueCell" TargetType="TextBlock">
+        <Style x:Key="ValueCell" TargetType="TextBlock" BasedOn="{StaticResource MausText}">
             <Setter Property="HorizontalAlignment" Value="Right" />
             <Setter Property="Margin" Value="12,0,0,0" />
             <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
@@ -114,8 +116,8 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Style="{StaticResource Muted}" />
                                                     <TextBlock Grid.Column="1" Text="{Binding Value}" FontWeight="SemiBold" Style="{StaticResource ValueCell}" />
-                                                    <TextBlock Grid.Column="2" Text="{Binding Min}" Opacity="0.7" Style="{StaticResource ValueCell}" />
-                                                    <TextBlock Grid.Column="3" Text="{Binding Max}" Opacity="0.7" Style="{StaticResource ValueCell}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Min}" Opacity="{DynamicResource MutedOpacity}" Style="{StaticResource ValueCell}" />
+                                                    <TextBlock Grid.Column="3" Text="{Binding Max}" Opacity="{DynamicResource MutedOpacity}" Style="{StaticResource ValueCell}" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

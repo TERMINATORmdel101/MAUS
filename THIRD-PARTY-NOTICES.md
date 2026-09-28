@@ -15,14 +15,17 @@ Le texte de la MPL-2.0 : https://mozilla.org/MPL/2.0/. Les fichiers couverts par
 
 **Pilote PawnIO** (namazso, https://github.com/namazso/PawnIO) : il n'est **pas** distribué avec MAUS. L'utilisateur l'installe s'il le souhaite, par winget (`namazso.PawnIO`), depuis l'Atelier, et peut le retirer de la même façon. Les modules PawnIO signés utilisés sont ceux inclus dans LibreHardwareMonitorLib, plus les deux modules officiels ci-dessous.
 
-**Modules PawnIO.Modules 0.2.11** (namazso et contributeurs, LGPL-2.1-or-later, https://github.com/namazso/PawnIO.Modules, étiquette `0.2.11`) : MAUS inclut, sans les modifier, deux modules compilés et signés de cette version, dans `Maus.Core.dll` (ressources `Maus.Core.PawnIo.*`). Ils ne servent qu'à lire les timings et horloges réellement appliqués par le contrôleur mémoire des processeurs Intel, si l'utilisateur a installé PawnIO et lancé MAUS en administrateur.
+**Modules PawnIO.Modules 0.2.11** (namazso et contributeurs, LGPL-2.1-or-later, https://github.com/namazso/PawnIO.Modules, étiquette `0.2.11`) : MAUS inclut, sans les modifier, cinq modules compilés et signés de cette version, dans `Maus.Core.dll` (ressources `Maus.Core.PawnIo.*`). Ils ne servent qu'à lire les timings et horloges du contrôleur mémoire des processeurs Intel et les puces SPD des barrettes, si l'utilisateur a installé PawnIO et lancé MAUS en administrateur.
 
 | Module | Rôle dans MAUS | SHA-256 |
 |---|---|---|
 | `IntelMCHBAR.bin` | Lecture des registres du contrôleur mémoire (fenêtre MCHBAR) ; le module ne sait que lire et refuse toute adresse hors de la fenêtre | `3f82b832d99b4aac37d2a20fdb7c9baa2a3bc0488612c9019c9484eb0e8a6eae` |
 | `IntelMSR.bin` | Lecture des MSR 0x620 et 0x621 (plage et fréquence du ring) ; le module sait aussi écrire quelques MSR de puissance, fonction que MAUS n'appelle jamais | `d6ed85d65ab17a22f813ef98207d6d537155ee2ded5976a21cb48413c9b92e5f` |
+| `SmbusI801.bin` | Bus SMBus des chipsets Intel : lecture des puces SPD des barrettes. Le module sait écrire sur le bus ; MAUS filtre chaque transfert et ne laisse passer que le choix de page SPD (`Workshop/Memory/PawnIo/SpdBusDriver.cs`) | `a0f7d066e7efda28c0e754c1f52dbd8dc280d388ba8575b514a80cb67490530c` |
+| `SmbusPIIX4.bin` | Bus SMBus des chipsets AMD, même usage et même filtre | `91f9b4b1c39e3d399ce48477a89d8f6bd3e58a2241064a4daec3a1513dff56e5` |
+| `SmbusNCT6793.bin` | Bus SMBus de certaines puces Nuvoton, même usage et même filtre | `db068c6a87c0066ebfb7f691d88422fee8af350898e7a7f0db100fd6632bab17` |
 
-Archive de la version 0.2.11 publiée sur GitHub (SHA-256 `43608cb89bc84247fef1368a139013f7d043e17db6d6c8dfc9b46bf0905a81f4`). Le code source de ces modules (`IntelMCHBAR.p`, `IntelMSR.p`) est disponible à l'adresse ci-dessus ; le texte de la LGPL-2.1 est dans `licenses/LGPL-2.1.txt`, livré avec MAUS. Vous pouvez remplacer ces modules par une version modifiée en recompilant MAUS avec vos fichiers `.bin` (dossier `src/Maus.Core/Workshop/Memory/PawnIo/`).
+Les cinq modules viennent de l'archive de la version 0.2.11 publiée sur GitHub (SHA-256 `43608cb89bc84247fef1368a139013f7d043e17db6d6c8dfc9b46bf0905a81f4`). Le code source de ces modules (`IntelMCHBAR.p`, `IntelMSR.p`) est disponible à l'adresse ci-dessus ; le texte de la LGPL-2.1 est dans `licenses/LGPL-2.1.txt`, livré avec MAUS. Vous pouvez remplacer ces modules par une version modifiée en recompilant MAUS avec vos fichiers `.bin` (dossier `src/Maus.Core/Workshop/Memory/PawnIo/`).
 
 ## Sources de données techniques (non incluses comme code)
 
