@@ -32,14 +32,16 @@
 
 ## État du projet
 
-Version actuelle : **0.3.2-alpha** (voir [CHANGELOG.md](CHANGELOG.md)). *Alpha* veut dire : tout est codé et testé avec des simulations, mais pas encore validé sur un vrai PC Windows. À ne pas utiliser sur un PC important avant cette validation.
+Version actuelle : **3.9.1** (voir [CHANGELOG.md](CHANGELOG.md)). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
 
 | Version | Contenu | État |
 |---|---|---|
 | V0.1 | Socle, profil matériel, mode « audit seul » des modules | Terminée |
 | V0.2 | Corrections réversibles (journal, point de restauration, Annuler), atelier matériel, nouvelle interface, trois langues | Codée : à valider sur Windows |
 | 0.3.2-alpha | Capteurs avancés (PawnIO), fiche mémoire complète, relevé de partie, historique des scores, audit hebdomadaire, nettoyage « aucune donnée inventée » | Codée : à valider sur Windows |
-| V0.3 | Écran et HDR, publication sur le Microsoft Store | À venir |
+| 0.3.3-alpha | Thème clair / sombre, couleurs selon les composants, animations, fenêtre de surveillance (températures, consommations, fréquences, erreurs WHEA / PCIe et Windows), timings réels Intel Sandy Bridge et Skylake à Comet Lake, tension mémoire honnête | Testée sur le PC du porteur |
+| 3.9.1 | Timings réels sur tous les Intel Core depuis Haswell (jusqu'aux Core Ultra), APU Ryzen Raven Ridge, comparaison de fiches mémoire, étalonnage de la tension, relevé avec bilan, revue de sécurité | Timings vérifiés sur Coffee Lake ; autres générations à comparer à CPU-Z |
+| Suite | Écran et HDR, publication sur le Microsoft Store | À venir |
 
 **Aucune donnée inventée.** Chaque seuil (température, tension) cite sa source publiée dans `src/Maus.Core/Catalog/hw-safety-limits.json`. Sans source, MAUS n'affiche pas de seuil et ne déclenche pas d'alarme.
 

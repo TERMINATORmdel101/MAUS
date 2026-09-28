@@ -2,17 +2,20 @@
 
 Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le travail **sur le PC Windows du porteur**. À lire après `CLAUDE.md` (qui reste la mémoire complète du projet). Le mettre à jour, ou le vider, une fois la reprise faite.
 
-## 0. État au 26/09/2026 (session locale sur le PC du porteur)
+## 0. État au 28/09/2026 (session locale sur le PC du porteur)
 
-- Fait et testé sous Windows (compilation 0 avertissement, **1 229 tests réussis**, interface ouverte en clair et en sombre par une copie `asInvoker` compilée hors du dépôt, avec `-p:ApplicationManifest=<copie>` : le manifeste du dépôt n'est plus touché) : icône, fiche mémoire sans pilote, profils XMP / EXPO, timings réels Intel (Sandy / Ivy Bridge et Skylake à Comet Lake), bouton « Installer PawnIO » dans l'onglet Mémoire, **Paramètres** (thème, couleurs selon les composants, animations, vitesse d'actualisation), **animations**, **fenêtre de surveillance** (températures, consommation, fréquences, erreurs WHEA / PCIe et Windows).
-- Version de test publiée : `publish\MAUS-0.3.3-apparence` (les dossiers plus anciens peuvent être verrouillés par un MAUS ouvert : ne jamais tuer le MAUS du porteur).
-- **À faire valider par le porteur** : PawnIO installé par lui (bouton de l'onglet Mémoire), puis « Lire la mémoire » en administrateur, comparé à CPU-Z (i7-8700K, DDR4-3467 attendue, horloge ≈ 1733 MHz). Si tout concorde, passer `verifiedOnHardware` à `true` pour `skl-cml` dans `Catalog/intel-memory-controller.json`.
-- **Générations restantes** (demande « le plus de générations Intel et AMD possible ») : Haswell / Broadwell, Ice Lake / Tiger Lake / Rocket Lake, Alder / Raptor Lake, Meteor / Arrow / Lunar Lake, compléments Skylake, revue AMD Zen. Recherches partielles sauvegardées (une ligne JSON par fait sourcé) dans `C:\Users\CARO\Documents\MAUS\.worktrees\_pdf\registers\*.partial.jsonl` ; résultat vérifié de Sandy / Ivy Bridge dans `journal-results.jsonl`. Méthode suivie : relevé, puis **second passage indépendant qui rouvre chaque source** ; un champ sans deux sources concordantes est écarté et nommé « non disponible ».
-- Limite d'utilisation hebdomadaire des agents atteinte le 26/09 (retour le 28/09, 4 h) : la relecture critique du commit « Paramètres… » par agents n'a pas pu se faire ; relecture faite à la main (contrôles Fluent vérifiés, correction du contraste élevé).
+- Version **3.9.1** (numéro choisi par le porteur, après la 0.3.3-alpha). Compilation 0 avertissement, **1 274 tests réussis** sous Windows.
+- Vérifié sur le vrai PC du porteur (i7-8700K, MSI Z390, DDR4-3467) : timings réels Skylake à Comet Lake (`verifiedOnHardware: true` pour `skl-cml`), textes blancs du thème sombre. Tension mémoire : Windows donne celle déclarée par le BIOS (1,25 V) pour 1,45 V réglés ; l'étalonnage par l'utilisateur existe, **pas encore essayé par le porteur**.
+- **Générations mémoire faites** (catalogue `src/Maus.Core/Catalog/intel-memory-controller.json`, chaque champ sourcé) : Sandy / Ivy Bridge, Haswell / Broadwell, Skylake à Comet Lake, Ice Lake / Rocket Lake, Tiger Lake, Alder / Raptor Lake, Meteor / Arrow / Lunar Lake. Seule `skl-cml` est vérifiée sur un vrai processeur ; les autres affichent « pas encore comparée à CPU-Z ». Champs écartés car les sources se contredisent : horloge mémoire Haswell / Broadwell, tRRD et tRDPRE Haswell, horloge Meteor / Arrow Lake en gear 4, horloge et réglages Lunar Lake.
+- AMD : table Raven Ridge / Picasso (0x1E0004) ajoutée ; Renoir 0x370000 à 0x370002 en disposition générique « à vérifier » ; alerte UCLK > MCLK.
+- Revue de sécurité des fonctions qui modifient le PC faite le 28/09 (voir `CHANGELOG.md`, 3.9.1) : trois corrections (retour arrière des corrections sur toute erreur, arrêt du test RAM en surchauffe, tâche planifiée seulement depuis un dossier protégé).
+- Recherches de registres sauvegardées (une ligne JSON par fait sourcé) : `C:\Users\CARO\Documents\MAUS\.worktrees\_pdf\registers\*.partial.jsonl` et `v2\`.
+- **À faire valider par le porteur** : ouvrir l'onglet Mémoire de la 3.9.1 (plus de blocage ? sinon lire `%LOCALAPPDATA%\MAUS\logs\interface-bloquee.txt` et `lecture-memoire.txt`), lecture des puces SPD avec PawnIO, étalonnage de la tension avec ses 1,45 V, fenêtre de surveillance (courbes, relevé, export).
+- Toute personne ayant un autre processeur Intel peut comparer avec CPU-Z : si tout concorde, passer `verifiedOnHardware` à `true` pour sa famille, avec un commentaire daté (modèle, mémoire).
 
 ## 1. Où en est le code
 
-- Version : **0.3.2-alpha** (`Directory.Build.props`, `CHANGELOG.md`).
+- Version : **3.9.1** (`Directory.Build.props`, `CHANGELOG.md`).
 - Tout le travail cloud est sur la branche **`claude/keen-wozniak-93as1n`** (poussée sur GitHub). **Elle n'est pas encore fusionnée dans `main`.** Aucune pull request n'a été ouverte : demander au porteur s'il veut en ouvrir une (ou fusionner) après validation.
 - Sous Linux : compilation 0 avertissement, 1 185 tests dont **12 échecs attendus** (ils appellent de vraies API Windows : signature de fichiers, journaux d'événements, chemins `C:\`, raccourcis). **Sous Windows, les 1 185 doivent passer.**
 - Rien de ce qui a été codé dans le cloud n'a tourné sur un vrai Windows : l'interface WPF n'a jamais été ouverte depuis la refonte.
@@ -27,7 +30,7 @@ git checkout claude/keen-wozniak-93as1n
 git pull origin claude/keen-wozniak-93as1n
 dotnet build Maus.slnx --disable-build-servers
 dotnet test Maus.slnx
-dotnet run --project src/Maus.Cli -- --version    # doit afficher « MAUS 0.3.2-alpha »
+dotnet run --project src/Maus.Cli -- --version    # doit afficher « MAUS 3.9.1 »
 ```
 
 Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@users.noreply.github.com>` (jamais l'adresse personnelle : GitHub refuse le push).
@@ -51,7 +54,7 @@ Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@user
 ## 5. Ce qui reste à faire (demandes du porteur non terminées)
 
 - **Vraies tensions VDD / VDDQ des barrettes DDR5** (demande du 25/09/2026) : lire le PMIC de chaque barrette par le SMBus, **en lecture seule** (jamais d'écriture : une écriture dans un PMIC change la tension). Rien n'est codé. Avant d'écrire une ligne : trouver une **source vérifiable** de la carte des registres (spécification JEDEC du PMIC5100 / PMIC5010, ou code libre qui la lit), et ne rien afficher tant qu'une valeur n'a pas été comparée à un outil de référence sur une vraie barrette. Aujourd'hui MAUS affiche seulement le type de PMIC (octet du SPD) et les tensions **demandées** par les profils XMP / EXPO.
-- **Comparer deux fiches mémoire** (demande du 25/09/2026) : enregistrer chaque lecture de l'onglet Mémoire (JSON local, `%LOCALAPPDATA%\MAUS\`), choisir une lecture précédente, afficher les différences (timings, horloges, tensions). Rien n'est codé. Le texte de `MemoryDetails.ToText` peut déjà se copier et se comparer à la main.
+- **Comparer deux fiches mémoire** (demande du 25/09/2026) : fait le 28/09 (`MemorySnapshots.cs`, bouton « Comparer avec une lecture précédente » de l'onglet Mémoire).
 - Nettoyage « fichiers inutiles » : fait pour les deux fichiers évidents (voir `CHANGELOG.md`). Aucune classe inutilisée trouvée par un balayage des noms. Reste possible : méthodes jamais appelées (à chercher avec l'analyse de Visual Studio, « Find All References »).
 - Ne **pas** faire l'étape 5 (publication sur le Microsoft Store) tant que le porteur ne l'a pas demandé.
 - Liste complète des points ouverts : `CLAUDE.md`, sections « Reste à faire ».
