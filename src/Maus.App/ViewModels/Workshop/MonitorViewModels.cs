@@ -39,11 +39,16 @@ public sealed class MonitorRowViewModel(string name, MonitorKind kind) : Observa
         private set => SetProperty(ref _max, value);
     }
 
+    /// <summary>Dernières valeurs, pour la mini-courbe (une minute environ à une mesure par seconde).</summary>
+    public double[] History { get; private set; } = [];
+
     internal void Show(MonitorRow row)
     {
         Value = Format(row.Value);
         Min = Format(row.Min);
         Max = Format(row.Max);
+        History = [.. History.TakeLast(59), row.Value];
+        OnPropertyChanged(nameof(History));
     }
 
     private string Format(double value) => Kind switch
@@ -101,10 +106,24 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
     private string _status = string.Empty;
     private string _errorsStatus = string.Empty;
 
+    private MonitorRecording? _recording;
+    private MonitorRecording? _lastRecording;
+    private bool _autoRecording;
+    private string _recordingStatus = T("Le relevé garde toutes les mesures jusqu'à son arrêt, puis donne un bilan. Il démarre tout seul pendant un test de stabilité.");
+    private string _recordingSummary = string.Empty;
+
     public MonitorViewModel(WorkshopViewModel workshop)
     {
         _workshop = workshop;
         _workshop.Sampled += OnSampled;
+        _workshop.PropertyChanged += OnWorkshopChanged;
+        StartRecordingCommand = new AsyncCommand(() =>
+        {
+            StartRecording(automatic: false);
+            return Task.CompletedTask;
+        });
+        StopRecordingCommand = new AsyncCommand(StopRecordingAsync);
+        ExportRecordingCommand = new AsyncCommand(ExportRecordingAsync);
         _errorTimer.Tick += async (_, _) => await ReadErrorsAsync();
         ResetCommand = new AsyncCommand(() =>
         {
@@ -180,12 +199,126 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
     {
         _errorTimer.Stop();
         _workshop.Sampled -= OnSampled;
+        _workshop.PropertyChanged -= OnWorkshopChanged;
         _workshop.IsMonitorOpen = false;
+    }
+
+    public ICommand StartRecordingCommand { get; }
+
+    public ICommand StopRecordingCommand { get; }
+
+    public ICommand ExportRecordingCommand { get; }
+
+    public bool IsRecording => _recording is not null;
+
+    public bool IsNotRecording => _recording is null;
+
+    public string RecordingStatus
+    {
+        get => _recordingStatus;
+        private set => SetProperty(ref _recordingStatus, value);
+    }
+
+    public string RecordingSummary
+    {
+        get => _recordingSummary;
+        private set
+        {
+            if (SetProperty(ref _recordingSummary, value))
+            {
+                OnPropertyChanged(nameof(HasRecordingSummary));
+            }
+        }
+    }
+
+    public bool HasRecordingSummary => RecordingSummary.Length > 0;
+
+    /// <summary>Un test de stabilité démarre ou s'arrête dans l'atelier : le relevé suit, s'il n'a pas été lancé à la main.</summary>
+    private void OnWorkshopChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(WorkshopViewModel.IsTesting))
+        {
+            return;
+        }
+
+        if (_workshop.IsTesting && _recording is null)
+        {
+            StartRecording(automatic: true);
+        }
+        else if (!_workshop.IsTesting && _autoRecording)
+        {
+            _ = StopRecordingAsync();
+        }
+    }
+
+    private void StartRecording(bool automatic)
+    {
+        _recording = new MonitorRecording(DateTimeOffset.Now);
+        _autoRecording = automatic;
+        RecordingSummary = string.Empty;
+        RecordingStatus = automatic ? T("Relevé lancé avec le test de stabilité…") : T("Relevé en cours…");
+        OnPropertyChanged(nameof(IsRecording));
+        OnPropertyChanged(nameof(IsNotRecording));
+    }
+
+    private async Task StopRecordingAsync()
+    {
+        if (_recording is not { } recording)
+        {
+            return;
+        }
+
+        _recording = null;
+        _autoRecording = false;
+        _lastRecording = recording;
+        OnPropertyChanged(nameof(IsRecording));
+        OnPropertyChanged(nameof(IsNotRecording));
+        var errors = await Task.Run(() => ErrorWatch.Read(_logs, recording.Start.LocalDateTime));
+        RecordingSummary = recording.Summary(errors.Hardware, errors.PciExpress, errors.Windows);
+        RecordingStatus = T("Relevé terminé à {0:T}.", DateTime.Now);
+    }
+
+    private async Task ExportRecordingAsync()
+    {
+        if (_lastRecording is not { } recording)
+        {
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = T("releve-surveillance-{0:yyyy-MM-dd-HHmm}", recording.Start.LocalDateTime) + ".csv",
+            DefaultExt = ".csv",
+            Filter = T("Tableau CSV") + " (*.csv)|*.csv",
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var culture = CultureInfo.CurrentCulture;
+            await System.IO.File.WriteAllTextAsync(dialog.FileName, recording.ToCsv(culture), new System.Text.UTF8Encoding(true));
+            RecordingStatus = T("Relevé exporté : {0}", dialog.FileName);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            RecordingStatus = T("L'export a échoué : {0}", ex.Message);
+        }
     }
 
     private void OnSampled(object? sender, SensorSnapshot snapshot)
     {
-        foreach (var row in _tracker.Update(snapshot))
+        var rows = _tracker.Update(snapshot);
+        if (_recording is { } recording)
+        {
+            recording.Add(snapshot.At, rows);
+            RecordingStatus = T("Relevé en cours : {0:hh\\:mm\\:ss}, {1} mesures.", recording.Elapsed, recording.Count);
+        }
+
+        foreach (var row in rows)
         {
             var key = (row.Component, row.Name, row.Kind);
             if (!_rows.TryGetValue(key, out var model))

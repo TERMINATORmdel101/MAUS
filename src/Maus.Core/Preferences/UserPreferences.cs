@@ -54,6 +54,9 @@ public sealed record UserPreferences
     /// <summary>La fenêtre de surveillance reste au premier plan.</summary>
     public bool MonitorOnTop { get; init; }
 
+    /// <summary>Entrée de la carte mère choisie par l'utilisateur comme tension de la mémoire (étalonnage), ou <c>null</c>.</summary>
+    public Workshop.Memory.DramVoltageCalibration? DramVoltage { get; init; }
+
     /// <summary>Intervalle réellement utilisé : une valeur hors de la liste proposée (fichier modifié à la main) revient à 1 seconde.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public TimeSpan RefreshInterval => TimeSpan.FromMilliseconds(RefreshChoices.Contains(RefreshMilliseconds) ? RefreshMilliseconds : 1000);

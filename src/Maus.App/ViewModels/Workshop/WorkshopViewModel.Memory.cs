@@ -242,6 +242,7 @@ public sealed partial class WorkshopViewModel
             var report = await reading;
             log.Write("lecture terminée");
             Show(report);
+            await SaveSnapshotAsync(report);
             MemoryStatus = T("Lu le {0:g}. Survolez un timing pour savoir ce qu'il mesure. MAUS ne modifie aucun réglage mémoire : cela se fait dans le BIOS.", DateTime.Now);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -326,30 +327,6 @@ public sealed partial class WorkshopViewModel
         }
 
         MemoryConfiguration = text;
-    }
-
-    /// <summary>
-    /// Tension de la mémoire mesurée par la puce de surveillance de la carte mère (pilote PawnIO, lecture seule), si
-    /// LibreHardwareMonitor sait laquelle de ses entrées la porte sur ce modèle. Jamais devinée.
-    /// </summary>
-    private static async Task<string> ReadDramVoltageAsync()
-    {
-        try
-        {
-            var readings = await Task.Run(() =>
-            {
-                using var sensors = new LhmAdvancedSensors();
-                return sensors.Read();
-            }).WaitAsync(TimeSpan.FromSeconds(20));
-
-            return AdvancedReadings.DramVoltage(readings) is { } dram
-                ? T("Tension de la mémoire mesurée par la carte mère (capteur « {0} ») : {1} V.", dram.Name, dram.Value.ToString("0.000", CultureInfo.InvariantCulture))
-                : T("Tension réellement appliquée : la puce de surveillance de cette carte mère ne dit pas à MAUS laquelle de ses entrées porte la tension de la mémoire (modèle non décrit par LibreHardwareMonitor), et MAUS ne la devine pas. La valeur de Windows ci-dessus est celle déclarée par le BIOS : vérifiez la tension réglée dans le BIOS ou avec l'outil du fabricant de la carte mère.");
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            return T("Tension mesurée illisible : {0}", ex.Message);
-        }
     }
 
     private static string OnOff(bool value) => value ? T("activé") : T("désactivé");

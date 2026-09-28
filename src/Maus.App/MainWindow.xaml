@@ -985,6 +985,33 @@
                                     <StackPanel>
                                         <TextBlock Text="{x:Static app:Ui.MemoryAppliedTitle}" Style="{StaticResource CardTitle}" />
                                         <TextBlock Text="{Binding Workshop.MemoryConfiguration, Mode=OneWay}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                        <!-- Étalonnage de la tension de la mémoire, avec celle réglée dans le BIOS (carte mère non décrite) -->
+                                        <StackPanel Margin="0,12,0,0" Visibility="{Binding Workshop.CanCalibrateVoltage, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{x:Static app:Ui.CalibrationTitle}" Style="{StaticResource SectionLabel}" />
+                                            <WrapPanel Margin="0,6,0,0">
+                                                <TextBox Width="80" Text="{Binding Workshop.CalibrationInput, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{x:Static app:Ui.CalibrationTitle}" />
+                                                <TextBlock Text="V" VerticalAlignment="Center" Margin="6,0,12,0" />
+                                                <Button Content="{x:Static app:Ui.FindInputs}" Command="{Binding Workshop.FindCandidatesCommand}" Padding="12,4" Margin="0,0,8,4" />
+                                                <Button Content="{x:Static app:Ui.ForgetCalibration}" Command="{Binding Workshop.ForgetCalibrationCommand}" Padding="12,4" Margin="0,0,8,4"
+                                                        Visibility="{Binding Workshop.HasCalibration, Converter={StaticResource BoolToVisibility}}" />
+                                            </WrapPanel>
+                                            <ListBox ItemsSource="{Binding Workshop.VoltageCandidates}" SelectedItem="{Binding Workshop.SelectedCandidate}" DisplayMemberPath="Label"
+                                                     MaxHeight="170" Margin="0,6,0,0" Visibility="{Binding Workshop.HasVoltageCandidates, Converter={StaticResource BoolToVisibility}}"
+                                                     AutomationProperties.Name="{x:Static app:Ui.CalibrationTitle}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.UseInput}" Command="{Binding Workshop.UseCandidateCommand}" Padding="14,5"
+                                                    HorizontalAlignment="Left" Margin="0,8,0,0" Visibility="{Binding Workshop.HasVoltageCandidates, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding Workshop.CalibrationStatus}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <!-- Comparaison avec une lecture précédente (avant / après un réglage dans le BIOS) -->
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding Workshop.HasComparisonOptions, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{x:Static app:Ui.CompareTitle}" Style="{StaticResource CardTitle}" />
+                                        <ComboBox ItemsSource="{Binding Workshop.ComparisonOptions}" SelectedItem="{Binding Workshop.ComparisonChoice}" DisplayMemberPath="Label"
+                                                  HorizontalAlignment="Left" MinWidth="360" Margin="0,6,0,0" AutomationProperties.Name="{x:Static app:Ui.CompareTitle}" />
+                                        <TextBlock Text="{Binding Workshop.MemoryComparison}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                                   Visibility="{Binding Workshop.HasMemoryComparison, Converter={StaticResource BoolToVisibility}}" />
                                     </StackPanel>
                                 </Border>
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding Workshop.HasMemoryClocks, Converter={StaticResource BoolToVisibility}}">

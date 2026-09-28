@@ -352,4 +352,18 @@ public static class Ui
     public static string MonitorMax => T("Max.");
 
     public static string MonitorTestsHint => T("Pendant un test de stabilité, gardez un œil sur les températures, la consommation, les fréquences et les erreurs matérielles dans une fenêtre à part, même par-dessus un jeu.");
+
+    public static string CalibrationTitle => T("Tension réglée dans le BIOS (pour étalonner la mesure)");
+
+    public static string FindInputs => T("Chercher l'entrée");
+
+    public static string UseInput => T("Utiliser cette entrée");
+
+    public static string ForgetCalibration => T("Oublier l'étalonnage");
+
+    public static string CompareTitle => T("Comparer avec une lecture précédente");
+
+    public static string StartRecording => T("Démarrer le relevé");
+
+    public static string StopRecording => T("Arrêter le relevé");
 }
