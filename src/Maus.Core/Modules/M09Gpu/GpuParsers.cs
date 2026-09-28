@@ -7,6 +7,14 @@ namespace Maus.Core.Modules.M09Gpu;
 /// <summary>Une ligne de <c>nvidia-smi --query-gpu=pci.bus_id,driver_version,name</c>.</summary>
 internal sealed record NvidiaSmiGpu(int? BusNumber, string DriverVersion, string Name);
 
+/// <summary>
+/// Largeur du lien PCIe d'une carte NVIDIA, lue dans <c>nvidia-smi --query-gpu=pci.bus_id,pcie.link.width.current,pcie.link.width.max</c>.
+/// D'après <c>nvidia-smi --help-query-gpu</c> : <c>pcie.link.width.max</c> est la largeur maximale « possible avec cette carte et
+/// cette configuration du système » (limite du slot, du processeur ou du câblage du portable comprise) ; la largeur actuelle
+/// « peut baisser quand la carte n'est pas utilisée ».
+/// </summary>
+internal sealed record NvidiaPcieLink(int? BusNumber, int? Width, int? SystemMaxWidth);
+
 /// <summary>Taille totale de la fenêtre BAR1 d'une carte NVIDIA, lue dans <c>nvidia-smi -q -d MEMORY</c>.</summary>
 internal sealed record NvidiaBar1(int? BusNumber, long TotalMiB);
 
@@ -56,6 +64,25 @@ internal static partial class GpuParsers
         }
 
         return gpus;
+    }
+
+    /// <summary>Sortie CSV sans en-tête : « 00000000:01:00.0, 8, 8 » ; « [N/A] » ou « [Not Supported] » donnent <c>null</c>.</summary>
+    public static IReadOnlyList<NvidiaPcieLink> ParseNvidiaPcie(string output)
+    {
+        static int? Width(string field) =>
+            int.TryParse(field, NumberStyles.None, CultureInfo.InvariantCulture, out var value) && value is > 0 and <= 32 ? value : null;
+
+        var links = new List<NvidiaPcieLink>();
+        foreach (var line in output.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            var fields = line.Split(',', StringSplitOptions.TrimEntries);
+            if (fields.Length == 3 && ParseBusNumber(fields[0]) is { } bus)
+            {
+                links.Add(new NvidiaPcieLink(bus, Width(fields[1]), Width(fields[2])));
+            }
+        }
+
+        return links;
     }
 
     /// <summary>Taille totale de la fenêtre BAR1 (Mio) de chaque carte, lue dans <c>nvidia-smi -q -d MEMORY</c>.</summary>

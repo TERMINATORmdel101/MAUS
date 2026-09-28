@@ -10,6 +10,7 @@ public class GpuDriverModuleTests
     private const string VideoControllerQuery = "SELECT Name, PNPDeviceID, DriverVersion, DriverDate, InfFilename FROM Win32_VideoController";
     private const string NvidiaQuery = "nvidia-smi --query-gpu=pci.bus_id,driver_version,name --format=csv,noheader";
     private const string NvidiaMemory = "nvidia-smi -q -d MEMORY";
+    private const string NvidiaPcie = "nvidia-smi --query-gpu=pci.bus_id,pcie.link.width.current,pcie.link.width.max --format=csv,noheader";
     private const string Rtx2080Ti = @"PCI\VEN_10DE&DEV_1E04&SUBSYS_86751043&REV_A1\4&F71F481&0&0008";
     private const string Rtx4070 = @"PCI\VEN_10DE&DEV_2786&SUBSYS_00000000&REV_A1\4&1&0&0008";
     private const string Rx6800 = @"PCI\VEN_1002&DEV_73BF&SUBSYS_00000000&REV_C1\6&1&0&00000019";
@@ -111,7 +112,7 @@ public class GpuDriverModuleTests
     }
 
     [Fact]
-    public async Task Narrow_pcie_link_on_nvidia_is_a_warning()
+    public async Task Narrow_pcie_link_on_a_desktop_is_to_check_under_load_before_reseating()
     {
         var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx2080Ti, width: 8, maxWidth: 16, bus: 1);
@@ -119,9 +120,81 @@ public class GpuDriverModuleTests
         var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
 
         var link = Get(findings, "M09.pcie-link.nvidia");
-        Assert.Equal(FindingStatus.Warning, link.Status);
+        Assert.Equal(FindingStatus.Improvable, link.Status);
         Assert.StartsWith("x8, Gen1", link.Current, StringComparison.Ordinal);
         Assert.StartsWith("x16", link.Expected, StringComparison.Ordinal);
+        Assert.StartsWith("D'abord, regardez la largeur pendant un jeu", link.Advice, StringComparison.Ordinal);
+    }
+
+    private static readonly HardwareProfile Laptop = new() { FormFactor = FormFactor.Laptop };
+
+    [Fact]
+    public async Task Laptop_wired_with_fewer_lanes_is_information_without_reseating_advice()
+    {
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070 Laptop GPU", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx4070, width: 8, maxWidth: 16, bus: 1);
+
+        var findings = await Detect(TestContext.Create(cim: cim, hardware: Laptop), new FakeScheduling());
+
+        var link = Get(findings, "M09.pcie-link.nvidia");
+        Assert.Equal(FindingStatus.Info, link.Status);
+        Assert.Contains("pas une panne", link.Advice, StringComparison.Ordinal);
+        Assert.DoesNotContain("enfoncée", link.Advice, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, "ce portable la relie en x8")]
+    [InlineData(false, "son slot ou le processeur la limitent à x8")]
+    public async Task System_limit_given_by_nvidia_smi_is_the_reference(bool laptop, string advice)
+    {
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx4070, width: 8, maxWidth: 16, bus: 1);
+        var commands = new FakeCommands().Answer(NvidiaPcie, "00000000:01:00.0, 8, 8\r\n");
+
+        var findings = await Detect(TestContext.Create(cim: cim, commands: commands, hardware: laptop ? Laptop : null), new FakeScheduling());
+
+        var link = Get(findings, "M09.pcie-link.nvidia");
+        Assert.Equal(FindingStatus.Info, link.Status);
+        Assert.StartsWith("x8 (maximum permis par la carte et ce PC", link.Expected, StringComparison.Ordinal);
+        Assert.Contains(advice, link.Advice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Reduced_width_below_the_system_limit_is_still_flagged_on_a_desktop()
+    {
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx4070, width: 4, maxWidth: 16, bus: 1);
+        var commands = new FakeCommands().Answer(NvidiaPcie, "00000000:01:00.0, 4, 16\r\n");
+
+        var findings = await Detect(TestContext.Create(cim: cim, commands: commands), new FakeScheduling());
+
+        Assert.Equal(FindingStatus.Improvable, Get(findings, "M09.pcie-link.nvidia").Status);
+    }
+
+    [Fact]
+    public async Task External_thunderbolt_enclosure_is_not_judged_like_a_slot()
+    {
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx4070, width: 4, maxWidth: 16, bus: 1, tunneled: true);
+
+        var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
+
+        var link = Get(findings, "M09.pcie-link.nvidia");
+        Assert.Equal(FindingStatus.Info, link.Status);
+        Assert.Contains("boîtier externe", link.Advice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Sleeping_laptop_gpu_gives_an_unknown_width_with_the_reason()
+    {
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070 Laptop GPU", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx4070, width: 0, maxWidth: 16, bus: 1);
+
+        var findings = await Detect(TestContext.Create(cim: cim, hardware: Laptop), new FakeScheduling());
+
+        var link = Get(findings, "M09.pcie-link.nvidia");
+        Assert.Equal(FindingStatus.Unknown, link.Status);
+        Assert.Contains("en veille", link.Explanation + link.Current + link.Advice, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -368,7 +441,7 @@ public class GpuDriverModuleTests
         ["InfFilename"] = inf,
     };
 
-    private static void AnswerProperties(FakeCim cim, string pnp, uint width, uint maxWidth, uint bus, string? driver = null)
+    private static void AnswerProperties(FakeCim cim, string pnp, uint width, uint maxWidth, uint bus, string? driver = null, bool tunneled = false)
     {
         var rows = new List<CimRow>
         {
@@ -377,6 +450,7 @@ public class GpuDriverModuleTests
             Property("DEVPKEY_PciDevice_CurrentLinkSpeed", 1u),
             Property("DEVPKEY_PciDevice_MaxLinkSpeed", 4u),
             Property("DEVPKEY_Device_BusNumber", bus),
+            Property("DEVPKEY_PciDevice_IsTunneledDevice", tunneled),
         };
         if (driver is not null)
         {

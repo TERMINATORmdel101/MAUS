@@ -112,6 +112,16 @@ public class GpuParsersTests
     public void Pcie_generation_is_named(long? speed, string expected) => Assert.Equal(expected, GpuParsers.PcieGeneration(speed));
 
     [Fact]
+    public void Nvidia_pcie_widths_are_read_per_card_and_unknown_values_are_null()
+    {
+        var links = GpuParsers.ParseNvidiaPcie("00000000:01:00.0, 8, 8\r\n00000000:02:00.0, [N/A], 16\r\ngarbage\r\n");
+
+        Assert.Equal(2, links.Count);
+        Assert.Equal(new NvidiaPcieLink(1, 8, 8), links[0]);
+        Assert.Equal(new NvidiaPcieLink(2, null, 16), links[1]);
+    }
+
+    [Fact]
     public void Wql_literals_are_escaped() =>
         Assert.Equal(@"PCI\\VEN_10DE&DEV_1E04\\4&F71F481\'X", GpuParsers.EscapeWql(@"PCI\VEN_10DE&DEV_1E04\4&F71F481'X"));
 

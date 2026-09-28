@@ -26,6 +26,9 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     internal static readonly string[] NvidiaSmiQueryArguments = ["--query-gpu=pci.bus_id,driver_version,name", "--format=csv,noheader"];
     internal static readonly string[] NvidiaSmiMemoryArguments = ["-q", "-d", "MEMORY"];
 
+    // Requête à part : un champ inconnu d'un ancien nvidia-smi ferait échouer toute la ligne, version du pilote comprise.
+    internal static readonly string[] NvidiaSmiPcieArguments = ["--query-gpu=pci.bus_id,pcie.link.width.current,pcie.link.width.max", "--format=csv,noheader"];
+
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(15);
 
     private readonly IGpuSchedulingReader _scheduling;
@@ -72,7 +75,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
                 : NvidiaSmiData.Empty;
 
             findings.AddRange(withDriver.Select(gpu => DetectDriverVersion(context, catalog, gpu, gpus, smi)));
-            findings.AddRange(withDriver.Where(g => !g.IsIntegrated).Select(DetectPcieLink));
+            findings.AddRange(withDriver.Where(g => !g.IsIntegrated).Select(gpu => DetectPcieLink(gpu, withDriver, smi, context.Hardware.IsLaptop)));
             findings.Add(DetectHags(context.Registry, catalog, withDriver));
             findings.AddRange(withDriver.Where(g => !g.IsIntegrated).Select(gpu => DetectResizableBar(context, catalog, gpu, gpus, smi)));
         }
@@ -268,25 +271,73 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
     // ----- Lien PCIe -----
 
-    private static Finding DetectPcieLink(GpuDevice gpu)
+    /// <summary>
+    /// Largeur du lien PCIe de la carte graphique. Windows donne la largeur actuelle et le maximum <em>de la carte</em>
+    /// (<c>DEVPKEY_PciDevice_*LinkWidth</c>) mais pas celui du slot ou du processeur : le port racine ne publie pas ces
+    /// propriétés (constaté le 28/09/2026 sur le PC du porteur). Une largeur plus petite que le maximum de la carte n'est donc
+    /// pas forcément une panne : portable câblé avec moins de lignes, slot ou processeur limités, lien réduit au repos.
+    /// Sur NVIDIA, <c>nvidia-smi</c> donne le maximum permis par la carte <em>et</em> le système, qui sert alors de référence.
+    /// </summary>
+    private static Finding DetectPcieLink(GpuDevice gpu, IReadOnlyList<GpuDevice> all, NvidiaSmiData smi, bool laptop)
     {
         var id = $"M09.pcie-link.{gpu.Slug}";
         var title = T("Largeur du lien PCIe : {0}", gpu.Name);
-        var width = gpu.GetProperty("DEVPKEY_PciDevice_CurrentLinkWidth");
-        var maxWidth = gpu.GetProperty("DEVPKEY_PciDevice_MaxLinkWidth");
-        if (width is null or 0 || maxWidth is null or 0)
+        static int? Width(long? value) => value is > 0 and <= 32 ? (int)value : null;
+
+        var nvidia = gpu.Vendor == HardwareVendor.Nvidia ? MatchNvidia(gpu, all, smi.Pcie, l => l.BusNumber) : null;
+        var width = Width(gpu.GetProperty("DEVPKEY_PciDevice_CurrentLinkWidth")) ?? nvidia?.Width;
+        var cardMax = Width(gpu.GetProperty("DEVPKEY_PciDevice_MaxLinkWidth"));
+        var systemMax = nvidia?.SystemMaxWidth;
+        if (width is null || (cardMax ?? systemMax) is not { } expected)
         {
-            return Finding.Unknown(id, title, T("Largeur du lien PCIe illisible pour cette carte."), SettingsCategory);
+            return Finding.Unknown(id, title, laptop
+                ? T("Largeur du lien PCIe illisible. Sur un portable, la carte graphique dédiée peut être en veille quand elle ne sert pas : relancez l'audit pendant un jeu pour la lire.")
+                : T("Largeur du lien PCIe illisible pour cette carte."), SettingsCategory);
         }
 
+        // Référence : ce que la carte ET le PC permettent quand nvidia-smi le dit, sinon le maximum de la carte seule.
+        expected = systemMax ?? expected;
         var speed = GpuParsers.PcieGeneration(gpu.GetProperty("DEVPKEY_PciDevice_CurrentLinkSpeed"));
         var maxSpeed = GpuParsers.PcieGeneration(gpu.GetProperty("DEVPKEY_PciDevice_MaxLinkSpeed"));
-        var narrow = width < maxWidth;
+        var narrow = width < expected;
+        var limitedBySystem = systemMax is { } system && cardMax is { } card && system < card;
+        var external = gpu.GetFlag("DEVPKEY_PciDevice_IsTunneledDevice") == true;
 
-        // Sur les Radeon récentes, la valeur lue peut être celle du commutateur PCIe interne à la carte (à confirmer).
-        var status = !narrow
-            ? FindingStatus.Ok
-            : gpu.Vendor == HardwareVendor.Amd ? FindingStatus.Info : FindingStatusExtensions.ForDeviation(Severity.Medium);
+        FindingStatus status;
+        string? advice;
+        if (external)
+        {
+            status = FindingStatus.Info;
+            advice = T("Carte graphique dans un boîtier externe (Thunderbolt ou USB4) : le lien passe par le câble et sa largeur ne se juge pas comme celle d'un slot.");
+        }
+        else if (!narrow)
+        {
+            status = limitedBySystem ? FindingStatus.Info : FindingStatus.Ok;
+            advice = !limitedBySystem
+                ? null
+                : laptop
+                    ? T("La carte peut aller jusqu'à x{0}, mais ce portable la relie en x{1} : c'est un choix de conception du fabricant, pas une panne. Rien à régler.", cardMax, systemMax)
+                    : T("La carte peut aller jusqu'à x{0}, mais son slot ou le processeur la limitent à x{1}. Si la carte mère a un autre slot x16 relié au processeur (voir son manuel), la carte y aurait toutes ses lignes.", cardMax, systemMax);
+        }
+        else if (laptop)
+        {
+            // Portable : jamais de conseil de démontage ; lignes câblées par le fabricant, lien réduit au repos.
+            status = FindingStatus.Info;
+            advice = T("Sur un portable, le fabricant relie souvent la carte graphique avec moins de lignes que son maximum, et le lien peut se réduire quand la carte ne travaille pas. Ce n'est pas une panne et il n'y a rien à démonter. Pour en avoir le cœur net, regardez la largeur pendant un jeu (GPU-Z, champ « Bus Interface »).");
+        }
+        else if (gpu.Vendor == HardwareVendor.Amd)
+        {
+            // Sur les Radeon récentes, la valeur lue peut être celle du commutateur PCIe interne à la carte (à confirmer).
+            status = FindingStatus.Info;
+            advice = T("Sur les Radeon, cette valeur peut venir du commutateur interne de la carte : confirmez avec GPU-Z (onglet Bus Interface) avant de démonter quoi que ce soit.");
+        }
+        else
+        {
+            status = FindingStatus.Improvable;
+            advice = T("D'abord, regardez la largeur pendant un jeu ou un test graphique (GPU-Z, champ « Bus Interface ») : le lien peut se réduire au repos. " +
+                       "Si elle reste plus petite : certains processeurs et slots secondaires n'offrent que x8 ou x4, et un SSD M.2 peut partager les lignes (voir le manuel de la carte mère). " +
+                       "Sinon, PC éteint et débranché, vérifiez que la carte est bien enfoncée dans le slot principal (le plus proche du processeur).");
+        }
 
         return new Finding
         {
@@ -296,16 +347,13 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             Status = status,
             Severity = Severity.Medium,
             Current = T("x{0}, {1} au moment de l'audit", width, speed),
-            Expected = T("x{0} (vitesse maximale de la carte : {1})", maxWidth, maxSpeed),
-            Explanation = T("La carte graphique échange avec le processeur par des lignes PCIe. Une largeur inférieure au maximum de la carte " +
-                          "(x8 au lieu de x16, par exemple) trahit une carte mal enfoncée, un mauvais slot ou des lignes partagées avec un SSD M.2. " +
-                          "La vitesse (Gen) baisse au repos pour économiser l'énergie : seule la largeur est jugée ici."),
-            Advice = !narrow
-                ? null
-                : gpu.Vendor == HardwareVendor.Amd
-                    ? T("Sur les Radeon, cette valeur peut venir du commutateur interne de la carte : confirmez avec GPU-Z (onglet Bus Interface) avant de démonter quoi que ce soit.")
-                    : T("PC éteint et débranché, vérifiez que la carte est bien enfoncée dans le slot PCIe principal (le plus proche du processeur). " +
-                      "Consultez le manuel de la carte mère : un SSD M.2 ou une seconde carte peut partager ces lignes. Certaines cartes sont nativement x8."),
+            Expected = systemMax is not null
+                ? T("x{0} (maximum permis par la carte et ce PC, d'après nvidia-smi)", expected)
+                : T("x{0} (vitesse maximale de la carte : {1})", expected, maxSpeed),
+            Explanation = T("La carte graphique échange avec le processeur par des lignes PCIe. Windows donne le maximum de la carte, pas celui du slot, du processeur " +
+                          "ou du câblage d'un portable : une largeur plus petite peut donc être normale (portable, slot x8 ou x4, lignes partagées avec un SSD M.2) " +
+                          "ou trahir une carte mal enfoncée. La vitesse (Gen) baisse au repos pour économiser l'énergie : seule la largeur est jugée ici."),
+            Advice = advice,
         };
     }
 
@@ -530,9 +578,11 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     {
         var query = await RunAsync(commands, NvidiaSmiQueryArguments, cancellationToken).ConfigureAwait(false);
         var memory = await RunAsync(commands, NvidiaSmiMemoryArguments, cancellationToken).ConfigureAwait(false);
+        var pcie = await RunAsync(commands, NvidiaSmiPcieArguments, cancellationToken).ConfigureAwait(false);
         return new NvidiaSmiData(
             query is null ? [] : GpuParsers.ParseNvidiaSmiQuery(query),
-            memory is null ? [] : GpuParsers.ParseNvidiaBar1(memory));
+            memory is null ? [] : GpuParsers.ParseNvidiaBar1(memory),
+            pcie is null ? [] : GpuParsers.ParseNvidiaPcie(pcie));
     }
 
     private static async Task<string?> RunAsync(ICommandRunner commands, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
@@ -684,9 +734,9 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
     private sealed record DriverVersions(string? InstalledLabel, Version? Installed, string? LatestLabel, Version? Latest, string? WindowsVersion);
 
-    private sealed record NvidiaSmiData(IReadOnlyList<NvidiaSmiGpu> Gpus, IReadOnlyList<NvidiaBar1> Bar1)
+    private sealed record NvidiaSmiData(IReadOnlyList<NvidiaSmiGpu> Gpus, IReadOnlyList<NvidiaBar1> Bar1, IReadOnlyList<NvidiaPcieLink> Pcie)
     {
-        public static NvidiaSmiData Empty { get; } = new([], []);
+        public static NvidiaSmiData Empty { get; } = new([], [], []);
     }
 
     /// <summary>Carte graphique PCI enrichie des détails WMI et des propriétés de périphérique.</summary>
@@ -713,5 +763,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
                 : null;
 
         public long? GetProperty(string key) => Properties.TryGetValue(key, out var row) ? row.GetInt64("Data") : null;
+
+        public bool? GetFlag(string key) => Properties.TryGetValue(key, out var row) ? row.GetBool("Data") : null;
     }
 }
