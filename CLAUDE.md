@@ -34,6 +34,7 @@ Décisions prises (24-25/09/2026) :
 - Pilotes via Windows Update : jamais bloqués par défaut (option du Module 9).
 - Module 13 (intégrité mémoire) : avertissement renforcé si Vanguard / FACEIT, mais l'utilisateur décide. Les atténuations CPU (Spectre…) ne sont **jamais** proposées à la désactivation.
 - Profils en un clic + chaque réglage modifiable ligne par ligne.
+- **Numéros de version** (règle du porteur, 29/09/2026, à partir de la 0.5.1) : corrections de bugs et améliorations très mineures = dernier chiffre (0.5.1 → 0.5.2) ; modifications moyennes ou majeures = chiffre du milieu (0.5.x → 0.6.0) ; le premier chiffre reste **0** tant que MAUS est une alpha. Changer `Directory.Build.props`, `AppVersionTests`, `CHANGELOG.md`.
 
 ## Architecture (C# / .NET 10, WPF)
 

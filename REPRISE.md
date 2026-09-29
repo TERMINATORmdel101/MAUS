@@ -20,7 +20,7 @@ Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le trav
 ## 1. Où en est le code
 
 - Version : **4.0.0** (`Directory.Build.props`, `CHANGELOG.md`).
-- Tout le travail cloud est sur la branche **`claude/keen-wozniak-93as1n`** (poussée sur GitHub). **Elle n'est pas encore fusionnée dans `main`.** Aucune pull request n'a été ouverte : demander au porteur s'il veut en ouvrir une (ou fusionner) après validation.
+- Le travail est sur la branche **`claude/keen-wozniak-93as1n`** (poussée sur GitHub). **Fusionnée dans `main` le 29/09/2026** (accord du porteur ; avance simple de `main`, sans conflit), version 0.5.1. Le dossier du dépôt principal (`C:\Users\CARO\Documents\MAUS`, branche `main`) doit faire `git pull` pour la récupérer.
 - Sous Linux : compilation 0 avertissement, 1 185 tests dont **12 échecs attendus** (ils appellent de vraies API Windows : signature de fichiers, journaux d'événements, chemins `C:\`, raccourcis). **Sous Windows, les 1 185 doivent passer.**
 - Rien de ce qui a été codé dans le cloud n'a tourné sur un vrai Windows : l'interface WPF n'a jamais été ouverte depuis la refonte.
 
