@@ -2,6 +2,20 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.5.2 — 29/09/2026
+
+Corrections et petites améliorations (règle du porteur : dernier chiffre). Trouvées par une analyse complète du logiciel (trois angles : vitesse, solidité, clarté pour l'utilisateur), chaque correction vérifiée par un agent chargé de la réfuter avant d'être faite.
+
+- **Tests du matériel** : cliquer « Arrêter le test » pendant la préparation (tests de la mémoire vive, de la mémoire vidéo, du disque) fermait MAUS avec « erreur inattendue ». Le test s'arrête maintenant proprement, « interrompu ». Un historique des scores illisible ne remplace plus le verdict d'un test par « le test n'a pas pu se dérouler ».
+- **Corrections toujours annulables** : si MAUS est fermé (ou le PC coupé) pendant qu'une correction s'écrit, elle restait inscrite « en attente » dans le journal, et « Annuler » l'ignorait alors que la valeur avait peut-être changé. Elle est maintenant affichée dans l'Historique (« interrompue : peut-être appliquée ») et « Annuler » la remet si la nouvelle valeur est en place. Fermer MAUS pendant des corrections demande confirmation ; « Annuler » attend la fin des corrections en cours.
+- **Heure réelle dans le journal** : les corrections et les annulations portaient l'heure du dernier audit, parfois vieille de plusieurs heures.
+- **Rapport HTML** : il promettait « ni nom d'utilisateur, ni nom de PC » mais pouvait recopier des chemins comme `C:\Users\<nom>\Téléchargements` (exclusions de Defender). Nom d'utilisateur, dossier du profil, nom du PC et e-mails sont maintenant masqués dans tous ses textes.
+- **Onglet Corrections** : les réponses de « Mettre à jour les logiciels », « Enregistrer le rapport » et des choix (audit automatique…) s'affichaient sur un autre onglet ; elles apparaissent maintenant sur place, avec une barre de progression pendant la recherche winget.
+- **Honnêteté** : « Pilote à jour » passe en information quand le catalogue de versions de MAUS a plus de 45 jours (une version plus récente a pu sortir) ; le panneau « Ce que vous pouvez vraiment gagner » ne cite plus « 1 à 3 % » sans source.
+- **Audit plus rapide** : le module 3 lit les correctifs installés, Defender et le registre pendant la recherche Windows Update (0,6 à 0,8 s gagnées en fin d'audit, mesurées).
+- **Accessibilité** : la case de chaque correction, les listes déroulantes et les zones de saisie ont un nom pour les lecteurs d'écran (Narrateur) ; une règle des tests empêche d'en oublier.
+- **« Ouvrir dans Windows »** sur beaucoup plus de constats : le bouton mène directement à la bonne page des Paramètres (adresses publiées par Microsoft), au lieu de décrire le chemin à suivre.
+
 ## 0.5.1 — 29/09/2026
 
 Numéro choisi par le porteur, après la 0.4.2 (qui n'a pas été publiée seule : tout son contenu, ci-dessous, fait partie de la 0.5.1).
