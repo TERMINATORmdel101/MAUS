@@ -45,7 +45,8 @@ public static unsafe class MemoryTest
         IProgress<MemoryTestProgress>? progress = null,
         Func<string?>? abortCheck = null,
         CancellationToken cancellationToken = default) =>
-        Task.Factory.StartNew(() => Run(options, progress, abortCheck, cancellationToken), cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        // Jeton déjà annulé : Run renvoie un résultat « interrompu » au lieu d'une tâche annulée qui ferait planter l'interface.
+        Task.Factory.StartNew(() => Run(options, progress, abortCheck, cancellationToken), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     private static MemoryTestResult Run(MemoryTestOptions options, IProgress<MemoryTestProgress>? progress, Func<string?>? abortCheck, CancellationToken cancellationToken)
     {

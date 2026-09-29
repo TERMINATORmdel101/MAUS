@@ -26,7 +26,8 @@ public static unsafe class DiskSpeedTest
         RunAsync(folder, bytes, RandomDuration, progress, cancellationToken);
 
     internal static Task<DiskSpeedResult> RunAsync(string folder, long bytes, TimeSpan randomDuration, IProgress<DiskSpeedProgress>? progress, CancellationToken cancellationToken) =>
-        Task.Factory.StartNew(() => Run(folder, bytes, randomDuration, progress, cancellationToken), cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        // Jeton déjà annulé : Run renvoie un résultat « interrompu » au lieu d'une tâche annulée qui ferait planter l'interface.
+        Task.Factory.StartNew(() => Run(folder, bytes, randomDuration, progress, cancellationToken), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     private static DiskSpeedResult Run(string folder, long bytes, TimeSpan randomDuration, IProgress<DiskSpeedProgress>? progress, CancellationToken cancellationToken)
     {

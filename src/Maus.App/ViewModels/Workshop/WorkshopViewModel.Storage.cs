@@ -291,7 +291,7 @@ public sealed partial class WorkshopViewModel
                 return;
             }
 
-            BenchmarkHistory.CreateDefault().Add(new BenchmarkEntry("disk-read", result.ReadMegabytesPerSecond ?? 0, true, DateTimeOffset.Now, root));
+            SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("disk-read", result.ReadMegabytesPerSecond ?? 0, true, DateTimeOffset.Now, root));
             DiskStatus = T("Écriture : {0:N0} Mo/s · lecture : {1:N0} Mo/s · accès aléatoires : {2:N0} par seconde ({3:0.00} ms chacun).", result.WriteMegabytesPerSecond, result.ReadMegabytesPerSecond, result.RandomReadsPerSecond, result.RandomLatencyMilliseconds)
                 + " " + T("Repères : disque dur 100 à 250 Mo/s et environ 100 accès par seconde ; SSD SATA 450 à 550 Mo/s ; SSD NVMe 2 000 à 7 000 Mo/s et plus, avec des milliers d'accès par seconde. Mesure simple : les chiffres des fabricants, obtenus avec beaucoup de demandes en parallèle, sont plus élevés.");
         }

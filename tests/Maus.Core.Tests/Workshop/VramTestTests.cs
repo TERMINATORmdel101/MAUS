@@ -69,6 +69,18 @@ public class VramTestTests
     }
 
     [Fact]
+    public async Task Stopping_before_the_start_gives_an_interrupted_result_not_an_exception()
+    {
+        // Bouton « Arrêter le test » cliqué pendant la préparation : le jeton est déjà annulé au lancement.
+        using var stop = new CancellationTokenSource();
+        await stop.CancelAsync();
+
+        var result = await VramTest.RunAsync(new FakeGpu(8L << 20), Adapter, new VramTestOptions(4L << 20), cancellationToken: stop.Token);
+
+        Assert.True(result.Aborted);
+    }
+
+    [Fact]
     public async Task A_stuck_bit_is_reported_with_its_offset()
     {
         var gpu = new FakeGpu(8L << 20, faultyBlock: 0);

@@ -72,7 +72,8 @@ public static class VramTest
         IProgress<VramTestProgress>? progress = null,
         Func<string?>? danger = null,
         CancellationToken cancellationToken = default) =>
-        Task.Factory.StartNew(() => Run(provider, adapter, options, progress, danger, cancellationToken), cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        // Jeton déjà annulé : Run renvoie un résultat « interrompu » au lieu d'une tâche annulée qui ferait planter l'interface.
+        Task.Factory.StartNew(() => Run(provider, adapter, options, progress, danger, cancellationToken), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     private static VramTestResult Run(IGpuMemoryProvider provider, GpuAdapterInfo adapter, VramTestOptions options, IProgress<VramTestProgress>? progress, Func<string?>? danger, CancellationToken cancellationToken)
     {

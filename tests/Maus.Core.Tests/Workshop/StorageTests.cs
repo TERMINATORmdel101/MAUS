@@ -80,4 +80,15 @@ public sealed class StorageTests : IDisposable
         Assert.True(result.RandomReadsPerSecond > 0);
         Assert.Empty(Directory.GetFiles(_root, "MAUS-test-*"));
     }
+
+    [Fact]
+    public async Task Disk_test_stopped_before_the_start_is_interrupted_not_an_exception()
+    {
+        using var stop = new CancellationTokenSource();
+        await stop.CancelAsync();
+
+        var result = await DiskSpeedTest.RunAsync(_root, 8L << 20, TimeSpan.FromMilliseconds(200), null, stop.Token);
+
+        Assert.True(result.Aborted);
+    }
 }

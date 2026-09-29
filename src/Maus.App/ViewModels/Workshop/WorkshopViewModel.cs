@@ -873,7 +873,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             var entry = new BenchmarkEntry(ScoreTrends.CpuKind(mode), result.Score, result.Stable, DateTimeOffset.Now);
             if (!result.Aborted)
             {
-                history.Add(entry);
+                SaveScore(history, entry);
             }
 
             var comparison = BenchmarkHistory.CompareToPrevious(previous, entry) is { } delta
@@ -924,7 +924,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             RamProgress = 100;
             if (!result.Aborted)
             {
-                BenchmarkHistory.CreateDefault().Add(new BenchmarkEntry("ram", result.CopyGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now,
+                SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("ram", result.CopyGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now,
                     result.LatencyNanoseconds?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)));
             }
 
@@ -1104,7 +1104,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
             VramProgress = 100;
             if (!result.Aborted)
             {
-                BenchmarkHistory.CreateDefault().Add(new BenchmarkEntry("vram", result.ReadbackGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now, adapter.Name));
+                SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("vram", result.ReadbackGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now, adapter.Name));
             }
 
             VramStatus = result.Aborted
@@ -1144,6 +1144,22 @@ public sealed partial class WorkshopViewModel : ObservableObject
         KeepAwake.End();
         LoadScoreHistory();
         await RefreshActivityAsync();
+    }
+
+    /// <summary>
+    /// Enregistre le score d'un test. Un historique inaccessible (disque plein, fichier verrouillé) ne doit jamais remplacer le
+    /// verdict du test qui vient de finir par « le test n'a pas pu se dérouler ».
+    /// </summary>
+    private static void SaveScore(BenchmarkHistory history, BenchmarkEntry entry)
+    {
+        try
+        {
+            history.Add(entry);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            Maus.Core.Diagnostics.Breadcrumbs.Add("Historique des scores non enregistré (" + ex.GetType().Name + ")");
+        }
     }
 
     private void OpenSearch(string query) => ShellLauncher.OpenUrl(WebSearch.Build(SearchEngineChoice.Value, query));

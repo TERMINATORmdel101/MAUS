@@ -170,4 +170,15 @@ public sealed class BenchmarkHistoryTests : IDisposable
         Assert.Equal(10, BenchmarkHistory.CompareToPrevious(history.Load(), current));
         Assert.Null(BenchmarkHistory.CompareToPrevious([], current));
     }
+
+    [Fact]
+    public async Task Memory_test_stopped_before_the_start_is_interrupted_not_an_exception()
+    {
+        using var stop = new CancellationTokenSource();
+        await stop.CancelAsync();
+
+        var result = await MemoryTest.RunAsync(new MemoryTestOptions(32L << 20), cancellationToken: stop.Token);
+
+        Assert.True(result.Aborted);
+    }
 }
