@@ -85,4 +85,17 @@ public class HtmlReportTests
         Assert.DoesNotContain("Ce qui a changé", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Corrections faites", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Report_masks_the_user_name_and_pc_name_in_every_text()
+    {
+        // Exemple réel : une exclusion Defender trop large recopiée dans « Constaté ».
+        var report = Report(FindingStatus.Improvable, @"C:\Users\Jean\Downloads ; poste BUREAU-42");
+
+        var html = HtmlReport.Build(new HtmlReportInput { After = report, Privacy = new PrivacyFilter("Jean", "BUREAU-42", @"C:\Users\Jean") });
+
+        Assert.DoesNotContain("Jean", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(@"%USERPROFILE%\Downloads", html, StringComparison.Ordinal);
+        Assert.Contains("[nom-du-pc]", html, StringComparison.Ordinal);
+    }
 }

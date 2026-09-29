@@ -229,6 +229,6 @@ return results.Any(r => r.WorstStatus == FindingStatus.Problem) ? 2 : 0;
 
 static void WriteHtml(string path, HtmlReportInput input)
 {
-    File.WriteAllText(path, HtmlReport.Build(input), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    File.WriteAllText(path, HtmlReport.Build(input with { Privacy = PrivacyFilter.ForCurrentUser() }), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     Console.WriteLine(T("Rapport HTML enregistré : {0}", Path.GetFullPath(path)));
 }

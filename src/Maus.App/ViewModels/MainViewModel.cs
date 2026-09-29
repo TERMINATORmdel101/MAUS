@@ -211,7 +211,7 @@ public sealed partial class MainViewModel : ObservableObject
                     Outcomes = applied.Verified,
                 }
                 : new HtmlReportInput { After = after };
-            var html = HtmlReport.Build(input);
+            var html = HtmlReport.Build(input with { Privacy = PrivacyFilter.ForCurrentUser() });
             await File.WriteAllTextAsync(path, html, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             StatusText = T("Rapport enregistré : {0} (ouvrez-le avec votre navigateur).", path);
         }

@@ -16,6 +16,12 @@ public sealed record HtmlReportInput
     public JournalSession? Session { get; init; }
 
     public IReadOnlyList<VerifiedOutcome> Outcomes { get; init; } = [];
+
+    /// <summary>
+    /// Masque nom d'utilisateur, dossier du profil, nom du PC et e-mails dans tous les textes du rapport (exclusions Defender,
+    /// chemins…). L'application et <c>maus --html</c> passent <see cref="PrivacyFilter.ForCurrentUser"/> ; sans filtre, rien n'est masqué.
+    /// </summary>
+    public PrivacyFilter? Privacy { get; init; }
 }
 
 /// <summary>
@@ -41,7 +47,24 @@ public static class HtmlReport
         return Convert.ToBase64String(memory.ToArray());
     });
 
+    /// <summary>Filtre de la construction en cours (le rapport se construit d'un seul tenant, sur un seul fil).</summary>
+    [ThreadStatic]
+    private static PrivacyFilter? t_privacy;
+
     public static string Build(HtmlReportInput input)
+    {
+        t_privacy = input.Privacy;
+        try
+        {
+            return BuildCore(input);
+        }
+        finally
+        {
+            t_privacy = null;
+        }
+    }
+
+    private static string BuildCore(HtmlReportInput input)
     {
         var after = input.After;
         var html = new StringBuilder();
@@ -226,7 +249,8 @@ public static class HtmlReport
     }
 
     /// <summary>Échappe seulement ce qui compte en HTML ; les accents restent lisibles (page en UTF-8).</summary>
-    private static string E(string text) => text
+    /// <remarks>Le masquage se fait sur le texte brut, avant l'échappement : il ne peut jamais toucher une balise.</remarks>
+    private static string E(string text) => (t_privacy is { } privacy ? privacy.Mask(text) : text)
         .Replace("&", "&amp;", StringComparison.Ordinal)
         .Replace("<", "&lt;", StringComparison.Ordinal)
         .Replace(">", "&gt;", StringComparison.Ordinal)
