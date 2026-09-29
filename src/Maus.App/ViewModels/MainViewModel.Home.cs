@@ -109,8 +109,8 @@ public sealed partial class MainViewModel
         {
             if (tab >= 30)
             {
-                Workshop.Open(tab - 30);
-                tab = TabWorkshop;
+                OpenWorkshop(tab - 30);
+                return;
             }
 
             SelectedTab = tab;
@@ -121,11 +121,30 @@ public sealed partial class MainViewModel
 
     /// <summary>« Pourquoi mon PC est lent ? » : ouvre les processus de l'atelier et lance une minute de mesures.</summary>
     public ICommand SlowPcCommand => _slowPc ??= new ParameterCommand(_ =>
+        OpenWorkshop(WorkshopViewModel.SectionProcesses, () => Workshop.DiagnoseCommand.Execute(null)));
+
+    /// <summary>
+    /// Ouvre l'atelier sur une sous-partie. À son affichage, la barre d'onglets de l'atelier revient d'elle-même au premier
+    /// onglet (« Mon PC ») : la sous-partie est donc choisie une fois l'atelier affiché, sinon toutes les cartes de l'accueil
+    /// menaient au même endroit.
+    /// </summary>
+    private void OpenWorkshop(int section, Action? then = null)
     {
-        Workshop.Open(WorkshopViewModel.SectionProcesses);
+        Workshop.Open(section);
         SelectedTab = TabWorkshop;
-        Workshop.DiagnoseCommand.Execute(null);
-    });
+        if (System.Windows.Application.Current?.Dispatcher is { } dispatcher)
+        {
+            dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+            {
+                Workshop.Open(section);
+                then?.Invoke();
+            });
+        }
+        else
+        {
+            then?.Invoke();
+        }
+    }
 
     private ICommand? _slowPc;
 
