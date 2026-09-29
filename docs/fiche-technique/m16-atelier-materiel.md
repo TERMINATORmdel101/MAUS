@@ -26,6 +26,20 @@
 
 « Copier la fiche » copie toute la fiche en texte, filtrée par `PrivacyFilter` (nom d'utilisateur, nom du PC, e-mails) ; MAUS n'envoie rien.
 
+### Pilotes (0.4.2, demande du porteur)
+
+| Information ou action | Source ou commande | Remarque |
+|---|---|---|
+| Tous les pilotes : périphérique, famille, version, éditeur, paquet .inf, signature | `Win32_PnPSignedDriver` (lecture seule) | Groupés par classe de périphérique |
+| Date du pilote | `DEVPKEY_Device_DriverDate` ({A8B865DD-2E3D-4094-AD97-E593A70C75D6} 2) par `CM_Locate_DevNodeW` + `CM_Get_DevNode_PropertyW` | La date de `Win32_PnPSignedDriver` inversait jour et mois sur le PC du porteur (29/09/2026) |
+| Redémarrer le pilote graphique | `pnputil /restart-device <instance>` | Windows 10 2004 et plus (Microsoft Learn, « PnPUtil Command Syntax ») |
+| Retirer et redétecter la carte | `pnputil /remove-device <instance>` puis `/scan-devices` | Idem |
+| Sauvegarder le pilote | `pnputil /export-driver oem#.inf <dossier>` (`%ProgramData%MAUSpilotes`) | Windows 10 1607 et plus ; seulement les paquets `oem#.inf` |
+| Supprimer le pilote | sauvegarde puis, si elle a réussi, `pnputil /delete-driver oem#.inf /uninstall` | Jamais `/force`, jamais un pilote de Windows |
+| Réinstaller une sauvegarde | `pnputil /add-driver <dossier>*.inf /subdirs /install` | Dossier choisi dans les sauvegardes de MAUS seulement |
+
+Toutes les actions : confirmation avec rappel des avertissements, fenêtre de commande visible (`cmd /s /k`), identifiant d'instance limité à `A-Z a-z 0-9 _  & . - # { }`, chemins sans `" % ! & | < > ^`. À valider dans Windows Sandbox avant tout usage réel.
+
 ### Ce qui exige un pilote noyau (non fait, question posée au porteur)
 
 Tension du processeur (Vcore) et de ses cœurs, température réelle du processeur (capteur interne), tensions de la carte mère, contenu SPD des barrettes (marque exacte des puces, timings secondaires), marque des puces de mémoire de la carte graphique, vitesse des ventilateurs de la carte mère. Pistes : PawnIO s'il est déjà installé (décision existante), ou la bibliothèque LibreHardwareMonitor (MPL 2.0, qui s'appuie sur PawnIO). Sans pilote, MAUS l'affiche honnêtement : « non lisible sans pilote ».
