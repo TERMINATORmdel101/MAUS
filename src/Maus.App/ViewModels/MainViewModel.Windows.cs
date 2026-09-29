@@ -28,6 +28,15 @@ public sealed partial class MainViewModel
         return Task.CompletedTask;
     });
 
+    /// <summary>« À propos » : logo, version, licence, confidentialité, avertissements, composants et signalement.</summary>
+    public ICommand OpenAboutCommand => _openAbout ??= new AsyncCommand(() =>
+    {
+        new AboutWindow { Owner = Application.Current?.MainWindow }.ShowDialog();
+        return Task.CompletedTask;
+    });
+
+    private ICommand? _openAbout;
+
     /// <summary>Ouvre les paramètres, ou les ramène devant s'ils sont déjà ouverts.</summary>
     public void OpenSettings()
     {

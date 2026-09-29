@@ -14,6 +14,9 @@
   <ItemGroup>
     <Resource Include="Assets\maus.ico" />
     <Resource Include="Assets\maus-banner.png" />
+    <Resource Include="Assets\maus-logo-512.png" />
+    <!-- Écran de démarrage, affiché par App.OnStartup (pas pendant l'audit planifié, qui n'a pas de fenêtre). -->
+    <Resource Include="Assets\splash.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +28,7 @@
     <None Include="..\..\LICENSE" Link="licenses\LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="licenses\THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\licenses\LGPL-2.1.txt" Link="licenses\LGPL-2.1.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\TRADEMARKS.md" Link="licenses\TRADEMARKS.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

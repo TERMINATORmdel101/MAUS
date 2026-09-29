@@ -22,16 +22,29 @@ public partial class HelpSummaryWindow : Window
         };
     }
 
-    private void OnCopy(object sender, RoutedEventArgs e)
+    private void OnCopy(object sender, RoutedEventArgs e) => CopyStatus.Text = Copy() ? Ui.Copied : Ui.CopyFailed;
+
+    /// <summary>
+    /// Signalement sur GitHub : le résumé relu par l'utilisateur est copié, puis la page « nouveau signalement » du dépôt
+    /// s'ouvre dans le navigateur, où il le colle. Rien ne passe par l'adresse de la page, et MAUS n'envoie rien lui-même.
+    /// </summary>
+    private void OnGitHub(object sender, RoutedEventArgs e)
+    {
+        var copied = Copy();
+        ShellLauncher.OpenUrl(Maus.Core.ProjectLinks.NewIssue);
+        CopyStatus.Text = copied ? Ui.GitHubPaste : Ui.CopyFailed;
+    }
+
+    private bool Copy()
     {
         try
         {
             Clipboard.SetText(Summary.Text);
-            CopyStatus.Text = Ui.Copied;
+            return true;
         }
         catch (ExternalException)
         {
-            CopyStatus.Text = Ui.CopyFailed;
+            return false;
         }
     }
 }

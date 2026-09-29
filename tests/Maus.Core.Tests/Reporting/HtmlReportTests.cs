@@ -77,6 +77,8 @@ public class HtmlReportTests
         var html = HtmlReport.Build(new HtmlReportInput { After = Report(FindingStatus.Improvable, "1") });
 
         Assert.Contains("Rapport d&#39;audit MAUS", html, StringComparison.Ordinal);
+        // Le logo est dans la page elle-même : le rapport reste un seul fichier, lisible hors connexion.
+        Assert.Contains("<img class=\"logo\" alt=\"MAUS\" src=\"data:image/jpeg;base64,/9j/", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Ce qui a changé", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Corrections faites", html, StringComparison.Ordinal);
     }

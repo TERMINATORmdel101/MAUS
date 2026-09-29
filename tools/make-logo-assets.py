@@ -21,7 +21,7 @@ def square(image, box, background):
 def main():
     os.makedirs(APP, exist_ok=True)
     logo = Image.open(SOURCE).convert("RGB")
-    grey = logo.getpixel((20, 20))
+
 
     # Bannière : les lettres, serrées, avec un peu du contour du char (lisibles dans la barre de 200 px de large).
     banner = logo.crop((100, 540, 1948, 1440))
@@ -30,15 +30,8 @@ def main():
     # Logo réduit pour le README et le Store.
     logo.resize((800, 800), Image.LANCZOS).save(os.path.join(ROOT, "assets", "logo", "maus-logo-800.jpg"), quality=90, optimize=True)
 
-    # Icône : le logo entier, sans recadrage, à toutes les tailles (demande du porteur).
-    # bitmap_format="bmp" est indispensable : le décodeur d'icônes de Windows (WIC, utilisé par WPF) refuse
-    # les petites tailles compressées en PNG, et MAUS plantait au démarrage. Sous Windows, tools/make-icon.ps1
-    # produit la même icône.
-    frames = [logo.resize((s, s), Image.LANCZOS) for s in (16, 24, 32, 48, 64, 128, 256)]
-    frames[-1].save(os.path.join(APP, "maus.ico"), format="ICO", sizes=[f.size for f in frames],
-                    append_images=frames[:-1], bitmap_format="bmp")
-    letter = square(logo, (240, 700, 670, 1225), grey)
-    letter.resize((256, 256), Image.LANCZOS).save(os.path.join(APP, "maus-letter-256.png"), optimize=True)
+    # Icône (le M aux petites tailles, le logo entier aux grandes), M seul, logo d'« À propos », écran de démarrage et
+    # logo du rapport : produits sous Windows par tools/make-app-images.ps1 (29/09/2026), qui fait foi.
 
 if __name__ == "__main__":
     main()

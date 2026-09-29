@@ -79,6 +79,44 @@ public static class Ui
 
     public static string Quit => T("Quitter");
 
+    public static string AboutTitle => T("À propos de MAUS");
+
+    public static string AboutVersion => T("Version {0}", Maus.Core.AppVersion.Display);
+
+    public static string AboutMadeBy => T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur. MAUS audite d'abord sans rien modifier ; chaque correction est expliquée, réversible et ne s'applique qu'avec votre accord.");
+
+    public static string AboutLicenseTitle => T("Licence");
+
+    public static string AboutLicense => T("Logiciel libre et gratuit, sous licence GPL-3.0 : vous pouvez l'utiliser, l'étudier, le modifier et le partager, en gardant la même licence. Le nom « MAUS » et son logo ne sont pas cédés : une version modifiée doit porter un autre nom (voir TRADEMARKS dans le dossier des licences).");
+
+    public static string AboutPrivacyTitle => T("Confidentialité");
+
+    public static string AboutPrivacy => T("Aucune télémétrie : MAUS n'envoie rien. Les rapports, les résumés et les relevés restent sur votre PC ; ils ne quittent votre machine que si vous les partagez vous-même, après les avoir relus.");
+
+    public static string AboutComponentsTitle => T("Composants et sources");
+
+    /// <summary>Composants tiers et sources des données techniques (détail dans THIRD-PARTY-NOTICES, dossier des licences).</summary>
+    public static IReadOnlyList<string> AboutComponents =>
+    [
+        T("LibreHardwareMonitorLib 0.9.6 (MPL-2.0) et ses dépendances DiskInfoToolkit, RAMSPDToolkit (MPL-2.0), HidSharp (Apache-2.0) : capteurs avancés, avec le pilote PawnIO que vous installez vous-même."),
+        T("Modules PawnIO.Modules 0.2.11 (LGPL-2.1) : lecture seule du contrôleur mémoire et des puces SPD des barrettes."),
+        T("ZenStates-Core (GPL-3.0), memtest86+, coreboot, CoreFreq et le noyau Linux (GPL-2.0) : emplacements des registres de la mémoire, des faits matériels relus par le code de MAUS."),
+        T("Fiches techniques Intel et AMD, normes JEDEC, documentation Microsoft et NVIDIA : chaque seuil et chaque réglage cité dans l'application renvoie à sa source."),
+        T(".NET et WPF (MIT) : la base de l'application."),
+    ];
+
+    public static string ReportProblem => T("Signaler un problème");
+
+    public static string ProjectPage => T("Page du projet");
+
+    public static string LicensesFolder => T("Licences et sources");
+
+    public static string ReportOnGitHub => T("Signaler sur GitHub");
+
+    public static string ReportOnGitHubTip => T("Copie ce résumé, puis ouvre la page de signalement du projet sur GitHub, où vous le collez (compte GitHub gratuit nécessaire). MAUS n'envoie rien lui-même.");
+
+    public static string GitHubPaste => T("Résumé copié : collez-le (Ctrl+V) dans la page GitHub qui vient de s'ouvrir, sous « Résumé copié par MAUS ».");
+
     /// <summary>Ce que veut dire le nom, sous le logo (en anglais et en espagnol aussi, les initiales restent M, A, U, S).</summary>
     public static string NameMeaning => T("Maintenance · Audit · Updates · Sécurité");
 

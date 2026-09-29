@@ -16,6 +16,8 @@
         <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="True">
             <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.CloseWindow}" Padding="16,6" IsCancel="True" />
             <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.CopyText}" Padding="16,6" Margin="0,0,8,0" IsDefault="True" Click="OnCopy" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.ReportOnGitHub}" Padding="16,6" Margin="0,0,8,0"
+                    Click="OnGitHub" ToolTip="{x:Static app:Ui.ReportOnGitHubTip}" />
             <TextBlock x:Name="CopyStatus" VerticalAlignment="Center" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" Margin="0,0,12,0" />
         </DockPanel>
         <TextBox x:Name="Summary" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"

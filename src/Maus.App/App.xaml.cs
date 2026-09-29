@@ -43,9 +43,15 @@ public partial class App : Application
             return;
         }
 
+        // Écran de démarrage : le logo s'affiche tout de suite, pendant que la fenêtre principale se prépare.
+        SplashScreen? splash = new SplashScreen(typeof(App).Assembly, "Assets/splash.png");
+        splash.Show(autoClose: false);
+
         // Avertissements au premier lancement (et après chaque changement de fond du texte) : sans accord, MAUS se ferme.
         if (preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version)
         {
+            splash.Close(TimeSpan.Zero);
+            splash = null;
             // Pendant cette fenêtre, fermer celle-ci ne doit pas être pris pour la fermeture de MAUS par Windows.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             if (new Views.DisclaimerWindow().ShowDialog() != true)
@@ -66,7 +72,7 @@ public partial class App : Application
             ShutdownMode = ShutdownMode.OnMainWindowClose;
         }
 
-        ShowMainWindow();
+        ShowMainWindow(splash);
         UiWatchdog.Start(Dispatcher);
     }
 
@@ -118,10 +124,16 @@ public partial class App : Application
         Environment.Exit(e.ApplicationExitCode);
     }
 
-    private static void ShowMainWindow()
+    private static void ShowMainWindow(SplashScreen? splash = null)
     {
         var window = new MainWindow();
         Current.MainWindow = window;
+        if (splash is not null)
+        {
+            // L'écran de démarrage s'efface en douceur une fois la fenêtre dessinée.
+            window.ContentRendered += (_, _) => splash.Close(TimeSpan.FromMilliseconds(350));
+        }
+
         window.Show();
     }
 

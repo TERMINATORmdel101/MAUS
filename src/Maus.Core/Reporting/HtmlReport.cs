@@ -27,6 +27,20 @@ public static class HtmlReport
     private static readonly FindingStatus[] Order =
         [FindingStatus.Problem, FindingStatus.Warning, FindingStatus.Improvable, FindingStatus.Unknown, FindingStatus.Info, FindingStatus.Ok];
 
+    /// <summary>Bannière du logo en base64, ou <c>null</c> si la ressource manque (le rapport s'en passe).</summary>
+    private static readonly Lazy<string?> Logo = new(() =>
+    {
+        using var stream = typeof(HtmlReport).Assembly.GetManifestResourceStream("Maus.Core.Reporting.maus-report-logo.jpg");
+        if (stream is null)
+        {
+            return null;
+        }
+
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return Convert.ToBase64String(memory.ToArray());
+    });
+
     public static string Build(HtmlReportInput input)
     {
         var after = input.After;
@@ -36,7 +50,14 @@ public static class HtmlReport
             .Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
             .Append(CultureInfo.InvariantCulture, $"<title>{E(title)}</title><style>{StyleSheet}</style></head><body><main>");
 
-        html.Append(CultureInfo.InvariantCulture, $"<header><h1>{E(title)}</h1><p class=\"sub\">{E(after.CreatedAt.ToLocalTime().ToString("f", Culture))}</p>")
+        html.Append("<header>");
+        if (Logo.Value is { } logo)
+        {
+            // Logo embarqué dans la page (base64) : le rapport reste un seul fichier, lisible hors connexion.
+            html.Append(CultureInfo.InvariantCulture, $"<img class=\"logo\" alt=\"MAUS\" src=\"data:image/jpeg;base64,{logo}\">");
+        }
+
+        html.Append(CultureInfo.InvariantCulture, $"<h1>{E(title)}</h1><p class=\"sub\">{E(after.CreatedAt.ToLocalTime().ToString("f", Culture))}</p>")
             .Append(CultureInfo.InvariantCulture, $"<p>{E(T("{0} {1} (build {2}), édition {3}", after.Windows.ProductName, after.Windows.DisplayVersion, after.Windows.FullBuild, after.Windows.EditionId))}</p>")
             .Append(CultureInfo.InvariantCulture, $"<p>{E($"{Labels.Of(after.Hardware.FormFactor)} · {after.Hardware.Cpu.Name}")}")
             .Append(after.Hardware.Gpus.Count > 0 ? E(" · " + string.Join(", ", after.Hardware.Gpus.Select(g => g.Name))) : string.Empty)
@@ -184,7 +205,7 @@ public static class HtmlReport
         "@media(prefers-color-scheme:dark){:root{--bg:#14161c;--fg:#e8eaf0;--muted:#a3a9b8;--card:#1d2029;--line:#2c313d;--ok:#3fbf73;--info:#9aa3ba;--improvable:#5b9bff;--warning:#f0a030;--problem:#ff6b5b;--unknown:#8a8f9c}}" +
         "*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 'Segoe UI Variable','Segoe UI',system-ui,sans-serif}" +
         "main{max-width:980px;margin:0 auto;padding:24px 16px 48px}h1{font-size:28px;margin:0}h2{font-size:20px;margin:32px 0 12px}h3{font-size:16px}" +
-        ".sub,footer,.val,.was{color:var(--muted)}header p{margin:4px 0}section{margin-top:8px}" +
+        ".sub,footer,.val,.was{color:var(--muted)}header p{margin:4px 0}header .logo{display:block;width:240px;max-width:60%;height:auto;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);margin:0 0 14px}section{margin-top:8px}" +
         ".cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}" +
         ".card{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:10px;padding:12px}.card .n{font-size:30px;font-weight:600;color:var(--c)}" +
         ".s-ok{--c:var(--ok)}.s-info{--c:var(--info)}.s-improvable{--c:var(--improvable)}.s-warning{--c:var(--warning)}.s-problem{--c:var(--problem)}.s-unknown{--c:var(--unknown)}" +

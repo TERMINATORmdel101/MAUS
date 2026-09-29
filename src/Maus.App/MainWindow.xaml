@@ -1212,6 +1212,8 @@
     <DockPanel Width="232" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,16">
         <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE713;" Margin="6,0,14,0"
                 Command="{Binding OpenSettingsCommand}" ToolTip="{x:Static app:Ui.SettingsTitle}" AutomationProperties.Name="{x:Static app:Ui.SettingsTitle}" />
+        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE946;" Margin="6,0,0,0"
+                Command="{Binding OpenAboutCommand}" ToolTip="{x:Static app:Ui.AboutTitle}" AutomationProperties.Name="{x:Static app:Ui.AboutTitle}" />
         <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE9D9;" Margin="6,0,0,0"
                 Command="{Binding OpenMonitorCommand}" ToolTip="{x:Static app:Ui.MonitorTitle}" AutomationProperties.Name="{x:Static app:Ui.MonitorTitle}" />
         <ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding LanguageChoice}" DisplayMemberPath="Label" VerticalAlignment="Center" Margin="14,0,0,0"
