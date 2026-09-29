@@ -227,7 +227,7 @@ public static class Ui
 
     public static string CopyList => T("Copier la liste");
 
-    public static string DriverBackupsFolder => T("Dossier des sauvegardes");
+    public static string DriverBackupsFolder => T("Voir les sauvegardes");
 
     public static string RestoreDriverBackup => T("Réinstaller une sauvegarde…");
 
@@ -241,7 +241,7 @@ public static class Ui
 
     public static string ReinstallDevice => T("Retirer et redétecter");
 
-    public static string ReinstallDeviceTip => T("pnputil /remove-device puis /scan-devices : Windows réinstalle la carte et son pilote.");
+    public static string ReinstallDeviceTip => T("pnputil /remove-device puis /scan-devices : Windows réinstalle la carte et son pilote. Seulement pour une vraie carte (PCI) : un écran virtuel ne serait pas recréé.");
 
     public static string BackupDriver => T("Sauvegarder le pilote");
 

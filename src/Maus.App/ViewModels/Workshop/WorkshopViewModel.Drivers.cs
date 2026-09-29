@@ -59,6 +59,7 @@ public sealed class GraphicsDriverCardViewModel
             new(T("Identifiant du périphérique"), driver.InstanceId),
         ];
         CanBackupOrRemove = GraphicsDriverActions.CanBackupOrRemove(driver);
+        CanReinstall = GraphicsDriverActions.CanReinstall(driver);
         HasDownloadPage = downloadPage is not null;
         RestartCommand = new AsyncCommand(() => Do(run, GraphicsDriverAction.Restart));
         ReinstallCommand = new AsyncCommand(() => Do(run, GraphicsDriverAction.Reinstall));
@@ -83,6 +84,9 @@ public sealed class GraphicsDriverCardViewModel
 
     /// <summary>Pilote tiers (oem#.inf) : sauvegarde et suppression possibles ; un pilote de Windows ne se supprime pas ici.</summary>
     public bool CanBackupOrRemove { get; }
+
+    /// <summary>Carte du bus PCI : « Retirer et redétecter » possible (un adaptateur virtuel ne serait pas recréé).</summary>
+    public bool CanReinstall { get; }
 
     public bool HasDownloadPage { get; }
 
@@ -222,14 +226,15 @@ public sealed partial class WorkshopViewModel
     /// <summary>Ouvre le dossier des pilotes sauvegardés par MAUS.</summary>
     public ICommand OpenDriverBackupsCommand => _openDriverBackups ??= new AsyncCommand(() =>
     {
-        if (Directory.Exists(GraphicsDriverActions.BackupRoot))
-        {
-            ShellLauncher.OpenFolder(GraphicsDriverActions.BackupRoot);
-        }
-        else
-        {
-            DriversStatus = T("Aucune sauvegarde de pilote pour l'instant.");
-        }
+        // Le dossier est réservé aux administrateurs (comme le journal) : l'Explorateur, qui n'est pas élevé, ne l'ouvrirait
+        // pas sans changer ses droits. MAUS liste donc les sauvegardes lui-même.
+        var root = GraphicsDriverActions.BackupRoot;
+        var backups = Directory.Exists(root)
+            ? Directory.GetDirectories(root).Select(Path.GetFileName).OfType<string>().Order(StringComparer.Ordinal).Reverse().ToList()
+            : [];
+        DriversStatus = backups.Count == 0
+            ? T("Aucune sauvegarde de pilote pour l'instant.")
+            : T("{0} sauvegarde(s) dans {1} : {2}. « Réinstaller une sauvegarde… » permet d'en choisir une.", backups.Count, root, string.Join(", ", backups));
 
         return Task.CompletedTask;
     });
@@ -326,6 +331,17 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
+        // /delete-driver /uninstall retire le paquet de TOUS les périphériques qui l'utilisent (Microsoft Learn, « PnPUtil Command Syntax »).
+        var sharing = _drivers
+            .Where(d => !string.Equals(d.InstanceId, gpu.InstanceId, StringComparison.OrdinalIgnoreCase)
+                && d.InfName is not null && string.Equals(d.InfName, gpu.InfName, StringComparison.OrdinalIgnoreCase))
+            .Select(d => d.Device)
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        var sharedNote = sharing.Count == 0
+            ? string.Empty
+            : Environment.NewLine + Environment.NewLine + T("Attention : ce même pilote ({0}) sert aussi à : {1}. Ils perdront eux aussi ce pilote.", gpu.InfName ?? "?", string.Join(", ", sharing));
+
         var (title, message) = action switch
         {
             GraphicsDriverAction.Restart => (T("Redémarrer le pilote graphique ?"),
@@ -342,7 +358,7 @@ public sealed partial class WorkshopViewModel
                 T("MAUS va d'abord créer un point de restauration de Windows (vérifié), puis sauvegarder le pilote de « {0} » ({1}) dans {2}, et seulement ensuite le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.", gpu.Device, gpu.InfName ?? "?", folder) + Environment.NewLine + Environment.NewLine
                 + T("Ensuite, Windows affiche avec son pilote de base : image moins fluide, pas de jeux 3D, définition parfois limitée. Windows Update peut réinstaller un pilote de lui-même.") + Environment.NewLine
                 + T("Téléchargez AVANT le nouveau pilote sur le site du fabricant (bouton « Page officielle du pilote ») : vous en aurez besoin pour retrouver une image normale.") + Environment.NewLine
-                + T("Les logiciels du fabricant (NVIDIA App, AMD Software, Intel Graphics) restent installés. Pour un nettoyage complet, DDU (téléchargé uniquement sur wagnardsoft.com), lancé en mode sans échec, reste l'outil de référence.")),
+                + T("Les logiciels du fabricant (NVIDIA App, AMD Software, Intel Graphics) restent installés. Pour un nettoyage complet, DDU (téléchargé uniquement sur wagnardsoft.com), lancé en mode sans échec, reste l'outil de référence.") + sharedNote),
         };
 
         if (!_confirm(title, message + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.OperationReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))

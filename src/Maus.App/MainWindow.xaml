@@ -1200,7 +1200,8 @@
                                                     <WrapPanel>
                                                         <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RestartDriver}"
                                                                 ToolTip="{x:Static app:Ui.RestartDriverTip}" Command="{Binding RestartCommand}" />
-                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.ReinstallDevice}" ToolTip="{x:Static app:Ui.ReinstallDeviceTip}" Command="{Binding ReinstallCommand}" />
+                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.ReinstallDevice}" ToolTip="{x:Static app:Ui.ReinstallDeviceTip}" Command="{Binding ReinstallCommand}"
+                                                                IsEnabled="{Binding CanReinstall, Mode=OneWay}" ToolTipService.ShowOnDisabled="True" />
                                                         <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.BackupDriver}" Command="{Binding BackupCommand}"
                                                                 IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
                                                         <Button Style="{StaticResource DangerButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RemoveDriver}"

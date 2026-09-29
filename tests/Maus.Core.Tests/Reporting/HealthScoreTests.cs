@@ -32,6 +32,7 @@ public class HealthScoreTests
         var high = HealthScore.Explain([new ModuleResult("M13", "M13", [Costly("M13.a", FindingStatus.Problem, Severity.High)], TimeSpan.Zero)]);
         Assert.Equal(74, high.Score);
         Assert.Equal(HealthScore.HighCap, high.Cap);
+        Assert.Equal(90, HealthScore.Uncapped(high.Points));
 
         // Un constat critique : plafonné à 49 (« à corriger en priorité »).
         var critical = HealthScore.Explain([new ModuleResult("M11", "M11", [Costly("M11.a", FindingStatus.Problem, Severity.Critical)], TimeSpan.Zero)]);

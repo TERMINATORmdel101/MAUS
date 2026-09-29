@@ -59,7 +59,8 @@ public class DriverTests
     {
         var arguments = GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Remove, Gpu(), @"C:\ProgramData\MAUS\pilotes\20260929-101500-oem42", "pnputil.exe")!;
 
-        Assert.Contains("\"pnputil.exe\" /export-driver oem42.inf \"C:\\ProgramData\\MAUS\\pilotes\\20260929-101500-oem42\" && \"pnputil.exe\" /delete-driver oem42.inf /uninstall", arguments, StringComparison.Ordinal);
+        Assert.Contains("\"pnputil.exe\" /export-driver oem42.inf \"C:\\ProgramData\\MAUS\\pilotes\\20260929-101500-oem42\" && (\"pnputil.exe\" /delete-driver oem42.inf /uninstall & if not errorlevel 0", arguments, StringComparison.Ordinal);
+        Assert.Contains("else if errorlevel 3010", arguments, StringComparison.Ordinal);
         Assert.DoesNotContain("/force", arguments, StringComparison.Ordinal);
     }
 
@@ -69,6 +70,12 @@ public class DriverTests
         var arguments = GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Reinstall, Gpu(), @"C:\x", "pnputil.exe")!;
 
         Assert.True(arguments.IndexOf("/remove-device", StringComparison.Ordinal) < arguments.IndexOf("/scan-devices", StringComparison.Ordinal));
+
+        // Un adaptateur virtuel (ROOT\, SWD\) ne serait pas recréé par /scan-devices : pas de retrait.
+        var parsec = Gpu(id: @"ROOT\DISPLAY\0000");
+        Assert.False(GraphicsDriverActions.CanReinstall(parsec));
+        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Reinstall, parsec, @"C:\x", "pnputil.exe"));
+        Assert.NotNull(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, parsec, @"C:\x", "pnputil.exe"));
     }
 
     [Theory]
@@ -125,5 +132,61 @@ public class DriverTests
         // Le plus ancien pilote de fabricant ignore les pilotes de Microsoft (datés par convention).
         Assert.Same(vendor, DriverAge.OldestVendorDriver([inbox, vendor, recent]));
         Assert.Equal(1, DriverAge.UnsignedCount([inbox, vendor with { IsSigned = false }, recent]));
+    }
+
+    /// <summary>
+    /// Exécute vraiment la commande dans cmd.exe, avec un faux pnputil (fichier .cmd) qui renvoie le code choisi :
+    /// vérifie les branches « réussi », « redémarrage nécessaire », « échec », « sauvegarde ratée » et « pilote plus récent ».
+    /// </summary>
+    [Theory]
+    [InlineData("Remove", 0, 0, "Pilote sauvegardé puis supprimé.")]
+    [InlineData("Remove", 0, 3010, "Pilote sauvegardé puis supprimé : redémarrez le PC pour terminer.")]
+    [InlineData("Remove", 0, 5, "La sauvegarde a réussi mais la suppression a échoué")]
+    [InlineData("Remove", 1, 0, "Sauvegarde impossible")]
+    [InlineData("Restore", 0, 259, "Rien n'a été remplacé")]
+    [InlineData("Restore", 0, 3010, "Pilote réinstallé : redémarrez le PC pour terminer.")]
+    [InlineData("Restart", 0, -1, "Le redémarrage du pilote a échoué")]
+    public void Console_commands_report_pnputil_exit_codes_for_real(string action, int export, int code, string expected)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // La sortie de cmd.exe redirigée est dans la page de code OEM de la console (850 en français), absente par défaut de .NET.
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        var folder = Path.Combine(Path.GetTempPath(), "maus-test-pilotes-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var fake = Path.Combine(folder, "faux-pnputil.cmd");
+            File.WriteAllText(fake, "@echo off\r\nif \"%1\"==\"/export-driver\" exit /b %FAUX_EXPORT%\r\nexit /b %FAUX_CODE%\r\n");
+            var backup = Path.Combine(folder, "sauvegarde");
+            var arguments = action switch
+            {
+                "Remove" => GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Remove, Gpu(), backup, fake),
+                "Restart" => GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, Gpu(), backup, fake),
+                _ => GraphicsDriverActions.RestoreArguments(backup, fake),
+            };
+
+            var start = new System.Diagnostics.ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"), arguments!.Replace("/s /k ", "/s /c ", StringComparison.Ordinal))
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.GetEncoding(System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage),
+            };
+            start.Environment["FAUX_EXPORT"] = export.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            start.Environment["FAUX_CODE"] = code.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            using var process = System.Diagnostics.Process.Start(start)!;
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(30_000);
+
+            Assert.Contains(expected, output, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     }
 }

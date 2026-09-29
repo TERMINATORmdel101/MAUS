@@ -97,6 +97,9 @@ public static class HealthScore
         _ => T("aucune"),
     };
 
+    /// <summary>Score avant plafond : 100 × e^(−points / 100), arrondi.</summary>
+    public static int Uncapped(double points) => (int)Math.Round(100 * Math.Exp(-points / 100), MidpointRounding.AwayFromZero);
+
     public static ScoreBreakdown Explain(IEnumerable<ModuleResult> results)
     {
         var costly = results.SelectMany(r => r.Findings)
@@ -120,7 +123,7 @@ public static class HealthScore
         var optimisationPoints = Math.Min(OptimisationCap, optimisations * PointsFor(Severity.Low));
         var points = lines.Sum(l => l.Points) + optimisationPoints;
 
-        var score = (int)Math.Round(100 * Math.Exp(-points / 100), MidpointRounding.AwayFromZero);
+        var score = Uncapped(points);
         int? cap = lines.Any(l => l.Gravity == Severity.Critical) ? CriticalCap
             : lines.Any(l => l.Gravity == Severity.High) ? HighCap
             : null;

@@ -21,7 +21,10 @@ public partial class ScoreWindow : Window
         ScoreWord.Text = HealthScore.Describe(breakdown.Score);
         Summary.Text = breakdown.Points <= 0
             ? T("Aucun constat ne retire de points : tout est conforme, indéterminé ou marqué « voulu ».")
-            : T("{0} points retirés au total ; le score baisse de moins en moins vite, d'où {1} sur 100.", Format(breakdown.Points), breakdown.Score);
+            : breakdown.Cap is { } limit
+                ? T("{0} points retirés au total, ce qui donnerait {1} sur 100 ; le score est plafonné à {2} à cause d'un constat de gravité {3}.",
+                    Format(breakdown.Points), HealthScore.Uncapped(breakdown.Points), limit, HealthScore.GravityName(limit == HealthScore.CriticalCap ? Severity.Critical : Severity.High))
+                : T("{0} points retirés au total ; le score baisse de moins en moins vite, d'où {1} sur 100.", Format(breakdown.Points), breakdown.Score);
 
         var rows = breakdown.Lines
             .Select(l => new ScoreRow("−" + Format(l.Points), l.Title, T("gravité {0} · {1}", HealthScore.GravityName(l.Gravity), l.FindingId), BrushOf(l.Gravity)))
