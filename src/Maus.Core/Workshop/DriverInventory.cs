@@ -134,3 +134,48 @@ public static class DriverInventoryReader
         return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 }
+
+/// <summary>Âge des pilotes, sans seuil « trop vieux » (aucune source n'en donne un) : l'âge est montré tel quel.</summary>
+public static class DriverAge
+{
+    /// <summary>
+    /// Date donnée volontairement aux pilotes livrés avec Windows (sortie de Windows Vista) pour que les pilotes des fabricants
+    /// gardent la priorité : elle ne dit rien de leur âge réel (Raymond Chen, Microsoft, « The Old New Thing », 08/02/2017).
+    /// </summary>
+    public static DateTime WindowsConventionalDate { get; } = new(2006, 6, 21);
+
+    public static bool HasConventionalDate(DriverEntry driver) =>
+        driver.Date?.Date == WindowsConventionalDate && IsMicrosoft(driver);
+
+    /// <summary>Âge lisible (« 3 ans », « 8 mois », « moins d'un mois »), ou la mention de la date de convention de Windows.</summary>
+    public static string Describe(DriverEntry driver, DateTime today)
+    {
+        if (driver.Date is not { } date)
+        {
+            return "—";
+        }
+
+        if (HasConventionalDate(driver))
+        {
+            return T("date de convention de Windows");
+        }
+
+        var months = ((today.Year - date.Year) * 12) + today.Month - date.Month - (today.Day < date.Day ? 1 : 0);
+        return months switch
+        {
+            < 1 => T("moins d'un mois"),
+            < 12 => T("{0} mois", months),
+            < 24 => T("1 an"),
+            _ => T("{0} ans", months / 12),
+        };
+    }
+
+    /// <summary>Pilote de fabricant (hors Microsoft) le plus ancien, ou <c>null</c>.</summary>
+    public static DriverEntry? OldestVendorDriver(IEnumerable<DriverEntry> drivers) =>
+        drivers.Where(d => d.Date is not null && !IsMicrosoft(d)).MinBy(d => d.Date);
+
+    public static int UnsignedCount(IEnumerable<DriverEntry> drivers) => drivers.Count(d => d.IsSigned == false);
+
+    private static bool IsMicrosoft(DriverEntry driver) =>
+        (driver.Provider ?? driver.Manufacturer ?? string.Empty).Contains("Microsoft", StringComparison.OrdinalIgnoreCase);
+}

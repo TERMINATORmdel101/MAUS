@@ -3202,7 +3202,6 @@
   "Les logiciels du fabricant (NVIDIA App, AMD Software, Intel Graphics) restent installés. Pour un nettoyage complet, DDU (téléchargé uniquement sur wagnardsoft.com), lancé en mode sans échec, reste l'outil de référence.": "The manufacturer's software (NVIDIA App, AMD Software, Intel Graphics) stays installed. For a complete cleanup, DDU (downloaded only from wagnardsoft.com), run in safe mode, remains the reference tool.",
   "Liste copiée (nom d'utilisateur, nom du PC et e-mails masqués) : collez-la avec Ctrl+V.": "List copied (user name, PC name and e-mail addresses masked): paste it with Ctrl+V.",
   "MAUS va copier le paquet du pilote de « {0} » ({1}) dans {2}. Rien n'est modifié : la sauvegarde permet de réinstaller ce pilote plus tard.": "MAUS will copy the driver package of \"{0}\" ({1}) to {2}. Nothing is changed: the backup lets you reinstall this driver later.",
-  "MAUS va d'abord sauvegarder le pilote de « {0} » ({1}) dans {2}, puis le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.": "MAUS will first back up the driver of \"{0}\" ({1}) to {2}, then delete it with pnputil. Without a successful backup, nothing is deleted.",
   "MAUS va redémarrer le pilote de « {0} » avec pnputil, l'outil de Microsoft. L'écran devient noir quelques secondes puis revient. Utile quand l'image se fige, clignote ou qu'un jeu a laissé la carte dans un mauvais état.": "MAUS will restart the driver of \"{0}\" with pnputil, Microsoft's tool. The screen goes black for a few seconds, then comes back. Useful when the picture freezes, flickers or a game left the card in a bad state.",
   "MAUS va retirer « {0} » de la liste des périphériques puis demander à Windows de la redétecter, qui réinstalle alors son pilote. L'écran peut devenir noir plusieurs secondes. À essayer si le redémarrage du pilote ne suffit pas.": "MAUS will remove \"{0}\" from the device list, then ask Windows to detect it again, which reinstalls its driver. The screen may go black for several seconds. Try this if restarting the driver is not enough.",
   "MAUS va réinstaller le pilote sauvegardé dans {0} avec pnputil. L'écran peut devenir noir quelques secondes.": "MAUS will reinstall the driver backed up in {0} with pnputil. The screen may go black for a few seconds.",
@@ -3250,5 +3249,19 @@
   "signé": "signed",
   "{0} pilotes, lus dans Windows sans rien modifier. Les actions sur la carte graphique demandent toujours votre accord.": "{0} drivers, read from Windows without changing anything. Actions on the graphics card always ask for your consent.",
   "Écrans": "Displays",
-  "Éditeur": "Publisher"
+  "Éditeur": "Publisher",
+  "Création du point de restauration…": "Creating the restore point…",
+  "Le point de restauration n'a pas pu être créé : {0}": "The restore point could not be created: {0}",
+  "Les pilotes de Microsoft datés du 21/06/2006 ne sont pas vieux : Windows leur donne volontairement cette date pour que les pilotes des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017). L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.": "Microsoft drivers dated 21/06/2006 are not old: Windows deliberately gives them this date so that manufacturers' drivers keep priority (Raymond Chen, Microsoft, \"The Old New Thing\", 2017). Age alone does not mean a driver is a problem: MAUS sets no threshold.",
+  "MAUS : avant la suppression du pilote graphique": "MAUS: before deleting the graphics driver",
+  "MAUS va d'abord créer un point de restauration de Windows (vérifié), puis sauvegarder le pilote de « {0} » ({1}) dans {2}, et seulement ensuite le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.": "MAUS will first create a Windows restore point (verified), then back up the driver of \"{0}\" ({1}) to {2}, and only then delete it with pnputil. Without a successful backup, nothing is deleted.",
+  "Suppression annulée : aucun pilote n'a été touché.": "Deletion cancelled: no driver was touched.",
+  "Supprimer le pilote quand même ? Il sera sauvegardé avant, et la sauvegarde permet de le réinstaller.": "Delete the driver anyway? It will be backed up first, and the backup lets you reinstall it.",
+  "Voir les pilotes non signés": "Show unsigned drivers",
+  "date de convention de Windows": "Windows conventional date",
+  "pilote de fabricant le plus ancien : {0} ({1}, {2})": "oldest manufacturer driver: {0} ({1}, {2})",
+  "tous signés": "all signed",
+  "{0} non signé(s) : Windows ne leur voit pas de signature numérique, vérifiez qu'ils viennent bien du fabricant": "{0} unsigned: Windows sees no digital signature for them, check that they really come from the manufacturer",
+  "{0} pilotes": "{0} drivers",
+  "Âge": "Age"
 }

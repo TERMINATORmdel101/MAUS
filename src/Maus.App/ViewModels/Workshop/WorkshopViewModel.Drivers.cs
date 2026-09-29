@@ -11,13 +11,17 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.App.ViewModels.Workshop;
 
 /// <summary>Une ligne de la liste des pilotes.</summary>
-public sealed record DriverRowViewModel(string Group, string Device, string Version, string Date, string Provider, string Package, string Signature)
+public sealed record DriverRowViewModel(string Group, string Device, string Version, string Date, DateTime? DateValue, string Age, string Provider, string Package, string Signature)
 {
-    public static DriverRowViewModel From(DriverEntry driver) => new(
+    public static DriverRowViewModel From(DriverEntry driver) => From(driver, DateTime.Today);
+
+    public static DriverRowViewModel From(DriverEntry driver, DateTime today) => new(
         DriverInventoryReader.GroupName(driver.Group),
         driver.Device,
         driver.Version ?? "—",
         driver.Date?.ToString("d", Culture) ?? "—",
+        driver.Date,
+        DriverAge.Describe(driver, today),
         driver.Provider ?? driver.Manufacturer ?? "—",
         driver.InfName ?? "—",
         driver.IsSigned switch
@@ -27,20 +31,21 @@ public sealed record DriverRowViewModel(string Group, string Device, string Vers
             null => "—",
         });
 
-    /// <summary>La ligne contient le texte recherché (nom, famille, version, éditeur ou paquet).</summary>
+    /// <summary>La ligne contient le texte recherché (nom, famille, version, éditeur, paquet ou signature).</summary>
     public bool Matches(string filter) =>
         filter.Length == 0
         || Device.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
         || Group.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
         || Version.Contains(filter, StringComparison.OrdinalIgnoreCase)
         || Provider.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
-        || Package.Contains(filter, StringComparison.OrdinalIgnoreCase);
+        || Package.Contains(filter, StringComparison.OrdinalIgnoreCase)
+        || Signature.Contains(filter, StringComparison.CurrentCultureIgnoreCase);
 }
 
 /// <summary>Carte d'une carte graphique dans l'onglet Pilotes : son pilote en détail et les actions manuelles.</summary>
 public sealed class GraphicsDriverCardViewModel
 {
-    public GraphicsDriverCardViewModel(DriverEntry driver, Uri? downloadPage, Action<GraphicsDriverAction, DriverEntry> run, Action<Uri> open)
+    public GraphicsDriverCardViewModel(DriverEntry driver, Uri? downloadPage, Func<GraphicsDriverAction, DriverEntry, Task> run, Action<Uri> open)
     {
         Driver = driver;
         Lines =
@@ -95,11 +100,7 @@ public sealed class GraphicsDriverCardViewModel
 
     public ICommand DownloadCommand { get; }
 
-    private Task Do(Action<GraphicsDriverAction, DriverEntry> run, GraphicsDriverAction action)
-    {
-        run(action, Driver);
-        return Task.CompletedTask;
-    }
+    private Task Do(Func<GraphicsDriverAction, DriverEntry, Task> run, GraphicsDriverAction action) => run(action, Driver);
 }
 
 /// <summary>
@@ -136,6 +137,27 @@ public sealed partial class WorkshopViewModel
         get => _driversStatus;
         private set => SetProperty(ref _driversStatus, value);
     }
+
+    /// <summary>Résumé de la liste : nombre de pilotes, pilotes non signés, pilote de fabricant le plus ancien.</summary>
+    public string DriversSummary
+    {
+        get => _driversSummary;
+        private set => SetProperty(ref _driversSummary, value);
+    }
+
+    private string _driversSummary = string.Empty;
+
+    /// <summary>Au moins un pilote sans signature reconnue par Windows (bouton « Voir les non signés »).</summary>
+    public bool HasUnsignedDrivers => DriverAge.UnsignedCount(_drivers) > 0;
+
+    /// <summary>Filtre la liste sur les pilotes non signés.</summary>
+    public ICommand ShowUnsignedDriversCommand => _showUnsigned ??= new AsyncCommand(() =>
+    {
+        DriverFilter = T("non signé");
+        return Task.CompletedTask;
+    });
+
+    private ICommand? _showUnsigned;
 
     /// <summary>Texte recherché dans la liste (nom, famille, version, éditeur, paquet).</summary>
     public string DriverFilter
@@ -231,6 +253,8 @@ public sealed partial class WorkshopViewModel
             _drivers = await Task.Run(() => DriverInventoryReader.Read(context.Cim, new CfgMgrDriverDateSource()));
             ShowDriverRows();
             ShowGraphicsDrivers(context.Hardware);
+            DriversSummary = Summary(_drivers);
+            OnPropertyChanged(nameof(HasUnsignedDrivers));
             DriversStatus = _drivers.Count == 0
                 ? T("Windows n'a pas donné la liste des pilotes (service WMI indisponible ?).")
                 : T("{0} pilotes, lus dans Windows sans rien modifier. Les actions sur la carte graphique demandent toujours votre accord.", _drivers.Count);
@@ -271,12 +295,17 @@ public sealed partial class WorkshopViewModel
                 page = Uri.TryCreate(url, UriKind.Absolute, out var parsed) && parsed.Scheme == Uri.UriSchemeHttps ? parsed : null;
             }
 
-            GraphicsDrivers.Add(new GraphicsDriverCardViewModel(driver, page, RunGraphicsDriverAction, ShellLauncher.OpenUrl));
+            GraphicsDrivers.Add(new GraphicsDriverCardViewModel(driver, page, RunGraphicsDriverActionAsync, ShellLauncher.OpenUrl));
         }
     }
 
-    private void RunGraphicsDriverAction(GraphicsDriverAction action, DriverEntry gpu)
+    private async Task RunGraphicsDriverActionAsync(GraphicsDriverAction action, DriverEntry gpu)
     {
+        if (_driverActionRunning)
+        {
+            return;
+        }
+
         var folder = GraphicsDriverActions.BackupFolder(gpu.InfName ?? "pilote", DateTimeOffset.Now);
         var arguments = GraphicsDriverActions.ConsoleArguments(action, gpu, folder);
         if (arguments is null)
@@ -298,7 +327,7 @@ public sealed partial class WorkshopViewModel
             GraphicsDriverAction.Backup => (T("Sauvegarder le pilote graphique ?"),
                 T("MAUS va copier le paquet du pilote de « {0} » ({1}) dans {2}. Rien n'est modifié : la sauvegarde permet de réinstaller ce pilote plus tard.", gpu.Device, gpu.InfName ?? "?", folder)),
             _ => (T("Supprimer le pilote graphique ?"),
-                T("MAUS va d'abord sauvegarder le pilote de « {0} » ({1}) dans {2}, puis le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.", gpu.Device, gpu.InfName ?? "?", folder) + Environment.NewLine + Environment.NewLine
+                T("MAUS va d'abord créer un point de restauration de Windows (vérifié), puis sauvegarder le pilote de « {0} » ({1}) dans {2}, et seulement ensuite le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.", gpu.Device, gpu.InfName ?? "?", folder) + Environment.NewLine + Environment.NewLine
                 + T("Ensuite, Windows affiche avec son pilote de base : image moins fluide, pas de jeux 3D, définition parfois limitée. Windows Update peut réinstaller un pilote de lui-même.") + Environment.NewLine
                 + T("Téléchargez AVANT le nouveau pilote sur le site du fabricant (bouton « Page officielle du pilote ») : vous en aurez besoin pour retrouver une image normale.") + Environment.NewLine
                 + T("Les logiciels du fabricant (NVIDIA App, AMD Software, Intel Graphics) restent installés. Pour un nettoyage complet, DDU (téléchargé uniquement sur wagnardsoft.com), lancé en mode sans échec, reste l'outil de référence.")),
@@ -309,9 +338,65 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        DriversStatus = ShellLauncher.RunConsole(arguments)
-            ? T("Commande lancée dans une fenêtre visible : lisez son résultat, puis cliquez sur « Actualiser la liste ».")
-            : T("La fenêtre de commande n'a pas pu s'ouvrir.");
+        _driverActionRunning = true;
+        try
+        {
+            if (action == GraphicsDriverAction.Remove)
+            {
+                // Point de restauration vérifié avant la suppression (même mécanisme que les corrections) ; s'il échoue,
+                // l'utilisateur décide de continuer ou non : la sauvegarde du pilote reste faite de toute façon.
+                DriversStatus = T("Création du point de restauration…");
+                var point = await Task.Run(CreateDriverRestorePoint);
+                if (!point.Succeeded && !_confirm(T("Point de restauration impossible"),
+                        point.Message + Environment.NewLine + Environment.NewLine
+                        + T("Supprimer le pilote quand même ? Il sera sauvegardé avant, et la sauvegarde permet de le réinstaller.")))
+                {
+                    DriversStatus = T("Suppression annulée : aucun pilote n'a été touché.");
+                    return;
+                }
+            }
+
+            DriversStatus = ShellLauncher.RunConsole(arguments)
+                ? T("Commande lancée dans une fenêtre visible : lisez son résultat, puis cliquez sur « Actualiser la liste ».")
+                : T("La fenêtre de commande n'a pas pu s'ouvrir.");
+        }
+        finally
+        {
+            _driverActionRunning = false;
+        }
+    }
+
+    private bool _driverActionRunning;
+
+    /// <summary>Point de restauration « avant la suppression du pilote graphique », créé puis relu dans la liste de Windows.</summary>
+    private Maus.Core.Fixes.RestorePointOutcome CreateDriverRestorePoint()
+    {
+        try
+        {
+            var fix = Maus.Core.Fixes.FixContext.CreateDefault(_context() ?? AuditContext.CreateDefault());
+            return new Maus.Core.Fixes.RestorePointCreator(fix.SystemRestore, fix.Settings)
+                .Create(T("MAUS : avant la suppression du pilote graphique"), enableProtectionIfNeeded: false);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return new Maus.Core.Fixes.RestorePointOutcome(Maus.Core.Fixes.RestorePointStatus.Failed, null, T("Le point de restauration n'a pas pu être créé : {0}", ex.Message));
+        }
+    }
+
+    /// <summary>Résumé : nombre de pilotes, pilotes non signés, pilote de fabricant le plus ancien (sans seuil « trop vieux »).</summary>
+    private static string Summary(IReadOnlyList<DriverEntry> drivers)
+    {
+        var parts = new List<string> { T("{0} pilotes", drivers.Count) };
+        var unsigned = DriverAge.UnsignedCount(drivers);
+        parts.Add(unsigned == 0
+            ? T("tous signés")
+            : T("{0} non signé(s) : Windows ne leur voit pas de signature numérique, vérifiez qu'ils viennent bien du fabricant", unsigned));
+        if (DriverAge.OldestVendorDriver(drivers) is { Date: { } date } oldest)
+        {
+            parts.Add(T("pilote de fabricant le plus ancien : {0} ({1}, {2})", oldest.Device, date.ToString("d", Culture), DriverAge.Describe(oldest, DateTime.Today)));
+        }
+
+        return string.Join(" · ", parts);
     }
 
     private void RestoreDriverBackup()

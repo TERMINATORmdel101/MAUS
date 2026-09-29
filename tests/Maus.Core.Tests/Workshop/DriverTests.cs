@@ -107,4 +107,23 @@ public class DriverTests
         Assert.Contains("*.inf\" /subdirs /install", restore, StringComparison.Ordinal);
         Assert.Null(GraphicsDriverActions.RestoreArguments("C:\\x%TEMP%"));
     }
+
+    [Fact]
+    public void Age_is_shown_without_threshold_and_the_windows_2006_date_is_not_called_old()
+    {
+        var today = new DateTime(2026, 9, 29);
+        var inbox = Gpu() with { Provider = "Microsoft", Date = new DateTime(2006, 6, 21), IsSigned = true };
+        var vendor = Gpu() with { Provider = "Realtek Semiconductor Corp.", Date = new DateTime(2023, 3, 14) };
+        var recent = Gpu() with { Date = new DateTime(2026, 9, 17) };
+
+        Assert.Equal("date de convention de Windows", DriverAge.Describe(inbox, today));
+        Assert.Equal("3 ans", DriverAge.Describe(vendor, today));
+        Assert.Equal("moins d'un mois", DriverAge.Describe(recent, today));
+        Assert.Equal("8 mois", DriverAge.Describe(Gpu() with { Date = new DateTime(2026, 1, 29) }, today));
+        Assert.Equal("—", DriverAge.Describe(Gpu() with { Date = null }, today));
+
+        // Le plus ancien pilote de fabricant ignore les pilotes de Microsoft (datés par convention).
+        Assert.Same(vendor, DriverAge.OldestVendorDriver([inbox, vendor, recent]));
+        Assert.Equal(1, DriverAge.UnsignedCount([inbox, vendor with { IsSigned = false }, recent]));
+    }
 }

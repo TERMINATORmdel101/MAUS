@@ -1214,6 +1214,10 @@
                                     <TextBlock DockPanel.Dock="Right" Text="{x:Static app:Ui.FilterLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <TextBlock Text="{x:Static app:Ui.DriversAllTitle}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
                                 </DockPanel>
+                                <TextBlock Text="{Binding Workshop.DriversSummary}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <TextBlock Text="{x:Static app:Ui.DriversDateNote}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" Margin="0,0,0,6" />
+                                <Button Content="{x:Static app:Ui.ShowUnsignedDrivers}" Command="{Binding Workshop.ShowUnsignedDriversCommand}" HorizontalAlignment="Left" Padding="12,4" Margin="0,0,0,8"
+                                        Visibility="{Binding Workshop.HasUnsignedDrivers, Converter={StaticResource BoolToVisibility}}" />
                                 <DataGrid ItemsSource="{Binding Workshop.DriverRows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
                                           CanUserAddRows="False" CanUserDeleteRows="False" GridLinesVisibility="None" Height="480" BorderThickness="0"
                                           Background="Transparent" RowBackground="Transparent">
@@ -1221,7 +1225,8 @@
                                         <DataGridTextColumn Header="{x:Static app:Ui.ColumnFamily}" Binding="{Binding Group, Mode=OneWay}" Width="1.2*" />
                                         <DataGridTextColumn Header="{x:Static app:Ui.ColumnDevice}" Binding="{Binding Device, Mode=OneWay}" Width="2.6*" FontWeight="SemiBold" />
                                         <DataGridTextColumn Header="{x:Static app:Ui.ColumnVersion}" Binding="{Binding Version, Mode=OneWay}" Width="1.2*" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnDate}" Binding="{Binding Date, Mode=OneWay}" Width="0.9*" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnDate}" Binding="{Binding Date, Mode=OneWay}" SortMemberPath="DateValue" Width="0.9*" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnAge}" Binding="{Binding Age, Mode=OneWay}" SortMemberPath="DateValue" Width="0.9*" />
                                         <DataGridTextColumn Header="{x:Static app:Ui.ColumnProvider}" Binding="{Binding Provider, Mode=OneWay}" Width="1.4*" />
                                         <DataGridTextColumn Header="{x:Static app:Ui.ColumnPackage}" Binding="{Binding Package, Mode=OneWay}" Width="0.9*" />
                                         <DataGridTextColumn Header="{x:Static app:Ui.ColumnSignature}" Binding="{Binding Signature, Mode=OneWay}" Width="1.4*" />

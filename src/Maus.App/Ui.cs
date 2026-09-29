@@ -269,6 +269,12 @@ public static class Ui
 
     public static string ColumnSignature => T("Signature");
 
+    public static string ColumnAge => T("Âge");
+
+    public static string ShowUnsignedDrivers => T("Voir les pilotes non signés");
+
+    public static string DriversDateNote => T("Les pilotes de Microsoft datés du 21/06/2006 ne sont pas vieux : Windows leur donne volontairement cette date pour que les pilotes des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017). L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.");
+
     public static string ReadMemory => T("Lire la mémoire");
 
     public static string CopyMemory => T("Copier la fiche");

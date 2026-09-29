@@ -3202,7 +3202,6 @@
   "Les logiciels du fabricant (NVIDIA App, AMD Software, Intel Graphics) restent installés. Pour un nettoyage complet, DDU (téléchargé uniquement sur wagnardsoft.com), lancé en mode sans échec, reste l'outil de référence.": "Los programas del fabricante (NVIDIA App, AMD Software, Intel Graphics) siguen instalados. Para una limpieza completa, DDU (descargado solo de wagnardsoft.com), ejecutado en modo seguro, sigue siendo la herramienta de referencia.",
   "Liste copiée (nom d'utilisateur, nom du PC et e-mails masqués) : collez-la avec Ctrl+V.": "Lista copiada (nombre de usuario, nombre del PC y correos ocultos): péguela con Ctrl+V.",
   "MAUS va copier le paquet du pilote de « {0} » ({1}) dans {2}. Rien n'est modifié : la sauvegarde permet de réinstaller ce pilote plus tard.": "MAUS copiará el paquete del controlador de «{0}» ({1}) en {2}. No se modifica nada: la copia permite reinstalar este controlador más adelante.",
-  "MAUS va d'abord sauvegarder le pilote de « {0} » ({1}) dans {2}, puis le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.": "MAUS primero hará una copia del controlador de «{0}» ({1}) en {2} y luego lo eliminará con pnputil. Sin una copia correcta, no se elimina nada.",
   "MAUS va redémarrer le pilote de « {0} » avec pnputil, l'outil de Microsoft. L'écran devient noir quelques secondes puis revient. Utile quand l'image se fige, clignote ou qu'un jeu a laissé la carte dans un mauvais état.": "MAUS reiniciará el controlador de «{0}» con pnputil, la herramienta de Microsoft. La pantalla se pone negra unos segundos y luego vuelve. Útil cuando la imagen se congela, parpadea o un juego ha dejado la tarjeta en mal estado.",
   "MAUS va retirer « {0} » de la liste des périphériques puis demander à Windows de la redétecter, qui réinstalle alors son pilote. L'écran peut devenir noir plusieurs secondes. À essayer si le redémarrage du pilote ne suffit pas.": "MAUS quitará «{0}» de la lista de dispositivos y luego pedirá a Windows que la vuelva a detectar, lo que reinstala su controlador. La pantalla puede ponerse negra varios segundos. Pruébelo si reiniciar el controlador no basta.",
   "MAUS va réinstaller le pilote sauvegardé dans {0} avec pnputil. L'écran peut devenir noir quelques secondes.": "MAUS reinstalará el controlador guardado en {0} con pnputil. La pantalla puede ponerse negra unos segundos.",
@@ -3250,5 +3249,19 @@
   "signé": "firmado",
   "{0} pilotes, lus dans Windows sans rien modifier. Les actions sur la carte graphique demandent toujours votre accord.": "{0} controladores, leídos en Windows sin modificar nada. Las acciones sobre la tarjeta gráfica siempre piden su consentimiento.",
   "Écrans": "Pantallas",
-  "Éditeur": "Editor"
+  "Éditeur": "Editor",
+  "Création du point de restauration…": "Creando el punto de restauración…",
+  "Le point de restauration n'a pas pu être créé : {0}": "No se ha podido crear el punto de restauración: {0}",
+  "Les pilotes de Microsoft datés du 21/06/2006 ne sont pas vieux : Windows leur donne volontairement cette date pour que les pilotes des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017). L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.": "Los controladores de Microsoft fechados el 21/06/2006 no son antiguos: Windows les da esta fecha a propósito para que los controladores de los fabricantes mantengan la prioridad (Raymond Chen, Microsoft, «The Old New Thing», 2017). La antigüedad por sí sola no indica que un controlador sea un problema: MAUS no fija ningún umbral.",
+  "MAUS : avant la suppression du pilote graphique": "MAUS: antes de eliminar el controlador gráfico",
+  "MAUS va d'abord créer un point de restauration de Windows (vérifié), puis sauvegarder le pilote de « {0} » ({1}) dans {2}, et seulement ensuite le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.": "MAUS primero creará un punto de restauración de Windows (verificado), luego guardará el controlador de «{0}» ({1}) en {2}, y solo después lo eliminará con pnputil. Sin una copia correcta, no se elimina nada.",
+  "Suppression annulée : aucun pilote n'a été touché.": "Eliminación cancelada: no se ha tocado ningún controlador.",
+  "Supprimer le pilote quand même ? Il sera sauvegardé avant, et la sauvegarde permet de le réinstaller.": "¿Eliminar el controlador de todos modos? Se guardará antes, y la copia permite reinstalarlo.",
+  "Voir les pilotes non signés": "Ver los controladores sin firma",
+  "date de convention de Windows": "fecha convencional de Windows",
+  "pilote de fabricant le plus ancien : {0} ({1}, {2})": "controlador de fabricante más antiguo: {0} ({1}, {2})",
+  "tous signés": "todos firmados",
+  "{0} non signé(s) : Windows ne leur voit pas de signature numérique, vérifiez qu'ils viennent bien du fabricant": "{0} sin firma: Windows no les ve firma digital, compruebe que proceden realmente del fabricante",
+  "{0} pilotes": "{0} controladores",
+  "Âge": "Antigüedad"
 }
