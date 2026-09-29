@@ -65,7 +65,8 @@ public sealed record MachineDetails(
     MemorySlots? Slots,
     IReadOnlyList<DisplayIdentity> Displays,
     IReadOnlyList<NetworkAdapterIdentity> Network,
-    IReadOnlyList<AudioDeviceIdentity> Audio);
+    IReadOnlyList<AudioDeviceIdentity> Audio,
+    string? Microcode = null);
 
 /// <summary>Source du mode de démarrage (remplaçable dans les tests).</summary>
 public interface IFirmwareTypeSource
@@ -102,7 +103,26 @@ public static class MachineDetailsReader
         ReadSlots(context.Cim),
         ReadDisplays(displays),
         ReadNetwork(context.Cim),
-        ReadAudio(context.Cim));
+        ReadAudio(context.Cim),
+        ReadMicrocode(context.Registry));
+
+    /// <summary>
+    /// Révision du microcode chargé, lue comme le Module 8 (valeur <c>Update Revision</c> du premier processeur, décodée par
+    /// <see cref="Modules.M08Bios.MicrocodeRevision"/>) ; <c>null</c> si elle est absente ou illisible.
+    /// </summary>
+    internal static string? ReadMicrocode(IRegistryReader registry)
+    {
+        try
+        {
+            return Modules.M08Bios.MicrocodeRevision.Parse(registry.GetBinary(RegistryHive.LocalMachine, Modules.M08Bios.BiosModule.CpuKey, "Update Revision")) is { } revision
+                ? Modules.M08Bios.MicrocodeRevision.Format(revision)
+                : null;
+        }
+        catch (MausAccessDeniedException)
+        {
+            return null;
+        }
+    }
 
     internal static SystemIdentity ReadSystem(AuditContext context, IFirmwareTypeSource firmware)
     {

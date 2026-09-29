@@ -52,7 +52,9 @@ public class MachineDetailsTests
     [Fact]
     public void Windows_firmware_secure_boot_and_tpm_are_read_without_writing()
     {
-        var registry = new FakeRegistry().Set(RegistryHive.LocalMachine, MachineDetailsReader.SecureBootStateKey, "UEFISecureBootEnabled", 1);
+        var registry = new FakeRegistry()
+            .Set(RegistryHive.LocalMachine, MachineDetailsReader.SecureBootStateKey, "UEFISecureBootEnabled", 1)
+            .Set(RegistryHive.LocalMachine, Maus.Core.Modules.M08Bios.BiosModule.CpuKey, "Update Revision", new byte[] { 0xF0, 0, 0, 0 });
         var details = MachineDetailsReader.Read(Context(Machine(), registry), new FakeDisplays(null), new FakeFirmware(2));
 
         var system = details.System;
@@ -63,6 +65,7 @@ public class MachineDetailsTests
         Assert.Equal(FirmwareKind.Uefi, system.Firmware);
         Assert.True(system.SecureBoot);
         Assert.Equal(new TpmIdentity("2.0", "INTC", true, true), system.Tpm);
+        Assert.Equal("0xF0", details.Microcode);
         Assert.False(system.TpmNeedsAdministrator);
         Assert.Empty(registry.Writes);
     }

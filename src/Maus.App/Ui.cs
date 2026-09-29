@@ -221,6 +221,54 @@ public static class Ui
 
     public static string SectionMemory => T("Mémoire");
 
+    public static string SectionDrivers => T("Pilotes");
+
+    public static string RefreshList => T("Actualiser la liste");
+
+    public static string CopyList => T("Copier la liste");
+
+    public static string DriverBackupsFolder => T("Dossier des sauvegardes");
+
+    public static string RestoreDriverBackup => T("Réinstaller une sauvegarde…");
+
+    public static string DriversGpuTitle => T("Carte graphique : son pilote");
+
+    public static string DriversIntro => T("Redémarrer le pilote répare souvent une image figée, un écran noir ou qui clignote. Retirer et redétecter la carte va plus loin. Sauvegarder puis supprimer le pilote sert à repartir sur une installation propre. Chaque action demande votre accord et s'ouvre dans une fenêtre visible.");
+
+    public static string RestartDriver => T("Redémarrer le pilote");
+
+    public static string RestartDriverTip => T("pnputil /restart-device : l'écran devient noir quelques secondes. Fermez d'abord les jeux.");
+
+    public static string ReinstallDevice => T("Retirer et redétecter");
+
+    public static string ReinstallDeviceTip => T("pnputil /remove-device puis /scan-devices : Windows réinstalle la carte et son pilote.");
+
+    public static string BackupDriver => T("Sauvegarder le pilote");
+
+    public static string RemoveDriver => T("Supprimer le pilote…");
+
+    public static string RemoveDriverTip => T("Sauvegarde d'abord le pilote, puis le supprime (pnputil /delete-driver /uninstall). Téléchargez avant le nouveau pilote.");
+
+    public static string DriverPage => T("Page officielle du pilote");
+
+    public static string DriversAllTitle => T("Tous les pilotes installés");
+
+    public static string DriverFilterLabel => T("Rechercher un pilote");
+
+    public static string ColumnFamily => T("Famille");
+
+    public static string ColumnDevice => T("Périphérique");
+
+    public static string ColumnVersion => T("Version");
+
+    public static string ColumnDate => T("Date");
+
+    public static string ColumnProvider => T("Éditeur");
+
+    public static string ColumnPackage => T("Paquet");
+
+    public static string ColumnSignature => T("Signature");
+
     public static string ReadMemory => T("Lire la mémoire");
 
     public static string CopyMemory => T("Copier la fiche");

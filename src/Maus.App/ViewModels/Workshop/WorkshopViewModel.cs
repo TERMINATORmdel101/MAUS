@@ -578,6 +578,11 @@ public sealed partial class WorkshopViewModel : ObservableObject
             await LoadInventoryAsync();
         }
 
+        if (IsActive && Section == SectionDrivers && !_driversLoaded)
+        {
+            await LoadDriversAsync();
+        }
+
         if (IsActive && Section == SectionTests && !_gpuAdaptersLoaded)
         {
             await LoadGpuAdaptersAsync();

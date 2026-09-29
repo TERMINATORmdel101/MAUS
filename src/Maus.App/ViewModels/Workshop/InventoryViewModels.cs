@@ -67,6 +67,7 @@ public sealed class ComponentCardViewModel
             new(T("Fréquence de base"), cpu.BaseClockMhz > 0 ? $"{cpu.BaseClockMhz} MHz" : "—"),
             new(T("Cache L2 / L3"), $"{Kb(cpu.L2CacheKb)} / {Kb(cpu.L3CacheKb)}"),
             new(T("Signature"), cpu.Signature ?? "—"),
+            new(T("Microcode"), details?.Microcode ?? "—"),
             new(T("Instructions"), cpu.InstructionSets.Count == 0 ? "—" : string.Join(", ", cpu.InstructionSets)),
             new(T("Architecture hybride"), cpu.Hybrid ? T("oui") : T("non")),
             new(T("Température maximale prévue"), cpuLimit is null ? T("non répertoriée") : $"{cpuLimit.MaxC} °C"),
@@ -108,6 +109,7 @@ public sealed class ComponentCardViewModel
             {
                 new(T("Mémoire vidéo"), gpu.MemoryBytes is { } vram ? Gb(vram) : "—"),
                 new(T("Pilote"), gpu.Info.DriverVersion ?? "—"),
+                new(T("Date du pilote"), gpu.Info.DriverDate?.ToString("d", Culture) ?? "—"),
             };
             GaugeInfo? gauge = null;
             if (nvidia is not null)

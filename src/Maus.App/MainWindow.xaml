@@ -1151,6 +1151,84 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
+
+                    <!-- Pilotes : liste complète (lecture seule) et actions manuelles sur le pilote de la carte graphique -->
+                    <TabItem Header="{x:Static app:Ui.SectionDrivers}" Style="{StaticResource PillTab}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <WrapPanel Margin="0,0,0,6">
+                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.RefreshList}" Command="{Binding Workshop.RefreshDriversCommand}" />
+                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.CopyList}" ToolTip="{x:Static app:Ui.CopySheetTip}" Command="{Binding Workshop.CopyDriversCommand}" />
+                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverBackupsFolder}" Command="{Binding Workshop.OpenDriverBackupsCommand}" />
+                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.RestoreDriverBackup}" Command="{Binding Workshop.RestoreDriverBackupCommand}" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding Workshop.DriversStatus}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,6" />
+                                <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,10" Visibility="{Binding Workshop.IsReadingDrivers, Converter={StaticResource BoolToVisibility}}" />
+
+                                <TextBlock Text="{x:Static app:Ui.DriversGpuTitle}" Style="{StaticResource CardTitle}" Margin="0,4,0,4" />
+                                <TextBlock Text="{x:Static app:Ui.DriversIntro}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,8" />
+                                <ItemsControl ItemsSource="{Binding Workshop.GraphicsDrivers}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type ws:GraphicsDriverCardViewModel}">
+                                            <Border Style="{StaticResource Card}" Margin="0,0,0,12" appearance:Motion.EnterOnLoad="True">
+                                                <StackPanel>
+                                                    <DockPanel Margin="0,0,0,10">
+                                                        <controls:LetterTile DockPanel.Dock="Left" Width="40" Height="40" Margin="0,0,12,0" Text="G" Fill="{StaticResource MausRed}" />
+                                                        <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                    </DockPanel>
+                                                    <ItemsControl ItemsSource="{Binding Lines}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type ws:InfoLine}">
+                                                                <Grid Margin="0,1">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="220" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="{Binding Label}" FontSize="12" Style="{StaticResource Muted}" Margin="0,0,8,0" />
+                                                                    <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <TextBlock Text="{Binding PackageNote}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,8" />
+                                                    <WrapPanel>
+                                                        <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RestartDriver}"
+                                                                ToolTip="{x:Static app:Ui.RestartDriverTip}" Command="{Binding RestartCommand}" />
+                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.ReinstallDevice}" ToolTip="{x:Static app:Ui.ReinstallDeviceTip}" Command="{Binding ReinstallCommand}" />
+                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.BackupDriver}" Command="{Binding BackupCommand}"
+                                                                IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
+                                                        <Button Style="{StaticResource DangerButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RemoveDriver}"
+                                                                ToolTip="{x:Static app:Ui.RemoveDriverTip}" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
+                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverPage}" Command="{Binding DownloadCommand}"
+                                                                Visibility="{Binding HasDownloadPage, Converter={StaticResource BoolToVisibility}}" />
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <DockPanel Margin="0,8,0,6">
+                                    <TextBox DockPanel.Dock="Right" Width="260" Text="{Binding Workshop.DriverFilter, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="{x:Static app:Ui.DriverFilterLabel}" ToolTip="{x:Static app:Ui.DriverFilterLabel}" />
+                                    <TextBlock Text="{x:Static app:Ui.DriversAllTitle}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <DataGrid ItemsSource="{Binding Workshop.DriverRows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                                          CanUserAddRows="False" CanUserDeleteRows="False" GridLinesVisibility="None" Height="480" BorderThickness="0"
+                                          Background="Transparent" RowBackground="Transparent">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnFamily}" Binding="{Binding Group, Mode=OneWay}" Width="1.2*" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnDevice}" Binding="{Binding Device, Mode=OneWay}" Width="2.6*" FontWeight="SemiBold" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnVersion}" Binding="{Binding Version, Mode=OneWay}" Width="1.2*" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnDate}" Binding="{Binding Date, Mode=OneWay}" Width="0.9*" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnProvider}" Binding="{Binding Provider, Mode=OneWay}" Width="1.4*" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnPackage}" Binding="{Binding Package, Mode=OneWay}" Width="0.9*" />
+                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnSignature}" Binding="{Binding Signature, Mode=OneWay}" Width="1.4*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
                 </TabControl>
             </DockPanel>
         </TabItem>
