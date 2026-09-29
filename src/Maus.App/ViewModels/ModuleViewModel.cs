@@ -14,6 +14,15 @@ public sealed class FindingViewModel
         this.finding = finding;
         AcknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, true));
         UnacknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, false));
+        OpenSettingsPageCommand = new AsyncCommand(() =>
+        {
+            if (finding.SettingsPage is { } page)
+            {
+                ShellLauncher.OpenSettings(page);
+            }
+
+            return Task.CompletedTask;
+        });
     }
 
     public string Title => finding.Title;
@@ -30,6 +39,11 @@ public sealed class FindingViewModel
     public ICommand AcknowledgeCommand { get; }
 
     public ICommand UnacknowledgeCommand { get; }
+
+    /// <summary>Le constat renvoie vers une page des Paramètres de Windows (bouton « Ouvrir dans Windows »).</summary>
+    public bool HasSettingsPage => finding.SettingsPage is not null;
+
+    public ICommand OpenSettingsPageCommand { get; }
 
     public string? Category => finding.Category;
 

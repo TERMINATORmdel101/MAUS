@@ -20,6 +20,9 @@ public sealed class DevicesModule : IAuditModule
 
     private static string Category => T("Périphériques");
 
+    /// <summary>Page « Mises à jour facultatives » de Windows Update, où Windows propose des pilotes.</summary>
+    private const string OptionalUpdatesPage = "ms-settings:windowsupdate-optionalupdates";
+
     public string Id => "M17";
 
     public string Title => T("Périphériques et pilotes");
@@ -53,6 +56,11 @@ public sealed class DevicesModule : IAuditModule
 
         var findings = new List<Finding> { Summary(failing, disabled, waiting) };
         findings.AddRange(failing.Select(Describe));
+        if (UnsignedDrivers(context.Cim) is { } unsigned)
+        {
+            findings.Add(unsigned);
+        }
+
         if (disabled.Count > 0)
         {
             findings.Add(new Finding
@@ -68,6 +76,38 @@ public sealed class DevicesModule : IAuditModule
         }
 
         return Result([.. findings]);
+    }
+
+    /// <summary>
+    /// Pilotes sans signature numérique reconnue (<c>Win32_PnPSignedDriver.IsSigned</c>). La signature permet à Windows de
+    /// vérifier l'intégrité du paquet et l'identité de son éditeur (Microsoft Learn, « Driver Signing ») ; son absence n'est pas
+    /// une panne, d'où une simple information. <c>null</c> si la liste des pilotes est illisible.
+    /// </summary>
+    private static Finding? UnsignedDrivers(ICimReader cim)
+    {
+        var drivers = Workshop.DriverInventoryReader.Read(cim);
+        if (drivers.Count == 0)
+        {
+            return null;
+        }
+
+        var unsigned = drivers.Where(d => d.IsSigned == false).ToList();
+        return new Finding
+        {
+            Id = "M17.unsigned-drivers",
+            Title = T("Pilotes sans signature numérique"),
+            Category = Category,
+            Status = unsigned.Count == 0 ? FindingStatus.Ok : FindingStatus.Info,
+            Current = unsigned.Count == 0
+                ? T("aucun, sur {0} pilotes", drivers.Count)
+                : T("{0} sur {1} : {2}", unsigned.Count, drivers.Count, string.Join(", ", unsigned.Take(8).Select(d => d.Device))),
+            Expected = T("aucun"),
+            Explanation = T("La signature numérique d'un pilote permet à Windows de vérifier qui l'a publié et qu'il n'a pas été modifié. "
+                + "Un pilote sans signature n'est pas forcément en panne, mais son origine n'est pas garantie."),
+            Advice = unsigned.Count == 0
+                ? null
+                : T("Vérifiez qu'ils viennent bien du fabricant de l'appareil (Atelier > Pilotes, bouton « Voir les pilotes non signés ») ; sinon, réinstallez le pilote depuis le site du fabricant."),
+        };
     }
 
     private static Task<IReadOnlyList<Finding>> Result(params Finding[] findings) => Task.FromResult<IReadOnlyList<Finding>>(findings);
@@ -87,6 +127,7 @@ public sealed class DevicesModule : IAuditModule
             + (waiting.Count > 0 ? " " + T("En attente d'un redémarrage ou d'une réinitialisation : {0}.", string.Join(", ", waiting.Select(d => d.Name))) : string.Empty)
             + (disabled.Count > 0 ? " " + T("{0} appareil(s) désactivé(s), listé(s) à part.", disabled.Count) : string.Empty),
         Advice = failing.Count == 0 ? null : T("Préférez Windows Update (Paramètres > Windows Update > Options avancées > Mises à jour facultatives > Pilotes) ou le site du fabricant du PC. Évitez les logiciels « de mise à jour de pilotes » : ils installent parfois des pilotes inadaptés."),
+        SettingsPage = failing.Count == 0 ? null : OptionalUpdatesPage,
     };
 
     private static Finding Describe(Device device)

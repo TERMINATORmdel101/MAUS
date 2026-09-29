@@ -86,6 +86,8 @@ public class WindowsUpdateModuleTests
         Assert.Contains("25H2", Get(findings, "M03.windows-support").Current, StringComparison.Ordinal);
         Assert.Contains("12/10/2027", Get(findings, "M03.windows-support").Current, StringComparison.Ordinal);
         Assert.Equal("aucune", Get(findings, "M03.pending-updates").Current);
+        Assert.Equal("aucune", Get(findings, "M03.driver-updates").Current);
+        Assert.Null(Get(findings, "M03.driver-updates").SettingsPage);
         Assert.Contains("KB5124008", Get(findings, "M03.last-install").Current, StringComparison.Ordinal);
         Assert.Contains("il y a 10 jours", Get(findings, "M03.last-install").Current, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M03.defender-signatures").Status);
@@ -94,7 +96,7 @@ public class WindowsUpdateModuleTests
     }
 
     [Fact]
-    public async Task Search_excludes_drivers_and_includes_optional_updates()
+    public async Task Search_includes_optional_updates_and_drivers_in_one_query()
     {
         var agent = HealthyAgent();
         await Detect(agent);
@@ -102,7 +104,7 @@ public class WindowsUpdateModuleTests
         Assert.Equal(WindowsUpdateModule.SearchCriteria, agent.ReceivedCriteria);
         Assert.Contains("Type='Software'", agent.ReceivedCriteria, StringComparison.Ordinal);
         Assert.Contains("BrowseOnly=1", agent.ReceivedCriteria, StringComparison.Ordinal);
-        Assert.DoesNotContain("Driver", agent.ReceivedCriteria, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" or IsInstalled=0 and IsHidden=0 and Type='Driver'", agent.ReceivedCriteria, StringComparison.Ordinal);
         Assert.Equal(TimeSpan.FromSeconds(180), new WindowsUpdateModule(agent, TimeSpan.FromSeconds(1)).Timeout);
     }
 
@@ -112,7 +114,7 @@ public class WindowsUpdateModuleTests
         var module = new WindowsUpdateModule();
 
         Assert.Equal("M03", module.Id);
-        Assert.Equal("Mises à jour Windows (hors pilotes)", module.Title);
+        Assert.Equal("Mises à jour Windows", module.Title);
         Assert.Equal(30, module.Order);
     }
 
@@ -372,6 +374,15 @@ public class WindowsUpdateModuleTests
         Assert.Equal("1 facultative : Aperçu cumulatif 2026-09 (KB5124010)", optional.Current);
         Assert.Contains("seulement si un correctif précis vous concerne", optional.Advice, StringComparison.Ordinal);
         Assert.True(optional.Fixable);
+
+        // Les pilotes ont leur propre constat, informatif, avec la page des mises à jour facultatives de Windows.
+        var drivers = Get(findings, "M03.driver-updates");
+        Assert.Equal(FindingStatus.Info, drivers.Status);
+        Assert.StartsWith("2 pilotes : ", drivers.Current, StringComparison.Ordinal);
+        Assert.Contains("NVIDIA - Display", drivers.Current, StringComparison.Ordinal);
+        Assert.Contains("Realtek - Audio", drivers.Current, StringComparison.Ordinal);
+        Assert.Equal(WindowsUpdateModule.OptionalUpdatesPage, drivers.SettingsPage);
+        Assert.False(drivers.Fixable);
     }
 
     [Fact]

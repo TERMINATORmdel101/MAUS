@@ -81,4 +81,36 @@ public class DevicesModuleTests
         Assert.False(string.IsNullOrWhiteSpace(meaning));
         Assert.False(string.IsNullOrWhiteSpace(advice));
     }
+
+    [Fact]
+    public async Task Unsigned_drivers_are_reported_as_information_with_the_device_names()
+    {
+        var cim = new FakeCim()
+            .Answer(DevicesModule.ProblemQuery, Device("Lecteur de cartes", "SDHost", 28))
+            .Answer(Maus.Core.Workshop.DriverInventoryReader.DriverQuery,
+                new Dictionary<string, object?> { ["DeviceName"] = "Manette maison", ["DeviceClass"] = "HIDClass", ["DeviceID"] = @"USB\VID_1234&PID_0001\1", ["IsSigned"] = false },
+                new Dictionary<string, object?> { ["DeviceName"] = "Realtek(R) Audio", ["DeviceClass"] = "MEDIA", ["DeviceID"] = @"HDAUDIO\FUNC_01\1", ["IsSigned"] = true });
+
+        var findings = await Detect(cim);
+
+        var unsigned = findings.Single(f => f.Id == "M17.unsigned-drivers");
+        Assert.Equal(FindingStatus.Info, unsigned.Status);
+        Assert.Equal("1 sur 2 : Manette maison", unsigned.Current);
+        Assert.Contains("Voir les pilotes non signés", unsigned.Advice, StringComparison.Ordinal);
+
+        // Le résumé des périphériques en erreur ouvre la page des mises à jour facultatives de Windows.
+        Assert.Equal("ms-settings:windowsupdate-optionalupdates", findings.Single(f => f.Id == "M17.devices").SettingsPage);
+    }
+
+    [Fact]
+    public async Task All_signed_drivers_are_compliant_and_an_unreadable_list_adds_nothing()
+    {
+        var signed = new FakeCim()
+            .Answer(DevicesModule.ProblemQuery)
+            .Answer(Maus.Core.Workshop.DriverInventoryReader.DriverQuery,
+                new Dictionary<string, object?> { ["DeviceName"] = "Realtek(R) Audio", ["DeviceClass"] = "MEDIA", ["DeviceID"] = @"HDAUDIO\FUNC_01\1", ["IsSigned"] = true });
+
+        Assert.Equal(FindingStatus.Ok, (await Detect(signed)).Single(f => f.Id == "M17.unsigned-drivers").Status);
+        Assert.DoesNotContain(await Detect(new FakeCim().Answer(DevicesModule.ProblemQuery)), f => f.Id == "M17.unsigned-drivers");
+    }
 }

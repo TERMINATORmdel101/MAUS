@@ -1253,7 +1253,6 @@
   "Mise à jour des logiciels par winget, l'outil de Microsoft. Répondez à ses questions dans cette fenêtre (conditions des éditeurs) ; certains installateurs ouvrent leur propre fenêtre.": "Actualización de programas con winget, la herramienta de Microsoft. Responda a sus preguntas en esta ventana (condiciones de los editores); algunos instaladores abren su propia ventana.",
   "Mise à jour du BIOS": "Actualización de la BIOS",
   "Mises à jour": "Actualizaciones",
-  "Mises à jour Windows (hors pilotes)": "Actualizaciones de Windows (sin controladores)",
   "Mises à jour Windows en attente (hors pilotes)": "Actualizaciones de Windows pendientes (sin controladores)",
   "Mises à jour de sécurité trimestrielles seulement, sans optimisation pour les nouveaux jeux.": "Solo actualizaciones de seguridad trimestrales, sin optimizaciones para los juegos nuevos.",
   "Mises à jour des logiciels": "Actualizaciones de programas",
@@ -3263,5 +3262,19 @@
   "tous signés": "todos firmados",
   "{0} non signé(s) : Windows ne leur voit pas de signature numérique, vérifiez qu'ils viennent bien du fabricant": "{0} sin firma: Windows no les ve firma digital, compruebe que proceden realmente del fabricante",
   "{0} pilotes": "{0} controladores",
-  "Âge": "Antigüedad"
+  "Âge": "Antigüedad",
+  "Installez-en un seulement si le périphérique concerné fonctionne mal : bouton « Ouvrir dans Windows » (Windows Update > Options avancées > Mises à jour facultatives), puis cochez ce pilote. Pour la carte graphique, préférez le pilote du fabricant (Module 9 et Atelier > Pilotes).": "Instale uno solo si el dispositivo afectado funciona mal: botón «Abrir en Windows» (Windows Update > Opciones avanzadas > Actualizaciones opcionales) y marque ese controlador. Para la tarjeta gráfica, prefiera el controlador del fabricante (Módulo 9 y Taller > Controladores).",
+  "La signature numérique d'un pilote permet à Windows de vérifier qui l'a publié et qu'il n'a pas été modifié. Un pilote sans signature n'est pas forcément en panne, mais son origine n'est pas garantie.": "La firma digital de un controlador permite a Windows comprobar quién lo publicó y que no ha sido modificado. Un controlador sin firma no está necesariamente averiado, pero su origen no está garantizado.",
+  "Mises à jour Windows": "Actualizaciones de Windows",
+  "Mises à jour de pilotes (Windows Update)": "Actualizaciones de controladores (Windows Update)",
+  "Mises à jour de pilotes proposées par Windows Update": "Actualizaciones de controladores propuestas por Windows Update",
+  "Ouvre la page des mises à jour facultatives de Windows, où Windows propose des pilotes : cochez seulement ceux dont vous avez besoin.": "Abre la página de actualizaciones opcionales de Windows, donde Windows propone controladores: marque solo los que necesite.",
+  "Ouvrir dans Windows": "Abrir en Windows",
+  "Pilotes sans signature numérique": "Controladores sin firma digital",
+  "Vérifiez qu'ils viennent bien du fabricant de l'appareil (Atelier > Pilotes, bouton « Voir les pilotes non signés ») ; sinon, réinstallez le pilote depuis le site du fabricant.": "Compruebe que proceden realmente del fabricante del dispositivo (Taller > Controladores, botón «Ver los controladores sin firma»); si no, reinstale el controlador desde el sitio del fabricante.",
+  "Windows Update propose parfois des pilotes pour vos périphériques. Windows les range dans les mises à jour facultatives et indique lui-même qu'ils servent surtout si un périphérique pose un problème précis.": "Windows Update a veces propone controladores para sus dispositivos. Windows los clasifica como actualizaciones opcionales e indica él mismo que sirven sobre todo si un dispositivo tiene un problema concreto.",
+  "aucun, sur {0} pilotes": "ninguno, de {0} controladores",
+  "pilote": "controlador",
+  "pilotes": "controladores",
+  "{0} sur {1} : {2}": "{0} de {1}: {2}"
 }

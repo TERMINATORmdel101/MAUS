@@ -207,6 +207,18 @@ public sealed partial class WorkshopViewModel
         return Task.CompletedTask;
     });
 
+    /// <summary>
+    /// Ouvre la page « Mises à jour facultatives » de Windows Update (adresse documentée par Microsoft), où Windows propose des
+    /// pilotes : l'utilisateur choisit lui-même ce qu'il installe, MAUS n'installe aucun pilote.
+    /// </summary>
+    public ICommand OpenDriverUpdatesCommand => _openDriverUpdates ??= new AsyncCommand(() =>
+    {
+        ShellLauncher.OpenSettings("ms-settings:windowsupdate-optionalupdates");
+        return Task.CompletedTask;
+    });
+
+    private ICommand? _openDriverUpdates;
+
     /// <summary>Ouvre le dossier des pilotes sauvegardés par MAUS.</summary>
     public ICommand OpenDriverBackupsCommand => _openDriverBackups ??= new AsyncCommand(() =>
     {

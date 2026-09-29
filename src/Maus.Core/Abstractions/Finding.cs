@@ -30,6 +30,12 @@ public sealed record Finding
     /// <summary>Regroupement facultatif dans l'interface (par exemple « Defender » ou « Windows Update »).</summary>
     public string? Category { get; init; }
 
+    /// <summary>
+    /// Page des Paramètres de Windows où l'utilisateur agit lui-même (adresse « ms-settings: » documentée par Microsoft,
+    /// « Launch Windows Settings ») : l'interface propose un bouton qui l'ouvre, sans rien modifier.
+    /// </summary>
+    public string? SettingsPage { get; init; }
+
     /// <summary>Vrai si une correction réversible est proposée.</summary>
     public bool Fixable { get; init; }
 

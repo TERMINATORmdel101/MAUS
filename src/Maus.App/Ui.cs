@@ -271,6 +271,12 @@ public static class Ui
 
     public static string ColumnAge => T("Âge");
 
+    public static string OpenInWindows => T("Ouvrir dans Windows");
+
+    public static string DriverUpdates => T("Mises à jour de pilotes (Windows Update)");
+
+    public static string DriverUpdatesTip => T("Ouvre la page des mises à jour facultatives de Windows, où Windows propose des pilotes : cochez seulement ceux dont vous avez besoin.");
+
     public static string ShowUnsignedDrivers => T("Voir les pilotes non signés");
 
     public static string DriversDateNote => T("Les pilotes de Microsoft datés du 21/06/2006 ne sont pas vieux : Windows leur donne volontairement cette date pour que les pilotes des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017). L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.");

@@ -292,6 +292,9 @@
                                             <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
                                                        Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                <Button Content="{x:Static app:Ui.OpenInWindows}" Padding="10,2" FontSize="12" Margin="0,0,6,0"
+                                                        Command="{Binding OpenSettingsPageCommand}"
+                                                        Visibility="{Binding HasSettingsPage, Converter={StaticResource BoolToVisibility}}" />
                                                 <Button Content="{x:Static app:Ui.Wanted}" Padding="10,2" FontSize="12"
                                                         ToolTip="{x:Static app:Ui.WantedTip}"
                                                         Command="{Binding AcknowledgeCommand}"
@@ -400,6 +403,8 @@
                                 ToolTip="{x:Static app:Ui.RepairWindowsTip}" />
                         <Button Content="{x:Static app:Ui.UpdateSoftware}" Padding="12,4" Margin="0,0,8,0" Command="{Binding UpdateSoftwareCommand}"
                                 ToolTip="{x:Static app:Ui.UpdateSoftwareTip}" />
+                        <Button Content="{x:Static app:Ui.DriverUpdates}" Padding="12,4" Margin="0,0,8,0" Command="{Binding Workshop.OpenDriverUpdatesCommand}"
+                                ToolTip="{x:Static app:Ui.DriverUpdatesTip}" />
                         <Button Content="{x:Static app:Ui.RestartExplorer}" Padding="12,4" Command="{Binding RestartExplorerCommand}"
                                 Visibility="{Binding NeedsExplorerRestart, Converter={StaticResource BoolToVisibility}}"
                                 ToolTip="{x:Static app:Ui.RestartExplorerTip}" />
@@ -1161,6 +1166,7 @@
                                     <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.CopyList}" ToolTip="{x:Static app:Ui.CopySheetTip}" Command="{Binding Workshop.CopyDriversCommand}" />
                                     <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverBackupsFolder}" Command="{Binding Workshop.OpenDriverBackupsCommand}" />
                                     <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.RestoreDriverBackup}" Command="{Binding Workshop.RestoreDriverBackupCommand}" />
+                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverUpdates}" ToolTip="{x:Static app:Ui.DriverUpdatesTip}" Command="{Binding Workshop.OpenDriverUpdatesCommand}" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding Workshop.DriversStatus}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,6" />
                                 <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,10" Visibility="{Binding Workshop.IsReadingDrivers, Converter={StaticResource BoolToVisibility}}" />

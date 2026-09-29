@@ -1253,7 +1253,6 @@
   "Mise à jour des logiciels par winget, l'outil de Microsoft. Répondez à ses questions dans cette fenêtre (conditions des éditeurs) ; certains installateurs ouvrent leur propre fenêtre.": "Updating software with winget, Microsoft's tool. Answer its questions in this window (publishers' terms); some installers open their own window.",
   "Mise à jour du BIOS": "BIOS update",
   "Mises à jour": "Updates",
-  "Mises à jour Windows (hors pilotes)": "Windows updates (excluding drivers)",
   "Mises à jour Windows en attente (hors pilotes)": "Pending Windows updates (excluding drivers)",
   "Mises à jour de sécurité trimestrielles seulement, sans optimisation pour les nouveaux jeux.": "Quarterly security updates only, without optimizations for new games.",
   "Mises à jour des logiciels": "Software updates",
@@ -3263,5 +3262,19 @@
   "tous signés": "all signed",
   "{0} non signé(s) : Windows ne leur voit pas de signature numérique, vérifiez qu'ils viennent bien du fabricant": "{0} unsigned: Windows sees no digital signature for them, check that they really come from the manufacturer",
   "{0} pilotes": "{0} drivers",
-  "Âge": "Age"
+  "Âge": "Age",
+  "Installez-en un seulement si le périphérique concerné fonctionne mal : bouton « Ouvrir dans Windows » (Windows Update > Options avancées > Mises à jour facultatives), puis cochez ce pilote. Pour la carte graphique, préférez le pilote du fabricant (Module 9 et Atelier > Pilotes).": "Install one only if the device concerned is misbehaving: \"Open in Windows\" button (Windows Update > Advanced options > Optional updates), then tick that driver. For the graphics card, prefer the manufacturer's driver (Module 9 and Workshop > Drivers).",
+  "La signature numérique d'un pilote permet à Windows de vérifier qui l'a publié et qu'il n'a pas été modifié. Un pilote sans signature n'est pas forcément en panne, mais son origine n'est pas garantie.": "A driver's digital signature lets Windows check who published it and that it has not been modified. An unsigned driver is not necessarily broken, but its origin is not guaranteed.",
+  "Mises à jour Windows": "Windows updates",
+  "Mises à jour de pilotes (Windows Update)": "Driver updates (Windows Update)",
+  "Mises à jour de pilotes proposées par Windows Update": "Driver updates offered by Windows Update",
+  "Ouvre la page des mises à jour facultatives de Windows, où Windows propose des pilotes : cochez seulement ceux dont vous avez besoin.": "Opens the Windows optional updates page, where Windows offers drivers: tick only the ones you need.",
+  "Ouvrir dans Windows": "Open in Windows",
+  "Pilotes sans signature numérique": "Drivers without a digital signature",
+  "Vérifiez qu'ils viennent bien du fabricant de l'appareil (Atelier > Pilotes, bouton « Voir les pilotes non signés ») ; sinon, réinstallez le pilote depuis le site du fabricant.": "Check that they really come from the device manufacturer (Workshop > Drivers, \"Show unsigned drivers\" button); otherwise, reinstall the driver from the manufacturer's site.",
+  "Windows Update propose parfois des pilotes pour vos périphériques. Windows les range dans les mises à jour facultatives et indique lui-même qu'ils servent surtout si un périphérique pose un problème précis.": "Windows Update sometimes offers drivers for your devices. Windows files them under optional updates and itself states that they are mainly useful if a device has a specific problem.",
+  "aucun, sur {0} pilotes": "none, out of {0} drivers",
+  "pilote": "driver",
+  "pilotes": "drivers",
+  "{0} sur {1} : {2}": "{0} out of {1}: {2}"
 }

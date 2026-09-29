@@ -15,12 +15,17 @@ namespace Maus.Core.Modules.M03Updates;
 public sealed class WindowsUpdateModule : IAuditModule
 {
     /// <summary>
-    /// Logiciels seulement (les pilotes relèvent du Module 9), obligatoires ou facultatifs en une seule recherche :
-    /// <c>OR</c> n'est admis qu'au premier niveau du critère.
+    /// Logiciels (obligatoires ou facultatifs) et pilotes proposés, en une seule recherche : <c>OR</c> n'est admis qu'au
+    /// premier niveau du critère (IUpdateSearcher::Search, critère <c>Type</c> = 'Software' ou 'Driver'). Les pilotes sont
+    /// comptés à part (constat « mises à jour de pilotes »), jamais avec les correctifs de Windows.
     /// </summary>
     internal const string SearchCriteria =
         "IsInstalled=0 and IsHidden=0 and Type='Software' and BrowseOnly=0"
-        + " or IsInstalled=0 and IsHidden=0 and Type='Software' and BrowseOnly=1";
+        + " or IsInstalled=0 and IsHidden=0 and Type='Software' and BrowseOnly=1"
+        + " or IsInstalled=0 and IsHidden=0 and Type='Driver'";
+
+    /// <summary>Page « Mises à jour facultatives » de Windows Update (Microsoft Learn, « Launch Windows Settings »).</summary>
+    internal const string OptionalUpdatesPage = "ms-settings:windowsupdate-optionalupdates";
 
     internal const string QfeQuery = "SELECT HotFixID, InstalledOn FROM Win32_QuickFixEngineering";
     internal const string DefenderQuery =
@@ -76,7 +81,7 @@ public sealed class WindowsUpdateModule : IAuditModule
 
     public string Id => "M03";
 
-    public string Title => T("Mises à jour Windows (hors pilotes)");
+    public string Title => T("Mises à jour Windows");
 
     public int Order => 30;
 
@@ -102,6 +107,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         findings.Add(DetectLastSearch(automaticResults, context.Now));
         findings.Add(DetectDefenderSignatures(context.Cim));
         findings.Add(DetectOptionalUpdates(search));
+        findings.Add(DetectDriverUpdates(search));
         findings.Add(DetectLatestUpdatesToggle(context.Registry));
         findings.Add(DetectUpdateSource(context.Registry));
         return findings;
@@ -463,6 +469,37 @@ public sealed class WindowsUpdateModule : IAuditModule
                 ? null
                 : T("Les aperçus corrigent des bugs plus tôt mais peuvent en introduire. Installez-les seulement si un correctif précis vous concerne."),
             Fixable = optional.Count > 0,
+        };
+    }
+
+    /// <summary>
+    /// Pilotes proposés par Windows Update. Information seulement : Windows les range dans les mises à jour facultatives et
+    /// précise lui-même, sur cette page, qu'ils servent surtout « si vous rencontrez un problème spécifique ».
+    /// </summary>
+    private static Finding DetectDriverUpdates(SearchOutcome search)
+    {
+        const string id = "M03.driver-updates";
+        var title = T("Mises à jour de pilotes proposées par Windows Update");
+        if (search.Updates is null)
+        {
+            return Finding.Unknown(id, title, T("Recherche Windows Update impossible : {0}.", search.Error), UpdateCategory);
+        }
+
+        var drivers = search.Updates.Where(u => UpdateParsers.Classify(u) == PendingUpdateKind.Driver).ToList();
+        return new Finding
+        {
+            Id = id,
+            Title = title,
+            Category = UpdateCategory,
+            Status = FindingStatus.Info,
+            Current = drivers.Count == 0 ? T("aucune") : $"{Plural(drivers.Count, T("pilote"), T("pilotes"))} : {TitleList(drivers)}",
+            Explanation = T("Windows Update propose parfois des pilotes pour vos périphériques. Windows les range dans les mises à jour facultatives "
+                + "et indique lui-même qu'ils servent surtout si un périphérique pose un problème précis."),
+            Advice = drivers.Count == 0
+                ? null
+                : T("Installez-en un seulement si le périphérique concerné fonctionne mal : bouton « Ouvrir dans Windows » (Windows Update > Options avancées > "
+                    + "Mises à jour facultatives), puis cochez ce pilote. Pour la carte graphique, préférez le pilote du fabricant (Module 9 et Atelier > Pilotes)."),
+            SettingsPage = drivers.Count == 0 ? null : OptionalUpdatesPage,
         };
     }
 
