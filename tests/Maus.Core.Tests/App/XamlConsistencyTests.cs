@@ -37,7 +37,7 @@ public partial class XamlConsistencyTests
         var code = CSharp();
         var missing = XamlFiles().SelectMany(f => UiStatic().Matches(File.ReadAllText(f)).Select(m => m.Groups[1].Value))
             .Distinct()
-            .Where(name => !Regex.IsMatch(code, $@"public static string {name}\b"))
+            .Where(name => !Regex.IsMatch(code, $@"public static (string|IReadOnlyList<string>) {name}\b"))
             .ToList();
 
         Assert.True(missing.Count == 0, "Textes Ui absents : " + string.Join(", ", missing));

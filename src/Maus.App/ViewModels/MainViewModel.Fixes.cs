@@ -177,7 +177,7 @@ public sealed partial class MainViewModel
             message.AppendLine().AppendLine(T("À lire avant de continuer :")).AppendLine(string.Join(Environment.NewLine, warnings));
         }
 
-        if (!Confirm(T("Appliquer les corrections ?"), message.AppendLine().Append(T("Continuer ?")).ToString()))
+        if (!Confirm(T("Appliquer les corrections ?"), message.AppendLine().AppendLine(Maus.Core.Legal.Disclaimer.ChangeReminder).AppendLine().Append(T("Continuer ?")).ToString()))
         {
             return;
         }
@@ -242,7 +242,7 @@ public sealed partial class MainViewModel
                 + T("Attention : un redémarrage est en attente. Redémarrez d'abord le PC, sinon la réparation risque d'échouer ou de donner un faux résultat.");
         }
 
-        if (!Confirm(T("Réparer les fichiers de Windows ?"), message + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!Confirm(T("Réparer les fichiers de Windows ?"), message + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.OperationReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -311,7 +311,7 @@ public sealed partial class MainViewModel
 
     private async Task RestartExplorerAsync()
     {
-        if (!Confirm(T("Redémarrer l'Explorateur ?"), ExplorerRestart.Warning + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!Confirm(T("Redémarrer l'Explorateur ?"), ExplorerRestart.Warning + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.OperationReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }

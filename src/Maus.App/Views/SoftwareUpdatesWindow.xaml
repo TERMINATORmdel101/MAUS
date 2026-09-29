@@ -13,7 +13,8 @@
     </Window.Resources>
     <DockPanel Margin="24">
         <TextBlock DockPanel.Dock="Top" Text="{x:Static app:Ui.SoftwareTitle}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock DockPanel.Dock="Top" Margin="0,8,0,12" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" Text="{x:Static app:Ui.SoftwareIntro}" />
+        <TextBlock DockPanel.Dock="Top" Margin="0,8,0,8" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" Text="{x:Static app:Ui.SoftwareIntro}" />
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,12" FontSize="12" TextWrapping="Wrap" Text="{x:Static app:Ui.OperationReminder}" />
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="{x:Static app:Ui.Cancel}" Padding="16,6" Margin="0,0,8,0" IsCancel="True" />
             <Button Content="{x:Static app:Ui.SoftwareUpdateSelected}" Padding="16,6" IsDefault="True" Click="OnValidate" />

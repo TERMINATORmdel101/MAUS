@@ -107,7 +107,7 @@ public sealed partial class MainViewModel : ObservableObject
         private set => SetProperty(ref _systemSummary, value);
     }
 
-    public string About { get; } = T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur · Logiciel libre sous licence GPL-3.0 · version {0}",
+    public string About { get; } = T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur · Logiciel libre sous licence GPL-3.0, fourni sans garantie · version {0}",
         AppVersion.Display);
 
     private async Task RunAuditAsync()

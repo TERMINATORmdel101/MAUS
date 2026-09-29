@@ -113,6 +113,7 @@ public sealed partial class WorkshopViewModel
             + TemperatureCaveat()
             + Environment.NewLine + Environment.NewLine
             + T("Si le PC gèle ou redémarre, MAUS dira au prochain lancement dans quelle phase et sur quel cœur. Le programme s'arrête à tout moment avec « Arrêter le test ».")
+            + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder
             + Environment.NewLine + Environment.NewLine + T("Lancer le programme complet ?");
         if (!_confirm(T("Programme complet Curve Optimizer"), warning))
         {

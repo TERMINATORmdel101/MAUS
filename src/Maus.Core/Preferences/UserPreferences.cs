@@ -32,6 +32,9 @@ public sealed record UserPreferences
 
     public LaptopPowerChoice LaptopPower { get; init; }
 
+    /// <summary>Version des avertissements (<see cref="Legal.Disclaimer.Version"/>) acceptée au lancement ; 0 = jamais acceptés.</summary>
+    public int DisclaimerAccepted { get; init; }
+
     /// <summary>Moteur de recherche pour « Rechercher sur le web » (atelier) ; DuckDuckGo par défaut, au choix de l'utilisateur.</summary>
     public Workshop.SearchEngine SearchEngine { get; init; }
 

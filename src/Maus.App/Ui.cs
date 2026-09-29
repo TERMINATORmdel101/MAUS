@@ -77,6 +77,20 @@ public static class Ui
 
     public static string Validate => T("Valider");
 
+    public static string Quit => T("Quitter");
+
+    public static string Continue => T("Continuer");
+
+    public static string DisclaimerTitle => Maus.Core.Legal.Disclaimer.Title;
+
+    public static IReadOnlyList<string> DisclaimerParagraphs => Maus.Core.Legal.Disclaimer.Paragraphs;
+
+    public static string DisclaimerAcceptance => Maus.Core.Legal.Disclaimer.Acceptance;
+
+    public static string ShowDisclaimer => T("Avertissements");
+
+    public static string OperationReminder => Maus.Core.Legal.Disclaimer.OperationReminder;
+
     public static string NavHome => T("Accueil");
 
     public static string NavWorkshop => T("Atelier");

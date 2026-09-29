@@ -268,7 +268,7 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        if (!_confirm(T("Lancer le test de vitesse du disque ?"), T("MAUS va écrire puis relire un fichier temporaire de {0} sur {1}, puis le supprimer. Rien d'autre n'est touché. Le test dure de quelques secondes à une minute.", FormatSize(DiskSize.Value), root) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Lancer le test de vitesse du disque ?"), T("MAUS va écrire puis relire un fichier temporaire de {0} sur {1}, puis le supprimer. Rien d'autre n'est touché. Le test dure de quelques secondes à une minute.", FormatSize(DiskSize.Value), root) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }

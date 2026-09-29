@@ -784,7 +784,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         var duration = CpuDuration.Value;
         var mode = CpuMode.Value;
         var heavyWarning = HeavyWarning(CpuMode) + TemperatureCaveat();
-        if (!_confirm(T("Lancer le test du processeur ?"), T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + heavyWarning + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Lancer le test du processeur ?"), T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + heavyWarning + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -839,7 +839,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
         var available = Live.Samples.LastOrDefault() is { MemoryTotalBytes: { } total, MemoryUsedBytes: { } used } ? total - used : 4L << 30;
         var bytes = RamSize.Value == 0 ? MemoryTest.SuggestedBytes(available) : Math.Min(RamSize.Value, Math.Max(256L << 20, available - (512L << 20)));
-        if (!_confirm(T("Lancer le test de la mémoire vive ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de mémoire. Fermez vos jeux et programmes lourds pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Lancer le test de la mémoire vive ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de mémoire. Fermez vos jeux et programmes lourds pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -929,7 +929,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
 
         var plan = CoreCycleTest.Plan(CoreDuration.Value, cores.Count) with { Load = CoreMode.Value };
-        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + HeavyWarning(CoreMode) + TemperatureCaveat() + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + HeavyWarning(CoreMode) + TemperatureCaveat() + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }
@@ -1019,7 +1019,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
         var ceiling = Math.Max(256L << 20, adapter.DedicatedBytes - (512L << 20));
         var bytes = VramSize.Value == 0 ? VramTest.SuggestedBytes(adapter.DedicatedBytes) : Math.Min(VramSize.Value, ceiling);
-        if (!_confirm(T("Lancer le test de la mémoire vidéo ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de la mémoire de « {1} ». Fermez vos jeux et applications 3D pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0, adapter.Name) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Lancer le test de la mémoire vidéo ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de la mémoire de « {1} ». Fermez vos jeux et applications 3D pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0, adapter.Name) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }

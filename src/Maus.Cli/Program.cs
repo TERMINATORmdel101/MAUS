@@ -116,6 +116,7 @@ if (Has("--revert"))
 if (Has("--restart-explorer"))
 {
     Console.WriteLine(ExplorerRestart.Warning);
+    Console.WriteLine(Maus.Core.Legal.Disclaimer.OperationReminder);
     if (!Has("--yes") && !FixCommands.Confirm(T("Redémarrer l'Explorateur ? (o/N) ")))
     {
         return 1;

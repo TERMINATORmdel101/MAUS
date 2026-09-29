@@ -77,6 +77,7 @@ internal static class FixCommands
         output.WriteLine(options.CreateRestorePoint
             ? T("Un point de restauration sera créé et vérifié avant toute modification.")
             : T("Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler)."));
+        output.WriteLine(Maus.Core.Legal.Disclaimer.ChangeReminder);
 
         if (!assumeYes && !Confirm(T("Appliquer ces corrections ? (o/N) ")))
         {

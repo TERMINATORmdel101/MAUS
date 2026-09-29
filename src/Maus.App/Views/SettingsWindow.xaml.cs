@@ -15,4 +15,7 @@ public partial class SettingsWindow : Window
     }
 
     private void OnClose(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>Relire les avertissements acceptés au premier lancement (lecture seule).</summary>
+    private void OnDisclaimer(object sender, RoutedEventArgs e) => new DisclaimerWindow(reviewOnly: true) { Owner = this }.ShowDialog();
 }

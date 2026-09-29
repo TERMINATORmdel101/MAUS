@@ -1,0 +1,38 @@
+<Window x:Class="Maus.App.Views.DisclaimerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="clr-namespace:Maus.App"
+        Title="{x:Static app:Ui.DisclaimerTitle}"
+        Width="640" SizeToContent="Height" MaxHeight="760" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/maus.ico">
+    <Window.Resources>
+        <!-- Tous les textes de la fenêtre prennent la couleur de texte du thème (blanc en thème sombre), sauf couleur voulue. -->
+        <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
+    </Window.Resources>
+    <DockPanel Margin="24">
+        <TextBlock DockPanel.Dock="Top" Text="{x:Static app:Ui.DisclaimerTitle}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+            <CheckBox x:Name="Accept" Content="{x:Static app:Ui.DisclaimerAcceptance}" Checked="OnAcceptChanged" Unchecked="OnAcceptChanged"
+                      AutomationProperties.Name="{x:Static app:Ui.DisclaimerAcceptance}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button x:Name="QuitButton" Content="{x:Static app:Ui.Quit}" Padding="16,6" Margin="0,0,8,0" IsCancel="True" />
+                <Button x:Name="Continue" Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.Continue}" Padding="16,6" IsDefault="True"
+                        IsEnabled="False" Click="OnContinue" />
+            </StackPanel>
+        </StackPanel>
+
+        <Border Margin="0,12,0,0" Padding="16" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource MausGold}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="480">
+                <ItemsControl ItemsSource="{x:Static app:Ui.DisclaimerParagraphs}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </DockPanel>
+</Window>

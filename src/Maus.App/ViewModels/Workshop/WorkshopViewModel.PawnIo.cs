@@ -108,7 +108,7 @@ public sealed partial class WorkshopViewModel
                 + "jusqu'à ce que vous le retiriez (bouton « Retirer PawnIO », ou Paramètres > Applications). Relancez MAUS après l'installation.")
             : T("MAUS va ouvrir une fenêtre de commande qui désinstalle PawnIO avec winget. Les autres logiciels qui l'utilisent "
                 + "(FanControl, LibreHardwareMonitor, OpenRGB) perdront aussi l'accès aux capteurs. Relancez MAUS ensuite.");
-        if (!_confirm(title, message + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(title, message + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.OperationReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
         }

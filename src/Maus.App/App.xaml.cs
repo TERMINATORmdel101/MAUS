@@ -43,6 +43,29 @@ public partial class App : Application
             return;
         }
 
+        // Avertissements au premier lancement (et après chaque changement de fond du texte) : sans accord, MAUS se ferme.
+        if (preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version)
+        {
+            // Pendant cette fenêtre, fermer celle-ci ne doit pas être pris pour la fermeture de MAUS par Windows.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (new Views.DisclaimerWindow().ShowDialog() != true)
+            {
+                Shutdown(0);
+                return;
+            }
+
+            try
+            {
+                FilePreferencesStore.CreateDefault().Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // Accord non enregistré : les avertissements reviendront au prochain lancement, MAUS s'ouvre quand même.
+            }
+
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+        }
+
         ShowMainWindow();
         UiWatchdog.Start(Dispatcher);
     }
