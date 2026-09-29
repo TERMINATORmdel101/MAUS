@@ -63,9 +63,12 @@ public static class HtmlReport
             .Append(after.Hardware.Gpus.Count > 0 ? E(" · " + string.Join(", ", after.Hardware.Gpus.Select(g => g.Name))) : string.Empty)
             .Append("</p></header>");
 
-        var score = HealthScore.Compute(after.Modules);
+        var breakdown = HealthScore.Explain(after.Modules);
+        var score = breakdown.Score;
         html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(T("En résumé"))}</h2>")
-            .Append(CultureInfo.InvariantCulture, $"<p class=\"score\"><b>{score}</b>/100 · {E(T("santé du PC : {0}", HealthScore.Describe(score)))}</p><div class=\"cards\">");
+            .Append(CultureInfo.InvariantCulture, $"<p class=\"score\"><b>{score}</b>/100 · {E(T("santé du PC : {0}", HealthScore.Describe(score)))}</p>");
+        AppendScoreDetail(html, breakdown);
+        html.Append("<div class=\"cards\">");
         foreach (var status in Order.Take(4))
         {
             var now = Count(after, status);
@@ -190,6 +193,36 @@ public static class HtmlReport
 
     private static int Count(AuditReport report, FindingStatus status) => report.Modules.Sum(m => m.Count(status));
 
+    /// <summary>« Pourquoi ce score ? » repliable : points retirés par constat, optimisations, plafond, barème.</summary>
+    private static void AppendScoreDetail(StringBuilder html, ScoreBreakdown breakdown)
+    {
+        if (breakdown.Points <= 0)
+        {
+            return;
+        }
+
+        html.Append(CultureInfo.InvariantCulture, $"<details class=\"why\"><summary>{E(T("Pourquoi ce score ?"))}</summary><ul>");
+        foreach (var line in breakdown.Lines)
+        {
+            html.Append(CultureInfo.InvariantCulture,
+                $"<li><b>−{line.Points.ToString("0.#", Culture)}</b> {E(line.Title)} <span class=\"val\">({E(T("gravité {0}", HealthScore.GravityName(line.Gravity)))})</span></li>");
+        }
+
+        if (breakdown.OptimisationCount > 0)
+        {
+            html.Append(CultureInfo.InvariantCulture,
+                $"<li><b>−{breakdown.OptimisationPoints.ToString("0.#", Culture)}</b> {E(T("{0} optimisations possibles", breakdown.OptimisationCount))} <span class=\"val\">({E(T("gravité faible, {0} points au plus pour l'ensemble", HealthScore.OptimisationCap.ToString("0.#", Culture)))})</span></li>");
+        }
+
+        html.Append("</ul>");
+        if (breakdown.Cap is { } cap)
+        {
+            html.Append(CultureInfo.InvariantCulture, $"<p>{E(T("Plafond : un constat de gravité {0} limite le score à {1}, même si peu de points ont été retirés.", HealthScore.GravityName(cap == HealthScore.CriticalCap ? Severity.Critical : Severity.High), cap))}</p>");
+        }
+
+        html.Append(CultureInfo.InvariantCulture, $"<p class=\"val\">{E(T("Barème de MAUS : critique 20 points, importante 10, moyenne 4, faible 1 ; le score baisse de moins en moins vite (100 × e^(−points/100)). C'est un repère, pas une mesure officielle."))}</p></details>");
+    }
+
     /// <summary>Échappe seulement ce qui compte en HTML ; les accents restent lisibles (page en UTF-8).</summary>
     private static string E(string text) => text
         .Replace("&", "&amp;", StringComparison.Ordinal)
@@ -205,7 +238,7 @@ public static class HtmlReport
         "@media(prefers-color-scheme:dark){:root{--bg:#14161c;--fg:#e8eaf0;--muted:#a3a9b8;--card:#1d2029;--line:#2c313d;--ok:#3fbf73;--info:#9aa3ba;--improvable:#5b9bff;--warning:#f0a030;--problem:#ff6b5b;--unknown:#8a8f9c}}" +
         "*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 'Segoe UI Variable','Segoe UI',system-ui,sans-serif}" +
         "main{max-width:980px;margin:0 auto;padding:24px 16px 48px}h1{font-size:28px;margin:0}h2{font-size:20px;margin:32px 0 12px}h3{font-size:16px}" +
-        ".sub,footer,.val,.was{color:var(--muted)}header p{margin:4px 0}header .logo{display:block;width:240px;max-width:60%;height:auto;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);margin:0 0 14px}section{margin-top:8px}" +
+        ".sub,footer,.val,.was{color:var(--muted)}header p{margin:4px 0}header .logo{display:block;width:240px;max-width:60%;height:auto;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);margin:0 0 14px}details.why{margin:4px 0 14px}details.why summary{cursor:pointer;color:var(--improvable)}details.why li{margin:2px 0}section{margin-top:8px}" +
         ".cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}" +
         ".card{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:10px;padding:12px}.card .n{font-size:30px;font-weight:600;color:var(--c)}" +
         ".s-ok{--c:var(--ok)}.s-info{--c:var(--info)}.s-improvable{--c:var(--improvable)}.s-warning{--c:var(--warning)}.s-problem{--c:var(--problem)}.s-unknown{--c:var(--unknown)}" +

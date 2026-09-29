@@ -138,6 +138,27 @@ public static class Ui
 
     public static string HealthCaption => T("santé du PC · sur 100");
 
+    public static string ScoreWhy => T("Pourquoi ce score ?");
+
+    public static string ScoreWindowTitle => T("Pourquoi ce score ? — MAUS");
+
+    public static string ScoreLostTitle => T("Ce qui retire des points");
+
+    public static string ScoreNothingLost => T("Rien : aucun constat ne retire de points.");
+
+    public static string ScoreRulesTitle => T("Le barème de MAUS");
+
+    /// <summary>Barème du score de santé (voir HealthScore), en clair.</summary>
+    public static IReadOnlyList<string> ScoreRules =>
+    [
+        T("Chaque constat retire des points selon sa gravité : critique 20, importante 10, moyenne 4, faible 1. Sans gravité précisée, la couleur décide : rouge = importante, orange = moyenne, bleu = faible."),
+        T("Les optimisations (gravité faible) retirent au plus 10 points en tout, quel que soit leur nombre."),
+        T("Le score baisse de moins en moins vite : une longue liste de petits écarts ne fait pas tomber un PC qui fonctionne à 0."),
+        T("Un constat critique limite le score à 49 (« à corriger en priorité »), un constat de gravité importante à 74 (« à améliorer »)."),
+        T("Un même sujet contrôlé par deux modules (Secure Boot) ne compte qu'une fois. Un constat indéterminé, informatif ou marqué « voulu » ne coûte rien."),
+        T("C'est un repère de MAUS pour suivre votre PC dans le temps, pas une mesure officielle. Ce barème date du 29/09/2026 : les scores précédents ne se comparent pas."),
+    ];
+
     public static string SlowPcTitle => T("Pourquoi mon PC est lent ?");
 
     public static string SlowPcDetail => T("Une minute de mesures, puis les causes principales et la façon de les corriger.");

@@ -116,6 +116,8 @@
                                     </StackPanel>
                                 </Grid>
                                 <TextBlock Text="{Binding ScoreDetail}" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,12,0,4" />
+                                <Button Content="{x:Static app:Ui.ScoreWhy}" Command="{Binding ShowScoreDetailCommand}" HorizontalAlignment="Center" Padding="12,3" Margin="0,0,0,8"
+                                        Visibility="{Binding HasScore, Converter={StaticResource BoolToVisibility}}" />
                                 <StackPanel Visibility="{Binding HasHealthTrend, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8" ToolTip="{Binding HealthTrendText}">
                                     <controls:Sparkline Height="28" Values="{Binding HealthTrend, Mode=OneWay}" Maximum="100" Stroke="{StaticResource MausGreen}" />
                                     <TextBlock Text="{Binding HealthTrendText}" FontSize="11" Style="{StaticResource Muted}" TextAlignment="Center" TextWrapping="Wrap" />

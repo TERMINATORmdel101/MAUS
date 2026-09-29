@@ -2,7 +2,9 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
-## Après la 4.0.0 — 29/09/2026 (numéro de version à choisir par le porteur)
+## 0.4.2 — 29/09/2026
+
+Numéro choisi par le porteur : après la 4.0.0 vient la 0.4.2.
 
 **Demandes du porteur du 29/09 : embellir, animer, plus d'informations sur la machine, aide et signalement sur GitHub.**
 
@@ -15,6 +17,8 @@ Les versions sont testées avec des simulations (faux registre, faux WMI, faux r
 - **Copier la fiche** : toute la fiche « Mon PC » en texte, pour un forum ou un signalement, avec nom d'utilisateur, nom du PC et e-mails masqués.
 - **Animations** (coupées avec le réglage des animations ou celui de Windows) : les cartes de l'accueil se soulèvent au survol, les boutons s'enfoncent à l'appui, les fiches de « Mon PC » et les constats apparaissent en cascade, barre de progression animée pendant la lecture du matériel.
 - **Accueil** : les quatre familles M·A·U·S sont présentées dès l'ouverture (« pas encore audité ») au lieu d'un cadre vide.
+- **Score de santé selon la gravité** (demande du porteur : son PC tombait à 0/100 avec 3 problèmes et 12 points à surveiller). Chaque constat retire des points selon sa gravité (critique 20, importante 10, moyenne 4, faible 1 ; sans gravité précisée, sa couleur décide) ; les optimisations comptent au plus 10 points en tout ; le score baisse de moins en moins vite (100 × e^(−points/100)) ; un constat critique plafonne le score à 49, un constat important à 74, pour qu'un problème sérieux ne soit jamais qualifié de « bon » ; Secure Boot, contrôlé par les modules 1 et 8, ne compte qu'une fois. Même PC : 51/100 (« à améliorer »). C'est un barème de MAUS, présenté comme tel.
+- **« Pourquoi ce score ? »** (bouton sous le score, et section repliable du rapport HTML) : chaque constat qui coûte des points, sa gravité, les optimisations, le plafond éventuel et le barème en clair. Les scores de l'ancien barème restent dans l'historique mais ne sont plus mélangés à la courbe de l'accueil.
 
 **Constaté sur le PC du porteur le 29/09 et corrigé**
 

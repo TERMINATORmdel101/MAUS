@@ -6,7 +6,14 @@ namespace Maus.Core.Workshop;
 /// <summary>Évolution des scores dans le temps : santé du PC après chaque audit, et résultats des tests de l'atelier.</summary>
 public static class ScoreTrends
 {
-    public const string HealthKind = "health";
+    /// <summary>
+    /// Score de santé au barème selon la gravité (depuis le 29/09/2026). Les scores de l'ancien barème (« health ») restent
+    /// dans l'historique mais ne sont pas mélangés à la courbe : ils ne se comparent pas.
+    /// </summary>
+    public const string HealthKind = "health-v2";
+
+    /// <summary>Ancien barème (un problème = 12 points, un point à surveiller = 5), avant le 29/09/2026.</summary>
+    public const string LegacyHealthKind = "health";
 
     /// <summary>Score de santé d'un audit, avec le nombre de problèmes / points à surveiller / optimisations en détail.</summary>
     public static BenchmarkEntry HealthEntry(IReadOnlyCollection<ModuleResult> results, DateTimeOffset at)
@@ -19,6 +26,7 @@ public static class ScoreTrends
     public static string Label(string kind) => kind switch
     {
         HealthKind => T("Score de santé"),
+        LegacyHealthKind => T("Score de santé (ancien barème)"),
         "cpu-multi" => T("Processeur (tous les cœurs)"),
         "cpu-int" => T("Processeur (tous les cœurs, calculs entiers)"),
         "cpu-sse" => T("Processeur (tous les cœurs, SSE2)"),
@@ -47,7 +55,7 @@ public static class ScoreTrends
 
     public static string Unit(string kind) => kind switch
     {
-        HealthKind => "/100",
+        HealthKind or LegacyHealthKind => "/100",
         "ram" or "vram" => T("Go/s"),
         "disk-read" => T("Mo/s"),
         _ => T("points"),

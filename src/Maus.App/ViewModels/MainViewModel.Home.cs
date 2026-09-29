@@ -226,10 +226,26 @@ public sealed partial class MainViewModel
         HealthTrendText = Maus.Core.Workshop.ScoreTrends.Describe(series);
     }
 
+    private ScoreBreakdown? _breakdown;
+
+    private ICommand? _showScoreDetail;
+
+    /// <summary>« Pourquoi ce score ? » : ce qui a coûté des points et le barème.</summary>
+    public ICommand ShowScoreDetailCommand => _showScoreDetail ??= new AsyncCommand(() =>
+    {
+        if (_breakdown is { } breakdown)
+        {
+            new Views.ScoreWindow(breakdown) { Owner = System.Windows.Application.Current?.MainWindow }.ShowDialog();
+        }
+
+        return Task.CompletedTask;
+    });
+
     /// <summary>Met à jour le score et les familles après un audit ou un changement de constat.</summary>
     private void RefreshDashboard()
     {
-        Score = HealthScore.Compute(_results);
+        _breakdown = HealthScore.Explain(_results);
+        Score = _breakdown.Score;
         var findings = _results.SelectMany(r => r.Findings).ToList();
         ScoreDetail = T("{0} problème(s) · {1} à surveiller · {2} optimisation(s)",
             findings.Count(f => f.Status == FindingStatus.Problem),
