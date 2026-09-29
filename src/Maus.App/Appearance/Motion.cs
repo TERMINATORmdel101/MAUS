@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
@@ -52,23 +53,186 @@ public static class Motion
         element.BeginAnimation(UIElement.OpacityProperty, fade);
 
         // Glissement seulement si l'élément n'a pas déjà sa propre transformation.
-        var translate = element.RenderTransform as TranslateTransform;
-        if (translate is null && element.RenderTransform is { } existing && existing != Transform.Identity)
+        if (Parts(element) is not { } parts)
         {
             return;
-        }
-
-        if (translate is null || translate.IsFrozen)
-        {
-            translate = new TranslateTransform();
-            element.RenderTransform = translate;
         }
 
         var slide = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
         slide.KeyFrames.Add(new DiscreteDoubleKeyFrame(offset, KeyTime.FromTimeSpan(TimeSpan.Zero)));
         slide.KeyFrames.Add(new DiscreteDoubleKeyFrame(offset, KeyTime.FromTimeSpan(delay)));
         slide.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(delay + PageDuration.TimeSpan), Ease));
-        translate.BeginAnimation(TranslateTransform.YProperty, slide);
+        parts.Translate.BeginAnimation(TranslateTransform.YProperty, slide);
+    }
+
+    /// <summary>Carte cliquable : se soulève légèrement au survol de la souris.</summary>
+    public static readonly DependencyProperty HoverLiftProperty = DependencyProperty.RegisterAttached(
+        "HoverLift", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnHoverLiftChanged));
+
+    public static bool GetHoverLift(DependencyObject element) => (bool)element.GetValue(HoverLiftProperty);
+
+    public static void SetHoverLift(DependencyObject element, bool value) => element.SetValue(HoverLiftProperty, value);
+
+    /// <summary>Bouton : s'enfonce légèrement pendant l'appui.</summary>
+    public static readonly DependencyProperty PressProperty = DependencyProperty.RegisterAttached(
+        "Press", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnPressChanged));
+
+    public static bool GetPress(DependencyObject element) => (bool)element.GetValue(PressProperty);
+
+    public static void SetPress(DependencyObject element, bool value) => element.SetValue(PressProperty, value);
+
+    /// <summary>Élément d'une liste (fiche, constat) : apparaît en cascade quand il s'affiche, les premiers seulement.</summary>
+    public static readonly DependencyProperty EnterOnLoadProperty = DependencyProperty.RegisterAttached(
+        "EnterOnLoad", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnEnterOnLoadChanged));
+
+    public static bool GetEnterOnLoad(DependencyObject element) => (bool)element.GetValue(EnterOnLoadProperty);
+
+    public static void SetEnterOnLoad(DependencyObject element, bool value) => element.SetValue(EnterOnLoadProperty, value);
+
+    private static readonly Duration HoverDuration = new(TimeSpan.FromMilliseconds(160));
+
+    private const double Lift = -3;
+
+    private const double Pressed = 0.97;
+
+    private static void OnHoverLiftChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (element is not UIElement target)
+        {
+            return;
+        }
+
+        target.MouseEnter -= OnLiftEnter;
+        target.MouseLeave -= OnLiftLeave;
+        if ((bool)e.NewValue)
+        {
+            target.MouseEnter += OnLiftEnter;
+            target.MouseLeave += OnLiftLeave;
+        }
+    }
+
+    private static void OnLiftEnter(object sender, MouseEventArgs e) => Glide((UIElement)sender, Lift);
+
+    private static void OnLiftLeave(object sender, MouseEventArgs e) => Glide((UIElement)sender, 0);
+
+    /// <summary>Déplace l'élément verticalement jusqu'à <paramref name="to"/> (0 = position normale).</summary>
+    private static void Glide(UIElement element, double to)
+    {
+        if (Parts(element) is not { } parts)
+        {
+            return;
+        }
+
+        parts.Translate.BeginAnimation(TranslateTransform.YProperty, IsEnabled && (to == 0 || element.IsEnabled)
+            ? new DoubleAnimation(to, HoverDuration) { EasingFunction = Ease }
+            : null);
+    }
+
+    private static void OnPressChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (element is not UIElement target)
+        {
+            return;
+        }
+
+        target.PreviewMouseLeftButtonDown -= OnPressDown;
+        target.PreviewMouseLeftButtonUp -= OnPressUp;
+        target.MouseLeave -= OnPressUp;
+        if ((bool)e.NewValue)
+        {
+            target.PreviewMouseLeftButtonDown += OnPressDown;
+            target.PreviewMouseLeftButtonUp += OnPressUp;
+            target.MouseLeave += OnPressUp;
+        }
+    }
+
+    private static void OnPressDown(object sender, MouseButtonEventArgs e) => Squeeze((UIElement)sender, Pressed, 90);
+
+    private static void OnPressUp(object sender, MouseEventArgs e) => Squeeze((UIElement)sender, 1, 160);
+
+    private static void Squeeze(UIElement element, double to, int milliseconds)
+    {
+        if (Parts(element) is not { } parts)
+        {
+            return;
+        }
+
+        if (!IsEnabled || !element.IsEnabled)
+        {
+            parts.Scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            parts.Scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            return;
+        }
+
+        var animation = new DoubleAnimation(to, new Duration(TimeSpan.FromMilliseconds(milliseconds))) { EasingFunction = Ease };
+        parts.Scale.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
+        parts.Scale.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
+    }
+
+    private static void OnEnterOnLoadChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (element is not FrameworkElement target)
+        {
+            return;
+        }
+
+        target.Loaded -= OnItemLoaded;
+        if ((bool)e.NewValue)
+        {
+            target.Loaded += OnItemLoaded;
+        }
+    }
+
+    private static void OnItemLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && IsEnabled && ItemIndex(element) is { } index && index < MaxStaggered)
+        {
+            Enter(element, Stagger * (index + 1), 14);
+        }
+    }
+
+    /// <summary>Rang de l'élément dans sa liste (celle dont il est le conteneur ou le contenu), ou <c>null</c>.</summary>
+    private static int? ItemIndex(DependencyObject element)
+    {
+        for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ItemsControl.ItemsControlFromItemContainer(current) is { } owner)
+            {
+                var index = owner.ItemContainerGenerator.IndexFromContainer(current);
+                return index >= 0 ? index : null;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed record TransformParts(ScaleTransform Scale, TranslateTransform Translate);
+
+    /// <summary>
+    /// Agrandissement et déplacement de l'élément, posés une fois pour toutes (groupe « échelle puis déplacement »).
+    /// <c>null</c> si l'élément a déjà sa propre transformation, que les animations ne doivent pas écraser.
+    /// </summary>
+    private static TransformParts? Parts(UIElement element)
+    {
+        switch (element.RenderTransform)
+        {
+            case TransformGroup { IsFrozen: false, Children: [ScaleTransform scale, TranslateTransform translate] }:
+                return new TransformParts(scale, translate);
+            case null:
+            case MatrixTransform { Matrix.IsIdentity: true }:
+            case TranslateTransform existing when existing.IsFrozen
+                || ((double)existing.GetAnimationBaseValue(TranslateTransform.XProperty) == 0 && (double)existing.GetAnimationBaseValue(TranslateTransform.YProperty) == 0):
+                var parts = new TransformParts(new ScaleTransform(), new TranslateTransform());
+                element.RenderTransform = new TransformGroup { Children = { parts.Scale, parts.Translate } };
+                if (element.RenderTransformOrigin == default)
+                {
+                    element.RenderTransformOrigin = new Point(0.5, 0.5);
+                }
+
+                return parts;
+            default:
+                return null;
+        }
     }
 
     /// <summary>Anime une valeur numérique d'un élément (par exemple la jauge du score) vers <paramref name="to"/>.</summary>

@@ -180,6 +180,15 @@ public sealed partial class WorkshopViewModel : ObservableObject
         private set => SetProperty(ref _inventoryStatus, value);
     }
 
+    /// <summary>La fiche « Mon PC » est en cours de lecture (barre de progression animée).</summary>
+    public bool IsReadingInventory
+    {
+        get => _isReadingInventory;
+        private set => SetProperty(ref _isReadingInventory, value);
+    }
+
+    private bool _isReadingInventory;
+
     /// <summary>L'atelier est affiché (onglet de la fenêtre principale).</summary>
     public bool IsActive
     {
@@ -612,6 +621,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         Maus.Core.Diagnostics.Breadcrumbs.Add("Mon PC : lecture du matériel");
         _inventoryLoaded = true;
         InventoryStatus = T("Lecture du matériel…");
+        IsReadingInventory = true;
         try
         {
             var context = _context() ?? await Task.Run(AuditContext.CreateDefault);
@@ -636,6 +646,10 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             _inventoryLoaded = false;
             InventoryStatus = T("La lecture du matériel a échoué : {0}", ex.Message);
+        }
+        finally
+        {
+            IsReadingInventory = false;
         }
     }
 

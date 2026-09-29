@@ -10,7 +10,8 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.App.ViewModels;
 
 /// <summary>Une famille M·A·U·S sur le tableau de bord, avec ses pastilles de comptage.</summary>
-public sealed class FamilyViewModel(FamilySummary summary)
+/// <param name="audited">Faux avant le premier audit : la famille est présentée, sans compte.</param>
+public sealed class FamilyViewModel(FamilySummary summary, bool audited = true)
 {
     public string Letter => summary.Letter;
 
@@ -18,7 +19,7 @@ public sealed class FamilyViewModel(FamilySummary summary)
 
     public string Description => summary.Description;
 
-    public IReadOnlyList<ChipViewModel> Chips { get; } = BuildChips(summary);
+    public IReadOnlyList<ChipViewModel> Chips { get; } = audited ? BuildChips(summary) : [new(T("pas encore audité"), Palette.Grey)];
 
     private static List<ChipViewModel> BuildChips(FamilySummary s)
     {
@@ -77,7 +78,8 @@ public sealed partial class MainViewModel
         }
     }
 
-    public ObservableCollection<FamilyViewModel> Families { get; } = [];
+    /// <summary>Les quatre familles M·A·U·S, présentées dès l'ouverture puis comptées après chaque audit.</summary>
+    public ObservableCollection<FamilyViewModel> Families { get; } = new(HealthScore.Summaries([]).Select(f => new FamilyViewModel(f, audited: false)));
 
     /// <summary>Score de santé sur 100, ou -1 avant le premier audit.</summary>
     public int Score { get; private set; } = -1;

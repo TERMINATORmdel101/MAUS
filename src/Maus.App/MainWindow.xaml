@@ -276,7 +276,7 @@
                         <ItemsControl ItemsSource="{Binding SelectedModule.Findings}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:FindingViewModel}">
-                                    <Border Margin="0,0,0,10" Padding="14,10" CornerRadius="8" BorderThickness="4,1,1,1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                    <Border appearance:Motion.EnterOnLoad="True" Margin="0,0,0,10" Padding="14,10" CornerRadius="8" BorderThickness="4,1,1,1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                             BorderBrush="{Binding Status, Converter={StaticResource StatusToBrush}}">
                                         <StackPanel>
                                             <DockPanel>
@@ -476,6 +476,7 @@
                                             Command="{Binding Workshop.CopyInventoryCommand}" Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Top" />
                                     <TextBlock Text="{Binding Workshop.InventoryStatus}" Style="{StaticResource Muted}" TextWrapping="Wrap" VerticalAlignment="Center" />
                                 </DockPanel>
+                                <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,10" Visibility="{Binding Workshop.IsReadingInventory, Converter={StaticResource BoolToVisibility}}" />
                                 <ItemsControl ItemsSource="{Binding Workshop.Components}" Margin="-6,0">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
@@ -484,7 +485,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type ws:ComponentCardViewModel}">
-                                            <Border Style="{StaticResource Card}" Margin="6">
+                                            <Border Style="{StaticResource Card}" Margin="6" appearance:Motion.EnterOnLoad="True">
                                                 <DockPanel>
                                                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
                                                         <controls:LetterTile DockPanel.Dock="Left" Width="40" Height="40" Margin="0,0,12,0"
