@@ -197,6 +197,50 @@ public class DisplayModuleTests
     }
 
     [Fact]
+    public async Task Inconsistent_mode_list_is_unknown_instead_of_a_false_alarm()
+    {
+        // Constaté le 29/09/2026 : liste générique jusqu'à 2560×1600 à 60 Hz et mode préféré 1024×768 pour un écran en 3440×1440 à 165 Hz.
+        var monitor = Monitor(refresh: 164.9) with
+        {
+            NativeWidth = 1024,
+            NativeHeight = 768,
+            Modes = [new DisplayMode(1024, 768, 60), new DisplayMode(1920, 1080, 60), new DisplayMode(2560, 1600, 60)],
+        };
+
+        var findings = await Detect(DesktopWithDedicatedGpu, monitor);
+
+        var refresh = Get(findings, "M14.refresh.display-1");
+        Assert.Equal(FindingStatus.Unknown, refresh.Status);
+        Assert.Contains("3440×1440", refresh.Explanation, StringComparison.Ordinal);
+        Assert.Contains("redémarrez le PC", refresh.Advice, StringComparison.Ordinal);
+        Assert.Equal(FindingStatus.Unknown, Get(findings, "M14.resolution.display-1").Status);
+    }
+
+    [Fact]
+    public async Task Resolution_above_the_preferred_mode_is_not_called_stretched()
+    {
+        // Résolution virtuelle (DSR) : le mode affiché dépasse le mode préféré, l'image n'est pas « étirée ».
+        var monitor = Monitor(refresh: 165) with { Width = 5160, Height = 2160, Modes = [new DisplayMode(3440, 1440, 165), new DisplayMode(5160, 2160, 165)] };
+
+        var findings = await Detect(DesktopWithDedicatedGpu, monitor);
+
+        var resolution = Get(findings, "M14.resolution.display-1");
+        Assert.Equal(FindingStatus.Unknown, resolution.Status);
+        Assert.Contains("DSR", resolution.Explanation, StringComparison.Ordinal);
+        Assert.Equal(FindingStatus.Ok, Get(findings, "M14.refresh.display-1").Status);
+    }
+
+    [Fact]
+    public void Active_hdr_counts_as_supported_even_without_the_capability_bit()
+    {
+        var color = DisplayParsers.FromAdvancedColorInfo2(0, 0, 8, (int)AdvancedColorMode.Hdr);
+
+        Assert.True(color.HdrSupported);
+        Assert.True(color.HdrActive);
+        Assert.False(DisplayParsers.FromAdvancedColorInfo2(0, 0, 8, (int)AdvancedColorMode.Sdr).HdrSupported);
+    }
+
+    [Fact]
     public async Task Non_native_resolution_is_informative()
     {
         var monitor = Monitor(refresh: 165) with { Width = 2560, Height = 1080, Modes = [new DisplayMode(2560, 1080, 165), new DisplayMode(3440, 1440, 165)] };

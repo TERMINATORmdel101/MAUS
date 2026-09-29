@@ -471,7 +471,11 @@
                     <TabItem Header="{x:Static app:Ui.SectionPc}" Style="{StaticResource PillTab}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="{Binding Workshop.InventoryStatus}" Style="{StaticResource Muted}" Margin="0,0,0,8" />
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.CopySheet}" ToolTip="{x:Static app:Ui.CopySheetTip}"
+                                            Command="{Binding Workshop.CopyInventoryCommand}" Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Top" />
+                                    <TextBlock Text="{Binding Workshop.InventoryStatus}" Style="{StaticResource Muted}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </DockPanel>
                                 <ItemsControl ItemsSource="{Binding Workshop.Components}" Margin="-6,0">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>

@@ -254,6 +254,10 @@ public static class Ui
 
     public static string SearchSheet => T("Rechercher la fiche");
 
+    public static string CopySheet => T("Copier la fiche");
+
+    public static string CopySheetTip => T("Copie toute la fiche en texte, pour un forum ou un signalement. Le nom d'utilisateur, le nom du PC et les e-mails sont masqués ; MAUS n'envoie rien.");
+
     public static string FilterLabel => T("Filtrer :");
 
     public static string SearchWith => T("Recherche avec :");

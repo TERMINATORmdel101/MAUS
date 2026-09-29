@@ -49,9 +49,9 @@ public sealed class LetterToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => (value as string) switch
     {
-        "M" or "P" => Palette.Blue,
-        "A" or "G" => Palette.Red,
-        "U" or "R" or "B" => Palette.Green,
+        "M" or "P" or "W" => Palette.Blue,
+        "A" or "G" or "E" => Palette.Red,
+        "U" or "R" or "B" or "N" => Palette.Green,
         "S" or "C" => Palette.Gold,
         _ => (Brush)Palette.Grey,
     };

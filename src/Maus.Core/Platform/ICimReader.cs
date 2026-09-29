@@ -28,4 +28,7 @@ public static class CimScopes
     public const string BitLocker = @"root\cimv2\Security\MicrosoftVolumeEncryption";
     public const string TaskScheduler = @"root\Microsoft\Windows\TaskScheduler";
     public const string SystemRestore = @"root\default";
+
+    /// <summary>Puce TPM (<c>Win32_Tpm</c>) : lisible seulement en administrateur.</summary>
+    public const string Tpm = @"root\cimv2\Security\MicrosoftTpm";
 }

@@ -137,6 +137,11 @@ public sealed class DisplayModule : IAuditModule
             return Finding.Unknown(id, title, T("Fréquence actuelle de l'écran illisible."), screen.Category);
         }
 
+        if (ModesInconsistent(path))
+        {
+            return Finding.Unknown(id, title, InconsistentModes(path), screen.Category) with { Advice = InconsistentAdvice };
+        }
+
         var native = Native(path);
         var atCurrent = path.Width > 0 ? DisplayParsers.MaxRefreshAt(path.Modes, path.Width, path.Height) : null;
         var reference = atCurrent ?? (native is { } n ? DisplayParsers.MaxRefreshAt(path.Modes, n.Width, n.Height) : null);
@@ -327,11 +332,28 @@ public sealed class DisplayModule : IAuditModule
             return null;
         }
 
+        var resolutionId = $"M14.resolution.{screen.Slug}";
+        var resolutionTitle = T("Résolution native : {0}", screen.Label);
+        if (ModesInconsistent(path))
+        {
+            return Finding.Unknown(resolutionId, resolutionTitle, InconsistentModes(path), screen.Category) with { Advice = InconsistentAdvice };
+        }
+
+        // Mode affiché plus grand que le mode « préféré » : résolution virtuelle (DSR / VSR) ou pilote qui ne décrit pas
+        // l'écran correctement (constaté : 1024×768 annoncé pour un écran en 3440×1440). Rien de sûr à conclure.
+        if ((long)nativeWidth * nativeHeight < (long)path.Width * path.Height)
+        {
+            return Finding.Unknown(resolutionId, resolutionTitle, T(
+                "Windows annonce pour cet écran un mode préféré ({0}×{1}) plus petit que le mode affiché ({2}×{3}) : résolution virtuelle (DSR, VSR) " +
+                "ou information incohérente du pilote graphique. MAUS ne conclut pas sur la résolution native.",
+                nativeWidth, nativeHeight, path.Width, path.Height), screen.Category);
+        }
+
         var native = (path.Width == nativeWidth && path.Height == nativeHeight) || (path.Width == nativeHeight && path.Height == nativeWidth);
         return new Finding
         {
-            Id = $"M14.resolution.{screen.Slug}",
-            Title = T("Résolution native : {0}", screen.Label),
+            Id = resolutionId,
+            Title = resolutionTitle,
             Category = screen.Category,
             Status = native ? FindingStatus.Ok : FindingStatus.Info,
             Current = $"{path.Width}×{path.Height}",
@@ -407,6 +429,23 @@ public sealed class DisplayModule : IAuditModule
         return hardware.Gpus.FirstOrDefault(g => pnp is not null && string.Equals(g.PnpDeviceId, pnp, StringComparison.OrdinalIgnoreCase))
                ?? hardware.Gpus.FirstOrDefault(g => path.AdapterName is { Length: > 0 } name && string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>
+    /// Le mode affiché manque dans la liste des modes que Windows propose pour cet écran (constaté le 29/09/2026 : liste
+    /// générique jusqu'à 2560×1600 à 60 Hz pour un écran qui affiche 3440×1440 à 165 Hz). La fréquence maximale et la
+    /// résolution native ne peuvent alors pas être déduites de cette liste.
+    /// </summary>
+    private static bool ModesInconsistent(DisplayPath path) =>
+        path.Width > 0 && path.Modes.Count > 0 &&
+        !path.Modes.Any(m => (m.Width == path.Width && m.Height == path.Height) || (m.Width == path.Height && m.Height == path.Width));
+
+    private static string InconsistentModes(DisplayPath path) => T(
+        "Windows donne des informations incohérentes sur cet écran : le mode affiché ({0}×{1}) ne figure pas dans la liste des modes qu'il propose. " +
+        "MAUS ne peut donc rien vérifier ici.", path.Width, path.Height);
+
+    private static string InconsistentAdvice => T(
+        "Si Paramètres > Système > Écran ne propose plus la résolution et la fréquence habituelles de l'écran, redémarrez le PC ; " +
+        "si cela persiste, réinstallez le pilote graphique.");
 
     private static (int Width, int Height)? Native(DisplayPath path) =>
         path.NativeWidth is { } w && path.NativeHeight is { } h ? (w, h) : DisplayParsers.LargestResolution(path.Modes);

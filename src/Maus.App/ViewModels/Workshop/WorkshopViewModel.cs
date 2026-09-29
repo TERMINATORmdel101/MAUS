@@ -34,6 +34,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private bool _monitorOpen;
     private int _section;
     private bool _inventoryLoaded;
+    private MachineDetails? _details;
     private bool _sampling;
     private bool _processSampling;
     private string _inventoryStatus = T("Ouvrez « Mon PC » pour lire la fiche d'identité de votre matériel.");
@@ -142,6 +143,34 @@ public sealed partial class WorkshopViewModel : ObservableObject
     public LiveViewModel Live { get; } = new();
 
     public ObservableCollection<ComponentCardViewModel> Components { get; } = [];
+
+    /// <summary>
+    /// Copie toute la fiche « Mon PC » en texte (pour un forum ou un signalement), après avoir masqué le nom
+    /// d'utilisateur, le nom du PC et les adresses e-mail. MAUS n'envoie rien : l'utilisateur colle où il veut.
+    /// </summary>
+    public ICommand CopyInventoryCommand => _copyInventory ??= new AsyncCommand(() =>
+    {
+        if (Components.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var text = T("Fiche du PC relevée par MAUS {0} le {1}", Maus.Core.AppVersion.Display, DateTime.Now.ToString("g", Culture)) +
+            Environment.NewLine + Environment.NewLine + ComponentCardViewModel.ToText(Components);
+        try
+        {
+            System.Windows.Clipboard.SetText(Maus.Core.Reporting.PrivacyFilter.ForCurrentUser().Mask(text));
+            InventoryStatus = T("Fiche copiée (nom d'utilisateur, nom du PC et e-mails masqués) : collez-la avec Ctrl+V.");
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            InventoryStatus = T("Le presse-papiers est occupé : réessayez.");
+        }
+
+        return Task.CompletedTask;
+    });
+
+    private ICommand? _copyInventory;
 
     public ProcessListState ProcessList { get; } = new();
 
@@ -587,6 +616,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             var context = _context() ?? await Task.Run(AuditContext.CreateDefault);
             var inventory = await Task.Run(() => HardwareInventoryReader.Read(context, new X86CpuIdSource(), new WindowsNvmlSource()));
+            _details = await Task.Run(() => MachineDetailsReader.Read(context));
             var limits = SafetyLimits.Load();
             ShowInventory(inventory, limits, null);
             InventoryStatus = T("Lu directement dans le matériel et le BIOS, sans pilote. « Rechercher la fiche » ouvre votre navigateur ; MAUS n'envoie rien de lui-même.");
@@ -612,7 +642,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private void ShowInventory(HardwareInventory inventory, SafetyLimits limits, IReadOnlyList<SpdModule>? spd)
     {
         Components.Clear();
-        foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd))
+        foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd, _details))
         {
             Components.Add(card);
         }

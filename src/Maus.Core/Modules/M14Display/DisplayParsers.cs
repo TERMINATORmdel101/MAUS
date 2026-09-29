@@ -14,7 +14,8 @@ internal static class DisplayParsers
     {
         var mode = Enum.IsDefined((AdvancedColorMode)activeColorMode) ? (AdvancedColorMode?)activeColorMode : null;
         return new AdvancedColorInfo(
-            HdrSupported: (value & 0x10) != 0,
+            // Bit 4 = highDynamicRangeSupported ; un HDR actif prouve à lui seul la prise en charge (constaté : bit à 0 avec le HDR actif).
+            HdrSupported: (value & 0x10) != 0 || mode == AdvancedColorMode.Hdr,
             HdrActive: mode == AdvancedColorMode.Hdr,
             Encoding: ToEncoding(encoding),
             BitsPerColorChannel: (int)bitsPerChannel,
