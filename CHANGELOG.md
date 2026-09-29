@@ -2,6 +2,32 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.5.1 — 29/09/2026
+
+Numéro choisi par le porteur, après la 0.4.2 (qui n'a pas été publiée seule : tout son contenu, ci-dessous, fait partie de la 0.5.1).
+
+**Les pilotes vérifiés dans l'audit de base** (demande du porteur)
+
+- **Module 3** : la recherche Windows Update porte aussi sur les pilotes, en une seule requête (pas d'attente supplémentaire). Nouveau constat « Mises à jour de pilotes proposées par Windows Update » : information seulement, car Windows les range dans les mises à jour facultatives et précise lui-même qu'elles servent surtout si un périphérique pose un problème précis. Bouton « Ouvrir dans Windows » vers la page des mises à jour facultatives (`ms-settings:windowsupdate-optionalupdates`, adresse documentée par Microsoft). Le module s'appelle maintenant « Mises à jour Windows ».
+- **Module 17** : nouveau constat « Pilotes sans signature numérique » (information : la signature permet à Windows de vérifier l'éditeur et l'intégrité du pilote, Microsoft Learn « Driver Signing » ; son absence n'est pas une panne). Le résumé des périphériques en erreur ouvre aussi la page des mises à jour facultatives.
+- Tout constat peut désormais proposer « Ouvrir dans Windows » vers la bonne page des Paramètres.
+- **Mettre à jour les pilotes** : boutons « Mises à jour de pilotes (Windows Update) » dans Corrections et dans Atelier > Pilotes. MAUS ouvre la page de Windows où l'on coche soi-même ce qu'on installe : il n'installe aucun pilote de lui-même.
+
+**Atelier > Pilotes**
+
+- Colonne « Âge » et tri par date réelle ; résumé : nombre de pilotes, pilotes non signés (bouton « Voir les pilotes non signés »), pilote de fabricant le plus ancien. Aucun seuil « trop vieux » : aucune source n'en donne. Les pilotes de Microsoft datés du 21/06/2006 sont présentés comme une date de convention : Windows leur donne volontairement cette date pour que les pilotes des fabricants gardent la priorité ([Raymond Chen, Microsoft, The Old New Thing, 08/02/2017](https://devblogs.microsoft.com/oldnewthing/20170208-00/?p=95395)).
+- « Supprimer le pilote… » crée d'abord un **point de restauration** de Windows, vérifié (même mécanisme que les corrections) ; s'il échoue, vous choisissez de continuer ou non (la sauvegarde du pilote est faite de toute façon).
+
+**Relecture en parallèle (2 relecteurs, 2 vérificateurs) : 8 défauts confirmés, tous corrigés**
+
+- Suppression du pilote : le code 3010 de pnputil (« réussi, redémarrage nécessaire ») était annoncé comme un échec. La fenêtre distingue maintenant : supprimé, supprimé avec redémarrage nécessaire, sauvegarde ratée (rien supprimé), suppression ratée (pilote toujours là). Codes : Microsoft Learn, « PnPUtil Return Values ». Vérifié pour de vrai dans l'interpréteur de commandes de Windows avec un faux pnputil.
+- Réinstaller une sauvegarde : pnputil n'installe pas un pilote plus ancien par-dessus un plus récent (code 259) ; la fenêtre le dit, et les textes ne promettent plus un retour à l'ancien pilote dans tous les cas.
+- Deux cartes graphiques qui partagent le même paquet de pilote : la confirmation de suppression les nomme toutes (la suppression les touche toutes).
+- « Retirer et redétecter » n'est plus proposé pour un écran virtuel (Parsec, écran virtuel…) : Windows ne le recréerait pas.
+- « Voir les sauvegardes » les liste dans MAUS : le dossier est réservé aux administrateurs et l'Explorateur ne l'ouvrait pas.
+- « Pourquoi ce score ? » : phrase juste quand le score est plafonné.
+- Date des pilotes (jour et mois inversés par la source WMI) et tri par date : déjà corrigés avant la fin de la relecture.
+
 ## 0.4.2 — 29/09/2026
 
 Numéro choisi par le porteur : après la 4.0.0 vient la 0.4.2.

@@ -1,6 +1,6 @@
-﻿## Module 3 — Mises à jour Windows (hors pilotes)
+﻿## Module 3 — Mises à jour Windows
 
-Ce module installe toutes les mises à jour Windows de type logiciel via l'API Windows Update Agent, en excluant les pilotes par le critère `Type='Software'`. Les mises à jour facultatives forment une sous-catégorie décochée par défaut. Urgence du moment : Windows 11 24H2 Famille et Pro ne reçoit plus de correctifs après le 13 octobre 2026 ([source](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information)).
+Ce module installe toutes les mises à jour Windows de type logiciel via l'API Windows Update Agent, en excluant les pilotes par le critère `Type='Software'`. Depuis la 0.5.1, la même recherche porte aussi sur les pilotes (`or IsInstalled=0 and IsHidden=0 and Type='Driver'`) : ils forment un constat à part, informatif, « Mises à jour de pilotes proposées par Windows Update », avec le bouton « Ouvrir dans Windows » vers les mises à jour facultatives ; MAUS n'installe aucun pilote de lui-même. Les mises à jour facultatives forment une sous-catégorie décochée par défaut. Urgence du moment : Windows 11 24H2 Famille et Pro ne reçoit plus de correctifs après le 13 octobre 2026 ([source](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information)).
 
 **Détection :**
 - Version lue dans `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion` (`DisplayVersion`, `CurrentBuild`, `UBR`). 25H2 (build 26200) est servie jusqu'au 12 octobre 2027 en Famille et Pro ([source](https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information)).
