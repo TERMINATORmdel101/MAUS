@@ -109,6 +109,25 @@ public class WindowsUpdateModuleTests
     }
 
     [Fact]
+    public async Task Local_reads_happen_while_the_online_search_is_still_running()
+    {
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var agent = new FakeUpdateAgent { Results = HealthyAgent().Results, Hold = hold };
+        var cim = HealthyCim();
+
+        var detecting = Detect(agent, cim: cim);
+
+        // Le serveur n'a pas encore répondu, mais les correctifs installés et Defender sont déjà lus.
+        Assert.False(detecting.IsCompleted);
+        Assert.Contains(WindowsUpdateModule.QfeQuery, cim.Received);
+        Assert.Contains(WindowsUpdateModule.DefenderQuery, cim.Received);
+
+        hold.SetResult();
+        var findings = await detecting;
+        Assert.Equal("aucune", Get(findings, "M03.pending-updates").Current);
+    }
+
+    [Fact]
     public void Module_identity_and_public_constructor()
     {
         var module = new WindowsUpdateModule();
@@ -732,12 +751,18 @@ public class WindowsUpdateModuleTests
 
         public AutomaticUpdatesResults? GetAutomaticUpdatesResults() => ResultsError is null ? Results : throw ResultsError;
 
-        public Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken)
+        /// <summary>Si posé, la recherche ne répond qu'une fois ce signal donné (serveur lent).</summary>
+        public TaskCompletionSource? Hold { get; init; }
+
+        public async Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken)
         {
             ReceivedCriteria = criteria;
-            return SearchError is null
-                ? Task.FromResult<IReadOnlyList<PendingUpdate>>(Updates)
-                : Task.FromException<IReadOnlyList<PendingUpdate>>(SearchError);
+            if (Hold is not null)
+            {
+                await Hold.Task.ConfigureAwait(false);
+            }
+
+            return SearchError is null ? Updates : throw SearchError;
         }
     }
 }

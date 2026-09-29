@@ -100,16 +100,24 @@ public sealed class WindowsUpdateModule : IAuditModule
 
         // Lu avant notre propre recherche, pour refléter l'activité de Windows et non celle de MAUS.
         var automaticResults = ReadAutomaticUpdatesResults();
-        var search = await SearchAsync(cancellationToken).ConfigureAwait(false);
+
+        // La recherche en ligne tourne sur son propre fil : les lectures locales se font pendant qu'elle attend le serveur
+        // (liste des correctifs : 0,6 à 0,8 s mesurés sur le PC du porteur), au lieu d'allonger la fin de l'audit.
+        var searching = SearchAsync(cancellationToken);
+        var lastInstall = DetectLastInstall(context.Cim, today);
+        var defender = DetectDefenderSignatures(context.Cim);
+        var latestToggle = DetectLatestUpdatesToggle(context.Registry);
+        var source = DetectUpdateSource(context.Registry);
+        var search = await searching.ConfigureAwait(false);
 
         findings.Add(DetectPendingUpdates(search));
-        findings.Add(DetectLastInstall(context.Cim, today));
+        findings.Add(lastInstall);
         findings.Add(DetectLastSearch(automaticResults, context.Now));
-        findings.Add(DetectDefenderSignatures(context.Cim));
+        findings.Add(defender);
         findings.Add(DetectOptionalUpdates(search));
         findings.Add(DetectDriverUpdates(search));
-        findings.Add(DetectLatestUpdatesToggle(context.Registry));
-        findings.Add(DetectUpdateSource(context.Registry));
+        findings.Add(latestToggle);
+        findings.Add(source);
         return findings;
     }
 
