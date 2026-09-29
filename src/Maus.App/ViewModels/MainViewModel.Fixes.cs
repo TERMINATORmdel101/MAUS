@@ -266,6 +266,15 @@ public sealed partial class MainViewModel
     /// <summary>« Mettre à jour les logiciels » : liste winget (lecture seule), choix de l'utilisateur, puis console visible.</summary>
     public ICommand UpdateSoftwareCommand => _updateSoftware ??= new AsyncCommand(UpdateSoftwareAsync);
 
+    /// <summary>Recherche winget en cours (barre de progression de l'onglet Corrections).</summary>
+    public bool IsCheckingSoftware
+    {
+        get => _isCheckingSoftware;
+        private set => SetProperty(ref _isCheckingSoftware, value);
+    }
+
+    private bool _isCheckingSoftware;
+
     private void AddToFixReport(string text) =>
         FixReport = (FixReport.Length > 0 ? FixReport + Environment.NewLine + Environment.NewLine : string.Empty) + text;
 
@@ -274,6 +283,7 @@ public sealed partial class MainViewModel
         StatusText = T("Recherche des mises à jour des logiciels (winget), jusqu'à une minute…");
         IReadOnlyList<SoftwareUpdate> updates;
         string? winget;
+        IsCheckingSoftware = true;
         try
         {
             var context = _lastContext ?? await Task.Run(AuditContext.CreateDefault);
@@ -290,6 +300,10 @@ public sealed partial class MainViewModel
         {
             StatusText = T("La liste des mises à jour n'a pas pu être lue : {0}", ex.Message);
             return;
+        }
+        finally
+        {
+            IsCheckingSoftware = false;
         }
 
         if (updates.Count == 0)

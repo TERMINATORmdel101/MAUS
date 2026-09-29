@@ -409,6 +409,9 @@
                                 Visibility="{Binding NeedsExplorerRestart, Converter={StaticResource BoolToVisibility}}"
                                 ToolTip="{x:Static app:Ui.RestartExplorerTip}" />
                     </WrapPanel>
+                    <!-- Réponses des boutons ci-dessus et des choix (winget, rapport, audit automatique) : visibles ici aussi. -->
+                    <TextBlock Text="{Binding StatusText}" Margin="0,8,0,0" TextWrapping="Wrap" Style="{StaticResource Muted}" />
+                    <ProgressBar IsIndeterminate="True" Height="4" Margin="0,6,0,0" Visibility="{Binding IsCheckingSoftware, Converter={StaticResource BoolToVisibility}}" />
                     <Border Padding="12,8" Margin="0,10,0,0" CornerRadius="6" BorderThickness="1" BorderBrush="#808080"
                             Visibility="{Binding HasFixReport, Converter={StaticResource BoolToVisibility}}">
                         <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto">
