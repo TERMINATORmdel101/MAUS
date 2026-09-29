@@ -12,7 +12,7 @@ internal static class PrivacyFindings
     internal const string FeedbackPage = "ms-settings:privacy-feedback";
 
     /// <summary>Confidentialité et sécurité > Général, renommée « Recommandations et offres » sur les versions récentes.</summary>
-    internal const string GeneralPrivacyPage = "ms-settings:privacy";
+    internal const string GeneralPrivacyPage = "ms-settings:privacy-general";
 
     /// <summary>Système > Notifications (rubrique « Paramètres supplémentaires » en bas de page).</summary>
     internal const string NotificationsPage = "ms-settings:notifications";

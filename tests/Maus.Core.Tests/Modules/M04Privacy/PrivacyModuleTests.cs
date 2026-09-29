@@ -69,8 +69,8 @@ public class PrivacyModuleTests
             ("M04.diagnostic-data", "ms-settings:privacy-feedback"),
             ("M04.feedback-frequency", "ms-settings:privacy-feedback"),
             ("M04.tailored-experiences", "ms-settings:privacy-feedback"),
-            ("M04.advertising-id", "ms-settings:privacy"),
-            ("M04.settings-suggestions", "ms-settings:privacy"),
+            ("M04.advertising-id", "ms-settings:privacy-general"),
+            ("M04.settings-suggestions", "ms-settings:privacy-general"),
             ("M04.tips-silent-apps", "ms-settings:notifications"),
             ("M04.lockscreen-tips", "ms-settings:lockscreen"),
             ("M04.start-recommendations", "ms-settings:personalization-start"),
@@ -239,7 +239,7 @@ public class PrivacyModuleTests
         Assert.Equal(FindingStatus.Info, PrivacyRegistryChecks.SearchHighlights(registry, policiesHonored: true).Status);
 
         // Le conseil renvoie vers Confidentialité et sécurité : le bouton n'y mène que si l'interrupteur s'y trouve vraiment.
-        Assert.Equal("ms-settings:privacy", PrivacyRegistryChecks.AdvertisingId(registry, policiesHonored: true).SettingsPage);
+        Assert.Equal("ms-settings:privacy-general", PrivacyRegistryChecks.AdvertisingId(registry, policiesHonored: true).SettingsPage);
         Assert.Equal("ms-settings:search-permissions", PrivacyRegistryChecks.SearchHighlights(registry, policiesHonored: true).SettingsPage);
         Assert.Null(PrivacyRegistryChecks.StartRecommendations(registry, Pro).SettingsPage);
 
