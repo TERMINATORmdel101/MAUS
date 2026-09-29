@@ -5,6 +5,7 @@ Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le trav
 ## 0. État au 29/09/2026 (session locale sur le PC du porteur)
 
 - Version **4.0.0** (numéros choisis par le porteur : 0.3.3-alpha, puis 3.9.1, puis 4.0.0), plus les ajouts du 29/09 (numéro à choisir). Compilation 0 avertissement, **1 315 tests réussis** sous Windows.
+- **0.5.2 — à faire valider** : « Arrêter le test » pendant la préparation (mémoire vive, mémoire vidéo, disque), réponses des boutons de l'onglet Corrections affichées sur place, boutons « Ouvrir dans Windows » (chaque page doit s'ouvrir au bon endroit), Historique : correction « interrompue ». Dossier prêt : `C:\Users\CARO\Documents\MAUS\publish\MAUS-0.5.2`. Compilation 0 avertissement, **1 353 tests réussis**.
 - **0.5.1 — à faire valider** : audit (constats « Mises à jour de pilotes proposées par Windows Update » et « Pilotes sans signature numérique », bouton « Ouvrir dans Windows »), bouton « Mises à jour de pilotes (Windows Update) ».
 - **0.4.2 — à faire valider** : score (« Pourquoi ce score ? »), onglet Atelier > Pilotes (liste en lecture seule sur le PC du porteur ; les boutons redémarrer / retirer / sauvegarder / supprimer / réinstaller une sauvegarde se testent d'abord dans **Windows Sandbox**, jamais sur le PC du porteur sans son accord).
 - **Ajouts du 29/09, à faire valider par le porteur** : fenêtre « À propos » (bouton i), écran de démarrage, icône M dans la barre des tâches, logo du rapport HTML, « Signaler sur GitHub » dans « Demander de l'aide » (dépôt privé : la page ne s'ouvre que pour ses membres), Mon PC enrichi et « Copier la fiche » (TPM lisible seulement en administrateur), animations. Si des fenêtres de MAUS restent blanches : redémarrer le PC (constaté le 29/09 pour toutes les applications WPF, pas seulement MAUS).
@@ -19,8 +20,8 @@ Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le trav
 
 ## 1. Où en est le code
 
-- Version : **4.0.0** (`Directory.Build.props`, `CHANGELOG.md`).
-- Le travail est sur la branche **`claude/keen-wozniak-93as1n`** (poussée sur GitHub). **Fusionnée dans `main` le 29/09/2026** (accord du porteur ; avance simple de `main`, sans conflit), version 0.5.1. Le dossier du dépôt principal (`C:\Users\CARO\Documents\MAUS`, branche `main`) doit faire `git pull` pour la récupérer.
+- Version : **0.5.2** (`Directory.Build.props`, `CHANGELOG.md`).
+- Le travail est sur la branche **`claude/keen-wozniak-93as1n`** (poussée sur GitHub). **Fusionnée dans `main` le 29/09/2026** (accord du porteur ; avance simple de `main`, sans conflit), version 0.5.2. Le dossier du dépôt principal (`C:\Users\CARO\Documents\MAUS`, branche `main`) doit faire `git pull` pour la récupérer.
 - Sous Linux : compilation 0 avertissement, 1 185 tests dont **12 échecs attendus** (ils appellent de vraies API Windows : signature de fichiers, journaux d'événements, chemins `C:\`, raccourcis). **Sous Windows, les 1 185 doivent passer.**
 - Rien de ce qui a été codé dans le cloud n'a tourné sur un vrai Windows : l'interface WPF n'a jamais été ouverte depuis la refonte.
 
