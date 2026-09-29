@@ -130,8 +130,23 @@ public partial class App : Application
         Current.MainWindow = window;
         if (splash is not null)
         {
-            // L'écran de démarrage s'efface en douceur une fois la fenêtre dessinée.
-            window.ContentRendered += (_, _) => splash.Close(TimeSpan.FromMilliseconds(350));
+            // L'écran de démarrage s'efface en douceur une fois la fenêtre dessinée. Secours : une fenêtre ouverte réduite
+            // n'est pas dessinée tout de suite, l'écran de démarrage ne doit pas rester affiché pour autant.
+            var closed = false;
+            var fallback = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            void CloseSplash(TimeSpan fade)
+            {
+                fallback.Stop();
+                if (!closed)
+                {
+                    closed = true;
+                    splash.Close(fade);
+                }
+            }
+
+            window.ContentRendered += (_, _) => CloseSplash(TimeSpan.FromMilliseconds(350));
+            fallback.Tick += (_, _) => CloseSplash(TimeSpan.Zero);
+            fallback.Start();
         }
 
         window.Show();

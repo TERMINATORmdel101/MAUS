@@ -626,7 +626,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             var context = _context() ?? await Task.Run(AuditContext.CreateDefault);
             var inventory = await Task.Run(() => HardwareInventoryReader.Read(context, new X86CpuIdSource(), new WindowsNvmlSource()));
-            _details = await Task.Run(() => MachineDetailsReader.Read(context));
+            _details = await Task.Run(() => ReadDetails(context));
             var limits = SafetyLimits.Load();
             ShowInventory(inventory, limits, null);
             InventoryStatus = T("Lu directement dans le matériel et le BIOS, sans pilote. « Rechercher la fiche » ouvre votre navigateur ; MAUS n'envoie rien de lui-même.");
@@ -659,6 +659,23 @@ public sealed partial class WorkshopViewModel : ObservableObject
         foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd, _details))
         {
             Components.Add(card);
+        }
+    }
+
+    /// <summary>
+    /// Windows, écrans, réseau, son et emplacements mémoire ; <c>null</c> en cas d'échec imprévu : les cartes des composants
+    /// s'affichent quand même, seules ces cartes-là manquent.
+    /// </summary>
+    private static MachineDetails? ReadDetails(AuditContext context)
+    {
+        try
+        {
+            return MachineDetailsReader.Read(context);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Maus.Core.Diagnostics.Breadcrumbs.Add("Mon PC : informations supplémentaires illisibles (" + ex.GetType().Name + ")");
+            return null;
         }
     }
 

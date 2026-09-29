@@ -190,7 +190,8 @@ public sealed class ComponentCardViewModel
             new(T("Version de Windows"), T("{0} · build {1} · édition {2}", windows.DisplayVersion, windows.FullBuild, windows.EditionId)),
             new(T("Architecture"), system.Architecture ?? "—"),
 
-            // InstallDate change à chaque mise à niveau majeure de Windows (par exemple 24H2 vers 25H2).
+            // InstallDate peut changer lors d'une mise à niveau majeure de Windows (souvent constaté, non documenté par Microsoft) :
+            // d'où le libellé prudent « installé ou mis à niveau ».
             new(T("Installé ou mis à niveau le"), system.InstalledOn?.ToString("d", Culture) ?? "—"),
             new(T("Dernier démarrage complet"), system.BootedAt is { } boot ? T("{0} (il y a {1})", boot.ToString("g", Culture), Duration(now - boot)) : "—"),
 

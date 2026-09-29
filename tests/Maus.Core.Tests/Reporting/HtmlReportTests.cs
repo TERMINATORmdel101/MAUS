@@ -66,7 +66,10 @@ public class HtmlReportTests
         Assert.Contains("&lt;script&gt;", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<script>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Numéro-secret-123", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("http", html, StringComparison.OrdinalIgnoreCase);
+
+        // Aucun lien vers l'extérieur ; le logo encodé (base64) est retiré avant, ses lettres pourraient former « http ».
+        var withoutLogo = System.Text.RegularExpressions.Regex.Replace(html, "data:image/jpeg;base64,[A-Za-z0-9+/=]+", "data:");
+        Assert.DoesNotContain("http", withoutLogo, StringComparison.OrdinalIgnoreCase);
 
         File.WriteAllText(Path.Combine(Path.GetTempPath(), "maus-rapport-exemple.html"), html);
     }

@@ -138,11 +138,13 @@ public static class Motion
         target.PreviewMouseLeftButtonDown -= OnPressDown;
         target.PreviewMouseLeftButtonUp -= OnPressUp;
         target.MouseLeave -= OnPressUp;
+        target.LostMouseCapture -= OnPressUp;
         if ((bool)e.NewValue)
         {
             target.PreviewMouseLeftButtonDown += OnPressDown;
             target.PreviewMouseLeftButtonUp += OnPressUp;
             target.MouseLeave += OnPressUp;
+            target.LostMouseCapture += OnPressUp;
         }
     }
 
@@ -208,6 +210,11 @@ public static class Motion
 
     private sealed record TransformParts(ScaleTransform Scale, TranslateTransform Translate);
 
+    /// <summary>Déplacement nul (hors animation en cours) : on peut le remplacer sans rien décaler.</summary>
+    private static bool AtRest(TranslateTransform transform) => transform.IsFrozen
+        ? transform.X == 0 && transform.Y == 0
+        : (double)transform.GetAnimationBaseValue(TranslateTransform.XProperty) == 0 && (double)transform.GetAnimationBaseValue(TranslateTransform.YProperty) == 0;
+
     /// <summary>
     /// Agrandissement et déplacement de l'élément, posés une fois pour toutes (groupe « échelle puis déplacement »).
     /// <c>null</c> si l'élément a déjà sa propre transformation, que les animations ne doivent pas écraser.
@@ -220,8 +227,7 @@ public static class Motion
                 return new TransformParts(scale, translate);
             case null:
             case MatrixTransform { Matrix.IsIdentity: true }:
-            case TranslateTransform existing when existing.IsFrozen
-                || ((double)existing.GetAnimationBaseValue(TranslateTransform.XProperty) == 0 && (double)existing.GetAnimationBaseValue(TranslateTransform.YProperty) == 0):
+            case TranslateTransform existing when AtRest(existing):
                 var parts = new TransformParts(new ScaleTransform(), new TranslateTransform());
                 element.RenderTransform = new TransformGroup { Children = { parts.Scale, parts.Translate } };
                 if (element.RenderTransformOrigin == default)
