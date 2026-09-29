@@ -2,6 +2,25 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## Après la 4.0.0 — 29/09/2026 (numéro de version à choisir par le porteur)
+
+**Demandes du porteur du 29/09 : embellir, animer, plus d'informations sur la machine, aide et signalement sur GitHub.**
+
+- **À propos de MAUS** (bouton « i » en bas de la barre de gauche) : grand logo, version, signification du nom, qui l'a fait, licence et marque, confidentialité, avertissements, composants tiers et sources ; boutons « Signaler un problème », « Page du projet », « Licences et sources ».
+- **Écran de démarrage** avec le logo pendant que la fenêtre principale se prépare (pas pendant l'audit planifié, sans fenêtre).
+- **Icône lisible** : la lettre M seule dans les petites tailles (barre des tâches, titre des fenêtres), le logo entier en grand. Images tirées du logo du porteur, recadrées, jamais redessinées (`tools/make-app-images.ps1`).
+- **Rapport HTML** : le logo en tête du rapport, intégré au fichier (il reste un seul fichier, lisible hors connexion).
+- **Signaler sur GitHub** (fenêtre « Demander de l'aide ») : le résumé, déjà relu et masqué (nom d'utilisateur, nom du PC, e-mails), est copié, puis la page de signalement du projet s'ouvre avec un modèle en français ; l'utilisateur colle et envoie lui-même. MAUS n'envoie rien. Tant que le dépôt est privé, seuls ses membres peuvent ouvrir cette page.
+- **Mon PC, beaucoup plus complet** : carte « Windows et ce PC » (modèle, fixe ou portable, version et build, architecture, date d'installation ou de dernière mise à niveau majeure, dernier démarrage complet avec la remarque sur le démarrage rapide, UEFI ou BIOS hérité, Secure Boot, puce TPM en administrateur) ; une carte par écran (définition, fréquence, connecteur, carte graphique, HDR, bits par couleur) ; cartes Réseau (cartes physiques, état, débit du lien, sans adresse MAC ni IP) et Son ; emplacements mémoire utilisés et mémoire maximale déclarée par le BIOS. Tout en lecture seule, sans pilote.
+- **Copier la fiche** : toute la fiche « Mon PC » en texte, pour un forum ou un signalement, avec nom d'utilisateur, nom du PC et e-mails masqués.
+- **Animations** (coupées avec le réglage des animations ou celui de Windows) : les cartes de l'accueil se soulèvent au survol, les boutons s'enfoncent à l'appui, les fiches de « Mon PC » et les constats apparaissent en cascade, barre de progression animée pendant la lecture du matériel.
+- **Accueil** : les quatre familles M·A·U·S sont présentées dès l'ouverture (« pas encore audité ») au lieu d'un cadre vide.
+
+**Constaté sur le PC du porteur le 29/09 et corrigé**
+
+- Écran (M14) : ce matin-là, Windows annonçait pour l'AW3423DWF un « mode préféré » de 1024×768 et une liste de modes générique (jusqu'à 2560×1600 à 60 Hz) alors que l'écran affichait 3440×1440 à 165 Hz en HDR. MAUS concluait « résolution native attendue 1024×768 », « maximum 60 Hz » et « HDR non pris en charge ». Maintenant : mode affiché absent de la liste ou mode préféré plus petit que le mode affiché = constat **indéterminé** avec explication (et, si Windows ne propose plus les modes habituels, redémarrer le PC puis réinstaller le pilote graphique) ; un HDR actif compte comme pris en charge.
+- Le même matin, toutes les fenêtres WPF (y compris une fenêtre de test sans rapport avec MAUS) restaient blanches dès qu'une deuxième fenêtre s'ouvrait, alors que tout fonctionnait la veille avec le même pilote : état passager de l'affichage de Windows, pas un défaut de MAUS. Les captures de contrôle sont faites en rendu logiciel.
+
 ## 4.0.0 — 28/09/2026
 
 Numéro choisi par le porteur, après la 3.9.1 : nouveaux tests du processeur, programme de validation du Curve Optimizer, corrections issues de ses essais.

@@ -18,6 +18,13 @@
 | Utilisation CPU, RAM, disques, réseau, GPU (par moteur et par processus) | PDH (`PdhAddEnglishCounterW`), `GlobalMemoryStatusEx` | |
 | Batterie : capacité d'origine et actuelle, tension, débit de charge | `root\wmi` : `BatteryStaticData`, `BatteryFullChargedCapacity`, `BatteryStatus` | |
 | Disques : modèle, type, température, usure | `MSFT_PhysicalDisk`, `MSFT_StorageReliabilityCounter` (Module 11) | |
+| Windows et le PC (29/09/2026) : modèle, version et build, architecture, installation ou dernière mise à niveau majeure, dernier démarrage complet | `Win32_OperatingSystem` (`OSArchitecture`, `InstallDate`, `LastBootUpTime`), registre `CurrentVersion`, `Win32_ComputerSystem` | Un arrêt avec le démarrage rapide n'est pas un redémarrage complet (Microsoft Learn, « Distinguishing Fast Startup from Wake-from-Hibernation ») |
+| Mode de démarrage, Secure Boot, TPM | `GetFirmwareType` (kernel32 : 1 = BIOS, 2 = UEFI), valeur `UEFISecureBootEnabled` (comme le Module 8), `Win32_Tpm` (`root\cimv2\Security\MicrosoftTpm`) | TPM lisible seulement en administrateur |
+| Emplacements mémoire | `Win32_PhysicalMemoryArray` (`MemoryDevices`, `MaxCapacity`/`MaxCapacityEx` en Ko, `Use` = 3) | Maximum « déclaré par le BIOS » |
+| Écrans : définition, fréquence, connecteur, carte, HDR, bits par couleur | API d'affichage du Module 14 (`QueryDisplayConfig`, `DisplayConfigGetDeviceInfo`, `EnumDisplaySettingsExW`) | Mode préféré affiché seulement s'il dépasse le mode actuel (sinon incohérent ou virtuel) |
+| Réseau et son | `MSFT_NetAdapter` (cartes physiques seulement), `Win32_SoundDevice` | Ni adresse MAC ni adresse IP |
+
+« Copier la fiche » copie toute la fiche en texte, filtrée par `PrivacyFilter` (nom d'utilisateur, nom du PC, e-mails) ; MAUS n'envoie rien.
 
 ### Ce qui exige un pilote noyau (non fait, question posée au porteur)
 
