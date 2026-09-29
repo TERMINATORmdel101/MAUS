@@ -1211,6 +1211,7 @@
                                 <DockPanel Margin="0,8,0,6">
                                     <TextBox DockPanel.Dock="Right" Width="260" Text="{Binding Workshop.DriverFilter, UpdateSourceTrigger=PropertyChanged}"
                                              AutomationProperties.Name="{x:Static app:Ui.DriverFilterLabel}" ToolTip="{x:Static app:Ui.DriverFilterLabel}" />
+                                    <TextBlock DockPanel.Dock="Right" Text="{x:Static app:Ui.FilterLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <TextBlock Text="{x:Static app:Ui.DriversAllTitle}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
                                 </DockPanel>
                                 <DataGrid ItemsSource="{Binding Workshop.DriverRows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"

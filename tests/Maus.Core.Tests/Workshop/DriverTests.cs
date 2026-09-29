@@ -7,6 +7,11 @@ public class DriverTests
 {
     private const string NvidiaId = @"PCI\VEN_10DE&DEV_1E07&SUBSYS_37111462&REV_A1\4&2C8A8F4E&0&0008";
 
+    private sealed class FakeDates(Dictionary<string, DateTime> dates) : IDriverDateSource
+    {
+        public DateTime? DriverDate(string instanceId) => dates.TryGetValue(instanceId, out var date) ? date : null;
+    }
+
     private static DriverEntry Gpu(string? inf = "oem42.inf", string id = NvidiaId) =>
         new("NVIDIA GeForce RTX 2080 Ti", "DISPLAY", DriverGroup.Graphics, id, "32.0.16.1714", new DateTime(2026, 9, 17), "NVIDIA", "NVIDIA", inf, true, "Microsoft Windows Hardware Compatibility Publisher");
 
@@ -15,18 +20,19 @@ public class DriverTests
     {
         var cim = new FakeCim().Answer(DriverInventoryReader.DriverQuery,
             new Dictionary<string, object?> { ["DeviceName"] = "Realtek High Definition Audio", ["DeviceClass"] = "MEDIA", ["DeviceID"] = @"HDAUDIO\FUNC_01&VEN_10EC\4&1", ["DriverVersion"] = "6.0.9", ["InfName"] = "oem7.inf", ["IsSigned"] = true },
-            new Dictionary<string, object?> { ["DeviceName"] = "NVIDIA GeForce RTX 2080 Ti", ["DeviceClass"] = "DISPLAY", ["DeviceID"] = NvidiaId, ["DriverVersion"] = "32.0.16.1714", ["DriverDate"] = new DateTime(2026, 9, 17), ["DriverProviderName"] = "NVIDIA", ["InfName"] = "oem42.inf", ["IsSigned"] = true },
+            new Dictionary<string, object?> { ["DeviceName"] = "NVIDIA GeForce RTX 2080 Ti", ["DeviceClass"] = "DISPLAY", ["DeviceID"] = NvidiaId, ["DriverVersion"] = "32.0.16.1714", ["DriverProviderName"] = "NVIDIA", ["InfName"] = "oem42.inf", ["IsSigned"] = true },
             new Dictionary<string, object?> { ["DeviceName"] = "NVIDIA GeForce RTX 2080 Ti", ["DeviceClass"] = "DISPLAY", ["DeviceID"] = NvidiaId.ToLowerInvariant() },
             new Dictionary<string, object?> { ["DeviceName"] = "Pont PCI standard", ["DeviceClass"] = "SYSTEM", ["DeviceID"] = @"PCI\VEN_8086&DEV_A343\3&11583659&0&E0", ["InfName"] = "machine.inf" },
             new Dictionary<string, object?> { ["DeviceName"] = null, ["DeviceClass"] = "SYSTEM", ["DeviceID"] = @"ROOT\X\0000" });
 
-        var drivers = DriverInventoryReader.Read(cim);
+        var drivers = DriverInventoryReader.Read(cim, new FakeDates(new Dictionary<string, DateTime> { [NvidiaId] = new DateTime(2026, 9, 17) }));
 
         Assert.Equal(["NVIDIA GeForce RTX 2080 Ti", "Realtek High Definition Audio", "Pont PCI standard"], drivers.Select(d => d.Device));
         Assert.Equal([DriverGroup.Graphics, DriverGroup.Audio, DriverGroup.Chipset], drivers.Select(d => d.Group));
         Assert.True(drivers[0].IsThirdPartyPackage);
         Assert.False(drivers[2].IsThirdPartyPackage);
         Assert.Equal(new DateTime(2026, 9, 17), drivers[0].Date);
+        Assert.Null(drivers[1].Date);
     }
 
     [Fact]

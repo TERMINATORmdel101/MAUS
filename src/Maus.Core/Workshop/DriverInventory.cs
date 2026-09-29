@@ -50,9 +50,11 @@ public sealed partial record DriverEntry(
 public static class DriverInventoryReader
 {
     internal const string DriverQuery =
-        "SELECT DeviceName, FriendlyName, DeviceClass, DeviceID, DriverVersion, DriverDate, DriverProviderName, Manufacturer, InfName, IsSigned, Signer FROM Win32_PnPSignedDriver";
+        "SELECT DeviceName, FriendlyName, DeviceClass, DeviceID, DriverVersion, DriverProviderName, Manufacturer, InfName, IsSigned, Signer FROM Win32_PnPSignedDriver";
 
-    public static IReadOnlyList<DriverEntry> Read(ICimReader cim)
+    /// <param name="dates">Dates du Gestionnaire de périphériques (<see cref="CfgMgrDriverDateSource"/>) ; sans elle, pas de date :
+    /// celle de <c>Win32_PnPSignedDriver</c> inverse parfois le jour et le mois.</param>
+    public static IReadOnlyList<DriverEntry> Read(ICimReader cim, IDriverDateSource? dates = null)
     {
         IReadOnlyList<CimRow> rows;
         try
@@ -81,7 +83,7 @@ public static class DriverInventoryReader
                     GroupOf(cls),
                     id,
                     Clean(row.GetString("DriverVersion")),
-                    row.GetDateTime("DriverDate"),
+                    dates?.DriverDate(id),
                     Clean(row.GetString("DriverProviderName")),
                     Clean(row.GetString("Manufacturer")),
                     Clean(row.GetString("InfName")),

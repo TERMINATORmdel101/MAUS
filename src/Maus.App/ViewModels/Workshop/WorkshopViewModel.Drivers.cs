@@ -4,6 +4,7 @@ using System.Windows.Input;
 using Maus.Core;
 using Maus.Core.Hardware;
 using Maus.Core.Modules.M09Gpu;
+using Maus.Core.Platform;
 using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
 
@@ -227,7 +228,7 @@ public sealed partial class WorkshopViewModel
         try
         {
             var context = _context() ?? await Task.Run(AuditContext.CreateDefault);
-            _drivers = await Task.Run(() => DriverInventoryReader.Read(context.Cim));
+            _drivers = await Task.Run(() => DriverInventoryReader.Read(context.Cim, new CfgMgrDriverDateSource()));
             ShowDriverRows();
             ShowGraphicsDrivers(context.Hardware);
             DriversStatus = _drivers.Count == 0
