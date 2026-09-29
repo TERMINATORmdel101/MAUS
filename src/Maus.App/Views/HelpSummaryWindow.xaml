@@ -20,7 +20,7 @@
                     Click="OnGitHub" ToolTip="{x:Static app:Ui.ReportOnGitHubTip}" />
             <TextBlock x:Name="CopyStatus" VerticalAlignment="Center" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" Margin="0,0,12,0" />
         </DockPanel>
-        <TextBox x:Name="Summary" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+        <TextBox x:Name="Summary" AutomationProperties.Name="{x:Static app:Ui.HelpWindowTitle}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                  FontFamily="Cascadia Mono, Consolas" FontSize="13" Padding="8" />
     </DockPanel>
 </Window>

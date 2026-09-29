@@ -79,6 +79,33 @@ public partial class XamlConsistencyTests
         Assert.True(offenders.Count == 0, "Liaisons bidirectionnelles vers une propriété sans « set » : " + string.Join(", ", offenders));
     }
 
+    [Fact]
+    public void Inputs_have_a_name_for_screen_readers()
+    {
+        // Liste déroulante, case à cocher sans texte, zone de saisie : le Narrateur doit pouvoir dire à quoi elle sert.
+        // Exemptés : un contrôle qui porte son propre texte (Content ou contenu entre balises) et un texte en lecture seule.
+        var offenders = new List<string>();
+        foreach (var file in XamlFiles())
+        {
+            foreach (Match match in InputElement().Matches(File.ReadAllText(file)))
+            {
+                var tag = match.Value;
+                var named = tag.Contains("AutomationProperties.Name", StringComparison.Ordinal) || tag.Contains("AutomationProperties.LabeledBy", StringComparison.Ordinal);
+                var selfLabelled = tag.Contains("Content=", StringComparison.Ordinal) || !tag.EndsWith("/>", StringComparison.Ordinal);
+                var readOnly = tag.Contains("IsReadOnly=\"True\"", StringComparison.Ordinal);
+                if (!named && !selfLabelled && !readOnly)
+                {
+                    offenders.Add($"{Path.GetFileName(file)} : {Regex.Replace(tag, @"\s+", " ")[..Math.Min(90, tag.Length)]}");
+                }
+            }
+        }
+
+        Assert.True(offenders.Count == 0, "Contrôles sans nom pour les lecteurs d'écran : " + string.Join(" | ", offenders));
+    }
+
+    [GeneratedRegex(@"<(ComboBox|CheckBox|TextBox|Slider|PasswordBox)\b[^>]*>", RegexOptions.Singleline)]
+    private static partial Regex InputElement();
+
     [GeneratedRegex(@"x:Key=""([^""]+)""")]
     private static partial Regex Key();
 
