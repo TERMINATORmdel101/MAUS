@@ -94,7 +94,9 @@ internal static class PrivacySystemChecks
                     100 => T("Le mode 100 (contournement) est déprécié : choisir le mode 0."),
                     _ => T("Couper « Autoriser les téléchargements à partir d'autres PC » dans Paramètres > Windows Update > Options avancées > Optimisation de la distribution, " +
                          "ou le limiter aux PC du réseau local (mode 1) si vous avez plusieurs PC."),
-                });
+                },
+                // Seul le conseil par défaut renvoie vers Paramètres ; ceux des modes 1 (choix valable) et 100 (contournement) n'y renvoient pas.
+                mode is 1 or 100 ? null : DeliveryOptimizationPage);
         });
     }
 

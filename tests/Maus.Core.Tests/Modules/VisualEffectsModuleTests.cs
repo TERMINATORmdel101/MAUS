@@ -21,7 +21,9 @@ public class VisualEffectsModuleTests
 
         Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M06.taskview").Status);
         Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M06.widgets").Status);
+        Assert.Equal("ms-settings:taskbar", findings.Single(f => f.Id == "M06.widgets").SettingsPage);
         Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M06.minimize-animation").Status);
+        Assert.Null(findings.Single(f => f.Id == "M06.minimize-animation").SettingsPage);
         Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M06.menu-animation").Status);
         Assert.Equal(FindingStatus.Ok, findings.Single(f => f.Id == "M06.keep.fonts").Status);
         Assert.Equal(FindingStatus.Ok, findings.Single(f => f.Id == "M06.keep.thumbnails").Status);
@@ -60,6 +62,7 @@ public class VisualEffectsModuleTests
         var findings = await new VisualEffectsModule().DetectAsync(TestContext.Create(registry), CancellationToken.None);
 
         Assert.Equal(FindingStatus.Ok, findings.Single(f => f.Id == "M06.widgets").Status);
+        Assert.Null(findings.Single(f => f.Id == "M06.widgets").SettingsPage);
     }
 }
 

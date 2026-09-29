@@ -17,6 +17,17 @@ public sealed class GameBarModule : IFixableModule
     private const RegistryHive Hklm = RegistryHive.LocalMachine;
     private const RegistryHive Hkcu = RegistryHive.CurrentUser;
 
+    // Pages Jeux des Paramètres (Microsoft Learn, « Launch Windows Settings ») où les conseils envoient l'utilisateur.
+
+    /// <summary>Jeux > Captures (« Game DVR »).</summary>
+    internal const string CapturesPage = "ms-settings:gaming-gamedvr";
+
+    /// <summary>Jeux > Mode Jeu.</summary>
+    internal const string GameModePage = "ms-settings:gaming-gamemode";
+
+    /// <summary>Jeux > Game Bar.</summary>
+    internal const string GameBarPage = "ms-settings:gaming-gamebar";
+
     public string Id => "M07";
 
     public string Title => "Xbox Game Bar";
@@ -83,6 +94,7 @@ public sealed class GameBarModule : IFixableModule
                 Advice = on
                     ? T("Couper « Enregistrer ce qui s'est passé » dans Paramètres > Jeux > Captures (ms-settings:gaming-gamedvr). Les captures manuelles restent possibles.")
                     : null,
+                SettingsPage = on ? CapturesPage : null,
                 Fixable = on,
             };
         });
@@ -180,6 +192,7 @@ public sealed class GameBarModule : IFixableModule
                 Expected = T("activé"),
                 Explanation = explanation,
                 Advice = off ? T("Activer « Mode Jeu » dans Paramètres > Jeux > Mode Jeu (ms-settings:gaming-gamemode).") : null,
+                SettingsPage = off ? GameModePage : null,
                 Fixable = off,
             };
         });
@@ -291,6 +304,7 @@ public sealed class GameBarModule : IFixableModule
                     Expected = T("désactivées (profil 1)"),
                     Explanation = explanation,
                     Advice = compliant ? null : T("Couper les captures dans Paramètres > Jeux > Captures, ou depuis la Game Bar (Win+G > Paramètres > Captures)."),
+                    SettingsPage = compliant ? null : CapturesPage,
                     Fixable = !compliant,
                 };
             }
@@ -329,6 +343,7 @@ public sealed class GameBarModule : IFixableModule
                     Expected = T("désactivée (profil 1)"),
                     Explanation = explanation,
                     Advice = on ? T("Couper « Ouvrir la Game Bar avec ce bouton sur une manette » dans Paramètres > Jeux > Game Bar (ms-settings:gaming-gamebar).") : null,
+                    SettingsPage = on ? GameBarPage : null,
                     Fixable = on,
                 };
             }

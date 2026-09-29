@@ -59,11 +59,19 @@ public class GameBarModuleTests
         Assert.Equal(FindingStatus.Improvable, captures.Status);
         Assert.Equal("activées", captures.Current);
         Assert.True(captures.Fixable);
+        Assert.Equal("ms-settings:gaming-gamedvr", captures.SettingsPage);
 
         var controller = Single(findings, "M07.controller-button");
         Assert.Equal(FindingStatus.Improvable, controller.Status);
         Assert.Equal("activée (par défaut)", controller.Current);
         Assert.NotNull(controller.Advice);
+        Assert.Equal("ms-settings:gaming-gamebar", controller.SettingsPage);
+
+        // Conformes ou simples informations : pas de bouton « Ouvrir dans Windows ».
+        foreach (var id in new[] { "M07.background-recording", "M07.game-mode", "M07.gamebar-package", "M07.profile", "M07.gamedvr-policy" })
+        {
+            Assert.Null(Single(findings, id).SettingsPage);
+        }
     }
 
     [Fact]
@@ -104,6 +112,7 @@ public class GameBarModuleTests
             Assert.Equal(current, finding.Current);
             Assert.Equal(expected == FindingStatus.Improvable, finding.Fixable);
             Assert.Equal(expected == FindingStatus.Improvable, finding.Advice is not null);
+            Assert.Equal(expected == FindingStatus.Improvable ? "ms-settings:gaming-gamedvr" : null, finding.SettingsPage);
         }
     }
 
@@ -119,6 +128,7 @@ public class GameBarModuleTests
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.Equal("absente", finding.Current);
         Assert.True(finding.Fixable);
+        Assert.Null(finding.SettingsPage); // Réinstallation par le Microsoft Store : aucune page des Paramètres.
         Assert.Contains("ms-gamingoverlay", finding.Explanation, StringComparison.Ordinal);
         Assert.Contains("2 jeu(x)", finding.Explanation, StringComparison.Ordinal);
         Assert.Contains(GameBarStoreId, finding.Advice, StringComparison.Ordinal);
@@ -146,6 +156,7 @@ public class GameBarModuleTests
         Assert.Equal(FindingStatus.Improvable, regular.Status);
         Assert.Equal("désactivé", regular.Current);
         Assert.True(regular.Fixable);
+        Assert.Equal("ms-settings:gaming-gamemode", regular.SettingsPage);
 
         var x3d = Single(await Detect(registry, packages, X3DDesktop), "M07.game-mode");
         Assert.Equal(FindingStatus.Warning, x3d.Status);

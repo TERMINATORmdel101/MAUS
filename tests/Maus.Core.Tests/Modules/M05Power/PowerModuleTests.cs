@@ -79,6 +79,7 @@ public class PowerModuleTests
         Assert.True(plan.Fixable);
         Assert.Contains("Meilleures performances", plan.Current, StringComparison.Ordinal);
         Assert.NotNull(plan.Advice);
+        Assert.Null(plan.SettingsPage); // Le mode de gestion se choisit dans le Panneau de configuration, sans adresse ms-settings.
         Assert.DoesNotContain(findings, f => f.Id == "M05.power-mode-ac");
     }
 
@@ -226,8 +227,10 @@ public class PowerModuleTests
 
         Assert.Equal(FindingStatus.Ok, Get(findings, "M05.power-plan").Status);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M05.power-mode-ac").Status);
+        Assert.Null(Get(findings, "M05.power-mode-ac").SettingsPage);
         var dc = Get(findings, "M05.power-mode-dc");
         Assert.Equal(FindingStatus.Ok, dc.Status);
+        Assert.Null(dc.SettingsPage);
         Assert.Equal("Équilibré (réglage par défaut)", dc.Current);
         Assert.Equal("prise en charge", Get(findings, "M05.modern-standby").Current);
         Assert.Equal("Portable", Get(findings, "M05.profile").Current);
@@ -247,9 +250,11 @@ public class PowerModuleTests
         Assert.Equal(FindingStatus.Improvable, ac.Status);
         Assert.True(ac.Fixable);
         Assert.Equal("Équilibré (réglage par défaut)", ac.Current);
+        Assert.Equal("ms-settings:powersleep", ac.SettingsPage);
         var dc = Get(findings, "M05.power-mode-dc");
         Assert.Equal(FindingStatus.Improvable, dc.Status);
         Assert.Equal("Meilleures performances", dc.Current);
+        Assert.Equal("ms-settings:powersleep", dc.SettingsPage);
     }
 
     [Fact]
@@ -339,6 +344,7 @@ public class PowerModuleTests
         Assert.True(fastStartup.Fixable);
         Assert.Equal("activé", fastStartup.Current);
         Assert.Contains("plus lent", fastStartup.Advice, StringComparison.Ordinal);
+        Assert.Null(fastStartup.SettingsPage);
     }
 
     [Fact]

@@ -19,6 +19,12 @@ public sealed class PowerModule : Fixes.IFixableModule
     internal const string PowerPolicyKey = @"SOFTWARE\Policies\Microsoft\Power\PowerSettings";
     internal const string X3DServiceQuery = "SELECT Name, State FROM Win32_Service WHERE Name = 'amd3dvcacheSvc'";
 
+    /// <summary>
+    /// Système > Alimentation (« Power &amp; sleep », Microsoft Learn « Launch Windows Settings ») : là où se choisit le mode d'alimentation.
+    /// Le mode de gestion et le démarrage rapide se règlent dans le Panneau de configuration, qui n'a pas d'adresse ms-settings.
+    /// </summary>
+    internal const string PowerSettingsPage = "ms-settings:powersleep";
+
     private static string PlanCategory => T("Mode de gestion");
     private static string ModeCategory => T("Mode d'alimentation");
     private static string StartupCategory => T("Démarrage et veille");
@@ -364,6 +370,7 @@ public sealed class PowerModule : Fixes.IFixableModule
                 Expected = T("Équilibré (votre choix : autonomie)"),
                 Explanation = T("Vous avez choisi de privilégier l'autonomie et le silence : « Équilibré » sur secteur chauffe moins et fait moins de bruit."),
                 Advice = economical ? null : T("Choisir « Équilibré » pour « Branché » dans Paramètres > Système > Alimentation (ms-settings:powersleep)."),
+                SettingsPage = economical ? null : PowerSettingsPage,
             };
         }
 
@@ -379,6 +386,7 @@ public sealed class PowerModule : Fixes.IFixableModule
             Expected = PowerSchemes.OverlayLabel(PowerSchemes.OverlayBestPerformance) + (profile == PowerProfile.Laptop && choice != LaptopPowerChoice.NotChosen ? T(" (votre choix)") : string.Empty),
             Explanation = T("Le mode d'alimentation (Paramètres > Système > Alimentation) ajuste « Utilisation normale » : « Meilleures performances » privilégie la réactivité et la fréquence du processeur quand le PC est branché."),
             Advice = compliant ? null : T("Choisir « Meilleures performances » pour « Branché » dans Paramètres > Système > Alimentation. Plus de chaleur et de bruit sur secteur."),
+            SettingsPage = compliant ? null : PowerSettingsPage,
             Fixable = !compliant,
         };
     }
@@ -428,6 +436,7 @@ public sealed class PowerModule : Fixes.IFixableModule
             Expected = expected,
             Explanation = explanation,
             Advice = compliant ? null : advice,
+            SettingsPage = compliant ? null : PowerSettingsPage,
         };
     }
 

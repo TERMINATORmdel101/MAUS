@@ -12,6 +12,9 @@ namespace Maus.Core.Modules.M06Visual;
 /// </summary>
 public sealed class VisualEffectsModule : IFixableModule
 {
+    /// <summary>Personnalisation > Barre des tâches (Microsoft Learn, « Launch Windows Settings ») : interrupteur « Widgets ».</summary>
+    internal const string TaskbarSettingsPage = "ms-settings:taskbar";
+
     private static string Category => T("Effets désactivés");
 
     /// <summary>Effets pilotés par SystemParametersInfo : code GET, libellé Windows, valeur attendue.</summary>
@@ -191,6 +194,7 @@ public sealed class VisualEffectsModule : IFixableModule
                 Expected = T("désactivés"),
                 Explanation = T("Le panneau Widgets charge du contenu en ligne en arrière-plan (actualités, météo, publicités)."),
                 Advice = disabled ? null : T("Désactiver les Widgets par la stratégie AllowNewsAndInterests (Pro et plus) ou dans Paramètres > Barre des tâches."),
+                SettingsPage = disabled ? null : TaskbarSettingsPage,
                 Fixable = !disabled && !windows.IsHomeEdition,
             };
         }

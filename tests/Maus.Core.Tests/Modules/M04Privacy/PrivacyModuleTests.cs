@@ -60,12 +60,46 @@ public class PrivacyModuleTests
     }
 
     [Fact]
+    public async Task Deviations_open_the_settings_page_named_in_the_advice()
+    {
+        var findings = await Detect(FreshRegistry(), FreshCim(), new FakePackages().Add(CopilotPackage));
+
+        foreach (var (id, page) in new[]
+        {
+            ("M04.diagnostic-data", "ms-settings:privacy-feedback"),
+            ("M04.feedback-frequency", "ms-settings:privacy-feedback"),
+            ("M04.tailored-experiences", "ms-settings:privacy-feedback"),
+            ("M04.advertising-id", "ms-settings:privacy"),
+            ("M04.settings-suggestions", "ms-settings:privacy"),
+            ("M04.tips-silent-apps", "ms-settings:notifications"),
+            ("M04.lockscreen-tips", "ms-settings:lockscreen"),
+            ("M04.start-recommendations", "ms-settings:personalization-start"),
+            ("M04.search-highlights", "ms-settings:search-permissions"),
+            ("M04.activity-history", "ms-settings:privacy-activityhistory"),
+        })
+        {
+            Assert.Equal(page, Single(findings, id).SettingsPage);
+        }
+
+        // Stratégies, service, tâches planifiées, page « Rechercher » sans adresse documentée, mode 1 laissé au choix, corrections de MAUS : aucun bouton.
+        foreach (var id in new[]
+        {
+            "M04.diagtrack", "M04.diagnostic-logs", "M04.ceip-tasks", "M04.web-search", "M04.delivery-optimization",
+            "M04.copilot", "M04.recall", "M04.error-reporting",
+        })
+        {
+            Assert.Null(Single(findings, id).SettingsPage);
+        }
+    }
+
+    [Fact]
     public async Task Tuned_pc_is_fully_compliant()
     {
         var findings = await Detect(TunedRegistry(), TunedCim(), new FakePackages().Add("Microsoft.MicrosoftOfficeHub"));
 
         Assert.All(findings, f => Assert.True(f.Status == FindingStatus.Ok, $"{f.Id} : {f.Status} ({f.Current})"));
         Assert.All(findings, f => Assert.False(f.Fixable, f.Id));
+        Assert.All(findings, f => Assert.Null(f.SettingsPage));
     }
 
     [Theory]
@@ -204,6 +238,11 @@ public class PrivacyModuleTests
         Assert.Equal("valeur 5 non documentée", PrivacyRegistryChecks.StartRecommendations(registry, Pro).Current);
         Assert.Equal(FindingStatus.Info, PrivacyRegistryChecks.SearchHighlights(registry, policiesHonored: true).Status);
 
+        // Le conseil renvoie vers Confidentialité et sécurité : le bouton n'y mène que si l'interrupteur s'y trouve vraiment.
+        Assert.Equal("ms-settings:privacy", PrivacyRegistryChecks.AdvertisingId(registry, policiesHonored: true).SettingsPage);
+        Assert.Equal("ms-settings:search-permissions", PrivacyRegistryChecks.SearchHighlights(registry, policiesHonored: true).SettingsPage);
+        Assert.Null(PrivacyRegistryChecks.StartRecommendations(registry, Pro).SettingsPage);
+
         registry.Set(Hklm, AdvertisingPolicy, "DisabledByGroupPolicy", 1);
         Assert.Equal(FindingStatus.Ok, PrivacyRegistryChecks.AdvertisingId(registry, policiesHonored: true).Status);
     }
@@ -337,13 +376,13 @@ public class PrivacyModuleTests
     }
 
     [Theory]
-    [InlineData(0, FindingStatus.Ok)]
-    [InlineData(99, FindingStatus.Ok)]
-    [InlineData(1, FindingStatus.Improvable)]
-    [InlineData(2, FindingStatus.Improvable)]
-    [InlineData(3, FindingStatus.Improvable)]
-    [InlineData(100, FindingStatus.Improvable)]
-    public void Delivery_optimization_mode_is_read_like_Get_DOConfig(byte mode, FindingStatus expected)
+    [InlineData(0, FindingStatus.Ok, null)]
+    [InlineData(99, FindingStatus.Ok, null)]
+    [InlineData(1, FindingStatus.Improvable, null)]
+    [InlineData(2, FindingStatus.Improvable, "ms-settings:delivery-optimization")]
+    [InlineData(3, FindingStatus.Improvable, "ms-settings:delivery-optimization")]
+    [InlineData(100, FindingStatus.Improvable, null)]
+    public void Delivery_optimization_mode_is_read_like_Get_DOConfig(byte mode, FindingStatus expected, string? settingsPage)
     {
         var cim = new FakeCim().Answer(DeliveryOptimizationQuery, DeliveryOptimizationScope,
             Row(("DownloadMode", mode), ("DownloadModeProvider", 8)));
@@ -351,6 +390,7 @@ public class PrivacyModuleTests
         var finding = PrivacySystemChecks.DeliveryOptimization(cim, new FakeRegistry());
 
         Assert.Equal(expected, finding.Status);
+        Assert.Equal(settingsPage, finding.SettingsPage);
         Assert.StartsWith(PrivacySystemChecks.DescribeDownloadMode(mode), finding.Current, StringComparison.Ordinal);
         Assert.EndsWith("(choisi dans Paramètres)", finding.Current, StringComparison.Ordinal);
     }
