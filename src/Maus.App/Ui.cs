@@ -79,6 +79,9 @@ public static class Ui
 
     public static string Quit => T("Quitter");
 
+    /// <summary>Ce que veut dire le nom, sous le logo (en anglais et en espagnol aussi, les initiales restent M, A, U, S).</summary>
+    public static string NameMeaning => T("Maintenance · Audit · Updates · Sécurité");
+
     public static string Continue => T("Continuer");
 
     public static string DisclaimerTitle => Maus.Core.Legal.Disclaimer.Title;

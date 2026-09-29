@@ -32,8 +32,27 @@
                     <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
                         <Border Background="{DynamicResource MausSidebarTint}" Padding="14,16">
                             <DockPanel>
-                                <Image DockPanel.Dock="Top" Source="/Assets/maus-banner.png" Height="108" HorizontalAlignment="Center"
-                                       RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="MAUS" Margin="0,0,0,16" />
+                                <!-- Logo du porteur, recadré sur les lettres (jamais redessiné) : coins arrondis et ombre légère pour qu'il se pose
+                                     sur la barre, puis les quatre couleurs des lettres et ce que veut dire le nom. -->
+                                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,18">
+                                    <Border Height="100" CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                            AutomationProperties.Name="MAUS">
+                                        <Border.Background>
+                                            <ImageBrush ImageSource="/Assets/maus-banner.png" Stretch="UniformToFill" />
+                                        </Border.Background>
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.35" />
+                                        </Border.Effect>
+                                    </Border>
+                                    <UniformGrid Rows="1" Height="3" Margin="10,10,10,0">
+                                        <Border Background="{StaticResource MausBlue}" CornerRadius="1.5" Margin="0,0,3,0" />
+                                        <Border Background="{StaticResource MausRed}" CornerRadius="1.5" Margin="0,0,3,0" />
+                                        <Border Background="{StaticResource MausGreen}" CornerRadius="1.5" Margin="0,0,3,0" />
+                                        <Border Background="{StaticResource MausGold}" CornerRadius="1.5" />
+                                    </UniformGrid>
+                                    <TextBlock Text="{x:Static app:Ui.NameMeaning}" FontSize="10.5" Margin="0,7,0,0" HorizontalAlignment="Center"
+                                               TextAlignment="Center" TextWrapping="Wrap" Opacity="{DynamicResource MutedOpacity}" />
+                                </StackPanel>
                                 <!-- Place réservée aux réglages du bas (langue, surveillance, paramètres), posés hors du gabarit
                                      pour rester accessibles aux lecteurs d'écran : voir la fin de la fenêtre. -->
                                 <Border DockPanel.Dock="Bottom" Height="36" />

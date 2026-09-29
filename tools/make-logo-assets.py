@@ -23,8 +23,8 @@ def main():
     logo = Image.open(SOURCE).convert("RGB")
     grey = logo.getpixel((20, 20))
 
-    # Bannière : le char et les lettres, sans le sol ni le haut du mur.
-    banner = logo.crop((0, 380, 2048, 1460))
+    # Bannière : les lettres, serrées, avec un peu du contour du char (lisibles dans la barre de 200 px de large).
+    banner = logo.crop((100, 540, 1948, 1440))
     banner.resize((720, round(720 * banner.height / banner.width)), Image.LANCZOS).save(os.path.join(APP, "maus-banner.png"), optimize=True)
 
     # Logo réduit pour le README et le Store.
