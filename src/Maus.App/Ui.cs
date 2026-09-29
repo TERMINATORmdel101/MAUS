@@ -411,7 +411,7 @@ public static class Ui
 
     public static string HonestTitle => T("Soyons honnêtes : ce que ces corrections apportent vraiment");
 
-    public static string HonestWindows => T("• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais font rarement gagner plus de 1 à 3 % d'images par seconde dans les jeux.");
+    public static string HonestWindows => T("• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais leur gain en images par seconde dans les jeux est faible, souvent impossible à mesurer.");
 
     public static string HonestHardware => T("• Les vrais gains viennent du matériel bien réglé : mémoire à sa vitesse annoncée (XMP/EXPO), écran à sa bonne fréquence, pilote graphique à jour, Windows sur un SSD, applications inutiles retirées du démarrage. MAUS les signale dans l'audit.");
 

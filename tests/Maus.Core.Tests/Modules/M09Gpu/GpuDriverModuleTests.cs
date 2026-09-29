@@ -43,6 +43,26 @@ public class GpuDriverModuleTests
     }
 
     [Fact]
+    public async Task Old_catalog_cannot_say_up_to_date_forever()
+    {
+        // Même pilote « à jour », mais le catalogue intégré (vérifié le 24/09/2026) a plus de 45 jours au moment de l'audit.
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx2080Ti, width: 16, maxWidth: 16, bus: 1);
+        var commands = new FakeCommands()
+            .Answer(NvidiaQuery, "00000000:01:00.0, 617.14, NVIDIA GeForce RTX 2080 Ti\r\n")
+            .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true, EnabledByDefault: false));
+        var later = new DateTimeOffset(2027, 1, 15, 12, 0, 0, TimeSpan.FromHours(1));
+
+        var findings = await Detect(TestContext.Create(cim: cim, commands: commands, now: later), scheduling);
+
+        var driver = Get(findings, "M09.driver.nvidia");
+        Assert.Equal(FindingStatus.Info, driver.Status);
+        Assert.Contains("Le catalogue de MAUS date du", driver.Explanation, StringComparison.Ordinal);
+        Assert.Contains("nvidia.com", driver.Advice, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Old_nvidia_driver_is_improvable_with_official_link()
     {
         var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "31.0.15.3598", new DateTime(2023, 6, 1), "oem12.inf"));

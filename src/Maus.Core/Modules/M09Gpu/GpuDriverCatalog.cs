@@ -55,6 +55,12 @@ public sealed record GpuDriverCatalog
     /// <summary>Âge (en jours) au-delà duquel un pilote est jugé ancien, même sans catalogue.</summary>
     public int MaxDriverAgeDays { get; init; } = 183;
 
+    /// <summary>
+    /// Âge (en jours) au-delà duquel le catalogue lui-même est trop vieux pour dire « à jour » : il est revérifié chaque mois
+    /// (CLAUDE.md), 45 jours laissent une marge. Choix de MAUS sur sa propre fraîcheur, pas une donnée technique.
+    /// </summary>
+    public int CatalogMaxAgeDays { get; init; } = 45;
+
     public IReadOnlyList<GpuDriverBranch> Branches { get; init; } = [];
 
     public IReadOnlyDictionary<string, string> VendorDownloads { get; init; } = new Dictionary<string, string>();

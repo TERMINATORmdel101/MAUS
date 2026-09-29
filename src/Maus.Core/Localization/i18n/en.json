@@ -2801,7 +2801,6 @@
   "événement {0} ({1}) le {2}": "event {0} ({1}) on {2}",
   "événements": "events",
   "• DISM répare la copie de référence de Windows en la comparant à Windows Update (connexion Internet conseillée) ;": "• DISM repairs the Windows reference copy by comparing it with Windows Update (Internet connection recommended);",
-  "• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais font rarement gagner plus de 1 à 3 % d'images par seconde dans les jeux.": "• Windows settings (visual effects, privacy, Game Bar, startup) make the PC more responsive, more private and smoother, but rarely gain more than 1 to 3 % frames per second in games.",
   "• Les vrais gains viennent du matériel bien réglé : mémoire à sa vitesse annoncée (XMP/EXPO), écran à sa bonne fréquence, pilote graphique à jour, Windows sur un SSD, applications inutiles retirées du démarrage. MAUS les signale dans l'audit.": "• The real gains come from well-tuned hardware: memory at its rated speed (XMP/EXPO), display at its proper refresh rate, up-to-date graphics driver, Windows on an SSD, useless apps removed from startup. MAUS reports them in the audit.",
   "• MAUS ne coupe jamais une protection importante (antivirus, pare-feu, mises à jour, protections du processeur) ni une fonction utile de Windows pour gagner quelques pour cent.": "• MAUS never turns off an important protection (antivirus, firewall, updates, processor protections) or a useful Windows feature to gain a few percent.",
   "• Méfiez-vous des outils qui promettent +30 % : la plupart de leurs réglages sont sans effet mesurable, ou retirent des fonctions de Windows dont vous aurez besoin un jour.": "• Beware of tools that promise +30 %: most of their tweaks have no measurable effect, or remove Windows features you will need one day.",
@@ -3301,5 +3300,7 @@
   "Fermer quand même ?": "Close anyway?",
   "Interrompue : peut-être appliquée": "Interrupted: possibly applied",
   "Modifiée depuis, laissée telle quelle": "Changed since, left as is",
-  "interrompue : peut-être appliquée, « Annuler » vérifie": "interrupted: possibly applied, \"Undo\" checks"
+  "interrompue : peut-être appliquée, « Annuler » vérifie": "interrupted: possibly applied, \"Undo\" checks",
+  "Le catalogue de MAUS date du {0} : une version plus récente a pu sortir depuis. Vérifiez sur la page officielle du fabricant.": "The MAUS catalogue dates from {0}: a newer version may have been released since. Check on the manufacturer's official page.",
+  "• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais leur gain en images par seconde dans les jeux est faible, souvent impossible à mesurer.": "• Windows settings (visual effects, privacy, Game Bar, startup) make the PC more responsive, more discreet and steadier, but their gain in frames per second in games is small, often impossible to measure."
 }

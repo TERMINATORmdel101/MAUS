@@ -4,6 +4,7 @@
   "checkedOn": "2026-09-24",
   "significantGapDays": 90,
   "maxDriverAgeDays": 183,
+  "catalogMaxAgeDays": 45,
   "branches": [
     {
       "id": "nvidia-r580-legacy",

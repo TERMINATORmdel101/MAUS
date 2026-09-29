@@ -176,9 +176,12 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         var gapDays = date is null || branch is null ? (int?)null : branch.ReleasedOn.DayNumber - DateOnly.FromDateTime(date.Value).DayNumber;
         var comparison = versions.Installed is not null && versions.Latest is not null ? versions.Installed.CompareTo(versions.Latest) : (int?)null;
         var old = ageDays > catalog.MaxDriverAgeDays || gapDays > catalog.SignificantGapDays;
+        // Catalogue trop ancien : une version plus récente a pu sortir depuis, MAUS ne peut pas affirmer « à jour ».
+        var staleCatalog = (DateOnly.FromDateTime(context.Now.Date).DayNumber - catalog.CheckedOn.DayNumber) > catalog.CatalogMaxAgeDays;
 
         var status = comparison switch
         {
+            >= 0 when staleCatalog => FindingStatus.Info,
             >= 0 => FindingStatus.Ok,
             < 0 when old => FindingStatusExtensions.ForDeviation(Severity.Low),
             < 0 => FindingStatus.Info,
@@ -209,6 +212,11 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         if (branch?.Note is { } note)
         {
             explanation += " " + T(note);
+        }
+
+        if (staleCatalog && comparison >= 0)
+        {
+            explanation += " " + T("Le catalogue de MAUS date du {0} : une version plus récente a pu sortir depuis. Vérifiez sur la page officielle du fabricant.", FormatDate(catalog.CheckedOn));
         }
 
         string? advice = null;
