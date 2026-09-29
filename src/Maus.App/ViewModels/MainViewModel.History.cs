@@ -41,6 +41,12 @@ public sealed partial class MainViewModel
 
     private async Task RevertAsync(SessionViewModel session, string? changeId)
     {
+        if (IsApplying)
+        {
+            FixReport = T("Corrections en cours : attendez qu'elles soient finies avant d'annuler.");
+            return;
+        }
+
         var what = changeId is null
             ? T("MAUS va remettre les valeurs d'origine de la séance du {0}.", session.Header)
             : T("MAUS va remettre les valeurs d'origine de la correction « {0} ».", session.Session.Entries.First(e => e.ChangeId == changeId).ChangeTitle);

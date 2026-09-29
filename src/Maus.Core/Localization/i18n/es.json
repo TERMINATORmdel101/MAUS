@@ -3293,5 +3293,13 @@
   "pilote facultatif": "controlador opcional",
   "pilote installé automatiquement": "controlador instalado automáticamente",
   "pilotes facultatifs": "controladores opcionales",
-  "pilotes installés automatiquement": "controladores instalados automáticamente"
+  "pilotes installés automatiquement": "controladores instalados automáticamente",
+  "Correction interrompue avant l'écriture : la valeur d'origine était encore en place.": "Corrección interrumpida antes de la escritura: el valor original seguía en su sitio.",
+  "Correction interrompue avant l'écriture : rien à annuler.": "Corrección interrumpida antes de la escritura: nada que deshacer.",
+  "Corrections en cours : attendez qu'elles soient finies avant d'annuler.": "Correcciones en curso: espere a que terminen antes de deshacer.",
+  "Des corrections sont en cours d'écriture. Fermer maintenant peut laisser une correction à moitié faite ; elle restera annulable dans l'Historique au prochain lancement.": "Se están escribiendo correcciones. Cerrar ahora puede dejar una corrección a medias; seguirá pudiéndose deshacer en el Historial en el próximo inicio.",
+  "Fermer quand même ?": "¿Cerrar de todos modos?",
+  "Interrompue : peut-être appliquée": "Interrumpida: quizá aplicada",
+  "Modifiée depuis, laissée telle quelle": "Modificada desde entonces, dejada tal cual",
+  "interrompue : peut-être appliquée, « Annuler » vérifie": "interrumpida: quizá aplicada, «Deshacer» comprueba"
 }

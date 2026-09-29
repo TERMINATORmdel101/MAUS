@@ -74,8 +74,8 @@ public sealed class FixEngine
 
         var session = new JournalSession
         {
-            Id = JournalSession.NewId(_context.Audit.Now),
-            CreatedAt = _context.Audit.Now,
+            Id = JournalSession.NewId(Now),
+            CreatedAt = Now,
             WindowsBuild = _context.Audit.Windows.Build,
             RestorePoint = restorePoint?.Point,
             RestorePointNote = restorePoint switch
@@ -148,7 +148,7 @@ public sealed class FixEngine
 
         var outcomes = new List<RevertOutcome>();
         var targets = Enumerable.Reverse(session.Entries)
-            .Where(e => e.State == EntryState.Applied && (changeId is null || e.ChangeId == changeId))
+            .Where(e => e.State is EntryState.Applied or EntryState.Pending && (changeId is null || e.ChangeId == changeId))
             .ToList();
         if (changeId is not null && targets.Count == 0)
         {
@@ -162,7 +162,7 @@ public sealed class FixEngine
 
         if (!session.CanRevert)
         {
-            session.RevertedAt = _context.Audit.Now;
+            session.RevertedAt = Now;
         }
 
         _context.Journal.Save(session);
@@ -232,7 +232,7 @@ public sealed class FixEngine
             {
                 _context.Settings.Write(entry.Key, entry.After);
                 entry.State = EntryState.Applied;
-                entry.AppliedAt = _context.Audit.Now;
+                entry.AppliedAt = Now;
             }
             catch (Exception ex) when (IsSettingFailure(ex))
             {
@@ -280,6 +280,15 @@ public sealed class FixEngine
             return Outcome(RevertStatus.Failed, T("Valeur actuelle illisible : rien n'a été modifié."));
         }
 
+        // Écriture interrompue (MAUS fermé, plantage, coupure) : si la valeur d'origine est encore en place, rien n'avait été
+        // écrit ; si c'est la nouvelle valeur, elle se remet comme une correction appliquée (même condition, même relecture).
+        if (entry.State == EntryState.Pending && !force && !SettingValue.AreEquivalent(current, entry.After) && SettingValue.AreEquivalent(current, entry.Before))
+        {
+            entry.State = EntryState.Failed;
+            entry.Error = T("Correction interrompue avant l'écriture : la valeur d'origine était encore en place.");
+            return Outcome(RevertStatus.Skipped, T("Correction interrompue avant l'écriture : rien à annuler."));
+        }
+
         if (!force && !SettingValue.AreEquivalent(current, entry.After))
         {
             entry.State = EntryState.RevertSkipped;
@@ -305,9 +314,12 @@ public sealed class FixEngine
         }
 
         entry.State = EntryState.Reverted;
-        entry.RevertedAt = _context.Audit.Now;
+        entry.RevertedAt = Now;
         return Outcome(RevertStatus.Reverted, T("Valeur d'origine remise ({0}).", SettingValue.Display(entry.Before)));
     }
+
+    /// <summary>Heure réelle de l'opération (horloge du contexte), sinon celle de l'audit (tests).</summary>
+    private DateTimeOffset Now => _context.Clock?.Invoke() ?? _context.Audit.Now;
 
     /// <summary>Défait les écritures d'une correction, dans l'ordre inverse.</summary>
     private void RollBack(IEnumerable<JournalEntry> entries)

@@ -74,9 +74,12 @@ public sealed class JournalSession
 
     public DateTimeOffset? RevertedAt { get; set; }
 
-    /// <summary>Au moins une valeur est encore appliquée : « Annuler » a quelque chose à faire.</summary>
+    /// <summary>
+    /// Au moins une valeur est encore appliquée, ou une écriture a été interrompue (MAUS fermé pendant la correction) :
+    /// « Annuler » a peut-être quelque chose à faire.
+    /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool CanRevert => Entries.Any(e => e.State == EntryState.Applied);
+    public bool CanRevert => Entries.Any(e => e.State is EntryState.Applied or EntryState.Pending);
 
     /// <summary>Identifiant lisible et triable : date, heure, puis suffixe aléatoire.</summary>
     public static string NewId(DateTimeOffset now) =>

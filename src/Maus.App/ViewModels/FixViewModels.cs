@@ -57,7 +57,6 @@ public sealed class SessionViewModel
         Session = session;
         RevertCommand = new AsyncCommand(() => revert(this, null));
         Changes = session.Entries
-            .Where(e => e.State is not EntryState.Pending)
             .GroupBy(e => e.ChangeId)
             .Select(g => new SessionChangeViewModel(g.ToList(), () => revert(this, g.Key)))
             .ToList();
@@ -104,7 +103,7 @@ public sealed class SessionChangeViewModel
 
     public string Title => _entries[0].ChangeTitle;
 
-    public bool CanRevert => _entries.Any(e => e.State == EntryState.Applied);
+    public bool CanRevert => _entries.Any(e => e.State is EntryState.Applied or EntryState.Pending);
 
     public string State => _entries.Select(e => e.State).Distinct().ToList() switch
     {
@@ -112,6 +111,7 @@ public sealed class SessionChangeViewModel
         [EntryState.Reverted] => T("annulée"),
         [EntryState.RevertSkipped] => T("modifiée depuis"),
         [EntryState.Failed] => T("échec, origine remise"),
+        [EntryState.Pending] => T("interrompue : peut-être appliquée, « Annuler » vérifie"),
         _ => T("en partie annulée"),
     };
 

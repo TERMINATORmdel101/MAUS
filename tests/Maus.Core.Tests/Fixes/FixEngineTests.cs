@@ -283,4 +283,53 @@ public class FixEngineTests
         Assert.Equal(RegistryValueKind.ExpandString, registry.GetValueKind(RegistryHive.CurrentUser, "Environment", "Chemin"));
         Assert.Equal("%USERPROFILE%\\x", registry.GetValue(RegistryHive.CurrentUser, "Environment", "Chemin"));
     }
+
+    [Fact]
+    public void Interrupted_write_stays_revertible()
+    {
+        // MAUS fermé (ou coupure) juste après l'écriture : le journal est resté à « en attente ».
+        var (engine, registry, _, journal, _, _) = Setup();
+        var applied = engine.Apply([Change("M06.taskview", new SettingWrite(TaskView, SettingValue.Dword(0)))], new ApplyOptions());
+        var saved = journal.Load(applied.Session!.Id)!;
+        saved.Entries.Single().State = EntryState.Pending;
+        journal.Save(saved);
+        Assert.True(journal.Load(applied.Session.Id)!.CanRevert);
+
+        var reverted = engine.Revert(applied.Session.Id);
+
+        Assert.Equal(RevertStatus.Reverted, reverted.Entries.Single().Status);
+        Assert.Equal(1, registry.GetDword(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton"));
+        Assert.False(reverted.Session!.CanRevert);
+    }
+
+    [Fact]
+    public void Interrupted_before_the_write_has_nothing_to_undo()
+    {
+        var (engine, registry, _, journal, _, _) = Setup();
+        var applied = engine.Apply([Change("M06.taskview", new SettingWrite(TaskView, SettingValue.Dword(0)))], new ApplyOptions());
+        var saved = journal.Load(applied.Session!.Id)!;
+        saved.Entries.Single().State = EntryState.Pending;
+        journal.Save(saved);
+        registry.Set(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton", 1);
+
+        var reverted = engine.Revert(applied.Session.Id);
+
+        Assert.Equal(RevertStatus.Skipped, reverted.Entries.Single().Status);
+        Assert.Equal(EntryState.Failed, reverted.Session!.Entries.Single().State);
+        Assert.False(reverted.Session.CanRevert);
+    }
+
+    [Fact]
+    public void Journal_dates_use_the_real_clock_not_the_audit_time()
+    {
+        var registry = new FakeRegistry().Set(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton", 1);
+        var audit = TestContext.Create(registry, hardware: new HardwareProfile { FormFactor = FormFactor.Desktop });
+        var later = audit.Now.AddHours(9);
+        var engine = new FixEngine(TestFixContext.Create(audit, registry, clock: () => later));
+
+        var applied = engine.Apply([Change("M06.taskview", new SettingWrite(TaskView, SettingValue.Dword(0)))], new ApplyOptions());
+
+        Assert.Equal(later, applied.Session!.CreatedAt);
+        Assert.Equal(later, applied.Session.Entries.Single().AppliedAt);
+    }
 }

@@ -21,6 +21,12 @@ public sealed class FixContext
     /// <summary>MAUS a été élevé avec un autre compte que celui de la session : les réglages du profil sont bloqués.</summary>
     public bool ElevatedAsAnotherUser { get; init; }
 
+    /// <summary>
+    /// Horloge des dates du journal (séance, écriture, annulation). Sans elle, l'heure de l'audit : l'interface réutilise le
+    /// dernier audit, dont l'heure peut dater de plusieurs heures.
+    /// </summary>
+    public Func<DateTimeOffset>? Clock { get; init; }
+
     public static FixContext CreateDefault(AuditContext audit)
     {
         var settings = new SettingsAccessor(audit.Registry, new WindowsRegistryWriter(), audit.SystemParameters, new Win32SystemParametersWriter());
@@ -31,6 +37,7 @@ public sealed class FixContext
             Journal = FileJournalStore.CreateDefault(),
             SystemRestore = new WmiSystemRestore(audit.Registry),
             ElevatedAsAnotherUser = SessionUser.IsElevatedAsAnotherUser(),
+            Clock = () => DateTimeOffset.Now,
         };
     }
 }

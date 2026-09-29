@@ -3293,5 +3293,13 @@
   "pilote facultatif": "optional driver",
   "pilote installé automatiquement": "driver installed automatically",
   "pilotes facultatifs": "optional drivers",
-  "pilotes installés automatiquement": "drivers installed automatically"
+  "pilotes installés automatiquement": "drivers installed automatically",
+  "Correction interrompue avant l'écriture : la valeur d'origine était encore en place.": "Fix interrupted before the write: the original value was still in place.",
+  "Correction interrompue avant l'écriture : rien à annuler.": "Fix interrupted before the write: nothing to undo.",
+  "Corrections en cours : attendez qu'elles soient finies avant d'annuler.": "Fixes in progress: wait until they are finished before undoing.",
+  "Des corrections sont en cours d'écriture. Fermer maintenant peut laisser une correction à moitié faite ; elle restera annulable dans l'Historique au prochain lancement.": "Fixes are being written. Closing now may leave a fix half done; it will remain undoable in History at the next launch.",
+  "Fermer quand même ?": "Close anyway?",
+  "Interrompue : peut-être appliquée": "Interrupted: possibly applied",
+  "Modifiée depuis, laissée telle quelle": "Changed since, left as is",
+  "interrompue : peut-être appliquée, « Annuler » vérifie": "interrupted: possibly applied, \"Undo\" checks"
 }

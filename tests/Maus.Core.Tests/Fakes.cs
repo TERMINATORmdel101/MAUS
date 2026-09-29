@@ -344,7 +344,8 @@ public static class TestFixContext
         FakeSystemRestore? restore = null,
         FakeNotifier? notifier = null,
         bool elevatedAsAnotherUser = false,
-        IPowerSchemeAccessor? power = null)
+        IPowerSchemeAccessor? power = null,
+        Func<DateTimeOffset>? clock = null)
     {
         parameters ??= (FakeSystemParameters)audit.SystemParameters;
         return new FixContext
@@ -355,6 +356,7 @@ public static class TestFixContext
             SystemRestore = restore ?? new FakeSystemRestore(),
             Notifier = notifier ?? new FakeNotifier(),
             ElevatedAsAnotherUser = elevatedAsAnotherUser,
+            Clock = clock,
         };
     }
 }

@@ -149,6 +149,8 @@ public static class HtmlReport
                     EntryState.Applied => T("Appliqué"),
                     EntryState.Reverted => T("Annulé depuis"),
                     EntryState.Failed => T("Échec : valeur d'origine remise"),
+                    EntryState.RevertSkipped => T("Modifiée depuis, laissée telle quelle"),
+                    EntryState.Pending => T("Interrompue : peut-être appliquée"),
                     _ => first.State.ToString(),
                 };
             var values = string.Join("<br>", change.Select(e => $"<code>{E(e.Key.Describe())}</code> : {E(SettingValue.Display(e.Before))} → {E(SettingValue.Display(e.After))}"));
