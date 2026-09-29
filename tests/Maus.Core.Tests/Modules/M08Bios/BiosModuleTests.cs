@@ -40,6 +40,7 @@ public class BiosModuleTests
         Assert.Equal(FindingStatus.Ok, Single(findings, "M08.secure-boot-events").Status);
         Assert.Equal(FindingStatus.Ok, Single(findings, "M08.dbdefault").Status);
         Assert.Equal(FindingStatus.Ok, Single(findings, "M08.boot-manager-2023").Status);
+        Assert.Null(Single(findings, "M08.ca2023-status").SettingsPage);
         Assert.DoesNotContain(findings, f => f.Status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable);
     }
 
@@ -151,6 +152,8 @@ public class BiosModuleTests
 
         Assert.Equal(FindingStatus.Warning, Single(findings, "M08.ca2023-status").Status);
         Assert.Equal("en cours (InProgress)", Single(findings, "M08.ca2023-status").Current);
+        Assert.Equal("ms-settings:windowsupdate", Single(findings, "M08.ca2023-status").SettingsPage);
+        Assert.Null(Single(findings, "M08.ca2023-error").SettingsPage);
         Assert.Equal(FindingStatus.Warning, Single(findings, "M08.ca2023-error").Status);
         Assert.Equal("code 0x80070015", Single(findings, "M08.ca2023-error").Current);
         var journal = Single(findings, "M08.secure-boot-events");

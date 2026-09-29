@@ -23,6 +23,12 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     private const string DriverSearchingKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\DriverSearching";
     private const string VideoControllerQuery = "SELECT Name, PNPDeviceID, DriverVersion, DriverDate, InfFilename FROM Win32_VideoController";
 
+    /// <summary>
+    /// Page « Paramètres graphiques par défaut » (Système > Écran > Graphiques), où se trouve HAGS
+    /// (Microsoft Learn, « Launch Windows Settings » : <c>ms-settings:display-advancedgraphics-default</c>).
+    /// </summary>
+    internal const string DefaultGraphicsSettingsPage = "ms-settings:display-advancedgraphics-default";
+
     internal static readonly string[] NvidiaSmiQueryArguments = ["--query-gpu=pci.bus_id,driver_version,name", "--format=csv,noheader"];
     internal static readonly string[] NvidiaSmiMemoryArguments = ["-q", "-d", "MEMORY"];
 
@@ -453,6 +459,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             Advice = enabled.Value
                 ? null
                 : T("Paramètres > Système > Écran > Graphiques > « Modifier les paramètres graphiques par défaut », puis redémarrez le PC."),
+            SettingsPage = enabled.Value ? null : DefaultGraphicsSettingsPage,
             Fixable = !enabled.Value && needsFrameGeneration,
         };
     }

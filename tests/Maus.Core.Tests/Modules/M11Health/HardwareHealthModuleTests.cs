@@ -29,6 +29,7 @@ public class HardwareHealthModuleTests
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.disk-0-reliability"));
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.trim"));
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.free-space"));
+        Assert.Null(findings.Single(f => f.Id == "M11.free-space").SettingsPage);
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.firmware-throttling"));
         Assert.Equal(FindingStatus.Info, Status(findings, "M11.benchmark"));
         Assert.Contains("Atelier", findings.Single(f => f.Id == "M11.benchmark").Title, StringComparison.Ordinal);
@@ -86,6 +87,7 @@ public class HardwareHealthModuleTests
         var findings = await Detect(Context(NvmeDisk(), trimOutput: FrenchTrimOn, files: files));
 
         Assert.Equal(FindingStatus.Warning, Status(findings, "M11.free-space"));
+        Assert.Equal("ms-settings:storagerecommendations", findings.Single(f => f.Id == "M11.free-space").SettingsPage);
     }
 
     [Fact]

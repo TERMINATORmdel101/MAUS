@@ -16,6 +16,11 @@ public sealed class DisplayModule : IAuditModule
     private const string DirectXPreferencesKey = @"Software\Microsoft\DirectX\UserGpuPreferences";
     private static string SettingsLinks => T("Paramètres > Système > Écran (ms-settings:display) et Graphiques (ms-settings:display-advancedgraphics)");
 
+    // Pages des Paramètres ouvertes par le bouton « Ouvrir dans Windows » (Microsoft Learn, « Launch Windows Settings »).
+    internal const string DisplayPage = "ms-settings:display";
+    internal const string AdvancedDisplayPage = "ms-settings:display-advanced";
+    internal const string GraphicsPage = "ms-settings:display-advancedgraphics";
+
     /// <summary>Tolérance entre la fréquence exacte (59,94 Hz) et la valeur entière des modes (60 Hz).</summary>
     private const double RefreshTolerance = 1.0;
 
@@ -139,7 +144,7 @@ public sealed class DisplayModule : IAuditModule
 
         if (ModesInconsistent(path))
         {
-            return Finding.Unknown(id, title, InconsistentModes(path), screen.Category) with { Advice = InconsistentAdvice };
+            return Finding.Unknown(id, title, InconsistentModes(path), screen.Category) with { Advice = InconsistentAdvice, SettingsPage = DisplayPage };
         }
 
         var native = Native(path);
@@ -197,6 +202,7 @@ public sealed class DisplayModule : IAuditModule
             Explanation = T("Votre écran accepte {0} Hz mais tourne à {1} Hz. Vous gagnez en fluidité partout, mais pas en images par seconde dans les jeux. " +
                           "En HDR, le débit du câble est limité : une fréquence plus basse donne parfois une image plus nette.", max, Hz(current)),
             Advice = advice,
+            SettingsPage = AdvancedDisplayPage,
             Fixable = true,
         };
     }
@@ -287,6 +293,7 @@ public sealed class DisplayModule : IAuditModule
                 ? T("Réglages HDR, Auto HDR et fréquence variable : {0}. " +
                   "Pour un HDR juste, lancez l'application gratuite « Windows HDR Calibration » (Microsoft Store).", SettingsLinks)
                 : null,
+            SettingsPage = color.HdrSupported ? DisplayPage : null,
         };
     }
 
@@ -336,7 +343,7 @@ public sealed class DisplayModule : IAuditModule
         var resolutionTitle = T("Résolution native : {0}", screen.Label);
         if (ModesInconsistent(path))
         {
-            return Finding.Unknown(resolutionId, resolutionTitle, InconsistentModes(path), screen.Category) with { Advice = InconsistentAdvice };
+            return Finding.Unknown(resolutionId, resolutionTitle, InconsistentModes(path), screen.Category) with { Advice = InconsistentAdvice, SettingsPage = DisplayPage };
         }
 
         // Mode affiché plus grand que le mode « préféré » : résolution virtuelle (DSR / VSR) ou pilote qui ne décrit pas
@@ -362,6 +369,7 @@ public sealed class DisplayModule : IAuditModule
                 ? T("L'écran affiche sa résolution native : chaque pixel de l'image correspond à un pixel de la dalle.")
                 : T("En dehors de sa résolution native, l'image est étirée et devient floue. Pour agrandir le texte, préférez la mise à l'échelle (100 %, 125 %…)."),
             Advice = native ? null : T("Paramètres > Système > Écran : choisissez la résolution marquée « (recommandé) », puis ajustez la mise à l'échelle."),
+            SettingsPage = native ? null : DisplayPage,
         };
     }
 
@@ -410,6 +418,7 @@ public sealed class DisplayModule : IAuditModule
             Expected = T("au choix de l'utilisateur (défaut Windows)"),
             Explanation = T("Ces options de Windows complètent le HDR et la fréquence variable dans les jeux. MAUS les lit sans jamais les modifier."),
             Advice = T("Pour les changer : {0}.", SettingsLinks),
+            SettingsPage = GraphicsPage,
         };
     }
 

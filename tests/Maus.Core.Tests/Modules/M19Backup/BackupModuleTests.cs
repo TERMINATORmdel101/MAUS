@@ -27,6 +27,17 @@ public class BackupModuleTests
 
         Assert.Equal(FindingStatus.Ok, finding.Status);
         Assert.Contains("1 point", finding.Current, StringComparison.Ordinal);
+        Assert.Null(finding.SettingsPage);
+    }
+
+    [Fact]
+    public async Task Protection_without_any_point_opens_the_about_page()
+    {
+        var finding = await Get("M19.restore-points", ProtectionOn(), Points());
+
+        Assert.Equal(FindingStatus.Info, finding.Status);
+        Assert.Contains("Protection du système", finding.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:about", finding.SettingsPage);
     }
 
     [Fact]
@@ -37,6 +48,7 @@ public class BackupModuleTests
         var finding = await Get("M19.restore-points", registry);
 
         Assert.Equal(FindingStatus.Warning, finding.Status);
+        Assert.Equal("ms-settings:about", finding.SettingsPage);
     }
 
     [Fact]
@@ -59,6 +71,7 @@ public class BackupModuleTests
 
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.Contains("voulu", finding.Advice, StringComparison.Ordinal);
+        Assert.Null(finding.SettingsPage);
     }
 
     [Fact]

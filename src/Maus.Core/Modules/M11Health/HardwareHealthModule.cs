@@ -29,6 +29,9 @@ public sealed class HardwareHealthModule : IAuditModule
     private const double FreeSpaceWarningRatio = 0.15;
     private const long ReadLatencyProblemMs = 10_000;
 
+    /// <summary>Page « Recommandations de nettoyage » du Stockage (Microsoft Learn, « Launch Windows Settings »).</summary>
+    internal const string CleanupRecommendationsPage = "ms-settings:storagerecommendations";
+
     private static readonly string[] TrimArguments = ["behavior", "query", "DisableDeleteNotify"];
     private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
 
@@ -371,6 +374,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Advice = low
                 ? T("Libérez de la place : Paramètres > Système > Stockage > Recommandations de nettoyage, puis désinstallez les jeux et applications inutilisés.")
                 : null,
+            SettingsPage = low ? CleanupRecommendationsPage : null,
         };
     }
 

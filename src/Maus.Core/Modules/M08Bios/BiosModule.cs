@@ -23,6 +23,9 @@ public sealed class BiosModule : IAuditModule
     internal const string TpmWmiProvider = "Microsoft-Windows-TPM-WMI";
     internal const uint RequiredMicrocode = 0x12F;
 
+    /// <summary>Page Windows Update des Paramètres (Microsoft Learn, « Launch Windows Settings »).</summary>
+    internal const string WindowsUpdatePage = "ms-settings:windowsupdate";
+
     private const string IntelAdvisoryUrl = "https://www.intel.com/content/www/us/en/support/articles/000102331/processors.html";
     private const string RecoveryKeyUrl = "https://aka.ms/myrecoverykey";
     private static string UpdateCategory => T("Mise à jour du BIOS");
@@ -341,6 +344,7 @@ public sealed class BiosModule : IAuditModule
             Explanation = explanation,
             Advice = T("Installez toutes les mises à jour de Windows Update, puis redémarrez deux fois. Si l'état ne progresse pas, " +
                 "installez le dernier BIOS du fabricant. {0} L'état est aussi visible dans Sécurité Windows > Sécurité de l'appareil.", PageAdvice(target)),
+            SettingsPage = WindowsUpdatePage,
         };
     }
 

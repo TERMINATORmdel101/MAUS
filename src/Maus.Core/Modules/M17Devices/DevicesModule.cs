@@ -132,7 +132,7 @@ public sealed class DevicesModule : IAuditModule
 
     private static Finding Describe(Device device)
     {
-        var (meaning, advice) = Explain(device.Code);
+        var (meaning, advice, settingsPage) = Explain(device.Code);
         var critical = device.Class is "Display" or "SCSIAdapter" or "HDC" && device.Code is 10 or 28 or 31 or 39 or 43;
         var severity = critical ? Severity.High : Severity.Medium;
         return new Finding
@@ -147,34 +147,38 @@ public sealed class DevicesModule : IAuditModule
             Explanation = T("Windows signale ce code d'erreur pour l'appareil « {0} » ({1}).", device.Name, ClassLabel(device.Class))
                 + (critical ? " " + T("C'est un composant essentiel : sans lui, l'affichage ou les disques peuvent fonctionner en mode dégradé.") : string.Empty),
             Advice = advice,
+            SettingsPage = settingsPage,
         };
     }
 
-    /// <summary>Sens du code d'erreur et marche à suivre (codes documentés par Microsoft pour le Gestionnaire de périphériques).</summary>
-    internal static (string Meaning, string Advice) Explain(long code) => code switch
+    /// <summary>
+    /// Sens du code d'erreur, marche à suivre (codes documentés par Microsoft pour le Gestionnaire de périphériques) et page
+    /// des Paramètres quand la marche à suivre y renvoie.
+    /// </summary>
+    internal static (string Meaning, string Advice, string? SettingsPage) Explain(long code) => code switch
     {
         1 or 19 or 40 => (T("configuration du pilote incomplète ou abîmée"),
-            T("Désinstallez le périphérique (clic droit > Désinstaller l'appareil) puis redémarrez : Windows le réinstalle tout seul. Sinon, installez le pilote du fabricant.")),
-        3 => (T("pilote endommagé, ou mémoire insuffisante"), T("Fermez des applications, redémarrez, puis réinstallez le pilote si l'erreur revient.")),
+            T("Désinstallez le périphérique (clic droit > Désinstaller l'appareil) puis redémarrez : Windows le réinstalle tout seul. Sinon, installez le pilote du fabricant."), null),
+        3 => (T("pilote endommagé, ou mémoire insuffisante"), T("Fermez des applications, redémarrez, puis réinstallez le pilote si l'erreur revient."), null),
         10 => (T("le périphérique ne peut pas démarrer"),
-            T("Débranchez et rebranchez l'appareil (autre port USB si possible), redémarrez, puis mettez à jour ou réinstallez son pilote.")),
+            T("Débranchez et rebranchez l'appareil (autre port USB si possible), redémarrez, puis mettez à jour ou réinstallez son pilote."), null),
         12 or 16 or 29 or 33 or 34 or 35 or 36 => (T("ressources matérielles introuvables ou désactivées dans le BIOS"),
-            T("Vérifiez que l'appareil est activé dans le BIOS (Module 8) et mettez le BIOS à jour ; retirez les cartes d'extension inutilisées.")),
+            T("Vérifiez que l'appareil est activé dans le BIOS (Module 8) et mettez le BIOS à jour ; retirez les cartes d'extension inutilisées."), null),
         18 or 39 or 41 => (T("pilote absent, endommagé ou incompatible"),
-            T("Réinstallez le pilote : désinstallez l'appareil (en cochant la suppression du pilote si proposée), redémarrez, puis installez le pilote du fabricant.")),
-        21 => (T("Windows est en train de supprimer ce périphérique"), T("Attendez quelques secondes puis redémarrez si l'erreur reste affichée.")),
-        24 or 42 => (T("périphérique absent, en double ou mal installé"), T("Débranchez-le, redémarrez, puis rebranchez-le. S'il est intégré au PC, installez le pilote de puce (chipset) du fabricant.")),
+            T("Réinstallez le pilote : désinstallez l'appareil (en cochant la suppression du pilote si proposée), redémarrez, puis installez le pilote du fabricant."), null),
+        21 => (T("Windows est en train de supprimer ce périphérique"), T("Attendez quelques secondes puis redémarrez si l'erreur reste affichée."), null),
+        24 or 42 => (T("périphérique absent, en double ou mal installé"), T("Débranchez-le, redémarrez, puis rebranchez-le. S'il est intégré au PC, installez le pilote de puce (chipset) du fabricant."), null),
         28 => (T("aucun pilote installé"),
-            T("Cherchez le pilote dans Windows Update (Options avancées > Mises à jour facultatives > Pilotes), puis sur le site du fabricant du PC ou de la carte mère.")),
-        31 or 37 or 38 => (T("Windows ne peut pas charger le pilote"), T("Redémarrez le PC. Si l'erreur reste, réinstallez le pilote du fabricant.")),
-        32 => (T("pilote ou service désactivé"), T("Un outil a probablement désactivé le service de ce pilote. Réinstallez le pilote, ou restaurez le point de restauration d'avant le réglage.")),
+            T("Cherchez le pilote dans Windows Update (Options avancées > Mises à jour facultatives > Pilotes), puis sur le site du fabricant du PC ou de la carte mère."), OptionalUpdatesPage),
+        31 or 37 or 38 => (T("Windows ne peut pas charger le pilote"), T("Redémarrez le PC. Si l'erreur reste, réinstallez le pilote du fabricant."), null),
+        32 => (T("pilote ou service désactivé"), T("Un outil a probablement désactivé le service de ce pilote. Réinstallez le pilote, ou restaurez le point de restauration d'avant le réglage."), null),
         43 => (T("Windows a arrêté ce périphérique car il a signalé des problèmes"),
-            T("Débranchez-le et rebranchez-le, mettez son pilote à jour. Pour une carte graphique : pilote propre (Module 9), vérifiez son alimentation et sa température ; si l'erreur persiste, la carte peut être défaillante.")),
-        48 => (T("pilote bloqué car il pose des problèmes connus"), T("Installez une version récente du pilote depuis le site du fabricant : Windows bloque les anciennes versions connues pour poser problème.")),
-        49 => (T("registre système trop volumineux"), T("Désinstallez les périphériques qui ne sont plus utilisés (menu Affichage > Afficher les périphériques cachés), puis redémarrez.")),
+            T("Débranchez-le et rebranchez-le, mettez son pilote à jour. Pour une carte graphique : pilote propre (Module 9), vérifiez son alimentation et sa température ; si l'erreur persiste, la carte peut être défaillante."), null),
+        48 => (T("pilote bloqué car il pose des problèmes connus"), T("Installez une version récente du pilote depuis le site du fabricant : Windows bloque les anciennes versions connues pour poser problème."), null),
+        49 => (T("registre système trop volumineux"), T("Désinstallez les périphériques qui ne sont plus utilisés (menu Affichage > Afficher les périphériques cachés), puis redémarrez."), null),
         52 => (T("signature numérique du pilote invérifiable"),
-            T("Installez un pilote signé depuis le site du fabricant ; un pilote non signé peut aussi être bloqué par Secure Boot ou l'intégrité de la mémoire (Module 13).")),
-        _ => (T("erreur signalée par Windows"), T("Ouvrez le Gestionnaire de périphériques, double-cliquez sur l'appareil pour lire l'erreur, puis mettez à jour ou réinstallez son pilote.")),
+            T("Installez un pilote signé depuis le site du fabricant ; un pilote non signé peut aussi être bloqué par Secure Boot ou l'intégrité de la mémoire (Module 13)."), null),
+        _ => (T("erreur signalée par Windows"), T("Ouvrez le Gestionnaire de périphériques, double-cliquez sur l'appareil pour lire l'erreur, puis mettez à jour ou réinstallez son pilote."), null),
     };
 
     private static string ClassLabel(string pnpClass) => pnpClass switch

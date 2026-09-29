@@ -43,7 +43,9 @@ public class StartupAppsModuleTests
         Assert.Equal("désactivé", steam.Expected);
         Assert.True(steam.Fixable);
         Assert.Contains("mises à jour des jeux", steam.Explanation, StringComparison.Ordinal);
+        Assert.Null(steam.SettingsPage);
         Assert.Contains("1 à désactiver sans problème", findings.Single(f => f.Id == "M12.summary").Current, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:startupapps", findings.Single(f => f.Id == "M12.summary").SettingsPage);
         Assert.Equal(FindingStatus.Improvable, findings[0].Status);
     }
 
@@ -139,6 +141,7 @@ public class StartupAppsModuleTests
         Assert.Equal(FindingStatus.Improvable, entry.Status);
         Assert.Contains("n'existe plus", entry.Explanation, StringComparison.Ordinal);
         Assert.Equal("activé · éditeur inconnu", entry.Current);
+        Assert.Equal("ms-settings:startupapps", entry.SettingsPage);
     }
 
     [Theory]
@@ -158,6 +161,7 @@ public class StartupAppsModuleTests
         Assert.Equal("Suspect", entry.Category);
         Assert.Contains(reason, entry.Explanation, StringComparison.Ordinal);
         Assert.Contains("Module 1", entry.Advice, StringComparison.Ordinal);
+        Assert.Null(entry.SettingsPage);
         Assert.False(entry.Fixable);
         Assert.Same(entry, findings[0]);
         Assert.Contains("1 suspecte(s)", findings.Single(f => f.Id == "M12.summary").Current, StringComparison.Ordinal);
@@ -226,8 +230,10 @@ public class StartupAppsModuleTests
         Assert.Equal("activé · application du Store", spotify.Current);
         Assert.False(spotify.Fixable);
         Assert.Contains("ms-settings:startupapps", spotify.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:startupapps", spotify.SettingsPage);
         var terminal = findings.Single(f => f.Id.StartsWith("M12.store-microsoft-windowsterminal", StringComparison.Ordinal));
         Assert.Equal(FindingStatus.Ok, terminal.Status);
+        Assert.Null(terminal.SettingsPage);
     }
 
     [Fact]

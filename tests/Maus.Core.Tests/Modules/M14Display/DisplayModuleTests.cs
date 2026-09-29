@@ -37,6 +37,9 @@ public class DisplayModuleTests
         Assert.Equal(FindingStatus.Ok, Get(findings, "M14.resolution.display-1").Status);
         Assert.Equal(FindingStatus.Info, Get(findings, "M14.hdr.display-1").Status);
         Assert.Equal(FindingStatus.Info, Get(findings, "M14.vrr").Status);
+        Assert.Null(refresh.SettingsPage);
+        Assert.Null(Get(findings, "M14.resolution.display-1").SettingsPage);
+        Assert.Null(Get(findings, "M14.vrr").SettingsPage);
         Assert.DoesNotContain(findings, f => f.Id == "M14.bit-depth.display-1");
         Assert.DoesNotContain(findings, f => f.Status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable or FindingStatus.Unknown);
         Assert.Equal("Écran 1 : AW3423DWF", refresh.Category);
@@ -56,6 +59,8 @@ public class DisplayModuleTests
         Assert.StartsWith("165 Hz", refresh.Expected, StringComparison.Ordinal);
         Assert.Contains("accepte 165 Hz mais tourne à 60 Hz", refresh.Explanation, StringComparison.Ordinal);
         Assert.True(refresh.Fixable);
+        Assert.Equal("ms-settings:display-advanced", refresh.SettingsPage);
+        Assert.Null(Get(findings, "M14.hdr.display-1").SettingsPage);
     }
 
     [Fact]
@@ -70,6 +75,7 @@ public class DisplayModuleTests
         Assert.Contains("RGB", refresh.Advice, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M14.bit-depth.display-1").Status);
         Assert.Equal("activé", Get(findings, "M14.hdr.display-1").Current);
+        Assert.Equal("ms-settings:display", Get(findings, "M14.hdr.display-1").SettingsPage);
     }
 
     [Fact]
@@ -213,6 +219,7 @@ public class DisplayModuleTests
         Assert.Equal(FindingStatus.Unknown, refresh.Status);
         Assert.Contains("3440×1440", refresh.Explanation, StringComparison.Ordinal);
         Assert.Contains("redémarrez le PC", refresh.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:display", refresh.SettingsPage);
         Assert.Equal(FindingStatus.Unknown, Get(findings, "M14.resolution.display-1").Status);
     }
 
@@ -251,6 +258,7 @@ public class DisplayModuleTests
         Assert.Equal(FindingStatus.Info, resolution.Status);
         Assert.Equal("2560×1080", resolution.Current);
         Assert.Equal("3440×1440", resolution.Expected);
+        Assert.Equal("ms-settings:display", resolution.SettingsPage);
     }
 
     [Fact]
@@ -290,6 +298,7 @@ public class DisplayModuleTests
         var settings = Get(findings, "M14.windows-graphics-settings");
         Assert.Equal(FindingStatus.Info, settings.Status);
         Assert.Equal("Auto HDR désactivé, optimisations des jeux en fenêtre activé, fréquence variable Windows activé", settings.Current);
+        Assert.Equal("ms-settings:display-advancedgraphics", settings.SettingsPage);
     }
 
     [Fact]

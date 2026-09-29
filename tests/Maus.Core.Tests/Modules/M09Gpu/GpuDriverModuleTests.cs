@@ -37,6 +37,7 @@ public class GpuDriverModuleTests
         Assert.StartsWith("617.14 (version Windows 32.0.16.1714)", driver.Current, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.pcie-link.nvidia").Status);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.hags").Status);
+        Assert.Null(Get(findings, "M09.hags").SettingsPage);
         Assert.Equal(FindingStatus.Info, Get(findings, "M09.resizable-bar.nvidia").Status);
         Assert.Equal(FindingStatus.Info, Get(findings, "M09.windows-update-drivers").Status);
         Assert.DoesNotContain(findings, f => f.Status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable);
@@ -242,8 +243,10 @@ public class GpuDriverModuleTests
         var hags = Get(findings, "M09.hags");
         Assert.Equal(FindingStatus.Improvable, hags.Status);
         Assert.True(hags.Fixable);
+        Assert.Equal("ms-settings:display-advancedgraphics-default", hags.SettingsPage);
         var bar = Get(findings, "M09.resizable-bar.nvidia");
         Assert.Equal(FindingStatus.Improvable, bar.Status);
+        Assert.Null(bar.SettingsPage);
         Assert.Contains("256 Mio", bar.Current, StringComparison.Ordinal);
         Assert.Contains("Above 4G Decoding", bar.Advice, StringComparison.Ordinal);
     }

@@ -35,6 +35,7 @@ public class DevicesModuleTests
         var device = findings.Single(f => f.Id.StartsWith("M17.device.", StringComparison.Ordinal));
         Assert.Contains("code 28", device.Current, StringComparison.Ordinal);
         Assert.Contains("Windows Update", device.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:windowsupdate-optionalupdates", device.SettingsPage);
     }
 
     [Fact]
@@ -42,7 +43,9 @@ public class DevicesModuleTests
     {
         var findings = await Detect(new FakeCim().Answer(DevicesModule.ProblemQuery, Device("GeForce", "Display", 43)));
 
-        Assert.Equal(FindingStatus.Problem, findings.Single(f => f.Id.StartsWith("M17.device.", StringComparison.Ordinal)).Status);
+        var device = findings.Single(f => f.Id.StartsWith("M17.device.", StringComparison.Ordinal));
+        Assert.Equal(FindingStatus.Problem, device.Status);
+        Assert.Null(device.SettingsPage);
     }
 
     [Fact]
@@ -76,7 +79,7 @@ public class DevicesModuleTests
     [InlineData(999)]
     public void Every_code_has_a_meaning_and_an_advice(long code)
     {
-        var (meaning, advice) = DevicesModule.Explain(code);
+        var (meaning, advice, _) = DevicesModule.Explain(code);
 
         Assert.False(string.IsNullOrWhiteSpace(meaning));
         Assert.False(string.IsNullOrWhiteSpace(advice));

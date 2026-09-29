@@ -17,6 +17,12 @@ public sealed class BackupModule : IAuditModule
     internal const string OneDriveAccounts = @"Software\Microsoft\OneDrive\Accounts";
     private const int RecentRestorePointDays = 30;
 
+    /// <summary>
+    /// Page « Système > Informations système » des Paramètres (Microsoft Learn, « Launch Windows Settings ») : elle porte le lien
+    /// « Protection du système » cité par le conseil. La fenêtre de la protection du système elle-même n'a pas d'adresse ms-settings.
+    /// </summary>
+    internal const string AboutPage = "ms-settings:about";
+
     private static string Category => T("Sauvegardes");
 
     public string Id => "M19";
@@ -69,6 +75,7 @@ public sealed class BackupModule : IAuditModule
             : latest is { } last
                 ? T("{0} point(s), le plus récent le {1:d}", count, last)
                 : T("aucun point de restauration");
+        var noRecentPoint = pointsRead && (latest is null || (now - latest.Value).TotalDays > RecentRestorePointDays);
         return state switch
         {
             ProtectionState.Enabled => new Finding
@@ -81,9 +88,10 @@ public sealed class BackupModule : IAuditModule
                 Current = T("activée sur C: · {0}", points),
                 Expected = T("activée, avec un point récent"),
                 Explanation = T("Un point de restauration permet de revenir à l'état d'avant une mise à jour, un pilote ou un réglage qui pose problème, sans toucher à vos documents. Windows en crée lors des mises à jour importantes, et MAUS avant chacune de ses corrections."),
-                Advice = pointsRead && (latest is null || (now - latest.Value).TotalDays > RecentRestorePointDays)
+                Advice = noRecentPoint
                     ? T("Aucun point récent : vous pouvez en créer un maintenant (Paramètres > Système > Informations système > Protection du système > Créer).")
                     : null,
+                SettingsPage = noRecentPoint ? AboutPage : null,
             },
             ProtectionState.Disabled => new Finding
             {
@@ -96,6 +104,7 @@ public sealed class BackupModule : IAuditModule
                 Expected = T("activée"),
                 Explanation = T("Sans protection du système, impossible de revenir en arrière après une mise à jour, un pilote ou un réglage qui pose problème. Certains outils d'« optimisation » la coupent pour gagner un peu de place sur le disque."),
                 Advice = T("Activez-la : Paramètres > Système > Informations système > Protection du système > Configurer > Activer, avec 3 à 5 % du disque. MAUS peut aussi l'activer, avec votre accord, avant sa première correction."),
+                SettingsPage = AboutPage,
             },
             _ => Finding.Unknown(id, title, T("L'état de la protection du système n'a pas pu être lu."), Category),
         };

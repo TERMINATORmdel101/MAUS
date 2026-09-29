@@ -31,6 +31,9 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     private static string OtherSourcesCategory => T("Autres lancements automatiques");
     private static string SettingsAdvice => T("Réglage : Paramètres > Applications > Démarrage (ms-settings:startupapps).");
 
+    /// <summary>Page « Applications > Démarrage » des Paramètres (Microsoft Learn, « Launch Windows Settings »).</summary>
+    internal const string StartupAppsPage = "ms-settings:startupapps";
+
     private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
     private static readonly Lazy<StartupCatalog> Catalog = new(StartupCatalog.LoadEmbedded);
 
@@ -298,7 +301,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             explanation += T(" Cette entrée ne figure pas dans le catalogue de MAUS : vérifiez l'éditeur et le chemin avant de décider.");
         }
 
-        var (status, severity, expected, advice, fixable, category) =
+        var (status, severity, expected, advice, fixable, category, settingsPage) =
             Verdict(entry, match?.Family, suspicion, orphan, enabled, isStore);
         if (suspicion is not null)
         {
@@ -325,54 +328,60 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Expected = expected,
             Explanation = explanation,
             Advice = advice,
+            SettingsPage = settingsPage,
             Fixable = fixable,
         };
     }
 
-    private static (FindingStatus Status, Severity Severity, string? Expected, string? Advice, bool Fixable, string? Category) Verdict(
+    /// <summary>
+    /// Verdict d'une entrée. La page des Paramètres n'est renseignée que lorsque le conseil y renvoie (texte <see cref="SettingsAdvice"/>) :
+    /// entrée orpheline, protection désactivée, tâche d'une application du Store.
+    /// </summary>
+    private static (FindingStatus Status, Severity Severity, string? Expected, string? Advice, bool Fixable, string? Category, string? SettingsPage) Verdict(
         StartupEntry entry, StartupFamily? family, string? suspicion, bool orphan, bool enabled, bool isStore)
     {
         var storeAdvice = isStore ? " " + SettingsAdvice : string.Empty;
+        var storePage = isStore ? StartupAppsPage : null;
         if (suspicion is not null)
         {
             var advice = T("Lancez une analyse complète avec Microsoft Defender (voir Module 1). En cas de doute, désactivez l'entrée et ne lancez pas ce programme.");
             return enabled
-                ? (FindingStatusExtensions.ForDeviation(Severity.Medium), Severity.Medium, T("vérifié par une analyse antivirus"), advice, false, SuspiciousCategory)
-                : (FindingStatus.Info, Severity.Medium, T("vérifié par une analyse antivirus"), T("L'entrée est déjà désactivée. ") + advice, false, SuspiciousCategory);
+                ? (FindingStatusExtensions.ForDeviation(Severity.Medium), Severity.Medium, T("vérifié par une analyse antivirus"), advice, false, SuspiciousCategory, null)
+                : (FindingStatus.Info, Severity.Medium, T("vérifié par une analyse antivirus"), T("L'entrée est déjà désactivée. ") + advice, false, SuspiciousCategory, null);
         }
 
         if (entry.RunOnce)
         {
             return (FindingStatus.Info, Severity.Info, null,
-                T("Affichage seul : cette commande s'exécutera une seule fois, puis Windows l'effacera."), false, null);
+                T("Affichage seul : cette commande s'exécutera une seule fois, puis Windows l'effacera."), false, null, null);
         }
 
         if (!enabled)
         {
             return family?.Advice == StartupAdvice.AlwaysKeep
-                ? (FindingStatus.Info, Severity.Info, T("activé"), T("Cette protection est désactivée au démarrage : réactivez-la. ") + SettingsAdvice, false, null)
-                : (FindingStatus.Ok, Severity.Low, T("désactivé si inutile"), null, false, null);
+                ? (FindingStatus.Info, Severity.Info, T("activé"), T("Cette protection est désactivée au démarrage : réactivez-la. ") + SettingsAdvice, false, null, StartupAppsPage)
+                : (FindingStatus.Ok, Severity.Low, T("désactivé si inutile"), null, false, null, null);
         }
 
         if (orphan)
         {
             return (FindingStatus.Improvable, Severity.Low, T("désactivé (programme absent)"),
-                T("Désactivez cette entrée : elle ne lance plus rien. ") + SettingsAdvice, !isStore, null);
+                T("Désactivez cette entrée : elle ne lance plus rien. ") + SettingsAdvice, !isStore, null, StartupAppsPage);
         }
 
         if (family is null)
         {
             return (FindingStatus.Info, Severity.Info, T("à vous de décider"),
-                T("Si vous ne connaissez pas ce programme, recherchez son éditeur avant de le désactiver.") + storeAdvice, !isStore, null);
+                T("Si vous ne connaissez pas ce programme, recherchez son éditeur avant de le désactiver.") + storeAdvice, !isStore, null, storePage);
         }
 
         return family.Advice switch
         {
-            StartupAdvice.Disable => (FindingStatus.Improvable, Severity.Low, T("désactivé"), T(family.Recommendation) + storeAdvice, !isStore, null),
-            StartupAdvice.BrowserSettings => (FindingStatus.Improvable, Severity.Low, T("désactivé dans le navigateur"), T(family.Recommendation), false, null),
-            StartupAdvice.DependsOnUse => (FindingStatus.Info, Severity.Info, T("selon votre usage"), T(family.Recommendation) + storeAdvice, !isStore, null),
-            StartupAdvice.KeepIfUsed => (FindingStatus.Info, Severity.Info, T("activé si vous utilisez ce service"), T(family.Recommendation), false, null),
-            _ => (FindingStatus.Ok, Severity.Info, T("activé"), T(family.Recommendation), false, null),
+            StartupAdvice.Disable => (FindingStatus.Improvable, Severity.Low, T("désactivé"), T(family.Recommendation) + storeAdvice, !isStore, null, storePage),
+            StartupAdvice.BrowserSettings => (FindingStatus.Improvable, Severity.Low, T("désactivé dans le navigateur"), T(family.Recommendation), false, null, null),
+            StartupAdvice.DependsOnUse => (FindingStatus.Info, Severity.Info, T("selon votre usage"), T(family.Recommendation) + storeAdvice, !isStore, null, storePage),
+            StartupAdvice.KeepIfUsed => (FindingStatus.Info, Severity.Info, T("activé si vous utilisez ce service"), T(family.Recommendation), false, null, null),
+            _ => (FindingStatus.Ok, Severity.Info, T("activé"), T(family.Recommendation), false, null, null),
         };
     }
 
@@ -400,6 +409,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 + "MAUS indique l'éditeur et le chemin de chaque programme ; les programmes non signés sont signalés par le Module 1."),
             Advice = T("Pour désactiver une entrée : Paramètres > Applications > Démarrage, ou Gestionnaire des tâches > Applications de démarrage. "
                 + "Rien n'est supprimé et tout se réactive en un clic. MAUS le propose aussi dans l'onglet Corrections, familles « sans problème » pré-cochées."),
+            SettingsPage = StartupAppsPage,
         };
     }
 
