@@ -27,6 +27,12 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     internal const string CodeIntegrityConfigKey = @"SYSTEM\CurrentControlSet\Control\CI\Config";
     internal const string ServicesKey = @"SYSTEM\CurrentControlSet\Services";
 
+    /// <summary>
+    /// Page « Sécurité Windows » des Paramètres (Microsoft Learn, « Launch Windows Settings ») : elle liste les zones de protection,
+    /// dont « Sécurité des appareils » ; aucune adresse « ms-settings: » n'ouvre directement l'isolation du noyau.
+    /// </summary>
+    internal const string WindowsSecurityPage = "ms-settings:windowsdefender";
+
     private static string IsolationCategory => T("Isolation du noyau");
     private static string DependenciesCategory => T("Dépendances");
 
@@ -209,6 +215,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Advice = disabled
                 ? T("Réactiver la liste dans Sécurité Windows > Sécurité des appareils > Isolation du noyau > Liste de blocage des pilotes vulnérables Microsoft, puis redémarrer.")
                 : null,
+            SettingsPage = disabled ? WindowsSecurityPage : null,
             Fixable = disabled,
         };
     }
@@ -265,6 +272,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
                 Expected = T("en cours d'exécution"),
                 Explanation = MemoryIntegrityMessage + T(" Elle est demandée mais ne tourne pas : redémarrage en attente, virtualisation coupée dans le BIOS (souvent après une mise à jour du BIOS, voir Module 8) ou pilote incompatible.") + policyNote,
                 Advice = T("Redémarrer le PC. Si rien ne change, vérifier que la virtualisation (Intel VT-x ou AMD SVM) est activée dans le BIOS, puis consulter Sécurité Windows > Sécurité des appareils > Isolation du noyau."),
+                SettingsPage = WindowsSecurityPage,
             };
         }
 
@@ -278,6 +286,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Explanation = MemoryIntegrityMessage + policyNote,
             Advice = T("Pour plus de sécurité, vous pouvez l'activer dans Sécurité Windows > Sécurité des appareils > Isolation du noyau, après avoir vérifié qu'aucun pilote incompatible n'est signalé.")
                 + (hasAntiCheat ? T(" {0} : si un jeu protégé refuse de se lancer, activez-la.", Installed(antiCheats!)) : string.Empty),
+            SettingsPage = WindowsSecurityPage,
         };
     }
 

@@ -6,8 +6,12 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M01Audit;
 
-/// <summary>Description d'un contrôle du catalogue et fabrique de ses constats, pour éviter de répéter identifiant, titre et catégorie.</summary>
-internal sealed record Check(string Id, string Title, string Category, Severity Severity, bool Fixable = false)
+/// <summary>
+/// Description d'un contrôle du catalogue et fabrique de ses constats, pour éviter de répéter identifiant, titre et catégorie.
+/// <c>SettingsPage</c> : page des Paramètres de Windows (« ms-settings: ») où l'utilisateur corrige lui-même un écart,
+/// jointe à chaque écart, et à une simple information seulement si l'appel la demande.
+/// </summary>
+internal sealed record Check(string Id, string Title, string Category, Severity Severity, bool Fixable = false, string? SettingsPage = null)
 {
     public Finding Compliant(string current, string expected, string explanation) => new()
     {
@@ -36,12 +40,13 @@ internal sealed record Check(string Id, string Title, string Category, Severity 
             Expected = expected,
             Explanation = explanation,
             Advice = advice,
+            SettingsPage = SettingsPage,
             Fixable = Fixable,
         };
     }
 
-    /// <summary>Simple information, sans jugement (antivirus tiers, PC géré…).</summary>
-    public Finding Neutral(string current, string? expected, string explanation, string? advice = null) => new()
+    /// <summary>Simple information, sans jugement (antivirus tiers, PC géré…) ; <paramref name="settingsPage"/> seulement si le conseil y renvoie.</summary>
+    public Finding Neutral(string current, string? expected, string explanation, string? advice = null, string? settingsPage = null) => new()
     {
         Id = Id,
         Title = Title,
@@ -52,6 +57,7 @@ internal sealed record Check(string Id, string Title, string Category, Severity 
         Expected = expected,
         Explanation = explanation,
         Advice = advice,
+        SettingsPage = settingsPage,
     };
 
     public Finding Unknown(string reason) => Finding.Unknown(Id, Title, reason, Category);

@@ -93,6 +93,15 @@ public class WindowsUpdateModuleTests
         Assert.Equal(FindingStatus.Ok, Get(findings, "M03.defender-signatures").Status);
         Assert.Equal("Windows Update (serveurs Microsoft)", Get(findings, "M03.update-source").Current);
         Assert.Equal("désactivée", Get(findings, "M03.latest-updates-toggle").Current);
+
+        // Rien à faire : pas de bouton « Ouvrir dans Windows », sauf pour l'option qui ne se règle que dans les Paramètres.
+        Assert.Null(Get(findings, "M03.windows-support").SettingsPage);
+        Assert.Null(Get(findings, "M03.automatic-updates").SettingsPage);
+        Assert.Null(Get(findings, "M03.pending-updates").SettingsPage);
+        Assert.Null(Get(findings, "M03.optional-updates").SettingsPage);
+        Assert.Null(Get(findings, "M03.last-install").SettingsPage);
+        Assert.Null(Get(findings, "M03.defender-signatures").SettingsPage);
+        Assert.Equal("ms-settings:windowsupdate", Get(findings, "M03.latest-updates-toggle").SettingsPage);
     }
 
     [Fact]
@@ -152,6 +161,7 @@ public class WindowsUpdateModuleTests
         Assert.Contains("KB5054156", finding.Advice, StringComparison.Ordinal);
         Assert.DoesNotContain("révision", finding.Advice, StringComparison.Ordinal);
         Assert.True(finding.Fixable);
+        Assert.Equal("ms-settings:windowsupdate", finding.SettingsPage);
     }
 
     [Fact]
@@ -223,6 +233,7 @@ public class WindowsUpdateModuleTests
         Assert.Equal(Severity.High, finding.Severity);
         Assert.Contains("14 octobre 2025", finding.Current, StringComparison.Ordinal);
         Assert.Contains("hors périmètre", finding.Explanation, StringComparison.Ordinal);
+        Assert.Null(finding.SettingsPage);
     }
 
     [Theory]
@@ -300,6 +311,7 @@ public class WindowsUpdateModuleTests
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.Contains("en pause jusqu'au 08/10/2026", finding.Current, StringComparison.Ordinal);
         Assert.Contains("Reprendre les mises à jour", finding.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:windowsupdate", finding.SettingsPage);
     }
 
     [Fact]
@@ -331,6 +343,9 @@ public class WindowsUpdateModuleTests
         Assert.Contains("NoAutoUpdate", finding.Current, StringComparison.Ordinal);
         Assert.Contains("DisableWindowsUpdateAccess", finding.Current, StringComparison.Ordinal);
         Assert.Contains(advice, finding.Advice, StringComparison.Ordinal);
+
+        // Une stratégie ne se retire pas depuis les Paramètres : pas de bouton.
+        Assert.Null(finding.SettingsPage);
     }
 
     [Fact]
@@ -388,11 +403,13 @@ public class WindowsUpdateModuleTests
         Assert.DoesNotContain("Aperçu", pending.Current, StringComparison.Ordinal);
         Assert.True(pending.Fixable);
         Assert.Contains("Aucun pilote", pending.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:windowsupdate", pending.SettingsPage);
 
         Assert.Equal(FindingStatus.Info, optional.Status);
         Assert.Equal("1 facultative : Aperçu cumulatif 2026-09 (KB5124010)", optional.Current);
         Assert.Contains("seulement si un correctif précis vous concerne", optional.Advice, StringComparison.Ordinal);
         Assert.True(optional.Fixable);
+        Assert.Equal("ms-settings:windowsupdate", optional.SettingsPage);
 
         // Les pilotes ont leur propre constat, informatif, avec la page des mises à jour facultatives de Windows.
         var drivers = Get(findings, "M03.driver-updates");
@@ -491,6 +508,7 @@ public class WindowsUpdateModuleTests
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.Contains("KB5060000 installé le 01/07/2026 (il y a 85 jours)", finding.Current, StringComparison.Ordinal);
         Assert.Contains("Module 2", finding.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:windowsupdate", finding.SettingsPage);
     }
 
     [Fact]
@@ -522,6 +540,9 @@ public class WindowsUpdateModuleTests
 
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.Contains("il y a 23 jours", finding.Current, StringComparison.Ordinal);
+
+        // Page d'accueil de Windows Update, jamais « windowsupdate-action » qui lancerait une recherche dès l'ouverture.
+        Assert.Equal("ms-settings:windowsupdate", finding.SettingsPage);
     }
 
     [Fact]
@@ -546,6 +567,7 @@ public class WindowsUpdateModuleTests
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.Equal("âge : 5 jours", finding.Current);
         Assert.True(finding.Fixable);
+        Assert.Equal("ms-settings:windowsdefender", finding.SettingsPage);
     }
 
     [Fact]

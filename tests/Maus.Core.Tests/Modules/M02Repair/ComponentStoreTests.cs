@@ -36,6 +36,9 @@ public class ComponentStoreTests
         Assert.Equal(expected, finding.Status);
         Assert.NotNull(finding.Advice);
         Assert.False(finding.Fixable);
+
+        // Seule la réinstallation sur place passe par les Paramètres (Récupération) ; sinon, l'onglet Corrections de MAUS.
+        Assert.Equal(health == ImageHealth.NotRepairable ? "ms-settings:recovery" : null, finding.SettingsPage);
     }
 
     [Fact]

@@ -37,6 +37,12 @@ public class RiskyChangesAuditModuleTests
         Assert.Equal(findings.Count, findings.Select(f => f.Id).Distinct().Count());
         Assert.All(findings, f => Assert.True(f.Status == FindingStatus.Ok, $"{f.Id} : {f.Status} ({f.Current})"));
         Assert.All(findings, f => Assert.False(string.IsNullOrWhiteSpace(f.Explanation)));
+
+        // Rien à corriger : pas de bouton « Ouvrir dans Windows » sur les contrôles qui en ont un en cas d'écart.
+        foreach (var id in new[] { "M01.defender-realtime", "M01.defender-tamper", "M01.defender-exclusions", "M01.firewall", "M01.wu-pause", "M01.proxy" })
+        {
+            Assert.Null(findings.Single(f => f.Id == id).SettingsPage);
+        }
     }
 
     [Fact]
@@ -173,6 +179,28 @@ public class RiskyChangesAuditModuleTests
         var timer = findings.Single(f => f.Id == "M01.boot-timer").Current!;
         Assert.Contains("useplatformclock", timer, StringComparison.Ordinal);
         Assert.DoesNotContain("useplatformtick", timer, StringComparison.Ordinal);
+
+        // Bouton « Ouvrir dans Windows » : seulement là où le conseil envoie l'utilisateur dans les Paramètres.
+        var pages = new Dictionary<string, string?>
+        {
+            ["M01.defender-realtime"] = "ms-settings:windowsdefender",
+            ["M01.defender-tamper"] = "ms-settings:windowsdefender",
+            ["M01.defender-exclusions"] = "ms-settings:windowsdefender",
+            ["M01.firewall"] = "ms-settings:windowsdefender",
+            ["M01.wu-pause"] = "ms-settings:windowsupdate",
+            ["M01.proxy"] = "ms-settings:network-proxy",
+            ["M01.defender-policy"] = null,
+            ["M01.uac-prompt"] = null,
+            ["M01.wu-services"] = null,
+            ["M01.wu-server"] = null,
+            ["M01.wu-target-version"] = null,
+            ["M01.wu-tasks"] = null,
+            ["M01.hosts"] = null,
+        };
+        foreach (var (id, page) in pages)
+        {
+            Assert.True(findings.Single(f => f.Id == id).SettingsPage == page, $"{id} : {findings.Single(f => f.Id == id).SettingsPage} au lieu de {page}");
+        }
     }
 
     [Fact]
@@ -189,6 +217,7 @@ public class RiskyChangesAuditModuleTests
         var realtime = findings.Single(f => f.Id == "M01.defender-realtime");
         Assert.Equal(FindingStatus.Info, realtime.Status);
         Assert.Contains("ESET", realtime.Current, StringComparison.Ordinal);
+        Assert.Null(realtime.SettingsPage);
         Assert.Equal(FindingStatus.Info, findings.Single(f => f.Id == "M01.defender-tamper").Status);
         var services = findings.Single(f => f.Id == "M01.core-services");
         Assert.Equal(FindingStatus.Warning, services.Status);
@@ -275,6 +304,7 @@ public class RiskyChangesAuditModuleTests
         Assert.Equal(FindingStatus.Info, findings[0].Status);
         Assert.Equal(FindingStatus.Info, findings.Single(f => f.Id == "M01.wu-server").Status);
         Assert.Equal(FindingStatus.Info, findings.Single(f => f.Id == "M01.proxy").Status);
+        Assert.Null(findings.Single(f => f.Id == "M01.proxy").SettingsPage);
         Assert.Equal(FindingStatus.Info, findings.Single(f => f.Id == "M01.residual-policies").Status);
     }
 
@@ -319,6 +349,9 @@ public class RiskyChangesAuditModuleTests
         {
             Assert.Equal("en pause jusqu'au 4 octobre 2026", finding.Current);
         }
+
+        // Pause en cours ou allongée : « Reprendre les mises à jour » se trouve dans Paramètres > Windows Update.
+        Assert.Equal(status is FindingStatus.Info or FindingStatus.Problem ? "ms-settings:windowsupdate" : null, finding.SettingsPage);
     }
 
     [Fact]
@@ -540,6 +573,9 @@ public class RiskyChangesAuditModuleTests
         var proxy = await pc.RunAsync("M01.proxy");
         Assert.Equal(FindingStatus.Problem, proxy.Status);
         Assert.Contains("10.0.0.1:3128", proxy.Current, StringComparison.Ordinal);
+
+        // Le proxy système (WinHTTP) n'apparaît pas dans Paramètres > Proxy : pas de bouton.
+        Assert.Null(proxy.SettingsPage);
 
         var garbled = new M01Pc();
         garbled.Commands.Answer("netsh.exe winhttp show proxy", "???");

@@ -27,6 +27,9 @@ public class SecurityTradeoffModuleTests
         Assert.DoesNotContain(findings, f => f.Status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable or FindingStatus.Unknown);
         Assert.DoesNotContain(findings, f => f.Fixable);
         Assert.All(findings, f => Assert.StartsWith("M13.", f.Id, StringComparison.Ordinal));
+
+        // Intégrité de la mémoire active : aucun bouton qui mènerait vers l'endroit où on la coupe.
+        Assert.All(findings, f => Assert.Null(f.SettingsPage));
     }
 
     [Fact]
@@ -103,6 +106,7 @@ public class SecurityTradeoffModuleTests
         Assert.Equal(expected, blocklist.Status);
         Assert.Equal(value == 0, blocklist.Fixable);
         Assert.Equal(value == 0, blocklist.Advice is not null);
+        Assert.Equal(value == 0 ? "ms-settings:windowsdefender" : null, blocklist.SettingsPage);
     }
 
     [Fact]
@@ -151,6 +155,7 @@ public class SecurityTradeoffModuleTests
         Assert.Equal(FindingStatus.Warning, hvci.Status);
         Assert.Equal(Severity.Medium, hvci.Severity);
         Assert.Contains("BIOS", hvci.Advice, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:windowsdefender", hvci.SettingsPage);
         Assert.Equal("activée, mais pas en cours d'exécution", Get(findings, "M13.vbs").Current);
         Assert.Equal(FindingStatus.Info, Get(findings, "M13.vbs").Status);
     }
@@ -168,6 +173,7 @@ public class SecurityTradeoffModuleTests
         Assert.Contains("activer", hvci.Advice, StringComparison.Ordinal);
         Assert.Equal("non activée", Get(findings, "M13.vbs").Current);
         Assert.False(hvci.Fixable);
+        Assert.Equal("ms-settings:windowsdefender", hvci.SettingsPage);
     }
 
     [Fact]

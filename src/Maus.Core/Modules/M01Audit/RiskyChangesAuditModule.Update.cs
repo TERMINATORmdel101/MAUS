@@ -13,6 +13,9 @@ public sealed partial class RiskyChangesAuditModule
     private const string WuUxSettingsKey = @"SOFTWARE\Microsoft\WindowsUpdate\UX\Settings";
     private const string UpdateTasksFolder = @"\Microsoft\Windows\UpdateOrchestrator";
 
+    /// <summary>Page « Windows Update » des Paramètres (Microsoft Learn, « Launch Windows Settings ») : bouton « Reprendre les mises à jour ».</summary>
+    internal const string WindowsUpdatePage = "ms-settings:windowsupdate";
+
     /// <summary>Durée de pause maximale proposée par Paramètres > Windows Update.</summary>
     private const int MaxPauseDays = 35;
 
@@ -27,7 +30,7 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Check WsusCheck => new("M01.wu-server", T("Serveur de mises à jour imposé"), UpdateCategory, Severity.Critical, Fixable: true);
 
-    private static Check PauseCheck => new("M01.wu-pause", T("Pause des mises à jour"), UpdateCategory, Severity.High, Fixable: true);
+    private static Check PauseCheck => new("M01.wu-pause", T("Pause des mises à jour"), UpdateCategory, Severity.High, Fixable: true, SettingsPage: WindowsUpdatePage);
 
     private static Check TargetVersionCheck => new("M01.wu-target-version", T("Version de Windows figée"), UpdateCategory, Severity.High, Fixable: true);
 
@@ -157,7 +160,8 @@ public sealed partial class RiskyChangesAuditModule
             T("en pause jusqu'au {0}", date),
             expected,
             T("Les mises à jour ont été suspendues depuis Paramètres : Windows les reprendra seul à la date indiquée."),
-            T("Pensez à reprendre les mises à jour plus tôt si un correctif de sécurité important est annoncé."));
+            T("Pensez à reprendre les mises à jour plus tôt si un correctif de sécurité important est annoncé."),
+            PauseCheck.SettingsPage);
     }
 
     private static Finding DetectTargetVersion(IRegistryReader registry, bool managed)

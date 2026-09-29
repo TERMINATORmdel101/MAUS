@@ -277,7 +277,9 @@ public class WindowsHealthModuleTests
         Assert.Equal("12,0 Go libres sur 256,0 Go (C:)", low.Current);
         Assert.Equal("au moins 20,0 Go", low.Expected);
         Assert.NotNull(low.Advice);
+        Assert.Equal("ms-settings:storagerecommendations", low.SettingsPage);
         Assert.Equal(FindingStatus.Unknown, missing.Status);
+        Assert.Null(missing.SettingsPage);
     }
 
     [Fact]

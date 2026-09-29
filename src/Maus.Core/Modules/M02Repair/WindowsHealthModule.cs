@@ -29,6 +29,12 @@ public sealed class WindowsHealthModule : IAuditModule
 
     internal const string WmiProbeQuery = "SELECT Caption FROM Win32_OperatingSystem";
 
+    /// <summary>Paramètres > Système > Stockage > Recommandations de nettoyage (Microsoft Learn, « Launch Windows Settings »).</summary>
+    internal const string StorageRecommendationsPage = "ms-settings:storagerecommendations";
+
+    /// <summary>Paramètres > Système > Récupération (même source).</summary>
+    internal const string RecoveryPage = "ms-settings:recovery";
+
     internal const int LookbackDays = 30;
     internal const int MemoryTestLookbackDays = 90;
     internal const int ReliabilityLookbackDays = 7;
@@ -566,6 +572,7 @@ public sealed class WindowsHealthModule : IAuditModule
             Advice = enough
                 ? null
                 : T("Libérez de l'espace : Paramètres > Système > Stockage > Recommandations de nettoyage."),
+            SettingsPage = enough ? null : StorageRecommendationsPage,
         };
     }
 
@@ -716,6 +723,9 @@ public sealed class WindowsHealthModule : IAuditModule
                     + "mise à jour de février 2024 installée) ; sinon, l'Assistant d'installation de Windows 11 sur le site de Microsoft. "
                     + "Sauvegardez d'abord vos fichiers."),
             },
+
+            // Les deux autres cas renvoient à l'onglet Corrections de MAUS, pas aux Paramètres.
+            SettingsPage = health == ImageHealth.NotRepairable ? RecoveryPage : null,
         };
     }
 

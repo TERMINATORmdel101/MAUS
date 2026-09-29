@@ -13,7 +13,7 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Check UacPromptCheck => new("M01.uac-prompt", T("Demande de confirmation de l'UAC"), DefensesCategory, Severity.High, Fixable: true);
 
-    private static readonly Check FirewallCheck = new("M01.firewall", "Pare-feu Windows", DefensesCategory, Severity.Critical, Fixable: true);
+    private static Check FirewallCheck => new("M01.firewall", "Pare-feu Windows", DefensesCategory, Severity.Critical, Fixable: true, SettingsPage: WindowsSecurityPage);
 
     /// <summary>Clés de stratégie par profil ; « StandardProfile » est l'ancien nom du profil privé.</summary>
     private static readonly (string Key, string Label)[] FirewallPolicyProfiles =

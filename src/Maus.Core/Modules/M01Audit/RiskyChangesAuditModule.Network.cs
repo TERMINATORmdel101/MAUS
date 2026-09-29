@@ -9,9 +9,12 @@ public sealed partial class RiskyChangesAuditModule
     private static string NetworkCategory => T("Réseau");
     private const string InternetSettingsKey = @"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
 
+    /// <summary>Page « Proxy » des Paramètres (Microsoft Learn, « Launch Windows Settings ») : proxy de l'utilisateur et script de configuration.</summary>
+    internal const string ProxyPage = "ms-settings:network-proxy";
+
     private static Check HostsCheck => new("M01.hosts", T("Fichier hosts bloquant Microsoft"), NetworkCategory, Severity.High, Fixable: true);
 
-    private static Check ProxyCheck => new("M01.proxy", T("Proxy imposé"), NetworkCategory, Severity.High, Fixable: true);
+    private static Check ProxyCheck => new("M01.proxy", T("Proxy imposé"), NetworkCategory, Severity.High, Fixable: true, SettingsPage: ProxyPage);
 
     private Finding DetectHosts(AuditContext context)
     {
@@ -66,14 +69,22 @@ public sealed partial class RiskyChangesAuditModule
 
         if (found.Count > 0)
         {
-            return managed
-                ? ProxyCheck.Neutral(Join(found), expected, T("Sur un PC géré, un proxy est souvent imposé par l'organisation pour filtrer ou sécuriser l'accès à Internet."))
-                : ProxyCheck.Deviation(
-                    Join(found),
-                    expected,
-                    explanation,
-                    T("Si vous n'avez pas installé vous-même ce proxy (VPN, contrôle parental, outil de développement…), " +
-                    "le désactiver dans Paramètres > Réseau et Internet > Proxy ; MAUS demandera confirmation avant de toucher au proxy système."));
+            if (managed)
+            {
+                return ProxyCheck.Neutral(Join(found), expected, T("Sur un PC géré, un proxy est souvent imposé par l'organisation pour filtrer ou sécuriser l'accès à Internet."));
+            }
+
+            var deviation = ProxyCheck.Deviation(
+                Join(found),
+                expected,
+                explanation,
+                T("Si vous n'avez pas installé vous-même ce proxy (VPN, contrôle parental, outil de développement…), " +
+                "le désactiver dans Paramètres > Réseau et Internet > Proxy ; MAUS demandera confirmation avant de toucher au proxy système."));
+
+            // La page Proxy des Paramètres montre le proxy de l'utilisateur et le script, jamais le proxy système (WinHTTP) :
+            // pas de bouton quand celui-ci est le seul trouvé.
+            var userLevel = (enabled && IsSet(server)) || IsSet(script);
+            return userLevel ? deviation : deviation with { SettingsPage = null };
         }
 
         return system.Kind == WinHttpProxyKind.Unknown

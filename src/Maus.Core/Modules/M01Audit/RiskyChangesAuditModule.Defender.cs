@@ -11,13 +11,19 @@ public sealed partial class RiskyChangesAuditModule
     internal const string DefenderPreferenceQuery = "SELECT ExclusionPath, ExclusionExtension, ExclusionProcess FROM MSFT_MpPreference";
     private const string RealtimePolicyKey = @"SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection";
 
+    /// <summary>
+    /// Page « Sécurité Windows » des Paramètres (Microsoft Learn, « Launch Windows Settings ») : elle liste les zones de protection
+    /// (virus et menaces, pare-feu, sécurité des appareils…). Aucune adresse « ms-settings: » n'ouvre directement une de ces zones.
+    /// </summary>
+    internal const string WindowsSecurityPage = "ms-settings:windowsdefender";
+
     private static Check ManagedCheck => new("M01.managed-pc", T("PC géré par une organisation"), "Contexte", Severity.Info);
 
-    private static Check RealtimeCheck => new("M01.defender-realtime", T("Protection en temps réel de l'antivirus"), DefenderCategory, Severity.Critical, Fixable: true);
+    private static Check RealtimeCheck => new("M01.defender-realtime", T("Protection en temps réel de l'antivirus"), DefenderCategory, Severity.Critical, Fixable: true, SettingsPage: WindowsSecurityPage);
 
-    private static Check TamperCheck => new("M01.defender-tamper", T("Protection contre les falsifications"), DefenderCategory, Severity.High);
+    private static Check TamperCheck => new("M01.defender-tamper", T("Protection contre les falsifications"), DefenderCategory, Severity.High, SettingsPage: WindowsSecurityPage);
 
-    private static Check ExclusionsCheck => new("M01.defender-exclusions", T("Exclusions de l'antivirus"), DefenderCategory, Severity.Critical, Fixable: true);
+    private static Check ExclusionsCheck => new("M01.defender-exclusions", T("Exclusions de l'antivirus"), DefenderCategory, Severity.Critical, Fixable: true, SettingsPage: WindowsSecurityPage);
 
     private static Finding ManagedFinding() => ManagedCheck.Neutral(
         T("joint à un domaine ou inscrit dans une gestion à distance (MDM)"),

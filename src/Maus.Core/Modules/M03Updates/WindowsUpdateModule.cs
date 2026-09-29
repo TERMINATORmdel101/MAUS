@@ -27,6 +27,18 @@ public sealed class WindowsUpdateModule : IAuditModule
     /// <summary>Page « Mises à jour facultatives » de Windows Update (Microsoft Learn, « Launch Windows Settings »).</summary>
     internal const string OptionalUpdatesPage = "ms-settings:windowsupdate-optionalupdates";
 
+    /// <summary>
+    /// Page d'accueil de Windows Update (même source). Jamais « windowsupdate-action », qui lance une recherche dès l'ouverture :
+    /// le bouton « Ouvrir dans Windows » ne doit rien déclencher.
+    /// </summary>
+    internal const string WindowsUpdatePage = "ms-settings:windowsupdate";
+
+    /// <summary>
+    /// Page « Sécurité Windows » des Paramètres (même source), qui liste les zones de protection ; aucune adresse
+    /// « ms-settings: » n'ouvre directement « Protection contre les virus et menaces ».
+    /// </summary>
+    internal const string WindowsSecurityPage = "ms-settings:windowsdefender";
+
     internal const string QfeQuery = "SELECT HotFixID, InstalledOn FROM Win32_QuickFixEngineering";
     internal const string DefenderQuery =
         "SELECT AMRunningMode, AntivirusEnabled, AntivirusSignatureAge, AntivirusSignatureLastUpdated, AntivirusSignatureVersion FROM MSFT_MpComputerStatus";
@@ -218,6 +230,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Expected = T("version maintenue encore au moins {0} jours", WarningDaysBeforeEndOfService),
             Explanation = explanation,
             Advice = advice,
+            SettingsPage = advice is null ? null : WindowsUpdatePage,
             Fixable = fixable,
         };
     }
@@ -353,6 +366,9 @@ public sealed class WindowsUpdateModule : IAuditModule
             Explanation = T("Windows installe seul les correctifs de sécurité publiés chaque mois. Une pause ou une stratégie qui "
                 + "bloque cette installation laisse le PC exposé aux failles connues."),
             Advice = advice.Count == 0 ? null : string.Join(' ', advice),
+
+            // Seule la pause se lève dans les Paramètres ; une stratégie se retire ailleurs (gpedit.msc, outil qui l'a posée).
+            SettingsPage = paused ? WindowsUpdatePage : null,
         };
     }
 
@@ -450,6 +466,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Explanation = explanation,
             Advice = T("Installez-les depuis Paramètres > Windows Update ; MAUS les installera dans une prochaine version. Aucun pilote n'est installé ici. "
                 + "Aucun gain de performance n'est attendu : ces mises à jour servent la sécurité et la stabilité."),
+            SettingsPage = WindowsUpdatePage,
             Fixable = true,
         };
     }
@@ -476,6 +493,9 @@ public sealed class WindowsUpdateModule : IAuditModule
             Advice = optional.Count == 0
                 ? null
                 : T("Les aperçus corrigent des bugs plus tôt mais peuvent en introduire. Installez-les seulement si un correctif précis vous concerne."),
+
+            // Page d'accueil de Windows Update, point de départ de toute installation (Options avancées > Mises à jour facultatives comprises).
+            SettingsPage = optional.Count == 0 ? null : WindowsUpdatePage,
             Fixable = optional.Count > 0,
         };
     }
@@ -576,6 +596,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 ? T("Lancez une recherche dans Paramètres > Windows Update. Si l'installation échoue en boucle, "
                     + "la réparation des composants de Windows Update (Module 2) sera proposée dans une prochaine version.")
                 : null,
+            SettingsPage = stale ? WindowsUpdatePage : null,
         };
     }
 
@@ -606,6 +627,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 ? T("Ouvrez Paramètres > Windows Update et cliquez sur « Rechercher des mises à jour ». En cas d'échec répété, "
                     + "la réparation de Windows Update (Module 2) sera proposée dans une prochaine version.")
                 : null,
+            SettingsPage = stale ? WindowsUpdatePage : null,
         };
     }
 
@@ -675,6 +697,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 ? T("Ouvrez Sécurité Windows > Protection contre les virus et menaces > Mises à jour de la protection > Rechercher des mises à jour. "
                     + "MAUS lancera cette mise à jour dans une prochaine version.")
                 : null,
+            SettingsPage = stale ? WindowsSecurityPage : null,
             Fixable = stale,
         };
     }
@@ -741,6 +764,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Explanation = T("Cette option installe plus tôt les nouveautés et les aperçus, sans changer le rythme des correctifs "
                 + "de sécurité, avec davantage de redémarrages. MAUS la lit sans la modifier."),
             Advice = T("Réglable dans Paramètres > Windows Update (ms-settings:windowsupdate)."),
+            SettingsPage = WindowsUpdatePage,
         };
     }
 
