@@ -279,7 +279,7 @@ public static class Ui
 
     public static string ShowUnsignedDrivers => T("Voir les pilotes non signés");
 
-    public static string DriversDateNote => T("Les pilotes de Microsoft datés du 21/06/2006 ne sont pas vieux : Windows leur donne volontairement cette date pour que les pilotes des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017). L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.");
+    public static string DriversDateNote => T("Deux dates ne disent rien de l'âge réel : le 21/06/2006, que Windows donne volontairement à ses pilotes pour que ceux des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017), et le 18/07/1968, date de fondation d'Intel donnée à son « Chipset Device Software » pour qu'il passe après tout autre pilote (Intel, article 000095169). L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.");
 
     public static string ReadMemory => T("Lire la mémoire");
 

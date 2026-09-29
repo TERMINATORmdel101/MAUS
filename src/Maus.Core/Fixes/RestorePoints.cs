@@ -83,7 +83,21 @@ public sealed class RestorePointCreator(ISystemRestore restore, ISettingsAccesso
         }
     }
 
+    /// <summary>
+    /// Une création à la fois dans MAUS (corrections et suppression d'un pilote) : chacune lit la fréquence d'origine, pose 0
+    /// puis remet la valeur lue. Deux créations mêlées pourraient laisser 0 pour de bon.
+    /// </summary>
+    private static readonly Lock Gate = new();
+
     private RestorePointOutcome CreateAndVerify(string description)
+    {
+        lock (Gate)
+        {
+            return CreateAndVerifyAlone(description);
+        }
+    }
+
+    private RestorePointOutcome CreateAndVerifyAlone(string description)
     {
         var lastBefore = restore.ListRestorePoints().Select(p => p.SequenceNumber).DefaultIfEmpty(0).Max();
         var originalFrequency = settings.Read(FrequencyKey);

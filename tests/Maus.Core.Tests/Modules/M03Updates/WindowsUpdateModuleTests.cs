@@ -353,7 +353,7 @@ public class WindowsUpdateModuleTests
             Update("Définitions Defender (KB2267602)", DefinitionCategory),
             Update("Aperçu cumulatif 2026-09 (KB5124010)", SecurityCategory, browseOnly: true),
             Update("NVIDIA - Display", DriverCategory),
-            Update("Realtek - Audio", "00000000-0000-0000-0000-000000000000", isDriver: true),
+            Update("Realtek - Audio", "00000000-0000-0000-0000-000000000000", browseOnly: true, isDriver: true),
         ]);
 
         var findings = await Detect(agent);
@@ -378,9 +378,8 @@ public class WindowsUpdateModuleTests
         // Les pilotes ont leur propre constat, informatif, avec la page des mises à jour facultatives de Windows.
         var drivers = Get(findings, "M03.driver-updates");
         Assert.Equal(FindingStatus.Info, drivers.Status);
-        Assert.StartsWith("2 pilotes : ", drivers.Current, StringComparison.Ordinal);
-        Assert.Contains("NVIDIA - Display", drivers.Current, StringComparison.Ordinal);
-        Assert.Contains("Realtek - Audio", drivers.Current, StringComparison.Ordinal);
+        // Facultatif (BrowseOnly) et automatique séparés : seul le facultatif se choisit dans « Mises à jour facultatives ».
+        Assert.Equal("1 pilote facultatif : Realtek - Audio ; 1 pilote installé automatiquement : NVIDIA - Display", drivers.Current);
         Assert.Equal(WindowsUpdateModule.OptionalUpdatesPage, drivers.SettingsPage);
         Assert.False(drivers.Fixable);
     }

@@ -154,13 +154,14 @@ public static partial class GraphicsDriverActions
     internal static string Outcome(string success, string restart, string? unchanged, string failure)
     {
         var fail = "(echo " + RepairConsole.Escape(failure) + ")";
-        return "if not errorlevel 0 " + fail
+        // Chaîne entre parenthèses : sans elles, la suite de la ligne (« & echo … ») ferait partie du dernier « else ».
+        return "(if not errorlevel 0 " + fail
             + " else if errorlevel 3011 " + fail
             + " else if errorlevel 3010 (echo " + RepairConsole.Escape(restart) + ")"
             + " else if errorlevel 260 " + fail
             + " else if errorlevel 259 " + (unchanged is null ? fail : "(echo " + RepairConsole.Escape(unchanged) + ")")
             + " else if errorlevel 1 " + fail
-            + " else (echo " + RepairConsole.Escape(success) + ")";
+            + " else (echo " + RepairConsole.Escape(success) + "))";
     }
 
     /// <summary>Chemin sans caractère qui casserait la ligne de commande (guillemet, %, !, &amp;, |, &lt;, &gt;, ^).</summary>

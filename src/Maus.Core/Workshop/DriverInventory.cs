@@ -144,10 +144,16 @@ public static class DriverAge
     /// </summary>
     public static DateTime WindowsConventionalDate { get; } = new(2006, 6, 21);
 
-    public static bool HasConventionalDate(DriverEntry driver) =>
-        driver.Date?.Date == WindowsConventionalDate && IsMicrosoft(driver);
+    /// <summary>
+    /// Date de fondation d'Intel, donnée volontairement aux fichiers de son « Chipset Device Software » pour qu'ils passent après
+    /// tout autre pilote (Intel, article 000095169, « Why Is There a Date of 1968 in the Intel Chipset Device Software Utility? »).
+    /// </summary>
+    public static DateTime IntelConventionalDate { get; } = new(1968, 7, 18);
 
-    /// <summary>Âge lisible (« 3 ans », « 8 mois », « moins d'un mois »), ou la mention de la date de convention de Windows.</summary>
+    /// <summary>Date de convention (Microsoft 2006 ou Intel 1968) : elle ne dit rien de l'âge réel du pilote.</summary>
+    public static bool HasConventionalDate(DriverEntry driver) => ConventionOf(driver) is not null;
+
+    /// <summary>Âge lisible (« 3 ans », « 8 mois », « 1 mois », « moins d'un mois »), ou la mention d'une date de convention.</summary>
     public static string Describe(DriverEntry driver, DateTime today)
     {
         if (driver.Date is not { } date)
@@ -155,27 +161,36 @@ public static class DriverAge
             return "—";
         }
 
-        if (HasConventionalDate(driver))
+        if (ConventionOf(driver) is { } convention)
         {
-            return T("date de convention de Windows");
+            return convention;
         }
 
         var months = ((today.Year - date.Year) * 12) + today.Month - date.Month - (today.Day < date.Day ? 1 : 0);
         return months switch
         {
             < 1 => T("moins d'un mois"),
+            1 => T("1 mois"),
             < 12 => T("{0} mois", months),
             < 24 => T("1 an"),
             _ => T("{0} ans", months / 12),
         };
     }
 
-    /// <summary>Pilote de fabricant (hors Microsoft) le plus ancien, ou <c>null</c>.</summary>
+    /// <summary>Pilote de fabricant (hors Microsoft, hors date de convention) le plus ancien, ou <c>null</c>.</summary>
     public static DriverEntry? OldestVendorDriver(IEnumerable<DriverEntry> drivers) =>
-        drivers.Where(d => d.Date is not null && !IsMicrosoft(d)).MinBy(d => d.Date);
+        drivers.Where(d => d.Date is not null && !Mentions(d, "Microsoft") && !HasConventionalDate(d)).MinBy(d => d.Date);
 
     public static int UnsignedCount(IEnumerable<DriverEntry> drivers) => drivers.Count(d => d.IsSigned == false);
 
-    private static bool IsMicrosoft(DriverEntry driver) =>
-        (driver.Provider ?? driver.Manufacturer ?? string.Empty).Contains("Microsoft", StringComparison.OrdinalIgnoreCase);
+    private static string? ConventionOf(DriverEntry driver) => driver.Date?.Date switch
+    {
+        { } day when day == WindowsConventionalDate && Mentions(driver, "Microsoft") => T("date de convention de Windows"),
+        { } day when day == IntelConventionalDate && Mentions(driver, "Intel") => T("date de convention d'Intel"),
+        _ => null,
+    };
+
+    private static bool Mentions(DriverEntry driver, string vendor) =>
+        (driver.Provider ?? string.Empty).Contains(vendor, StringComparison.OrdinalIgnoreCase)
+        || (driver.Manufacturer ?? string.Empty).Contains(vendor, StringComparison.OrdinalIgnoreCase);
 }

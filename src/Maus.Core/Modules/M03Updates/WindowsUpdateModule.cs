@@ -485,22 +485,38 @@ public sealed class WindowsUpdateModule : IAuditModule
             return Finding.Unknown(id, title, T("Recherche Windows Update impossible : {0}.", search.Error), UpdateCategory);
         }
 
+        // Facultatifs (BrowseOnly) : ils attendent le choix de l'utilisateur dans les mises à jour facultatives.
+        // Les autres sont installés automatiquement par Windows Update et n'apparaissent pas sur cette page.
         var drivers = search.Updates.Where(u => UpdateParsers.Classify(u) == PendingUpdateKind.Driver).ToList();
+        var optional = drivers.Where(u => u.BrowseOnly).ToList();
+        var automatic = drivers.Where(u => !u.BrowseOnly).ToList();
+        var parts = new List<string>();
+        if (optional.Count > 0)
+        {
+            parts.Add(T("{0} : {1}", Plural(optional.Count, T("pilote facultatif"), T("pilotes facultatifs")), TitleList(optional)));
+        }
+
+        if (automatic.Count > 0)
+        {
+            parts.Add(T("{0} : {1}", Plural(automatic.Count, T("pilote installé automatiquement"), T("pilotes installés automatiquement")), TitleList(automatic)));
+        }
+
         return new Finding
         {
             Id = id,
             Title = title,
             Category = UpdateCategory,
             Status = FindingStatus.Info,
-            Current = drivers.Count == 0 ? T("aucune") : $"{Plural(drivers.Count, T("pilote"), T("pilotes"))} : {TitleList(drivers)}",
-            Explanation = T("Windows Update propose parfois des pilotes pour vos périphériques. Windows les range dans les mises à jour facultatives "
-                + "et indique lui-même qu'ils servent surtout si un périphérique pose un problème précis."),
-            Advice = drivers.Count == 0
+            Current = parts.Count == 0 ? T("aucune") : string.Join(" ; ", parts),
+            Explanation = T("Windows Update propose parfois des pilotes pour vos périphériques. Les pilotes facultatifs attendent votre choix dans les mises à jour facultatives : "
+                + "Windows indique lui-même qu'ils servent surtout si un périphérique pose un problème précis. Les autres sont installés automatiquement par Windows Update."),
+            Advice = optional.Count == 0
                 ? null
-                : T("Installez-en un seulement si le périphérique concerné fonctionne mal : bouton « Ouvrir dans Windows » (Windows Update > Options avancées > "
+                : T("Installez un pilote facultatif seulement si le périphérique concerné fonctionne mal : bouton « Ouvrir dans Windows » (Windows Update > Options avancées > "
                     + "Mises à jour facultatives), puis cochez ce pilote. Pour la carte graphique, préférez le pilote du fabricant (Module 9 et Atelier > Pilotes)."),
-            SettingsPage = drivers.Count == 0 ? null : OptionalUpdatesPage,
+            SettingsPage = optional.Count == 0 ? null : OptionalUpdatesPage,
         };
+
     }
 
     private static Finding DetectLastInstall(ICimReader cim, DateOnly today)

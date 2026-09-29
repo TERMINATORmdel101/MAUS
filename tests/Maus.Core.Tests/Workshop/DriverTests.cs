@@ -59,7 +59,7 @@ public class DriverTests
     {
         var arguments = GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Remove, Gpu(), @"C:\ProgramData\MAUS\pilotes\20260929-101500-oem42", "pnputil.exe")!;
 
-        Assert.Contains("\"pnputil.exe\" /export-driver oem42.inf \"C:\\ProgramData\\MAUS\\pilotes\\20260929-101500-oem42\" && (\"pnputil.exe\" /delete-driver oem42.inf /uninstall & if not errorlevel 0", arguments, StringComparison.Ordinal);
+        Assert.Contains("\"pnputil.exe\" /export-driver oem42.inf \"C:\\ProgramData\\MAUS\\pilotes\\20260929-101500-oem42\" && (\"pnputil.exe\" /delete-driver oem42.inf /uninstall & (if not errorlevel 0", arguments, StringComparison.Ordinal);
         Assert.Contains("else if errorlevel 3010", arguments, StringComparison.Ordinal);
         Assert.DoesNotContain("/force", arguments, StringComparison.Ordinal);
     }
@@ -127,6 +127,12 @@ public class DriverTests
         Assert.Equal("3 ans", DriverAge.Describe(vendor, today));
         Assert.Equal("moins d'un mois", DriverAge.Describe(recent, today));
         Assert.Equal("8 mois", DriverAge.Describe(Gpu() with { Date = new DateTime(2026, 1, 29) }, today));
+        Assert.Equal("1 mois", DriverAge.Describe(Gpu() with { Date = new DateTime(2026, 8, 20) }, today));
+
+        // Date de fondation d'Intel donnée à son « Chipset Device Software » : convention, pas un pilote de 58 ans.
+        var chipset = Gpu() with { Provider = "INTEL", Manufacturer = "INTEL", Date = new DateTime(1968, 7, 18) };
+        Assert.Equal("date de convention d'Intel", DriverAge.Describe(chipset, today));
+        Assert.Same(vendor, DriverAge.OldestVendorDriver([chipset, vendor, recent]));
         Assert.Equal("—", DriverAge.Describe(Gpu() with { Date = null }, today));
 
         // Le plus ancien pilote de fabricant ignore les pilotes de Microsoft (datés par convention).
@@ -146,6 +152,7 @@ public class DriverTests
     [InlineData("Restore", 0, 259, "Rien n'a été remplacé")]
     [InlineData("Restore", 0, 3010, "Pilote réinstallé : redémarrez le PC pour terminer.")]
     [InlineData("Restart", 0, -1, "Le redémarrage du pilote a échoué")]
+    [InlineData("Restart", 0, 3010, "pnputil demande un redémarrage du PC pour terminer.")]
     public void Console_commands_report_pnputil_exit_codes_for_real(string action, int export, int code, string expected)
     {
         if (!OperatingSystem.IsWindows())
@@ -183,6 +190,9 @@ public class DriverTests
             process.WaitForExit(30_000);
 
             Assert.Contains(expected, output, StringComparison.Ordinal);
+
+            // La dernière ligne s'affiche quel que soit le code (elle n'est pas prise dans le dernier « else »).
+            Assert.Contains(action == "Remove" ? "Après une suppression réussie" : action == "Restart" ? "Terminé." : "Vous pouvez fermer cette fenêtre.", output, StringComparison.Ordinal);
         }
         finally
         {

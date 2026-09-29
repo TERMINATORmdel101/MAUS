@@ -28,6 +28,15 @@ Numéro choisi par le porteur, après la 0.4.2 (qui n'a pas été publiée seule
 - « Pourquoi ce score ? » : phrase juste quand le score est plafonné.
 - Date des pilotes (jour et mois inversés par la source WMI) et tri par date : déjà corrigés avant la fin de la relecture.
 
+**Deuxième relecture (0.5.1) : 6 défauts confirmés, tous corrigés**
+
+- Pilotes Intel datés du 18/07/1968 : date de fondation d'Intel, donnée volontairement à son « Chipset Device Software » pour qu'il passe après tout autre pilote ([Intel, article 000095169](https://www.intel.com/content/www/us/en/support/articles/000095169/processors.html)). Ils étaient annoncés comme « pilote le plus ancien, 58 ans » ; ils sont maintenant présentés comme une date de convention.
+- Mises à jour de pilotes de Windows Update : les pilotes facultatifs (à choisir) et ceux que Windows installe automatiquement sont séparés ; seuls les premiers renvoient vers « Mises à jour facultatives ».
+- Fenêtre de commande des pilotes : la dernière ligne s'affiche quel que soit le code de pnputil (vérifié dans cmd.exe).
+- « 1 month » / « 1 mes » au lieu de « 1 months » / « 1 meses ».
+- Point de restauration : une seule création à la fois dans MAUS (corrections et suppression d'un pilote), pour que le réglage de fréquence de Windows soit toujours remis.
+- Texte du Module 3 passé par la traduction (règle des trois langues).
+
 ## 0.4.2 — 29/09/2026
 
 Numéro choisi par le porteur : après la 4.0.0 vient la 0.4.2.
