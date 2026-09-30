@@ -106,8 +106,13 @@ public static class HelpSummary
         }
 
         var findings = report.Modules.SelectMany(m => m.Findings).ToList();
-        var score = HealthScore.Compute(report.Modules);
+        var breakdown = HealthScore.Explain(report.Modules);
+        var score = breakdown.Score;
         Line(T("- Score de santé MAUS : {0}/100 ({1})", score, HealthScore.Describe(score)));
+        if (HealthScore.PartialNote(breakdown) is { } partial)
+        {
+            Line("- " + partial);
+        }
         if (!report.IsElevated)
         {
             Line(T("- Audit sans droits administrateur : certains contrôles sont restés indéterminés."));

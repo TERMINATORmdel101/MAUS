@@ -3302,5 +3302,18 @@
   "Modifiée depuis, laissée telle quelle": "Changed since, left as is",
   "interrompue : peut-être appliquée, « Annuler » vérifie": "interrupted: possibly applied, \"Undo\" checks",
   "Le catalogue de MAUS date du {0} : une version plus récente a pu sortir depuis. Vérifiez sur la page officielle du fabricant.": "The MAUS catalogue dates from {0}: a newer version may have been released since. Check on the manufacturer's official page.",
-  "• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais leur gain en images par seconde dans les jeux est faible, souvent impossible à mesurer.": "• Windows settings (visual effects, privacy, Game Bar, startup) make the PC more responsive, more discreet and steadier, but their gain in frames per second in games is small, often impossible to measure."
+  "• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais leur gain en images par seconde dans les jeux est faible, souvent impossible à mesurer.": "• Windows settings (visual effects, privacy, Game Bar, startup) make the PC more responsive, more discreet and steadier, but their gain in frames per second in games is small, often impossible to measure.",
+  "1 module n'a pas pu être vérifié : {0}.": "1 module could not be checked: {0}.",
+  "1 module non vérifié": "1 module not checked",
+  "Appliqué ; l'audit de vérification a échoué, l'effet n'a pas pu être relu.": "Applied; the verification audit failed, the effect could not be read back.",
+  "Aucun des constats lus ne retire de points, mais une partie du PC n'a pas pu être vérifiée (voir ci-dessous).": "None of the findings read costs points, but part of the PC could not be checked (see below).",
+  "L'audit de vérification a échoué : l'effet des corrections n'a pas pu être relu. Elles restent dans le journal (onglet « Historique ») et peuvent être annulées. Relancez l'audit pour voir leur effet.": "The verification audit failed: the effect of the fixes could not be read back. They remain in the journal (\"History\" tab) and can be undone. Run the audit again to see their effect.",
+  "L'audit de vérification a échoué : les constats affichés sont encore ceux d'avant l'annulation. Relancez l'audit pour voir l'état actuel.": "The verification audit failed: the findings shown are still those from before the undo. Run the audit again to see the current state.",
+  "Non vérifié": "Not checked",
+  "Score partiel : 1 module n'a pas pu être vérifié ({0}). Le score ne tient compte que du reste.": "Partial score: 1 module could not be checked ({0}). The score only takes the rest into account.",
+  "Score partiel : {0} modules n'ont pas pu être vérifiés ({1}). Le score ne tient compte que du reste.": "Partial score: {0} modules could not be checked ({1}). The score only takes the rest into account.",
+  "Un module non vérifié ne retire ni n'ajoute de points : ses constats manquent. Ce score partiel n'est pas gardé dans l'historique, pour ne pas faire croire à une amélioration. Relancez l'audit pour obtenir un score complet.": "A module that was not checked neither removes nor adds points: its findings are missing. This partial score is not kept in the history, so as not to suggest an improvement. Run the audit again to get a complete score.",
+  "Un module qui n'a pas pu être vérifié (erreur, délai dépassé) ne retire ni n'ajoute de points : le score est alors dit partiel et n'est pas gardé dans l'historique.": "A module that could not be checked (error, time limit exceeded) neither removes nor adds points: the score is then called partial and is not kept in the history.",
+  "{0} modules n'ont pas pu être vérifiés : {1}.": "{0} modules could not be checked: {1}.",
+  "{0} modules non vérifiés": "{0} modules not checked"
 }

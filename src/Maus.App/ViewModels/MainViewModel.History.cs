@@ -62,7 +62,13 @@ public sealed partial class MainViewModel
             var result = await Task.Run(() => engine.Revert(session.Session.Id, changeId: changeId));
             FixReport = result.Error ?? T("Annulation :") + Environment.NewLine + string.Join(Environment.NewLine,
                 result.Entries.Select(e => $"• [{Labels.Of(e.Status)}] {e.Title} : {e.Message}"));
-            await RunAuditAsync();
+
+            // Audit en échec : les constats affichés sont encore ceux d'avant l'annulation, il faut le dire.
+            if (!await RunAuditAsync())
+            {
+                FixReport += Environment.NewLine + Environment.NewLine
+                    + T("L'audit de vérification a échoué : les constats affichés sont encore ceux d'avant l'annulation. Relancez l'audit pour voir l'état actuel.");
+            }
         }
         catch (Exception ex)
         {

@@ -207,8 +207,13 @@ public sealed partial class MainViewModel
 
             // Verify, second niveau : un nouvel audit relit l'état effectif (une stratégie peut être ignorée sur Famille).
             FixReport = T("Corrections faites. Vérification par un nouvel audit…");
-            await RunAuditAsync();
-            var verified = FixVerification.CompareWithAudit(selected, result, _results, _lastContext!.Windows);
+
+            // Audit de vérification en échec : les résultats affichés sont encore ceux d'AVANT les corrections. Les comparer
+            // ferait passer chaque correction pour « sans effet », et le journal le garderait : elles restent « non vérifiées ».
+            var audited = await RunAuditAsync();
+            var verified = audited
+                ? FixVerification.CompareWithAudit(selected, result, _results, _lastContext!.Windows)
+                : FixVerification.AuditFailed(result);
             if (result.Session is { } session)
             {
                 await Task.Run(() => engine.RecordVerification(session.Id, verified));
@@ -216,7 +221,7 @@ public sealed partial class MainViewModel
 
             _lastApplied = new AppliedSession(before, result.Session?.Id, verified);
             NeedsExplorerRestart = verified.Any(v => v.Outcome.Status == ChangeStatus.Applied && v.Outcome.Effect == ChangeEffect.ExplorerRestart);
-            FixReport = Describe(result, verified);
+            FixReport = Describe(result, verified, verificationFailed: !audited);
             await RefreshJournalAsync();
         }
         catch (Exception ex)
@@ -339,7 +344,8 @@ public sealed partial class MainViewModel
         }
     }
 
-    private static string Describe(ApplyResult result, IReadOnlyList<VerifiedOutcome> verified)
+    /// <param name="verificationFailed">L'audit de vérification a échoué : l'effet des corrections n'a pas pu être relu.</param>
+    private static string Describe(ApplyResult result, IReadOnlyList<VerifiedOutcome> verified, bool verificationFailed = false)
     {
         var text = new StringBuilder();
         if (result.RestorePoint is { } point)
@@ -355,6 +361,11 @@ public sealed partial class MainViewModel
         var byId = verified.ToDictionary(v => v.Outcome.ChangeId, StringComparer.Ordinal);
         var noEffect = verified.Count(v => v.Check == EffectCheck.NoEffect);
         text.AppendLine(T("{0} correction(s) appliquée(s).", result.AppliedCount));
+        if (verificationFailed)
+        {
+            text.AppendLine(T("L'audit de vérification a échoué : l'effet des corrections n'a pas pu être relu. Elles restent dans le journal (onglet « Historique ») et peuvent être annulées. Relancez l'audit pour voir leur effet."));
+        }
+
         if (noEffect > 0)
         {
             text.AppendLine(T("Attention : {0} correction(s) écrite(s) mais sans effet d'après le nouvel audit (détails ci-dessous).", noEffect));
@@ -368,6 +379,7 @@ public sealed partial class MainViewModel
                     EffectCheck.Confirmed => T("Confirmé"),
                     EffectCheck.PendingRestart => T("En attente"),
                     EffectCheck.NoEffect => T("SANS EFFET"),
+                    EffectCheck.NotChecked => T("Non vérifié"),
                     _ => T("Appliqué"),
                 }, check.Message)
                 : (Labels.Of(outcome.Status), outcome.Message);

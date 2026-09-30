@@ -47,6 +47,40 @@ public class FixVerificationTests
     }
 
     [Fact]
+    public void Failed_verification_audit_leaves_changes_not_checked_instead_of_without_effect()
+    {
+        var registry = new FakeRegistry();
+        var audit = TestContext.Create(registry);
+        var journal = new InMemoryJournalStore();
+        var engine = new FixEngine(TestFixContext.Create(audit, registry, journal: journal));
+        var change = Change("M04.a", @"SOFTWARE\Test\A");
+        var applied = engine.Apply([change], new ApplyOptions { CreateRestorePoint = false });
+
+        // Le piège : comparer aux résultats d'AVANT les corrections (audit de vérification en échec) donnerait « sans effet ».
+        var stale = new[] { new ModuleResult("M04", "t", [Found("M04.a", FindingStatus.Improvable)], TimeSpan.Zero) };
+        Assert.Equal(EffectCheck.NoEffect, FixVerification.CompareWithAudit([change], applied, stale, Pro).Single().Check);
+
+        var verified = FixVerification.AuditFailed(applied);
+        engine.RecordVerification(applied.Session!.Id, verified);
+
+        var outcome = Assert.Single(verified);
+        Assert.Equal(EffectCheck.NotChecked, outcome.Check);
+        Assert.Contains("l'audit de vérification a échoué", outcome.Message, StringComparison.Ordinal);
+        Assert.Null(journal.Load(applied.Session.Id)!.Entries.Single().EffectNote);
+    }
+
+    [Fact]
+    public void Failed_verification_keeps_the_message_of_changes_that_were_not_applied()
+    {
+        var failed = new ChangeOutcome("M04.b", "b", ChangeStatus.Failed, "valeur d'origine remise", ChangeEffect.Immediate);
+
+        var verified = FixVerification.AuditFailed(new ApplyResult(null, [failed], null));
+
+        Assert.Equal(EffectCheck.NotChecked, verified.Single().Check);
+        Assert.Equal("valeur d'origine remise", verified.Single().Message);
+    }
+
+    [Fact]
     public void Single_change_can_be_reverted_and_verification_is_journaled()
     {
         var registry = new FakeRegistry();

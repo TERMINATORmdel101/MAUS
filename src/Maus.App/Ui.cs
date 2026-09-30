@@ -156,6 +156,7 @@ public static class Ui
         T("Le score baisse de moins en moins vite : une longue liste de petits écarts ne fait pas tomber un PC qui fonctionne à 0."),
         T("Un constat critique limite le score à 49 (« à corriger en priorité »), un constat de gravité importante à 74 (« à améliorer »)."),
         T("Un même sujet contrôlé par deux modules (Secure Boot) ne compte qu'une fois. Un constat indéterminé, informatif ou marqué « voulu » ne coûte rien."),
+        T("Un module qui n'a pas pu être vérifié (erreur, délai dépassé) ne retire ni n'ajoute de points : le score est alors dit partiel et n'est pas gardé dans l'historique."),
         T("C'est un repère de MAUS pour suivre votre PC dans le temps, pas une mesure officielle. Ce barème date du 29/09/2026 : les scores précédents ne se comparent pas."),
     ];
 

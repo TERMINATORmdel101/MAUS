@@ -153,8 +153,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Audit hebdomadaire lancé par le Planificateur de tâches : lecture seule, score gardé dans l'historique, notification
-    /// seulement s'il y a un problème rouge. Rien n'est envoyé.
+    /// Audit hebdomadaire lancé par le Planificateur de tâches : lecture seule, score gardé dans l'historique (sauf score
+    /// partiel), notification seulement s'il y a un problème rouge, avec les modules non vérifiés. Rien n'est envoyé.
     /// </summary>
     private async Task RunScheduledAuditAsync()
     {
@@ -162,17 +162,22 @@ public partial class App : Application
         {
             var context = await Task.Run(AuditContext.CreateDefault);
             var results = await AuditEngine.CreateWithBuiltInModules().RunAsync(context);
-            await Task.Run(() =>
+
+            // Un score partiel (module en erreur ou en délai dépassé) n'est pas enregistré : il paraîtrait meilleur que la réalité.
+            if (ScoreTrends.HealthEntry(results, DateTimeOffset.Now) is { } entry)
             {
-                try
+                await Task.Run(() =>
                 {
-                    BenchmarkHistory.CreateHealth().Add(ScoreTrends.HealthEntry(results, DateTimeOffset.Now));
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // Historique non écrit : sans conséquence pour l'audit.
-                }
-            });
+                    try
+                    {
+                        BenchmarkHistory.CreateHealth().Add(entry);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // Historique non écrit : sans conséquence pour l'audit.
+                    }
+                });
+            }
 
             var problems = ScheduledAudit.WorthNotifying(results);
             if (problems.Count == 0)
@@ -181,7 +186,7 @@ public partial class App : Application
                 return;
             }
 
-            var notification = new Views.NotificationWindow(ScheduledAudit.NotificationText(problems));
+            var notification = new Views.NotificationWindow(ScheduledAudit.NotificationText(problems, results));
             notification.Closed += (_, _) =>
             {
                 if (notification.OpenRequested)

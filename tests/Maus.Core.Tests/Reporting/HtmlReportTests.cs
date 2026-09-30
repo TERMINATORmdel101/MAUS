@@ -87,6 +87,18 @@ public class HtmlReportTests
     }
 
     [Fact]
+    public void Partial_score_is_announced_next_to_the_score()
+    {
+        var report = Report(FindingStatus.Ok, "0");
+        report = report with { Modules = [.. report.Modules, new ModuleResult("M03", "Mises à jour Windows", [], TimeSpan.FromSeconds(180), "Délai dépassé (180 s).")] };
+
+        var html = HtmlReport.Build(new HtmlReportInput { After = report });
+
+        Assert.Contains("<p class=\"err\">Score partiel : 1 module n&#39;a pas pu être vérifié (Mises à jour Windows).", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Score partiel", HtmlReport.Build(new HtmlReportInput { After = Report(FindingStatus.Ok, "0") }), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Report_masks_the_user_name_and_pc_name_in_every_text()
     {
         // Exemple réel : une exclusion Defender trop large recopiée dans « Constaté ».

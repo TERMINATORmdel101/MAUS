@@ -21,9 +21,23 @@ public class ScoreTrendsTests
 
         var entry = ScoreTrends.HealthEntry(results, Day);
 
+        Assert.NotNull(entry);
         Assert.Equal(ScoreTrends.HealthKind, entry.Kind);
         Assert.InRange(entry.Score, 0, 99);
         Assert.Equal("1/0/1", entry.Detail);
+    }
+
+    [Fact]
+    public void Partial_health_score_is_not_recorded()
+    {
+        IReadOnlyCollection<ModuleResult> results =
+        [
+            new ModuleResult("M06", "t", [new Finding { Id = "a", Title = "a", Status = FindingStatus.Ok, Explanation = "e" }], TimeSpan.Zero),
+            new ModuleResult("M03", "Mises à jour Windows", [], TimeSpan.FromSeconds(180), "Délai dépassé (180 s)."),
+        ];
+
+        // 100/100 sans les constats de M03 : l'enregistrer montrerait une fausse amélioration sur la courbe.
+        Assert.Null(ScoreTrends.HealthEntry(results, Day));
     }
 
     [Fact]
