@@ -27,6 +27,11 @@
                     </StackPanel>
                 </StackPanel>
                 <TextBlock x:Name="Summary" TextWrapping="Wrap" Margin="0,12,0,0" />
+                <!-- Score partiel : modules en erreur ou en délai dépassé, qui ne retirent ni n'ajoutent de points. -->
+                <Border x:Name="PartialPanel" Margin="0,12,0,0" Padding="12,8" CornerRadius="8" BorderThickness="4,1,1,1" Visibility="Collapsed"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{StaticResource MausGrey}">
+                    <TextBlock x:Name="PartialNote" TextWrapping="Wrap" />
+                </Border>
 
                 <TextBlock Text="{x:Static app:Ui.ScoreLostTitle}" FontSize="15" FontWeight="SemiBold" Margin="0,20,0,8" />
                 <TextBlock x:Name="NothingLost" Text="{x:Static app:Ui.ScoreNothingLost}" TextWrapping="Wrap" Visibility="Collapsed" />

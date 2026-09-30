@@ -12,17 +12,36 @@ public enum ModuleFamily
 }
 
 /// <summary>Résumé d'une famille pour le tableau de bord.</summary>
-public sealed record FamilySummary(ModuleFamily Family, string Letter, string Name, string Description, int Problems, int Warnings, int Improvements, int Unknown);
+/// <param name="Unchecked">Modules de la famille qui n'ont pas pu être vérifiés (erreur ou délai dépassé).</param>
+public sealed record FamilySummary(ModuleFamily Family, string Letter, string Name, string Description, int Problems, int Warnings, int Improvements, int Unknown, int Unchecked = 0)
+{
+    /// <summary>
+    /// Tout a été lu et tout est conforme. Un module non vérifié n'a produit aucun constat : sans ce contrôle, la famille
+    /// paraîtrait « en ordre » alors qu'une partie n'a pas été lue (donnée illisible = gris, jamais un faux vert).
+    /// </summary>
+    public bool AllClear => Problems == 0 && Warnings == 0 && Improvements == 0 && Unknown == 0 && Unchecked == 0;
+}
 
 /// <summary>Un constat qui coûte des points, avec sa gravité retenue.</summary>
 public sealed record ScoreLine(string FindingId, string Title, Severity Gravity, double Points);
+
+/// <summary>Module qui n'a pas pu être vérifié (erreur ou délai dépassé) : ses constats manquent au score.</summary>
+/// <param name="Reason">Message d'erreur du moteur d'audit (déjà dans la langue de l'utilisateur).</param>
+public sealed record UncheckedModule(string ModuleId, string Title, string Reason);
 
 /// <summary>Détail du score : ce qui a coûté des points, et pourquoi le score est ce qu'il est.</summary>
 /// <param name="Lines">Constats de gravité critique, importante ou moyenne, du plus coûteux au moins coûteux.</param>
 /// <param name="OptimisationCount">Nombre d'optimisations (gravité faible), comptées ensemble.</param>
 /// <param name="OptimisationPoints">Points qu'elles retirent (au plus <see cref="HealthScore.OptimisationCap"/>).</param>
 /// <param name="Cap">Plafond appliqué à cause du constat le plus grave, ou <c>null</c>.</param>
-public sealed record ScoreBreakdown(int Score, double Points, IReadOnlyList<ScoreLine> Lines, int OptimisationCount, double OptimisationPoints, int? Cap);
+public sealed record ScoreBreakdown(int Score, double Points, IReadOnlyList<ScoreLine> Lines, int OptimisationCount, double OptimisationPoints, int? Cap)
+{
+    /// <summary>Modules non vérifiés : aucun point ne leur est retiré ni accordé, le score ne tient compte que du reste.</summary>
+    public IReadOnlyList<UncheckedModule> Unchecked { get; init; } = [];
+
+    /// <summary>Score partiel : au moins un module n'a pas pu être vérifié. Il n'est pas gardé dans l'historique.</summary>
+    public bool IsPartial => Unchecked.Count > 0;
+}
 
 /// <summary>
 /// Score de santé du PC (0 à 100) et résumé par famille. Barème de MAUS (choix de conception, révisé le 29/09/2026 à la
@@ -33,7 +52,9 @@ public sealed record ScoreBreakdown(int Score, double Points, IReadOnlyList<Scor
 /// <item>un même sujet contrôlé par deux modules (Secure Boot, modules 1 et 8) ne compte qu'une fois ;</item>
 /// <item>le score baisse de moins en moins vite : 100 × e^(−points / 100), une longue liste de petits écarts ne mène pas à 0 ;</item>
 /// <item>plafond selon le constat le plus grave : critique = 49 au plus (« à corriger en priorité »), importante = 74 au plus (« à améliorer ») ;</item>
-/// <item>un indéterminé, une information ou un constat marqué « voulu » ne coûte rien.</item>
+/// <item>un indéterminé, une information ou un constat marqué « voulu » ne coûte rien ;</item>
+/// <item>un module en erreur ou en délai dépassé n'a aucun constat : il ne coûte rien, mais le score est dit partiel
+/// (<see cref="ScoreBreakdown.Unchecked"/>), n'est pas gardé dans l'historique, et sa famille est « non vérifiée ».</item>
 /// </list>
 /// </summary>
 public static class HealthScore
@@ -100,9 +121,40 @@ public static class HealthScore
     /// <summary>Score avant plafond : 100 × e^(−points / 100), arrondi.</summary>
     public static int Uncapped(double points) => (int)Math.Round(100 * Math.Exp(-points / 100), MidpointRounding.AwayFromZero);
 
+    /// <summary>Modules dont la détection a échoué (erreur ou délai dépassé) : rien n'y a été lu.</summary>
+    public static IReadOnlyList<UncheckedModule> UncheckedModules(IEnumerable<ModuleResult> results) =>
+        results.Where(r => r.Error is not null).Select(r => new UncheckedModule(r.ModuleId, r.Title, r.Error!)).ToList();
+
+    /// <summary>Phrase qui signale un score partiel, ou <c>null</c> quand tous les modules ont été vérifiés.</summary>
+    public static string? PartialNote(ScoreBreakdown breakdown) => breakdown.Unchecked.Count switch
+    {
+        0 => null,
+        1 => T("Score partiel : 1 module n'a pas pu être vérifié ({0}). Le score ne tient compte que du reste.", breakdown.Unchecked[0].Title),
+        var count => T("Score partiel : {0} modules n'ont pas pu être vérifiés ({1}). Le score ne tient compte que du reste.", count,
+            string.Join(", ", breakdown.Unchecked.Select(u => u.Title))),
+    };
+
+    /// <summary>
+    /// Détail d'un score partiel pour « Pourquoi ce score ? » : la phrase de <see cref="PartialNote"/>, chaque module non
+    /// vérifié avec sa raison, puis ce que cela change ; <c>null</c> quand tous les modules ont été vérifiés.
+    /// </summary>
+    public static string? PartialDetail(ScoreBreakdown breakdown)
+    {
+        if (PartialNote(breakdown) is not { } note)
+        {
+            return null;
+        }
+
+        var lines = new List<string> { note };
+        lines.AddRange(breakdown.Unchecked.Select(u => "• " + T("{0} : {1}", u.Title, u.Reason)));
+        lines.Add(T("Un module non vérifié ne retire ni n'ajoute de points : ses constats manquent. Ce score partiel n'est pas gardé dans l'historique, pour ne pas faire croire à une amélioration. Relancez l'audit pour obtenir un score complet."));
+        return string.Join(Environment.NewLine, lines);
+    }
+
     public static ScoreBreakdown Explain(IEnumerable<ModuleResult> results)
     {
-        var costly = results.SelectMany(r => r.Findings)
+        var all = results.ToList();
+        var costly = all.SelectMany(r => r.Findings)
             .Select(f => (Finding: f, Gravity: GravityOf(f)))
             .Where(x => x.Gravity > Severity.Info)
             .ToList();
@@ -136,7 +188,11 @@ public static class HealthScore
             cap = null;
         }
 
-        return new ScoreBreakdown(Math.Clamp(score, 0, 100), points, lines, optimisations, optimisationPoints, cap);
+        // Un module non vérifié ne retire ni n'accorde de points (aucune donnée inventée) : il est seulement signalé.
+        return new ScoreBreakdown(Math.Clamp(score, 0, 100), points, lines, optimisations, optimisationPoints, cap)
+        {
+            Unchecked = UncheckedModules(all),
+        };
     }
 
     private static readonly Dictionary<string, ModuleFamily> Families = new(StringComparer.Ordinal)
@@ -181,7 +237,8 @@ public static class HealthScore
         var list = results.ToList();
         return Enum.GetValues<ModuleFamily>().Select(family =>
         {
-            var findings = list.Where(r => FamilyOf(r.ModuleId) == family).SelectMany(r => r.Findings).ToList();
+            var modules = list.Where(r => FamilyOf(r.ModuleId) == family).ToList();
+            var findings = modules.SelectMany(r => r.Findings).ToList();
             var (letter, name, description) = family switch
             {
                 ModuleFamily.Maintenance => ("M", T("Maintenance"), T("Démarrage, santé du matériel, périphériques, réseau, alimentation, mémoire")),
@@ -193,7 +250,8 @@ public static class HealthScore
                 findings.Count(f => f.Status == FindingStatus.Problem),
                 findings.Count(f => f.Status == FindingStatus.Warning),
                 findings.Count(f => f.Status == FindingStatus.Improvable),
-                findings.Count(f => f.Status == FindingStatus.Unknown));
+                findings.Count(f => f.Status == FindingStatus.Unknown),
+                modules.Count(r => r.Error is not null));
         }).ToList();
     }
 }

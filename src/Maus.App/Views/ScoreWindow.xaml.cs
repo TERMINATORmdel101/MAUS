@@ -20,7 +20,9 @@ public partial class ScoreWindow : Window
         ScoreValue.Text = breakdown.Score.ToString(CultureInfo.CurrentCulture);
         ScoreWord.Text = HealthScore.Describe(breakdown.Score);
         Summary.Text = breakdown.Points <= 0
-            ? T("Aucun constat ne retire de points : tout est conforme, indéterminé ou marqué « voulu ».")
+            ? breakdown.IsPartial
+                ? T("Aucun des constats lus ne retire de points, mais une partie du PC n'a pas pu être vérifiée (voir ci-dessous).")
+                : T("Aucun constat ne retire de points : tout est conforme, indéterminé ou marqué « voulu ».")
             : breakdown.Cap is { } limit
                 ? T("{0} points retirés au total, ce qui donnerait {1} sur 100 ; le score est plafonné à {2} à cause d'un constat de gravité {3}.",
                     Format(breakdown.Points), HealthScore.Uncapped(breakdown.Points), limit, HealthScore.GravityName(limit == HealthScore.CriticalCap ? Severity.Critical : Severity.High))
@@ -42,6 +44,13 @@ public partial class ScoreWindow : Window
             CapNote.Text = T("Plafond : un constat de gravité {0} limite le score à {1}, même si peu de points ont été retirés.",
                 HealthScore.GravityName(cap == HealthScore.CriticalCap ? Severity.Critical : Severity.High), cap);
             CapNote.Visibility = Visibility.Visible;
+        }
+
+        // Score partiel : les modules en erreur ou en délai dépassé sont nommés, avec la raison (donnée illisible = gris).
+        if (HealthScore.PartialDetail(breakdown) is { } partial)
+        {
+            PartialNote.Text = partial;
+            PartialPanel.Visibility = Visibility.Visible;
         }
 
         Loaded += (_, _) => Appearance.Motion.Enter(Page, offset: 12);

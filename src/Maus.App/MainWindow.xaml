@@ -116,6 +116,9 @@
                                     </StackPanel>
                                 </Grid>
                                 <TextBlock Text="{Binding ScoreDetail}" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,12,0,4" />
+                                <!-- Score partiel : un module en erreur ou en délai dépassé n'a rien lu, le score ne compte que le reste. -->
+                                <TextBlock Text="{Binding ScorePartialNote}" Style="{StaticResource MausText}" FontSize="12" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6"
+                                           Visibility="{Binding IsScorePartial, Converter={StaticResource BoolToVisibility}}" />
                                 <Button Content="{x:Static app:Ui.ScoreWhy}" Command="{Binding ShowScoreDetailCommand}" HorizontalAlignment="Center" Padding="12,3" Margin="0,0,0,8"
                                         Visibility="{Binding HasScore, Converter={StaticResource BoolToVisibility}}" />
                                 <StackPanel Visibility="{Binding HasHealthTrend, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8" ToolTip="{Binding HealthTrendText}">

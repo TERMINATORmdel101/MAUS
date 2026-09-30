@@ -110,8 +110,13 @@ public sealed partial class MainViewModel : ObservableObject
     public string About { get; } = T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur · Logiciel libre sous licence GPL-3.0, fourni sans garantie · version {0}",
         AppVersion.Display);
 
-    private async Task RunAuditAsync()
+    /// <summary>
+    /// Lance l'audit. Renvoie vrai quand de nouveaux résultats remplacent les précédents : sinon (audit en échec), les
+    /// constats affichés sont ceux d'avant, et rien ne doit être vérifié ni conclu sur leur base.
+    /// </summary>
+    private async Task<bool> RunAuditAsync()
     {
+        var fresh = false;
         IsRunning = true;
         Completed = 0;
         StatusText = T("Lecture de la configuration…");
@@ -142,6 +147,7 @@ public sealed partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(SelectedModule));
 
             _lastContext = context;
+            fresh = true;
             await RebindAcknowledgementsAsync(findings);
             OnPropertyChanged(nameof(HasAudit));
             LoadChoices(context);
@@ -164,6 +170,8 @@ public sealed partial class MainViewModel : ObservableObject
         {
             IsRunning = false;
         }
+
+        return fresh;
     }
 
     /// <summary>Relance un seul module (après un choix de l'utilisateur) et met à jour l'affichage et les corrections.</summary>

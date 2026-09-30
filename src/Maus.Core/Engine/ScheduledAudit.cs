@@ -112,8 +112,23 @@ public static class ScheduledAudit
     public static IReadOnlyList<Finding> WorthNotifying(IEnumerable<ModuleResult> results) =>
         results.SelectMany(r => r.Findings).Where(f => f.Status == FindingStatus.Problem).ToList();
 
-    /// <summary>Texte de la notification : combien de problèmes, et les premiers.</summary>
-    public static string NotificationText(IReadOnlyList<Finding> problems) =>
-        T("L'audit de la semaine a trouvé {0} problème(s) : {1}{2}", problems.Count,
+    /// <summary>
+    /// Texte de la notification : combien de problèmes, et les premiers ; puis les modules qui n'ont pas pu être vérifiés
+    /// (erreur ou délai dépassé), pour ne pas laisser croire que le reste est en ordre. Un module non vérifié ne suffit pas à
+    /// afficher la notification : il ne dit rien de l'état du PC, et la tâche promet de ne déranger que pour un problème rouge.
+    /// </summary>
+    /// <param name="problems">Problèmes rouges (<see cref="WorthNotifying"/>).</param>
+    /// <param name="results">Résultats de l'audit, pour citer les modules non vérifiés ; <c>null</c> = ne pas les citer.</param>
+    public static string NotificationText(IReadOnlyList<Finding> problems, IEnumerable<ModuleResult>? results = null)
+    {
+        var text = T("L'audit de la semaine a trouvé {0} problème(s) : {1}{2}", problems.Count,
             string.Join(" ; ", problems.Take(3).Select(p => p.Title)), problems.Count > 3 ? "…" : string.Empty);
+        var failed = results is null ? [] : Reporting.HealthScore.UncheckedModules(results);
+        return failed.Count switch
+        {
+            0 => text,
+            1 => text + Environment.NewLine + T("1 module n'a pas pu être vérifié : {0}.", failed[0].Title),
+            var count => text + Environment.NewLine + T("{0} modules n'ont pas pu être vérifiés : {1}.", count, string.Join(", ", failed.Select(f => f.Title))),
+        };
+    }
 }

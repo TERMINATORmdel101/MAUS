@@ -90,6 +90,11 @@ public static class HtmlReport
         var score = breakdown.Score;
         html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(T("En résumé"))}</h2>")
             .Append(CultureInfo.InvariantCulture, $"<p class=\"score\"><b>{score}</b>/100 · {E(T("santé du PC : {0}", HealthScore.Describe(score)))}</p>");
+        if (HealthScore.PartialNote(breakdown) is { } partial)
+        {
+            html.Append(CultureInfo.InvariantCulture, $"<p class=\"err\">{E(partial)}</p>");
+        }
+
         AppendScoreDetail(html, breakdown);
         html.Append("<div class=\"cards\">");
         foreach (var status in Order.Take(4))

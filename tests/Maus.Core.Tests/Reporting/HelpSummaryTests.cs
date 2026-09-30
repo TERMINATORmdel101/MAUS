@@ -86,6 +86,18 @@ public class HelpSummaryTests
     }
 
     [Fact]
+    public void Partial_score_is_announced_with_the_modules_that_could_not_be_checked()
+    {
+        var report = Report(F("M06.ok", FindingStatus.Ok));
+        report = report with { Modules = [.. report.Modules, new ModuleResult("M03", "Mises à jour Windows", [], TimeSpan.FromSeconds(180), "Délai dépassé (180 s).")] };
+
+        var text = HelpSummary.Build(report, Privacy);
+
+        Assert.Contains("- Score partiel : 1 module n'a pas pu être vérifié (Mises à jour Windows).", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Score partiel", HelpSummary.Build(Report(F("M06.ok", FindingStatus.Ok)), Privacy), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Clean_pc_says_so()
     {
         var text = HelpSummary.Build(Report(F("M06.ok", FindingStatus.Ok)), Privacy);

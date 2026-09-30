@@ -39,9 +39,15 @@ public sealed class FamilyViewModel(FamilySummary summary, bool audited = true)
             chips.Add(new(s.Improvements == 1 ? T("1 optimisation") : T("{0} optimisations", s.Improvements), Palette.Blue));
         }
 
+        // Module en erreur ou en délai dépassé : rien n'y a été lu, la famille n'est donc pas « en ordre » (gris, jamais un faux vert).
+        if (s.Unchecked > 0)
+        {
+            chips.Add(new(s.Unchecked == 1 ? T("1 module non vérifié") : T("{0} modules non vérifiés", s.Unchecked), Palette.Grey));
+        }
+
         if (chips.Count == 0)
         {
-            chips.Add(s.Unknown > 0 ? new(T("{0} indéterminé(s)", s.Unknown), Palette.Grey) : new(T("tout est en ordre"), Palette.Green));
+            chips.Add(s.AllClear ? new(T("tout est en ordre"), Palette.Green) : new(T("{0} indéterminé(s)", s.Unknown), Palette.Grey));
         }
 
         return chips;
@@ -91,6 +97,11 @@ public sealed partial class MainViewModel
     public string ScoreWord => HasScore ? HealthScore.Describe(Score) : T("lancez l'audit");
 
     public string ScoreDetail { get; private set; } = T("Le score apparaîtra après le premier audit. L'audit ne modifie rien.");
+
+    /// <summary>Phrase « Score partiel : … » quand un module n'a pas pu être vérifié, sinon vide.</summary>
+    public string ScorePartialNote { get; private set; } = string.Empty;
+
+    public bool IsScorePartial => ScorePartialNote.Length > 0;
 
     public string Greeting { get; } = DateTime.Now.Hour switch
     {
@@ -204,7 +215,10 @@ public sealed partial class MainViewModel
         HealthTrendText = Maus.Core.Workshop.ScoreTrends.Describe(series);
     }
 
-    /// <summary>Enregistre le score de cet audit (sur ce PC seulement) et met à jour la courbe.</summary>
+    /// <summary>
+    /// Enregistre le score de cet audit (sur ce PC seulement) et met à jour la courbe. Un score partiel (module en erreur ou
+    /// en délai dépassé) n'est pas enregistré : il paraîtrait meilleur que la réalité et la courbe monterait à tort.
+    /// </summary>
     private async Task RecordHealthAsync()
     {
         var entry = Maus.Core.Workshop.ScoreTrends.HealthEntry(_results, DateTimeOffset.Now);
@@ -213,7 +227,10 @@ public sealed partial class MainViewModel
             var history = Maus.Core.Workshop.BenchmarkHistory.CreateHealth();
             try
             {
-                history.Add(entry);
+                if (entry is not null)
+                {
+                    history.Add(entry);
+                }
             }
             catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
             {
@@ -251,6 +268,7 @@ public sealed partial class MainViewModel
             findings.Count(f => f.Status == FindingStatus.Problem),
             findings.Count(f => f.Status == FindingStatus.Warning),
             findings.Count(f => f.Status == FindingStatus.Improvable));
+        ScorePartialNote = HealthScore.PartialNote(_breakdown) ?? string.Empty;
         Families.Clear();
         foreach (var family in HealthScore.Summaries(_results))
         {
@@ -262,6 +280,8 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(ScoreText));
         OnPropertyChanged(nameof(ScoreWord));
         OnPropertyChanged(nameof(ScoreDetail));
+        OnPropertyChanged(nameof(ScorePartialNote));
+        OnPropertyChanged(nameof(IsScorePartial));
         OnPropertyChanged(nameof(HomeAuditLabel));
         OnPropertyChanged(nameof(FixCardDetail));
     }

@@ -15,11 +15,22 @@ public static class ScoreTrends
     /// <summary>Ancien barème (un problème = 12 points, un point à surveiller = 5), avant le 29/09/2026.</summary>
     public const string LegacyHealthKind = "health";
 
-    /// <summary>Score de santé d'un audit, avec le nombre de problèmes / points à surveiller / optimisations en détail.</summary>
-    public static BenchmarkEntry HealthEntry(IReadOnlyCollection<ModuleResult> results, DateTimeOffset at)
+    /// <summary>
+    /// Score de santé d'un audit, avec le nombre de problèmes / points à surveiller / optimisations en détail ; <c>null</c>
+    /// pour un score partiel (un module en erreur ou en délai dépassé) : ses constats manquent, le score serait meilleur que
+    /// la réalité et la courbe montrerait une fausse amélioration. Il n'est donc pas enregistré (les fichiers d'historique
+    /// existants restent lisibles tels quels).
+    /// </summary>
+    public static BenchmarkEntry? HealthEntry(IReadOnlyCollection<ModuleResult> results, DateTimeOffset at)
     {
+        var breakdown = HealthScore.Explain(results);
+        if (breakdown.IsPartial)
+        {
+            return null;
+        }
+
         var findings = results.SelectMany(r => r.Findings).ToList();
-        return new BenchmarkEntry(HealthKind, HealthScore.Compute(results), true, at,
+        return new BenchmarkEntry(HealthKind, breakdown.Score, true, at,
             string.Join('/', findings.Count(f => f.Status == FindingStatus.Problem), findings.Count(f => f.Status == FindingStatus.Warning), findings.Count(f => f.Status == FindingStatus.Improvable)));
     }
 
