@@ -162,7 +162,8 @@ public sealed class MemorySnapshotStore(string directory)
     {
         Directory.CreateDirectory(directory);
         var name = "fiche-" + snapshot.At.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".json";
-        File.WriteAllText(Path.Combine(directory, name), JsonSerializer.Serialize(snapshot, Json));
+        // « Tout ou rien » : un plantage pendant l'écriture ne laisse pas une fiche à moitié écrite.
+        Platform.AtomicFile.WriteAllText(Path.Combine(directory, name), JsonSerializer.Serialize(snapshot, Json));
         foreach (var old in Files().Skip(Keep))
         {
             File.Delete(old);
