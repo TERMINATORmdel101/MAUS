@@ -32,7 +32,7 @@
 
 ## État du projet
 
-Version actuelle : **4.0.0** (voir [CHANGELOG.md](CHANGELOG.md)). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
+Version actuelle : **0.5.2** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
 
 | Version | Contenu | État |
 |---|---|---|
@@ -42,11 +42,42 @@ Version actuelle : **4.0.0** (voir [CHANGELOG.md](CHANGELOG.md)). Tout est test�
 | 0.3.3-alpha | Thème clair / sombre, couleurs selon les composants, animations, fenêtre de surveillance (températures, consommations, fréquences, erreurs WHEA / PCIe et Windows), timings réels Intel Sandy Bridge et Skylake à Comet Lake, tension mémoire honnête | Testée sur le PC du porteur |
 | 3.9.1 | Timings réels sur tous les Intel Core depuis Haswell (jusqu'aux Core Ultra), APU Ryzen Raven Ridge, comparaison de fiches mémoire, étalonnage de la tension, relevé avec bilan, revue de sécurité | Timings vérifiés sur Coffee Lake ; autres générations à comparer à CPU-Z |
 | 4.0.0 | Sept charges pour les tests du processeur (dont AVX2 + FMA et AVX-512), programme complet de validation du Curve Optimizer (cœur par cœur puis transitoires, 1 h ou 4 h), température du processeur pendant les tests, plus de fausse alerte PCIe sur portable, anti-veille pendant les tests | Codée et relue ; programme à essayer sur un vrai Ryzen |
-| Suite | Écran et HDR, publication sur le Microsoft Store | À venir |
+| 0.4.2 / 0.5.1 | Score de santé selon la gravité (« Pourquoi ce score ? »), liste complète des pilotes, actions sur le pilote de la carte graphique (redémarrer, retirer, sauvegarder, supprimer avec point de restauration), pilotes vérifiés dans l'audit de base | Testées sur le PC du porteur ; actions sur le pilote à essayer dans Windows Sandbox |
+| 0.5.2 | Neuf corrections (tests arrêtés proprement, corrections interrompues annulables, rapport HTML sans nom d'utilisateur…), bouton « Ouvrir dans Windows » sur les constats, installateur | Testée sur le PC du porteur |
+| Suite | Écran et HDR, signature du code, publication sur le Microsoft Store | À venir |
 
 **Aucune donnée inventée.** Chaque seuil (température, tension) cite sa source publiée dans `src/Maus.Core/Catalog/hw-safety-limits.json`. Sans source, MAUS n'affiche pas de seuil et ne déclenche pas d'alarme.
 
-Configuration requise : Windows 11 23H2 (build 22631) ou plus récent.
+Configuration requise : Windows 11 23H2 (build 22631) ou plus récent, processeur x64.
+
+## Installer
+
+Téléchargez `MAUS-<version>-installation.exe` dans les *Releases* du dépôt et lancez-le. MAUS s'installe dans `Program Files` (dossier protégé, nécessaire à l'audit automatique de la semaine), avec un raccourci dans le menu Démarrer ; .NET est inclus, rien d'autre à installer. Un fichier `.sha256` permet de vérifier que le téléchargement est intact.
+
+Tant que l'installateur n'est pas signé (voir *Code signing policy* ci-dessous), Windows SmartScreen affiche « Windows a protégé votre ordinateur » : « Informations complémentaires », puis « Exécuter quand même ».
+
+Désinstaller : Paramètres > Applications > Applications installées > MAUS > Désinstaller. Les fichiers, les raccourcis et la tâche de l'audit automatique sont retirés. Le journal des corrections (`%ProgramData%\MAUS`) est gardé : il contient les valeurs d'origine des réglages modifiés. Annulez vos corrections avant de désinstaller si vous voulez retrouver ces valeurs. Le pilote PawnIO, s'il a été installé, se retire depuis MAUS ou depuis la liste des applications.
+
+Fabriquer l'installateur (SDK .NET 10 et [Inno Setup 7](https://jrsoftware.org/isinfo.php)) :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File installer\build-installer.ps1
+```
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+**Status:** the application to the SignPath Foundation is being prepared; current releases are **not signed yet**. Once accepted, only installers built by the project's own build from this repository's source code will be signed.
+
+Team roles:
+
+- Committers and reviewers: [TERMINATORmdel101](https://github.com/TERMINATORmdel101) (maintainer; code written with Claude, an AI by Anthropic, and reviewed by the maintainer)
+- Approvers: [TERMINATORmdel101](https://github.com/TERMINATORmdel101)
+
+Privacy policy: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. (MAUS has no telemetry. Network access happens only for actions the user starts: Windows Update search during an audit, software update list with winget, web search about a process, connection test, links to GitHub.)
+
+*En français :* la signature du code sera fournie gratuitement par SignPath.io, avec un certificat de la SignPath Foundation. La demande est en préparation : les versions actuelles ne sont **pas encore signées**. MAUS n'envoie aucune information sur le réseau sans une action de l'utilisateur.
 
 ## Compiler
 

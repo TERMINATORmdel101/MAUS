@@ -15,6 +15,7 @@ Corrections et petites améliorations (règle du porteur : dernier chiffre). Tro
 - **Audit plus rapide** : le module 3 lit les correctifs installés, Defender et le registre pendant la recherche Windows Update (0,6 à 0,8 s gagnées en fin d'audit, mesurées).
 - **Accessibilité** : la case de chaque correction, les listes déroulantes et les zones de saisie ont un nom pour les lecteurs d'écran (Narrateur) ; une règle des tests empêche d'en oublier.
 - **« Ouvrir dans Windows »** sur beaucoup plus de constats : le bouton mène directement à la bonne page des Paramètres (adresses publiées par Microsoft), au lieu de décrire le chemin à suivre.
+- **Installateur** (ajouté le 02/10, l'application ne change pas) : un seul fichier `MAUS-0.5.2-installation.exe` (Inno Setup 7) qui installe MAUS dans Program Files avec .NET inclus, un raccourci dans le menu Démarrer et une désinstallation propre (fichiers, raccourcis, tâche de l'audit automatique). Le README contient la section *Code signing policy* demandée par la SignPath Foundation pour une signature gratuite ; la demande n'est pas encore déposée et l'installateur n'est pas encore signé.
 
 ## 0.5.1 — 29/09/2026
 

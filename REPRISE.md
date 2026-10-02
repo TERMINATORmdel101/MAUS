@@ -5,7 +5,7 @@ Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le trav
 ## 0. État au 29/09/2026 (session locale sur le PC du porteur)
 
 - Version **4.0.0** (numéros choisis par le porteur : 0.3.3-alpha, puis 3.9.1, puis 4.0.0), plus les ajouts du 29/09 (numéro à choisir). Compilation 0 avertissement, **1 315 tests réussis** sous Windows.
-- **0.5.3 — EN PAUSE (limite hebdomadaire Claude atteinte le 30/09, retour le 05/10)**. Le porteur a dit « OK pour TOUS » les 7 défauts, et a demandé « qu'est-ce qui manque pour les experts du PC ? » (recherche pas encore faite : relancer le script `.worktrees/_smoke/wf-053.js` avec `{"mode":"research"}`, ou le réécrire). Numéro de version déjà passé à 0.5.3 (commit 7a2a57e). Travail des agents, chacun dans sa branche locale :
+- **0.5.3 — EN PAUSE (limite hebdomadaire Claude atteinte le 30/09, retour le 05/10)**. Le porteur a dit « OK pour TOUS » les 7 défauts, et a demandé « qu'est-ce qui manque pour les experts du PC ? » (recherche pas encore faite : relancer le script `.worktrees/_smoke/wf-053.js` avec `{"mode":"research"}`, ou le réécrire). Numéro de version remis à 0.5.2 le 02/10 (installateur de la 0.5.2) : repasser à 0.5.3 (`Directory.Build.props`, `AppVersionTests`) avec les corrections. Travail des agents, chacun dans sa branche locale :
   - Défaut 2 (module en échec = faux vert) : **terminé et testé** (1 363 tests, 0 avertissement), pas encore relu : `worktree-wf_bb647255-789-2`, commit 8fd44d6.
   - Défaut 1 (surchauffe pendant les tests longs, `ThermalWatchdog`) : partiel, `worktree-wf_bb647255-789-1` (09c21c2).
   - Défauts 3 et 6 (réglages régionaux, page OEM, dates) : partiel, `worktree-wf_bb647255-789-3` (c5c0d29).
