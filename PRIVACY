@@ -1,1 +1,7 @@
-This application is fully local and does not collect, store, or transmit any user data.
+MAUS Privacy Policy
+
+MAUS has no telemetry and no user account. It does not collect personal data and sends nothing to its developers.
+
+Data kept on your PC only: your settings, score history, test results and the log of changes made by MAUS (so they can be undone), in %ProgramData%\MAUS and %LocalAppData%\MAUS. You can delete these folders at any time.
+
+Network: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Network access only happens for actions you start: Windows Update search during an audit (Microsoft), software update list (winget), web search about a process (search engine of your choice), connection test, and links to GitHub.
