@@ -1,6 +1,6 @@
 ﻿; Installateur de MAUS (Inno Setup 7, https://jrsoftware.org/isinfo.php).
 ; Ne pas compiler à la main : installer\build-installer.ps1 publie l'application puis appelle ISCC avec
-;   /DAppVersion=<version de Directory.Build.props>  /DSourceDir=<dossier publié>  /DOutputDir=<dossier de sortie>
+;   --define=AppVersion=<version de Directory.Build.props>  --define=SourceDir=<dossier publié>  --define=OutputDir=<sortie>
 ;
 ; Choix :
 ; - Program Files (protégé) : l'audit automatique de la semaine n'est proposé que depuis un dossier que seul un

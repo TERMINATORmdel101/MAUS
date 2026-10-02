@@ -28,7 +28,7 @@ if (Test-Path $files) { Remove-Item -Recurse -Force $files }
 dotnet publish (Join-Path $root 'src\Maus.App\Maus.App.csproj') -c Release -r win-x64 --self-contained true -o $files --disable-build-servers -nologo
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué (code $LASTEXITCODE)" }
 
-& $Iscc "/DAppVersion=$version" "/DSourceDir=$files" "/DOutputDir=$out" (Join-Path $PSScriptRoot 'MAUS.iss')
+& $Iscc --quiet-progress "--define=AppVersion=$version" "--define=SourceDir=$files" "--define=OutputDir=$out" (Join-Path $PSScriptRoot 'MAUS.iss')
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup a échoué (code $LASTEXITCODE)" }
 
 $setup = Join-Path $out "MAUS-$version-installation.exe"
