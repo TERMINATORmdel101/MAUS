@@ -3,6 +3,7 @@ using System.Windows.Input;
 using Maus.App.Appearance;
 using Maus.App.ViewModels.Workshop;
 using Maus.App.Views;
+using Maus.Core.Diagnostics;
 using Maus.Core.Fixes;
 using Maus.Core.Preferences;
 
@@ -87,7 +88,7 @@ public sealed partial class MainViewModel
         }
 
         AppearanceManager.Apply(AppearanceManager.Current with { MonitorOnTop = onTop });
-        _ = Task.Run(() =>
+        Task.Run(() =>
         {
             try
             {
@@ -97,6 +98,6 @@ public sealed partial class MainViewModel
             {
                 // Le choix vaut pour cette ouverture de MAUS.
             }
-        });
+        }).Forget("surveillance : choix « au premier plan »", ReportChoiceError);
     }
 }

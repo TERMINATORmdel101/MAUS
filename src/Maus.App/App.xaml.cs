@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Maus.App.Appearance;
 using Maus.Core;
+using Maus.Core.Diagnostics;
 using Maus.Core.Engine;
 using Maus.Core.Localization;
 using Maus.Core.Preferences;
@@ -15,7 +16,10 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Filet de sécurité : fil de l'interface, autres fils (l'erreur ferme MAUS, la trace reste) et tâches jamais attendues.
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
         var preferences = FilePreferencesStore.CreateDefault().Load();
         UseLanguage(preferences.Language);
 
@@ -28,16 +32,18 @@ public partial class App : Application
         {
             // Audit planifié : pas de fenêtre, sauf si un problème rouge mérite d'être signalé.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = RunScheduledAuditAsync();
+
+            // Une erreur qui échapperait à l'audit ne doit pas laisser un MAUS invisible tourner indéfiniment.
+            RunScheduledAuditAsync().Forget("audit hebdomadaire", _ => Shutdown(1));
             return;
         }
+
+        s_interactive = true;
 
         // MAUS s'arrête quand sa fenêtre principale se ferme, même si une fenêtre annexe traîne encore.
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
-        // Une seule fenêtre de MAUS à la fois : deux MAUS ouverts se disputeraient le pilote et le bus des barrettes.
-        s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
-        if (!first && !TakeOverFromWindowlessInstance())
+        if (!AcquireSingleInstance())
         {
             Shutdown(0);
             return;
@@ -47,26 +53,14 @@ public partial class App : Application
         SplashScreen? splash = new SplashScreen(typeof(App).Assembly, "Assets/splash.png");
         splash.Show(autoClose: false);
 
-        // Avertissements au premier lancement (et après chaque changement de fond du texte) : sans accord, MAUS se ferme.
         if (preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version)
         {
             splash.Close(TimeSpan.Zero);
             splash = null;
-            // Pendant cette fenêtre, fermer celle-ci ne doit pas être pris pour la fermeture de MAUS par Windows.
-            ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            if (new Views.DisclaimerWindow().ShowDialog() != true)
+            if (!AskDisclaimer())
             {
                 Shutdown(0);
                 return;
-            }
-
-            try
-            {
-                FilePreferencesStore.CreateDefault().Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-            {
-                // Accord non enregistré : les avertissements reviendront au prochain lancement, MAUS s'ouvre quand même.
             }
 
             ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -78,6 +72,45 @@ public partial class App : Application
 
     /// <summary>Tenu tant que MAUS est ouvert (signale aux lancements suivants qu'une fenêtre existe déjà).</summary>
     private static Mutex? s_singleInstance;
+
+    /// <summary>Une fenêtre de MAUS est (ou va être) affichée : une erreur fatale s'annonce par un message.</summary>
+    private static volatile bool s_interactive;
+
+    /// <summary>
+    /// Une seule fenêtre de MAUS à la fois : deux MAUS ouverts se disputeraient le pilote et le bus des barrettes. Prend le
+    /// verrou <c>Local\MAUS.FenetrePrincipale</c>, ou ramène devant le MAUS déjà ouvert.
+    /// </summary>
+    /// <returns><c>true</c> si ce MAUS peut afficher sa fenêtre.</returns>
+    private static bool AcquireSingleInstance()
+    {
+        s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
+        return first || TakeOverFromWindowlessInstance();
+    }
+
+    /// <summary>
+    /// Avertissements au premier lancement (et après chaque changement de fond du texte).
+    /// </summary>
+    /// <returns><c>false</c> si l'utilisateur ne les accepte pas : MAUS doit alors se fermer.</returns>
+    private bool AskDisclaimer()
+    {
+        // Pendant cette fenêtre, fermer celle-ci ne doit pas être pris pour la fermeture de MAUS par Windows.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        if (new Views.DisclaimerWindow().ShowDialog() != true)
+        {
+            return false;
+        }
+
+        try
+        {
+            FilePreferencesStore.CreateDefault().Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // Accord non enregistré : les avertissements reviendront au prochain lancement, MAUS s'ouvre quand même.
+        }
+
+        return true;
+    }
 
     /// <summary>
     /// Un autre MAUS tourne. S'il a une fenêtre, elle revient devant et ce lancement s'arrête. S'il n'en a aucune (MAUS
@@ -186,12 +219,7 @@ public partial class App : Application
             {
                 if (notification.OpenRequested)
                 {
-                    ShutdownMode = ShutdownMode.OnMainWindowClose;
-                    ShowMainWindow();
-                    if (Current.MainWindow?.DataContext is ViewModels.MainViewModel model && model.RunAuditCommand.CanExecute(null))
-                    {
-                        model.RunAuditCommand.Execute(null);
-                    }
+                    OpenAfterScheduledAudit();
                 }
                 else
                 {
@@ -202,8 +230,37 @@ public partial class App : Application
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            WriteCrashLog(ex);
+            CrashLog.Write(ex, "Audit hebdomadaire interrompu : MAUS s'arrête");
             Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// « Ouvrir » après l'audit hebdomadaire : comme un lancement normal (une seule fenêtre de MAUS, avertissements acceptés),
+    /// puis l'audit est refait dans la fenêtre.
+    /// </summary>
+    private void OpenAfterScheduledAudit()
+    {
+        s_interactive = true;
+        if (!AcquireSingleInstance())
+        {
+            // Un MAUS est déjà ouvert : sa fenêtre revient devant, celui-ci s'arrête.
+            Shutdown(0);
+            return;
+        }
+
+        if (FilePreferencesStore.CreateDefault().Load().DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version && !AskDisclaimer())
+        {
+            Shutdown(0);
+            return;
+        }
+
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+        ShowMainWindow();
+        UiWatchdog.Start(Dispatcher);
+        if (Current.MainWindow?.DataContext is ViewModels.MainViewModel model && model.RunAuditCommand.CanExecute(null))
+        {
+            model.RunAuditCommand.Execute(null);
         }
     }
 
@@ -238,35 +295,44 @@ public partial class App : Application
     /// </summary>
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        var logPath = WriteCrashLog(e.Exception);
-        MessageBox.Show(
-            Texts.T("MAUS a rencontré une erreur inattendue et doit s'arrêter. Les corrections déjà faites sont enregistrées : l'onglet Historique permet de les annuler au prochain lancement.") +
-            $"\n\n{e.Exception.Message}" +
-            (logPath is null ? string.Empty : "\n\n" + Texts.T("Détails enregistrés dans :") + $"\n{logPath}"),
-            Texts.T("MAUS — erreur"),
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
+        var logPath = CrashLog.Write(e.Exception, "Erreur sur le fil de l'interface : MAUS s'arrête");
+        ShowCrashMessage(e.Exception, logPath);
         e.Handled = true;
         Shutdown(1);
     }
 
-    private static string? WriteCrashLog(Exception exception)
+    /// <summary>
+    /// Erreur sur un autre fil (mesure, test, bibliothèque tierce) : Windows ferme MAUS juste après, rien ne peut l'empêcher.
+    /// La trace est écrite avant, y compris pendant l'audit hebdomadaire sans fenêtre ; le message ne s'affiche que si une
+    /// fenêtre de MAUS était ouverte.
+    /// </summary>
+    private static void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
-        try
+        var exception = e.ExceptionObject as Exception
+            ?? new InvalidOperationException(Convert.ToString(e.ExceptionObject, CultureInfo.InvariantCulture));
+        var logPath = CrashLog.Write(exception, "Erreur sur un fil d'arrière-plan : MAUS s'arrête");
+        if (s_interactive && e.IsTerminating)
         {
-            var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "logs");
-            Directory.CreateDirectory(folder);
-            var path = Path.Combine(folder, $"erreur-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
-            File.WriteAllText(path, exception.ToString());
-            return path;
-        }
-        catch (IOException)
-        {
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return null;
+            ShowCrashMessage(exception, logPath);
         }
     }
+
+    /// <summary>
+    /// Tâche en erreur que personne n'a attendue : MAUS continue, l'erreur est notée dans le journal au lieu de disparaître.
+    /// </summary>
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        Maus.Core.Diagnostics.Breadcrumbs.Add("tâche d'arrière-plan en erreur, jamais attendue (" + e.Exception.InnerException?.GetType().Name + ")");
+        CrashLog.Write(e.Exception, "Tâche d'arrière-plan en erreur, jamais attendue : MAUS continue");
+        e.SetObserved();
+    }
+
+    private static void ShowCrashMessage(Exception exception, string? logPath) =>
+        MessageBox.Show(
+            Texts.T("MAUS a rencontré une erreur inattendue et doit s'arrêter. Les corrections déjà faites sont enregistrées : l'onglet Historique permet de les annuler au prochain lancement.") +
+            "\n\n" + exception.Message +
+            (logPath is null ? string.Empty : "\n\n" + Texts.T("Détails enregistrés dans :") + "\n" + logPath),
+            Texts.T("MAUS — erreur"),
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
 }

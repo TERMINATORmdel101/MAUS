@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Maus.Core;
+using Maus.Core.Diagnostics;
 using Maus.Core.Platform;
 using Maus.Core.Preferences;
 using Maus.Core.Workshop;
@@ -197,7 +198,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             if (SetProperty(ref _isActive, value))
             {
-                _ = RefreshActivityAsync();
+                RefreshActivity();
             }
         }
     }
@@ -210,7 +211,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             if (SetProperty(ref _section, value))
             {
-                _ = RefreshActivityAsync();
+                RefreshActivity();
             }
         }
     }
@@ -253,7 +254,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             if (value is not null && SetProperty(ref _searchEngine, value))
             {
-                _ = Task.Run(() =>
+                Task.Run(() =>
                 {
                     try
                     {
@@ -263,7 +264,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                     {
                         // Le choix vaut pour cette ouverture de MAUS.
                     }
-                });
+                }).Forget("processus : choix du moteur de recherche");
             }
         }
     }
@@ -527,7 +528,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _sensors = null;
         if (sensors is not null)
         {
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 while (_sampling)
                 {
@@ -535,7 +536,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 }
 
                 sensors.Dispose();
-            });
+            }).Forget("atelier : fermeture des capteurs");
         }
     }
 
@@ -550,7 +551,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             if (SetProperty(ref _monitorOpen, value))
             {
-                _ = RefreshActivityAsync();
+                RefreshActivity();
             }
         }
     }
@@ -570,6 +571,36 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
     /// <summary>Ouvre l'atelier sur une sous-partie (depuis les actions rapides de l'accueil).</summary>
     public void Open(int section) => Section = section;
+
+    /// <summary>Actualise l'atelier sans attendre (onglet, sous-partie, fenêtre de surveillance, relevé).</summary>
+    private void RefreshActivity() => RefreshActivityAsync().Forget("atelier : actualisation", ShowActivityError);
+
+    /// <summary>Erreur imprévue pendant une actualisation : affichée dans la partie de l'atelier concernée.</summary>
+    private void ShowActivityError(Exception ex)
+    {
+        var message = T("Cette partie de l'atelier n'a pas pu être actualisée : {0}", ex.Message);
+        switch (Section)
+        {
+            case SectionLive or SectionTests:
+                Live.Alarms.Add(message);
+                break;
+            case SectionProcesses:
+                DiagnosisStatus = message;
+                break;
+            case SectionStorage:
+                ScanStatus = message;
+                break;
+            case SectionMemory:
+                MemoryStatus = message;
+                break;
+            case SectionDrivers:
+                DriversStatus = message;
+                break;
+            default:
+                InventoryStatus = message;
+                break;
+        }
+    }
 
     private async Task RefreshActivityAsync()
     {

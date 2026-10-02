@@ -45,7 +45,7 @@ public sealed partial class WorkshopViewModel
             if (SetProperty(ref _isRecording, value))
             {
                 OnPropertyChanged(nameof(IsNotRecording));
-                _ = RefreshActivityAsync();
+                RefreshActivity();
             }
         }
     }

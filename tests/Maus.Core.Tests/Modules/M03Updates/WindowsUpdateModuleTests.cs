@@ -496,6 +496,30 @@ public class WindowsUpdateModuleTests
         Assert.Contains(expected, finding.Explanation, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("E_INVALIDARG")]
+    [InlineData("E_NOTIMPL")]
+    [InlineData("E_POINTER")]
+    public async Task Unexpected_error_on_the_search_thread_is_unknown_instead_of_closing_maus(string hresult)
+    {
+        // Ce que l'interop COM produit pour ces codes : sur le fil dédié, une telle erreur non attrapée fermait MAUS sans trace.
+        Func<IReadOnlyList<PendingUpdate>> search = hresult switch
+        {
+            "E_INVALIDARG" => () => throw new ArgumentException("Paramètre incorrect."),
+            "E_NOTIMPL" => () => throw new NotImplementedException(),
+            _ => ComWindowsUpdateAgentTests.ReadThroughNullPointer,
+        };
+        var agent = new FakeUpdateAgent { Results = HealthyAgent().Results, SearchOnThread = search };
+
+        var findings = await Detect(agent);
+
+        var pending = Get(findings, "M03.pending-updates");
+        Assert.Equal(FindingStatus.Unknown, pending.Status);
+        Assert.Contains("Réponse inattendue de l'agent Windows Update", pending.Explanation, StringComparison.Ordinal);
+        Assert.Equal(FindingStatus.Unknown, Get(findings, "M03.optional-updates").Status);
+        Assert.Equal(FindingStatus.Ok, Get(findings, "M03.last-install").Status);
+    }
+
     [Fact]
     public async Task Old_last_install_is_a_warning()
     {
@@ -776,9 +800,17 @@ public class WindowsUpdateModuleTests
         /// <summary>Si posé, la recherche ne répond qu'une fois ce signal donné (serveur lent).</summary>
         public TaskCompletionSource? Hold { get; init; }
 
+        /// <summary>Si posée, la recherche tourne comme la vraie : sur le fil dédié de <see cref="ComWindowsUpdateAgent"/>.</summary>
+        public Func<IReadOnlyList<PendingUpdate>>? SearchOnThread { get; init; }
+
         public async Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken)
         {
             ReceivedCriteria = criteria;
+            if (SearchOnThread is not null)
+            {
+                return await ComWindowsUpdateAgent.RunOnDedicatedThread(SearchOnThread, timeout, cancellationToken).ConfigureAwait(false);
+            }
+
             if (Hold is not null)
             {
                 await Hold.Task.ConfigureAwait(false);

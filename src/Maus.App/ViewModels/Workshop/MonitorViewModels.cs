@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Maus.App.Controls;
+using Maus.Core.Diagnostics;
 using Maus.Core.Platform;
 using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
@@ -247,7 +248,7 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
         }
         else if (!_workshop.IsTesting && _autoRecording)
         {
-            _ = StopRecordingAsync();
+            StopRecordingAsync().Forget("surveillance : fin du relevé", ex => RecordingStatus = T("Le bilan du relevé n'a pas pu être établi : {0}", ex.Message));
         }
     }
 

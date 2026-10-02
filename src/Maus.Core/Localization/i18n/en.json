@@ -3302,5 +3302,11 @@
   "Modifiée depuis, laissée telle quelle": "Changed since, left as is",
   "interrompue : peut-être appliquée, « Annuler » vérifie": "interrupted: possibly applied, \"Undo\" checks",
   "Le catalogue de MAUS date du {0} : une version plus récente a pu sortir depuis. Vérifiez sur la page officielle du fabricant.": "The MAUS catalogue dates from {0}: a newer version may have been released since. Check on the manufacturer's official page.",
-  "• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais leur gain en images par seconde dans les jeux est faible, souvent impossible à mesurer.": "• Windows settings (visual effects, privacy, Game Bar, startup) make the PC more responsive, more discreet and steadier, but their gain in frames per second in games is small, often impossible to measure."
+  "• Les réglages de Windows (effets visuels, confidentialité, Game Bar, démarrage) rendent le PC plus réactif, plus discret et plus régulier, mais leur gain en images par seconde dans les jeux est faible, souvent impossible à mesurer.": "• Windows settings (visual effects, privacy, Game Bar, startup) make the PC more responsive, more discreet and steadier, but their gain in frames per second in games is small, often impossible to measure.",
+  "La langue n'a pas pu être changée : {0}": "The language could not be changed: {0}",
+  "Votre choix n'a pas pu être appliqué : {0}": "Your choice could not be applied: {0}",
+  "L'état de l'audit automatique n'a pas pu être lu : {0}": "The state of the automatic audit could not be read: {0}",
+  "L'audit automatique n'a pas pu être modifié : {0}": "The automatic audit could not be changed: {0}",
+  "Le bilan du relevé n'a pas pu être établi : {0}": "The recording summary could not be produced: {0}",
+  "Cette partie de l'atelier n'a pas pu être actualisée : {0}": "This part of the workshop could not be refreshed: {0}"
 }

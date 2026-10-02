@@ -103,6 +103,22 @@ public partial class XamlConsistencyTests
         Assert.True(offenders.Count == 0, "Contrôles sans nom pour les lecteurs d'écran : " + string.Join(" | ", offenders));
     }
 
+    [Fact]
+    public void Background_tasks_are_never_discarded_silently()
+    {
+        // « _ = XxxAsync() » perdait l'erreur de la tâche sans rien afficher (liste des audits hebdomadaires qui montrait un
+        // jour alors qu'aucune tâche n'existait). On écrit « XxxAsync().Forget(…) » : l'erreur est notée et affichée.
+        var offenders = Directory.EnumerateFiles(AppFolder(), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .SelectMany(f => DiscardedTask().Matches(File.ReadAllText(f)).Select(m => $"{Path.GetFileName(f)} : {m.Value.Trim()}"))
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "Tâches lancées sans surveiller leur erreur : " + string.Join(" | ", offenders));
+    }
+
+    [GeneratedRegex(@"\b_\s*=\s*(Task\.Run\b|[\w.]+Async\s*\()")]
+    private static partial Regex DiscardedTask();
+
     [GeneratedRegex(@"<(ComboBox|CheckBox|TextBox|Slider|PasswordBox)\b[^>]*>", RegexOptions.Singleline)]
     private static partial Regex InputElement();
 

@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using System.Windows.Media;
 using Maus.App.Appearance;
+using Maus.Core.Diagnostics;
 using Maus.Core.Fixes;
 using Maus.Core.Preferences;
 using static Maus.Core.Localization.Texts;
@@ -208,7 +209,11 @@ public sealed class SettingsViewModel : ObservableObject
     private void Change(Func<UserPreferences, UserPreferences> change)
     {
         AppearanceManager.Apply(change(AppearanceManager.Current));
-        _ = Task.Run(() =>
+        SaveAsync(change).Forget("paramètres : enregistrement", ex => Status = T("Votre choix n'a pas pu être enregistré : {0}", ex.Message));
+    }
+
+    private async Task SaveAsync(Func<UserPreferences, UserPreferences> change) =>
+        Status = await Task.Run(() =>
         {
             try
             {
@@ -219,6 +224,5 @@ public sealed class SettingsViewModel : ObservableObject
             {
                 return T("Votre choix n'a pas pu être enregistré : {0}", ex.Message);
             }
-        }).ContinueWith(t => Status = t.Result, TaskScheduler.FromCurrentSynchronizationContext());
-    }
+        });
 }
