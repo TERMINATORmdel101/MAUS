@@ -157,7 +157,7 @@ public sealed partial class WorkshopViewModel
             });
             var logs = new Maus.Core.Platform.WindowsEventLogReader();
             var options = new CurveProgramOptions(total / 2, total / 2, CoreMode.Value);
-            var result = await CurveOptimizerProgram.RunAsync(_topology, _checkpoint, options, progress, () => Live.DangerAlarm,
+            var result = await CurveOptimizerProgram.RunAsync(_topology, _checkpoint, options, progress, _watchdog.AbortReason,
                 since => WheaEvents.CountSince(logs, since), cancellation.Token);
             CurveProgress = 100;
 
