@@ -94,7 +94,7 @@ public static class Acknowledgements
                     Status = FindingStatus.Info,
                     AcknowledgedFrom = finding.Status,
                     Fixable = false,
-                    Advice = T("Marqué « voulu » par vous le {0:dd/MM/yyyy}. MAUS le signalera de nouveau si la situation change.", mark.At.ToLocalTime()),
+                    Advice = T("Marqué « voulu » par vous le {0:d}. MAUS le signalera de nouveau si la situation change.", mark.At.ToLocalTime()),
                 }
                 : finding).ToList();
         return result with { Findings = findings };

@@ -203,7 +203,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
         if (date is not null)
         {
-            current += $", du {FormatDate(date.Value)}";
+            current += T(", du {0}", FormatDate(date.Value));
         }
 
         var downloadUrl = branch?.DownloadUrl ?? catalog.DownloadUrlFor(gpu.Vendor);
@@ -740,9 +740,11 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
         _ => T("graphique"),
     };
 
-    private static string FormatDate(DateTime date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    /// <summary>Date courte dans la langue de MAUS (24/09/2026 en français, 9/24/2026 en anglais), jamais un format figé.</summary>
+    private static string FormatDate(DateTime date) => date.ToString("d", Culture);
 
-    private static string FormatDate(DateOnly date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    /// <inheritdoc cref="FormatDate(DateTime)"/>
+    private static string FormatDate(DateOnly date) => date.ToString("d", Culture);
 
     [GeneratedRegex(@"VEN_(?<ven>[0-9A-F]{4})&DEV_(?<dev>[0-9A-F]{4})", RegexOptions.IgnoreCase)]
     private static partial Regex PciIdPattern();

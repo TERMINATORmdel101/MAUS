@@ -299,8 +299,8 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
 
         try
         {
-            var culture = CultureInfo.CurrentCulture;
-            await System.IO.File.WriteAllTextAsync(dialog.FileName, recording.ToCsv(culture), new System.Text.UTF8Encoding(true));
+            // Format régional de Windows (séparateur, virgule décimale), pas celui de la langue de MAUS : c'est lui qu'Excel attend.
+            await System.IO.File.WriteAllTextAsync(dialog.FileName, recording.ToCsv(RegionalCulture), new System.Text.UTF8Encoding(true));
             RecordingStatus = T("Relevé exporté : {0}", dialog.FileName);
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)

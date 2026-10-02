@@ -158,7 +158,7 @@ public sealed class WindowsHealthModule : IAuditModule
             Category = HardwareCategory,
             Status = events.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.High),
             Severity = Severity.High,
-            Current = DescribeEvents(events, whea.Truncated, T("aucune"), "erreur", "erreurs"),
+            Current = DescribeEvents(events, whea.Truncated, T("aucune"), T("erreur"), T("erreurs")),
             Expected = T("aucune"),
             Explanation = T("Le processeur, la mémoire ou le bus PCI Express signalent à Windows les erreurs qu'ils détectent. "
                 + "Une erreur « irrécupérable » provoque en général un plantage : ce n'est pas un défaut de Windows, "
@@ -189,8 +189,8 @@ public sealed class WindowsHealthModule : IAuditModule
             Status = events.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = events.Count == 0
-                ? DescribeEvents(events, whea.Truncated, T("aucune"), "erreur", "erreurs")
-                : $"{DescribeEvents(events, whea.Truncated, "aucune", "erreur", "erreurs")} ({byId})",
+                ? DescribeEvents(events, whea.Truncated, T("aucune"), T("erreur"), T("erreurs"))
+                : $"{DescribeEvents(events, whea.Truncated, T("aucune"), T("erreur"), T("erreurs"))} ({byId})",
             Expected = T("aucune"),
             Explanation = T("Le matériel a détecté puis corrigé lui-même une erreur. Une erreur isolée est sans conséquence, "
                 + "mais leur répétition annonce souvent une instabilité : overclocking, profil mémoire, température ou composant fatigué."),
@@ -235,7 +235,7 @@ public sealed class WindowsHealthModule : IAuditModule
 
         if (dumpFailures > 0)
         {
-            current += T(" ; vidage mémoire impossible {0} (volmgr 46)", Plural(dumpFailures, "fois", "fois"));
+            current += T(" ; vidage mémoire impossible {0} (volmgr 46)", T("{0} fois", dumpFailures));
         }
 
         var advice = new List<string>();
@@ -749,10 +749,10 @@ public sealed class WindowsHealthModule : IAuditModule
         }
 
         var newest = dumps.Select(HealthParsers.ParseMinidumpDate).OfType<DateOnly>().DefaultIfEmpty().Max();
-        var current = dumps.Count == 0 ? T("aucun") : Plural(dumps.Count, "fichier", "fichiers");
+        var current = dumps.Count == 0 ? T("aucun") : Plural(dumps.Count, T("fichier"), T("fichiers"));
         if (dumps.Count > 0 && newest != default)
         {
-            current += T(" (le plus récent du {0})", newest.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
+            current += T(" (le plus récent du {0})", newest.ToString("d", Culture));
         }
 
         return new Finding
@@ -787,7 +787,8 @@ public sealed class WindowsHealthModule : IAuditModule
     private static string Plural(int count, string singular, string plural) =>
         $"{count.ToString(CultureInfo.InvariantCulture)} {(count > 1 ? plural : singular)}";
 
-    private static string FormatDate(DateTime date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    /// <summary>Date courte dans la langue de MAUS (29/09/2026 en français, 9/29/2026 en anglais), jamais un format figé.</summary>
+    private static string FormatDate(DateTime date) => date.ToString("d", Culture);
 
     private static string FormatGigabytes(long bytes) => (bytes / 1024d / 1024 / 1024).ToString("0.0", French) + " Go";
 

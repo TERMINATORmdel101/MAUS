@@ -74,9 +74,14 @@ public sealed class MonitorRecording(DateTimeOffset start)
         return text.ToString();
     }
 
-    /// <summary>Export CSV (séparateur et décimales de la langue), une colonne par mesure, une ligne par échantillon.</summary>
+    /// <summary>
+    /// Export CSV (séparateur de liste et décimales de <paramref name="culture"/>), une colonne par mesure, une ligne par échantillon.
+    /// L'application passe <see cref="Localization.Texts.RegionalCulture"/> (format régional de Windows), jamais la culture de
+    /// la langue de MAUS.
+    /// </summary>
     public string ToCsv(CultureInfo culture)
     {
+        ArgumentNullException.ThrowIfNull(culture);
         var separator = culture.TextInfo.ListSeparator;
         var columns = _samples.SelectMany(s => s.Rows).Select(r => (r.Component, r.Name, r.Kind)).Distinct().ToList();
         static string Unit(MonitorKind kind) => kind switch
@@ -87,7 +92,9 @@ public sealed class MonitorRecording(DateTimeOffset start)
             _ => "%",
         };
 
-        static string Cell(string text) => text.Contains('"', StringComparison.Ordinal) || text.Contains(';', StringComparison.Ordinal) || text.Contains(',', StringComparison.Ordinal)
+        // Guillemets autour d'un nom qui contient le séparateur régional (il peut avoir été personnalisé), « ; », « , » ou « " ».
+        string Cell(string text) => text.Contains('"', StringComparison.Ordinal) || text.Contains(';', StringComparison.Ordinal) || text.Contains(',', StringComparison.Ordinal)
+            || (separator.Length > 0 && text.Contains(separator, StringComparison.Ordinal))
             ? "\"" + text.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
             : text;
 

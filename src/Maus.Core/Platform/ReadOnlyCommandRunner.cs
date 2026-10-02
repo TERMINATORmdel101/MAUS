@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 using static Maus.Core.Localization.Texts;
 
@@ -36,10 +35,11 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         ["winget.exe"] = args => args.All(WingetListArguments.Contains),
     };
 
-    static ReadOnlyCommandRunner()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-    }
+    /// <summary>
+    /// Encodage de la sortie des outils classiques : la page OEM du système (<see cref="OemEncoding"/>), et non celle de la
+    /// culture du fil, que l'application remplace par la langue de MAUS (un Windows russe lu en page 437 serait illisible).
+    /// </summary>
+    internal static Encoding ToolOutputEncoding => OemEncoding.Current;
 
     public static bool IsAllowed(string executable, IReadOnlyList<string> arguments)
     {
@@ -93,9 +93,9 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
             throw new InvalidOperationException(T("Commande refusée : winget doit être celui du dossier protégé des applications ({0}).", path));
         }
 
-        // Les outils classiques écrivent dans la page de code OEM. L'encodage de winget redirigé n'est pas documenté :
+        // Les outils classiques écrivent dans la page de code OEM du système. L'encodage de winget redirigé n'est pas documenté :
         // sa sortie est lue en octets puis décodée par DecodeOutput (UTF-16 si marqueur, UTF-8 si valide, sinon OEM).
-        var oem = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
+        var oem = ToolOutputEncoding;
         var startInfo = new ProcessStartInfo(path)
         {
             UseShellExecute = false,

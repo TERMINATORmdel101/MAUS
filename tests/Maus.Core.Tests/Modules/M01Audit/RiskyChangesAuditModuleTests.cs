@@ -347,7 +347,8 @@ public class RiskyChangesAuditModuleTests
         Assert.Equal(status, finding.Status);
         if (status == FindingStatus.Info)
         {
-            Assert.Equal("en pause jusqu'au 4 octobre 2026", finding.Current);
+            // Date courte de la langue de MAUS (français par défaut dans les tests).
+            Assert.Equal("en pause jusqu'au 04/10/2026", finding.Current);
         }
 
         // Pause en cours ou allongée : « Reprendre les mises à jour » se trouve dans Paramètres > Windows Update.

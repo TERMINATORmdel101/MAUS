@@ -459,7 +459,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = !throttled ? FindingStatus.Ok : laptop ? FindingStatus.Info : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = throttled
-                ? T("{0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("dd/MM/yyyy", French))
+                ? T("{0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("d", Culture))
                 : T("aucune alerte en 30 jours"),
             Expected = T("aucune alerte"),
             Explanation = T("Windows note (événement 37 de Kernel-Processor-Power) chaque fois que le BIOS limite la vitesse du processeur : "

@@ -1,4 +1,3 @@
-using System.Globalization;
 using Maus.Core;
 using Maus.Core.Engine;
 using Maus.Core.Fixes;
@@ -149,7 +148,8 @@ internal static class FixCommands
         foreach (var session in sessions)
         {
             var state = session.RevertedAt is not null ? T("annulée") : session.CanRevert ? T("active") : T("sans modification en cours");
-            output.WriteLine($"{session.Id}  {session.CreatedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)}  {state}  ({session.Entries.Count(e => e.State is EntryState.Applied or EntryState.Reverted or EntryState.RevertSkipped)} valeur(s))");
+            var values = session.Entries.Count(e => e.State is EntryState.Applied or EntryState.Reverted or EntryState.RevertSkipped);
+            output.WriteLine(T("{0}  {1:g}  {2}  ({3} valeur(s))", session.Id, session.CreatedAt.ToLocalTime(), state, values));
             foreach (var entry in session.Entries)
             {
                 output.WriteLine($"    [{entry.State}] {entry.ChangeId} · {entry.ChangeTitle} : {entry.Key} {SettingValue.Display(entry.Before)} -> {SettingValue.Display(entry.After)}");

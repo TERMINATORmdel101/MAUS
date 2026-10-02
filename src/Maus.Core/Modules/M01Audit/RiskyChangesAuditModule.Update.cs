@@ -19,8 +19,6 @@ public sealed partial class RiskyChangesAuditModule
     /// <summary>Durée de pause maximale proposée par Paramètres > Windows Update.</summary>
     private const int MaxPauseDays = 35;
 
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
-
     private static readonly string[] UpdateServices = ["wuauserv", "UsoSvc", "WaaSMedicSvc", "BITS"];
 
     /// <summary>Tâches qui lancent la recherche de mises à jour ; les autres varient selon la build.</summary>
@@ -150,7 +148,8 @@ public sealed partial class RiskyChangesAuditModule
             return PauseCheck.Compliant(T("aucune pause en cours"), expected, explanation);
         }
 
-        var date = until.ToOffset(context.Now.Offset).ToString("d MMMM yyyy", French);
+        // Date courte dans la langue de MAUS (04/10/2026 en français, 10/4/2026 en anglais) : jamais un format figé.
+        var date = until.ToOffset(context.Now.Offset).ToString("d", Culture);
         if (until > context.Now.AddDays(MaxPauseDays + 1))
         {
             return PauseCheck.Deviation(T("en pause jusqu'au {0}", date), expected, explanation, advice);

@@ -287,7 +287,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             : enabled
                 ? T("activé")
                 : entry.Approval.DisabledOnUtc is { } date
-                    ? T("désactivé le {0}", date.ToLocalTime().ToString("dd/MM/yyyy", French))
+                    ? T("désactivé le {0}", date.ToLocalTime().ToString("d", Culture))
                     : T("désactivé");
         var publisher = company ?? (isStore ? T("application du Store") : executable is null ? null : T("éditeur inconnu"));
 
@@ -471,7 +471,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Title = title,
             Category = MeasureCategory,
             Status = FindingStatus.Info,
-            Current = $"{seconds.Value.ToString("0.0", French)} s, le {boot.TimeCreated.ToString("dd/MM/yyyy", French)}",
+            Current = T("{0} s, le {1}", seconds.Value.ToString("0.0", French), boot.TimeCreated.ToString("d", Culture)),
             Explanation = explanation,
             Advice = T("Notez cette durée, désactivez les entrées inutiles, redémarrez, puis comparez."),
         };

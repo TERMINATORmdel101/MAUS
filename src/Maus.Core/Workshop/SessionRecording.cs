@@ -113,9 +113,14 @@ public sealed class SessionRecording(DateTimeOffset start)
             findings);
     }
 
-    /// <summary>CSV au format de la langue de Windows (séparateur et virgule décimale), prêt pour Excel ou LibreOffice.</summary>
+    /// <summary>
+    /// CSV avec le séparateur de liste et la virgule décimale de <paramref name="culture"/>, prêt pour Excel ou LibreOffice.
+    /// L'application passe <see cref="Localization.Texts.RegionalCulture"/> (format régional de Windows), jamais la culture de
+    /// la langue de MAUS : Windows en anglais avec le format français attend « ; » et « 12,5 ». Les en-têtes sont dans la langue de MAUS.
+    /// </summary>
     public string ToCsv(CultureInfo culture)
     {
+        ArgumentNullException.ThrowIfNull(culture);
         var separator = culture.TextInfo.ListSeparator;
         string F(double? value) => value?.ToString("0.#", culture) ?? string.Empty;
         var csv = new StringBuilder();

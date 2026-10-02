@@ -1,5 +1,4 @@
 using System.Diagnostics.Eventing.Reader;
-using System.Globalization;
 using System.Text;
 using Maus.Core.Hardware;
 using Maus.Core.Platform;
@@ -138,7 +137,7 @@ public sealed class BiosModule : IAuditModule
             Category = UpdateCategory,
             Status = old ? FindingStatusExtensions.ForDeviation(Severity.Low) : FindingStatus.Ok,
             Severity = Severity.Low,
-            Current = $"{versionText}, du {date.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)} ({FormatAge(months)})",
+            Current = T("{0}, du {1} ({2})", versionText, FormatDate(date.Value), FormatAge(months)),
             Expected = T("moins de 12 mois"),
             Explanation = T("Le BIOS est le micrologiciel de la carte mère. Ses mises à jour corrigent surtout la stabilité et la sécurité " +
                 "(microcode du processeur, certificats Secure Boot) ; le gain de performances est rarement mesurable."),
@@ -666,7 +665,8 @@ public sealed class BiosModule : IAuditModule
         ? T("Page officielle : {0}.", url)
         : T("Cherchez « {0} BIOS » sur le site officiel du fabricant.", target.DisplayName);
 
-    private static string FormatDate(DateTime date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+    /// <summary>Date courte dans la langue de MAUS (07/06/2024 en français, 6/7/2024 en anglais), jamais un format figé.</summary>
+    private static string FormatDate(DateTime date) => date.ToString("d", Culture);
 
     internal static string FormatAge(int months)
     {
