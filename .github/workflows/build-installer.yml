@@ -1,0 +1,68 @@
+# Fabrique l'installateur de MAUS sur les machines de GitHub, à partir du code public du dépôt.
+# C'est ce que demande la SignPath Foundation pour signer gratuitement : un fichier produit par un système
+# de compilation automatique (« origin verification »), jamais un fichier fabriqué sur un PC personnel.
+# Même recette que sur le PC du porteur : installer/build-installer.ps1 (application autonome + Inno Setup 7).
+# La signature (étape SignPath) sera ajoutée quand la demande à la SignPath Foundation sera acceptée.
+name: Installateur
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'installer/**'
+      - 'Directory.Build.props'
+      - 'nuget.config'
+      - '.github/workflows/build-installer.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installateur-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installateur:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Code du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: SDK .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Inno Setup 7.1.0 (empreinte vérifiée)
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe'
+          # Empreinte publiée sur la page GitHub de la version is-7_1_0 (jrsoftware/issrc).
+          $expected = '0362A383ED217D4C4239B5933866DD96D3EB2102737DA92F80F6057A4B40DF2F'
+          $file = Join-Path $env:RUNNER_TEMP 'innosetup-7.1.0-x64.exe'
+          Invoke-WebRequest -Uri $url -OutFile $file
+          $hash = (Get-FileHash -Algorithm SHA256 $file).Hash
+          if ($hash -ne $expected) { throw "Empreinte d'Inno Setup inattendue : $hash" }
+          $p = Start-Process -FilePath $file -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER','/SP-' -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Installation d'Inno Setup : code $($p.ExitCode)" }
+          $iscc = Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe introuvable : $iscc" }
+          "ISCC=$iscc" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Installateur
+        shell: pwsh
+        run: ./installer/build-installer.ps1 -Iscc $env:ISCC
+
+      - name: Installateur à télécharger
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: MAUS-installation
+          path: |
+            artifacts/installer/MAUS-*-installation.exe
+            artifacts/installer/MAUS-*-installation.exe.sha256
+          if-no-files-found: error
