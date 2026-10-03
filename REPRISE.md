@@ -2,6 +2,10 @@
 
 Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le travail **sur le PC Windows du porteur**. À lire après `CLAUDE.md` (qui reste la mémoire complète du projet). Le mettre à jour, ou le vider, une fois la reprise faite.
 
+## Nouveau PC (03/10/2026)
+
+L'ancien Windows (`C:\Users\CARO`) est perdu. Les chemins `C:\Users\CARO\Documents\MAUS\…` ci-dessous deviennent `C:\Users\T-800-MODEL-101\Documents\MAUS-ancien\…` (ancien dossier récupéré) ; le dépôt de travail est un clone neuf dans `C:\Users\T-800-MODEL-101\Documents\MAUS`. Les branches des agents de la 0.5.3 sont maintenant **sur GitHub** (`git fetch origin` puis `git checkout worktree-wf_bb647255-789-2`, etc.). `scan.md` et `wf-053.js` : `MAUS-ancien\.worktrees\_smoke\` ou `Documents\MAUS-notes-sauvegarde.zip`. À réinstaller au besoin : Inno Setup 7.1.0 (installateur ; GitHub Actions le fabrique aussi), Claude Code.
+
 ## 0. État au 29/09/2026 (session locale sur le PC du porteur)
 
 - Version **4.0.0** (numéros choisis par le porteur : 0.3.3-alpha, puis 3.9.1, puis 4.0.0), plus les ajouts du 29/09 (numéro à choisir). Compilation 0 avertissement, **1 315 tests réussis** sous Windows.
