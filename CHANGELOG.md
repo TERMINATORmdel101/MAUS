@@ -2,9 +2,9 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
-## 0.7.0 — 05/10/2026
+## 0.6.1 — 05/10/2026
 
-Améliorations proposées au porteur et acceptées (« tu peux tout faire ») : modifications moyennes, chiffre du milieu.
+Améliorations proposées au porteur et acceptées (« tu peux tout faire ») : améliorations et corrections, dernier chiffre (règle du porteur).
 
 - **« Corriger » sur chaque constat corrigeable** : le bouton coche la ou les corrections du constat, les remonte en tête de liste, les entoure et ouvre l'onglet Corrections. Rien n'est appliqué avant que vous cliquiez sur « Appliquer ».
 - **Un seul constat par sujet** : Secure Boot, signalé par les modules 1 et 8, n'apparaît plus qu'une fois dans « À traiter d'abord », avec la mention « Aussi signalé par ».
