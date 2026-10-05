@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using System.Windows.Media;
-using Maus.App.Controls;
+using Maus.App.Appearance;
 using Maus.App.ViewModels.Workshop;
 using Maus.Core;
 using Maus.Core.Reporting;
@@ -19,35 +18,35 @@ public sealed class FamilyViewModel(FamilySummary summary, bool audited = true)
 
     public string Description => summary.Description;
 
-    public IReadOnlyList<ChipViewModel> Chips { get; } = audited ? BuildChips(summary) : [new(T("pas encore audité"), Palette.Grey)];
+    public IReadOnlyList<ChipViewModel> Chips { get; } = audited ? BuildChips(summary) : [new(T("pas encore audité"), Tone.Grey)];
 
     private static List<ChipViewModel> BuildChips(FamilySummary s)
     {
         var chips = new List<ChipViewModel>();
         if (s.Problems > 0)
         {
-            chips.Add(new(s.Problems == 1 ? T("1 problème") : T("{0} problèmes", s.Problems), Palette.Red));
+            chips.Add(new(s.Problems == 1 ? T("1 problème") : T("{0} problèmes", s.Problems), Tone.Rose));
         }
 
         if (s.Warnings > 0)
         {
-            chips.Add(new(T("{0} à surveiller", s.Warnings), Palette.Gold));
+            chips.Add(new(T("{0} à surveiller", s.Warnings), Tone.Sand));
         }
 
         if (s.Improvements > 0)
         {
-            chips.Add(new(s.Improvements == 1 ? T("1 optimisation") : T("{0} optimisations", s.Improvements), Palette.Blue));
+            chips.Add(new(s.Improvements == 1 ? T("1 optimisation") : T("{0} optimisations", s.Improvements), Tone.Blue));
         }
 
         // Module en erreur ou en délai dépassé : rien n'y a été lu, la famille n'est donc pas « en ordre » (gris, jamais un faux vert).
         if (s.Unchecked > 0)
         {
-            chips.Add(new(s.Unchecked == 1 ? T("1 module non vérifié") : T("{0} modules non vérifiés", s.Unchecked), Palette.Grey));
+            chips.Add(new(s.Unchecked == 1 ? T("1 module non vérifié") : T("{0} modules non vérifiés", s.Unchecked), Tone.Grey));
         }
 
         if (chips.Count == 0)
         {
-            chips.Add(s.AllClear ? new(T("tout est en ordre"), Palette.Green) : new(T("{0} indéterminé(s)", s.Unknown), Palette.Grey));
+            chips.Add(s.AllClear ? new(T("tout est en ordre"), Tone.Mint) : new(T("{0} indéterminé(s)", s.Unknown), Tone.Grey));
         }
 
         return chips;
@@ -55,7 +54,7 @@ public sealed class FamilyViewModel(FamilySummary summary, bool audited = true)
 }
 
 /// <summary>Pastille colorée (« 3 optimisations »).</summary>
-public sealed record ChipViewModel(string Text, Brush Background);
+public sealed record ChipViewModel(string Text, Tone Tone);
 
 /// <summary>Accueil (tableau de bord) et navigation entre les grandes parties de la fenêtre.</summary>
 public sealed partial class MainViewModel
@@ -114,6 +113,26 @@ public sealed partial class MainViewModel
     public string FixCardDetail => _lastContext is null
         ? T("Après l'audit : les corrections recommandées, réversibles, avec point de restauration vérifié.")
         : T("{0} correction(s) proposée(s), réversibles, avec point de restauration vérifié.", Changes.Count);
+
+    /// <summary>Carte « prochaine étape » de l'accueil : l'audit d'abord, puis, dès qu'il est fini, les corrections.</summary>
+    public string NextStepTitle => !HasAudit
+        ? T("Première étape : l'audit")
+        : Changes.Count > 0
+            ? T("{0} correction(s) proposée(s)", Changes.Count)
+            : T("Rien à corriger pour l'instant");
+
+    public string NextStepText => !HasAudit
+        ? T("MAUS lit la configuration de votre PC sans rien modifier, puis vous propose des corrections. Chacune ne s'applique qu'avec votre accord et peut être annulée.")
+        : Changes.Count > 0
+            ? T("Réversibles, avec un point de restauration vérifié. Vous choisissez lesquelles appliquer.")
+            : T("MAUS ne propose aucune correction. Les constats restent à lire dans l'onglet Constats.");
+
+    public Tone NextStepTone => !HasAudit ? Tone.Blue : Changes.Count > 0 ? Tone.Mint : Tone.Grey;
+
+    /// <summary>L'audit est fait et propose au moins une correction : le bouton « Corriger maintenant » apparaît.</summary>
+    public bool HasProposedChanges => HasAudit && Changes.Count > 0;
+
+    public string FixNowLabel => T("Corriger maintenant ({0})", Changes.Count);
 
     /// <summary>Navigation depuis l'accueil : paramètre = numéro d'onglet, ou 30 + sous-partie de l'atelier.</summary>
     public ICommand GoToCommand => _goTo ??= new ParameterCommand(parameter =>
@@ -284,5 +303,10 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(IsScorePartial));
         OnPropertyChanged(nameof(HomeAuditLabel));
         OnPropertyChanged(nameof(FixCardDetail));
+        OnPropertyChanged(nameof(NextStepTitle));
+        OnPropertyChanged(nameof(NextStepText));
+        OnPropertyChanged(nameof(NextStepTone));
+        OnPropertyChanged(nameof(HasProposedChanges));
+        OnPropertyChanged(nameof(FixNowLabel));
     }
 }

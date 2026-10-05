@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
+using Maus.App.Appearance;
 using Maus.App.Controls;
 using Maus.Core;
 
@@ -70,6 +71,33 @@ public sealed class TrustToBrushConverter : IValueConverter
         Maus.Core.Workshop.ProcessTrust.Unusual => Palette.Gold,
         _ => Palette.Grey,
     };
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>
+/// Pinceau pastel d'une teinte : fond (par défaut), contour (<c>ConverterParameter=Stroke</c>) ou encre (<c>Ink</c>). La valeur
+/// est une <see cref="Tone"/>, un verdict (<see cref="FindingStatus"/>) ou une lettre de MAUS. Les pinceaux suivent le thème à chaud.
+/// </summary>
+public sealed class PastelConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var tone = value switch
+        {
+            Tone t => t,
+            FindingStatus status => Pastel.OfStatus(status),
+            string letter => Pastel.OfLetter(letter),
+            _ => Tone.Grey,
+        };
+        return (parameter as string) switch
+        {
+            "Stroke" => Pastel.Stroke(tone),
+            "Ink" => Pastel.Ink(tone),
+            _ => Pastel.Fill(tone),
+        };
+    }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();

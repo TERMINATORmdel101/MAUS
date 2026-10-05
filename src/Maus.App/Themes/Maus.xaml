@@ -105,24 +105,28 @@
         </Setter>
     </Style>
 
-    <!-- Carte cliquable (actions rapides de l'accueil). -->
+    <!-- Carte cliquable (actions rapides de l'accueil) : fond et contour pastel donnés par Background / BorderBrush. -->
     <Style x:Key="ActionCard" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <!-- Se soulève au survol et s'enfonce à l'appui (coupé avec les animations). -->
         <Setter Property="appearance:Motion.HoverLift" Value="True" />
         <Setter Property="appearance:Motion.Press" Value="True" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bd" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1" CornerRadius="12" Padding="16">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="14" Padding="16">
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MausAccent}" />
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MausAccent}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
@@ -133,7 +137,68 @@
         </Setter>
     </Style>
 
-    <!-- Pastille de comptage (« 3 optimisations »), fond de couleur et texte blanc. -->
+    <!-- Carte pastel : la teinte se donne par Background et BorderBrush (DynamicResource PastelX et PastelXStroke). -->
+    <Style x:Key="SoftCard" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource PastelGrey}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PastelGreyStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18,16" />
+    </Style>
+
+    <!-- Petite barre qui sépare deux zones d'une page (demande du porteur : pages plus légères, zones bien distinctes). -->
+    <Style x:Key="Divider" TargetType="Border">
+        <Setter Property="Height" Value="2" />
+        <Setter Property="CornerRadius" Value="1" />
+        <Setter Property="Margin" Value="0,16" />
+        <Setter Property="Background" Value="{DynamicResource PastelGreyStroke}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- Titre d'une zone de page, avec une encre de couleur (Foreground = PastelXInk). -->
+    <Style x:Key="ZoneTitle" TargetType="TextBlock" BasedOn="{StaticResource MausText}">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- Bouton secondaire arrondi, fond pastel (Background / BorderBrush / Foreground donnés par la page). -->
+    <Style x:Key="SoftButton" TargetType="Button">
+        <Setter Property="appearance:Motion.Press" Value="True" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="14,6" />
+        <Setter Property="Background" Value="{DynamicResource PastelGrey}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PastelGreyStroke}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                            CornerRadius="16" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MausAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MausAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.8" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Pastille de comptage (« 3 optimisations ») : fond pastel et encre de la même teinte, posés par la page. -->
     <Style x:Key="Chip" TargetType="Border">
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="8,1" />

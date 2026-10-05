@@ -83,6 +83,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasAudit => _lastContext is not null;
 
+    /// <summary>Pas encore d'audit : le bouton « Lancer l'audit » est le bouton principal de l'accueil.</summary>
+    public bool IsFirstAudit => !HasAudit;
+
     public ModuleViewModel? SelectedModule
     {
         get => _selectedModule;
@@ -156,6 +159,7 @@ public sealed partial class MainViewModel : ObservableObject
             fresh = true;
             await RebindAcknowledgementsAsync(findings);
             OnPropertyChanged(nameof(HasAudit));
+            OnPropertyChanged(nameof(IsFirstAudit));
             LoadChoices(context);
             var fixContext = await Task.Run(() => FixContext.CreateDefault(context));
             BlockingReason = new FixEngine(fixContext).GetBlockingReason()

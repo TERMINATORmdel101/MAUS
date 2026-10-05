@@ -81,7 +81,6 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <TextBlock Text="{Binding Greeting}" Style="{StaticResource PageTitle}" />
-                    <TextBlock Text="{x:Static app:Ui.Tagline}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
                     <TextBlock Text="{Binding SystemSummary}" Style="{StaticResource Muted}" Margin="0,2,0,0" />
                     <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausRed}"
                             Margin="0,12,0,0" Visibility="{Binding Workshop.HasCrashNotice, Converter={StaticResource BoolToVisibility}}">
@@ -95,21 +94,21 @@
                         </DockPanel>
                     </Border>
 
-                    <Grid Margin="0,18,0,0">
+                    <Grid Margin="0,16,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="290" />
+                            <ColumnDefinition Width="270" />
                             <ColumnDefinition Width="16" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <!-- Score -->
                         <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <Grid Width="176" Height="176" HorizontalAlignment="Center">
+                            <StackPanel VerticalAlignment="Center">
+                                <Grid Width="168" Height="168" HorizontalAlignment="Center">
                                     <controls:RingGauge Value="{Binding Score, Mode=OneWay}" Thickness="16"
                                                         Stroke="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                        <TextBlock Text="{Binding ScoreText}" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                        <TextBlock Text="{Binding ScoreText}" FontSize="46" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                         <TextBlock Text="{Binding ScoreWord}" FontWeight="SemiBold" HorizontalAlignment="Center"
                                                    Foreground="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
                                         <TextBlock Text="{x:Static app:Ui.HealthCaption}" FontSize="11" Opacity="{DynamicResource MutedOpacity}" HorizontalAlignment="Center" />
@@ -119,22 +118,42 @@
                                 <!-- Score partiel : un module en erreur ou en délai dépassé n'a rien lu, le score ne compte que le reste. -->
                                 <TextBlock Text="{Binding ScorePartialNote}" Style="{StaticResource MausText}" FontSize="12" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6"
                                            Visibility="{Binding IsScorePartial, Converter={StaticResource BoolToVisibility}}" />
-                                <Button Content="{x:Static app:Ui.ScoreWhy}" Command="{Binding ShowScoreDetailCommand}" HorizontalAlignment="Center" Padding="12,3" Margin="0,0,0,8"
+                                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ScoreWhy}" Command="{Binding ShowScoreDetailCommand}" HorizontalAlignment="Center" Margin="0,0,0,8"
                                         Visibility="{Binding HasScore, Converter={StaticResource BoolToVisibility}}" />
-                                <StackPanel Visibility="{Binding HasHealthTrend, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8" ToolTip="{Binding HealthTrendText}">
+                                <StackPanel Visibility="{Binding HasHealthTrend, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding HealthTrendText}">
                                     <controls:Sparkline Height="28" Values="{Binding HealthTrend, Mode=OneWay}" Maximum="100" Stroke="{StaticResource MausGreen}" />
                                     <TextBlock Text="{Binding HealthTrendText}" FontSize="11" Style="{StaticResource Muted}" TextAlignment="Center" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <Button Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" HorizontalAlignment="Center" />
-                                <ProgressBar Height="4" Margin="0,10,0,0" Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
-                                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Text="{Binding StatusText}" FontSize="12" Style="{StaticResource Muted}" TextAlignment="Center" Margin="0,8,0,0" />
                             </StackPanel>
                         </Border>
 
-                        <!-- Familles M·A·U·S -->
-                        <Border Grid.Column="2" Style="{StaticResource Card}">
-                            <ItemsControl ItemsSource="{Binding Families}">
+                        <StackPanel Grid.Column="2">
+                            <!-- Prochaine étape : l'audit d'abord, puis, dès qu'il est fini, les corrections (demande du porteur). -->
+                            <Border Style="{StaticResource SoftCard}" Padding="22,18"
+                                    Background="{Binding NextStepTone, Converter={StaticResource Pastel}}"
+                                    BorderBrush="{Binding NextStepTone, Converter={StaticResource Pastel}, ConverterParameter=Stroke}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding NextStepTitle}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
+                                               Foreground="{Binding NextStepTone, Converter={StaticResource Pastel}, ConverterParameter=Ink}" />
+                                    <TextBlock Text="{Binding NextStepText}" TextWrapping="Wrap" Margin="0,6,0,14" />
+                                    <WrapPanel>
+                                        <Button Style="{StaticResource PrimaryButton}" Content="{Binding FixNowLabel}" Command="{Binding GoToCommand}" CommandParameter="2" Margin="0,0,10,6"
+                                                Visibility="{Binding HasProposedChanges, Converter={StaticResource BoolToVisibility}}" />
+                                        <Button Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" Margin="0,0,10,6"
+                                                Visibility="{Binding IsFirstAudit, Converter={StaticResource BoolToVisibility}}" />
+                                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.SeeFindings}" Command="{Binding GoToCommand}" CommandParameter="1" Margin="0,0,10,6"
+                                                Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}" />
+                                        <Button Style="{StaticResource SoftButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" Margin="0,0,10,6"
+                                                Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}" />
+                                    </WrapPanel>
+                                    <ProgressBar Height="4" Margin="0,8,0,0" Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
+                                                 Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="{Binding StatusText}" FontSize="12" Style="{StaticResource Muted}" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Familles M·A·U·S, en tuiles pastel -->
+                            <ItemsControl ItemsSource="{Binding Families}" Margin="-5,10,-5,0">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <UniformGrid Columns="2" />
@@ -142,93 +161,101 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type vm:FamilyViewModel}">
-                                        <DockPanel Margin="4,4,12,14">
-                                            <controls:LetterTile DockPanel.Dock="Left" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Top"
-                                                                 Text="{Binding Letter}" Fill="{Binding Letter, Converter={StaticResource LetterToBrush}}" />
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Name}" Style="{StaticResource CardTitle}" />
-                                                <TextBlock Text="{Binding Description}" FontSize="12" Style="{StaticResource Muted}" />
-                                                <ItemsControl ItemsSource="{Binding Chips}" Margin="0,6,0,0">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate>
-                                                            <WrapPanel />
-                                                        </ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate DataType="{x:Type vm:ChipViewModel}">
-                                                            <Border Style="{StaticResource Chip}" Background="{Binding Background}">
-                                                                <TextBlock Text="{Binding Text}" Foreground="White" FontSize="12" FontWeight="SemiBold" />
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </StackPanel>
-                                        </DockPanel>
+                                        <Border Style="{StaticResource SoftCard}" Margin="5" Padding="14,12"
+                                                Background="{Binding Letter, Converter={StaticResource Pastel}}"
+                                                BorderBrush="{Binding Letter, Converter={StaticResource Pastel}, ConverterParameter=Stroke}">
+                                            <DockPanel>
+                                                <controls:LetterTile DockPanel.Dock="Left" Width="38" Height="38" Margin="0,0,12,0" VerticalAlignment="Top"
+                                                                     Text="{Binding Letter}" Fill="{Binding Letter, Converter={StaticResource LetterToBrush}}" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"
+                                                               Foreground="{Binding Letter, Converter={StaticResource Pastel}, ConverterParameter=Ink}" />
+                                                    <TextBlock Text="{Binding Description}" FontSize="12" Style="{StaticResource Muted}" />
+                                                    <ItemsControl ItemsSource="{Binding Chips}" Margin="0,6,0,0">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate DataType="{x:Type vm:ChipViewModel}">
+                                                                <Border Style="{StaticResource Chip}" BorderThickness="1"
+                                                                        Background="{Binding Tone, Converter={StaticResource Pastel}}"
+                                                                        BorderBrush="{Binding Tone, Converter={StaticResource Pastel}, ConverterParameter=Ink}">
+                                                                    <TextBlock Text="{Binding Text}" FontSize="12" FontWeight="SemiBold"
+                                                                               Foreground="{Binding Tone, Converter={StaticResource Pastel}, ConverterParameter=Ink}" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                        </Border>
+                        </StackPanel>
                     </Grid>
 
-                    <!-- Actions rapides -->
-                    <UniformGrid Columns="4" Margin="-6,12,-6,0">
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding SlowPcCommand}">
+                    <!-- Outils : quatre cartes, le reste en boutons -->
+                    <TextBlock Text="{x:Static app:Ui.HomeTools}" Style="{StaticResource ZoneTitle}" Margin="0,22,0,4" />
+                    <UniformGrid Columns="4" Margin="-6,0,-6,0">
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding SlowPcCommand}"
+                                Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xEC4A;" Foreground="{StaticResource MausGold}" />
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xEC4A;" Foreground="{DynamicResource PastelSandInk}" />
                                 <TextBlock Text="{x:Static app:Ui.SlowPcTitle}" Style="{StaticResource CardTitle}" />
                                 <TextBlock Text="{x:Static app:Ui.SlowPcDetail}" FontSize="12" Style="{StaticResource Muted}" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="33">
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="33"
+                                Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" Foreground="{StaticResource MausRed}" />
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" Foreground="{DynamicResource PastelRoseInk}" />
                                 <TextBlock Text="{x:Static app:Ui.TestPcTitle}" Style="{StaticResource CardTitle}" />
                                 <TextBlock Text="{x:Static app:Ui.TestPcDetail}" FontSize="12" Style="{StaticResource Muted}" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="2">
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="30"
+                                Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE90F;" Foreground="{StaticResource MausGreen}" />
-                                <TextBlock Text="{x:Static app:Ui.FixPcTitle}" Style="{StaticResource CardTitle}" />
-                                <TextBlock Text="{Binding FixCardDetail}" FontSize="12" Style="{StaticResource Muted}" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="30">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE950;" Foreground="{StaticResource MausBlue}" />
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE950;" Foreground="{DynamicResource PastelBlueInk}" />
                                 <TextBlock Text="{x:Static app:Ui.MyPcTitle}" Style="{StaticResource CardTitle}" />
                                 <TextBlock Text="{x:Static app:Ui.MyPcDetail}" FontSize="12" Style="{StaticResource Muted}" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="31">
+                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding HelpSummaryCommand}" IsEnabled="{Binding HasAudit, Mode=OneWay}"
+                                Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D2;" Foreground="{StaticResource MausRed}" />
-                                <TextBlock Text="{x:Static app:Ui.LiveTitle}" Style="{StaticResource CardTitle}" />
-                                <TextBlock Text="{x:Static app:Ui.LiveDetail}" FontSize="12" Style="{StaticResource Muted}" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding SaveReportCommand}" IsEnabled="{Binding HasAudit, Mode=OneWay}">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE8A5;" Foreground="{StaticResource MausGold}" />
-                                <TextBlock Text="{x:Static app:Ui.ReportTitle}" Style="{StaticResource CardTitle}" />
-                                <TextBlock Text="{x:Static app:Ui.ReportDetail}" FontSize="12" Style="{StaticResource Muted}" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding GoToCommand}" CommandParameter="34">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xEDA2;" Foreground="{StaticResource MausBlue}" />
-                                <TextBlock Text="{x:Static app:Ui.SpaceTitle}" Style="{StaticResource CardTitle}" />
-                                <TextBlock Text="{x:Static app:Ui.SpaceDetail}" FontSize="12" Style="{StaticResource Muted}" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource ActionCard}" Margin="6" Command="{Binding HelpSummaryCommand}" IsEnabled="{Binding HasAudit, Mode=OneWay}">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE897;" Foreground="{StaticResource MausGreen}" />
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE897;" Foreground="{DynamicResource PastelMintInk}" />
                                 <TextBlock Text="{x:Static app:Ui.HelpTitle}" Style="{StaticResource CardTitle}" />
                                 <TextBlock Text="{x:Static app:Ui.HelpDetail}" FontSize="12" Style="{StaticResource Muted}" />
                             </StackPanel>
                         </Button>
                     </UniformGrid>
+                    <WrapPanel Margin="0,8,0,0">
+                        <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Command="{Binding GoToCommand}" CommandParameter="31" ToolTip="{x:Static app:Ui.LiveDetail}"
+                                Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource NavIcon}" Text="&#xE9D2;" Foreground="{DynamicResource PastelLilacInk}" Margin="0,0,8,0" />
+                                <TextBlock Text="{x:Static app:Ui.LiveTitle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Command="{Binding GoToCommand}" CommandParameter="34" ToolTip="{x:Static app:Ui.SpaceDetail}"
+                                Background="{DynamicResource PastelAqua}" BorderBrush="{DynamicResource PastelAquaStroke}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource NavIcon}" Text="&#xEDA2;" Foreground="{DynamicResource PastelAquaInk}" Margin="0,0,8,0" />
+                                <TextBlock Text="{x:Static app:Ui.SpaceTitle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Command="{Binding SaveReportCommand}" IsEnabled="{Binding HasAudit, Mode=OneWay}" ToolTip="{x:Static app:Ui.ReportDetail}"
+                                Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource NavIcon}" Text="&#xE8A5;" Foreground="{DynamicResource PastelSandInk}" Margin="0,0,8,0" />
+                                <TextBlock Text="{x:Static app:Ui.ReportTitle}" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
                 </StackPanel>
             </ScrollViewer>
         </TabItem>

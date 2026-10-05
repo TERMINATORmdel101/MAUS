@@ -11,6 +11,10 @@ public static class Ui
 
     public static string RunAudit => T("Lancer l'audit");
 
+    public static string SeeFindings => T("Voir les constats");
+
+    public static string HomeTools => T("Outils");
+
     public static string TabFindings => T("Constats");
 
     public static string Wanted => T("C'est voulu");

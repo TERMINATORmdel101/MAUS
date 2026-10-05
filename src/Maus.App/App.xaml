@@ -11,6 +11,7 @@
             <views:ScoreToBrushConverter x:Key="ScoreToBrush" />
             <views:LetterToBrushConverter x:Key="LetterToBrush" />
             <views:TrustToBrushConverter x:Key="TrustToBrush" />
+            <views:PastelConverter x:Key="Pastel" />
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         </ResourceDictionary>
     </Application.Resources>
