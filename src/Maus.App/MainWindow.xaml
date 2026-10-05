@@ -483,10 +483,42 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Centre : la liste des corrections, puis, séparés par une barre, les outils, vos choix et l'honnêteté sur les gains. -->
+                <!-- Centre : la liste des corrections, rangées par module sous des titres repliables, puis, séparés par une barre,
+                     les outils, vos choix et l'honnêteté sur les gains. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <ItemsControl ItemsSource="{Binding Changes}">
+                        <StackPanel.Resources>
+                            <CollectionViewSource x:Key="GroupedChanges" Source="{Binding Changes}">
+                                <CollectionViewSource.GroupDescriptions>
+                                    <PropertyGroupDescription PropertyName="Group" />
+                                </CollectionViewSource.GroupDescriptions>
+                            </CollectionViewSource>
+                        </StackPanel.Resources>
+                        <ItemsControl ItemsSource="{Binding Source={StaticResource GroupedChanges}}">
+                            <ItemsControl.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.ContainerStyle>
+                                        <Style TargetType="GroupItem">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="GroupItem">
+                                                        <Expander Style="{StaticResource QuietExpander}" IsExpanded="True" Margin="0,4,0,8">
+                                                            <Expander.Header>
+                                                                <TextBlock FontSize="14">
+                                                                    <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
+                                                                    <Run Text="  ·  " />
+                                                                    <Run Text="{Binding ItemCount, Mode=OneWay}" />
+                                                                </TextBlock>
+                                                            </Expander.Header>
+                                                            <ItemsPresenter Margin="-16,4,0,0" />
+                                                        </Expander>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </GroupStyle.ContainerStyle>
+                                </GroupStyle>
+                            </ItemsControl.GroupStyle>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:ChangeViewModel}">
                                     <Grid Margin="0,0,0,8">

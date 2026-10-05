@@ -122,7 +122,7 @@ public sealed partial class MainViewModel
         Changes.Clear();
         foreach (var change in FixEngine.Plan(_engine, _results, _lastContext))
         {
-            var item = new ChangeViewModel(change);
+            var item = new ChangeViewModel(change, Modules.FirstOrDefault(m => m.Id == change.ModuleId)?.Header);
             if (previous.TryGetValue(change.Id, out var selected))
             {
                 item.IsSelected = selected;
@@ -170,6 +170,25 @@ public sealed partial class MainViewModel
         var warnings = selected.Where(c => c.Warning is not null).Select(c => $"• {c.Title} : {c.Warning}").ToList();
         var message = new StringBuilder()
             .AppendLine(T("MAUS va appliquer {0} correction(s).", selected.Count))
+            .AppendLine();
+
+        // Récapitulatif : ce qui change, regroupé selon le moment où l'effet sera complet.
+        const int Shown = 12;
+        foreach (var group in selected.GroupBy(c => c.Effect).OrderBy(g => g.Key))
+        {
+            message.AppendLine(group.Key == ChangeEffect.Immediate ? T("Effet immédiat :") : char.ToUpper(Labels.Of(group.Key)[0], Culture) + Labels.Of(group.Key)[1..] + " :");
+            foreach (var change in group.Take(Shown))
+            {
+                message.Append("  • ").AppendLine(change.Title);
+            }
+
+            if (group.Count() > Shown)
+            {
+                message.AppendLine("  " + T("… et {0} autre(s).", group.Count() - Shown));
+            }
+        }
+
+        message.AppendLine()
             .AppendLine(CreateRestorePoint
                 ? T("Un point de restauration sera d'abord créé, puis vérifié.")
                 : T("Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler)."))
@@ -190,6 +209,7 @@ public sealed partial class MainViewModel
         {
             var context = _lastContext;
             var before = AuditReport.Create(context, _results);
+            var scoreBefore = Score;
             var engine = new FixEngine(await Task.Run(() => FixContext.CreateDefault(context)));
             var options = new ApplyOptions { CreateRestorePoint = CreateRestorePoint, EnableProtectionIfNeeded = EnableProtection };
             var result = await Task.Run(() => engine.Apply(selected, options));
@@ -224,6 +244,13 @@ public sealed partial class MainViewModel
             _lastApplied = new AppliedSession(before, result.Session?.Id, verified);
             NeedsExplorerRestart = verified.Any(v => v.Outcome.Status == ChangeStatus.Applied && v.Outcome.Effect == ChangeEffect.ExplorerRestart);
             FixReport = Describe(result, verified, verificationFailed: !audited);
+            if (audited && ScoreChange(scoreBefore, Score, IsScorePartial) is { } change)
+            {
+                // Avant / après, en tête du compte rendu et sur l'accueil.
+                FixReport = change + Environment.NewLine + Environment.NewLine + FixReport;
+                StatusText = change;
+            }
+
             await RefreshJournalAsync();
         }
         catch (Exception ex)
@@ -234,6 +261,25 @@ public sealed partial class MainViewModel
         {
             IsApplying = false;
         }
+    }
+
+    /// <summary>
+    /// Score de santé avant et après les corrections (« 80 → 86 »). Rien si l'un des deux manque ; un score partiel (module
+    /// non vérifié) est dit tel quel, pour ne pas faire croire à un gain qui n'en est pas un.
+    /// </summary>
+    internal static string? ScoreChange(int before, int after, bool partial)
+    {
+        if (before < 0 || after < 0)
+        {
+            return null;
+        }
+
+        var text = after > before
+            ? T("Score de santé : {0} → {1} (+{2}).", before, after, after - before)
+            : after < before
+                ? T("Score de santé : {0} → {1} ({2}).", before, after, after - before)
+                : T("Score de santé : {0} → {1} (inchangé).", before, after);
+        return partial ? text + " " + T("Score partiel : un module n'a pas pu être vérifié.") : text;
     }
 
     /// <summary>« Réparer les fichiers de Windows » : DISM puis SFC dans une console visible, après confirmation.</summary>

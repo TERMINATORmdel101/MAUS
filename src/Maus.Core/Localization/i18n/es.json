@@ -806,6 +806,7 @@
   "Effet décoratif après un clic dans un menu.": "Efecto decorativo tras hacer clic en un menú.",
   "Effet décoratif autour des fenêtres.": "Efecto decorativo alrededor de las ventanas.",
   "Effet décoratif sous le pointeur de la souris.": "Efecto decorativo bajo el puntero del ratón.",
+  "Effet immédiat :": "Efecto inmediato:",
   "Effet purement décoratif sur le Bureau.": "Efecto puramente decorativo en el escritorio.",
   "Effets": "Efectos",
   "Effets conservés": "Efectos conservados",
@@ -2007,7 +2008,11 @@
   "Sauvegardez vos données importantes, puis vérifiez la santé du disque avec le Module 11. Un disque externe ou une clé USB mal branchés produisent aussi ces erreurs.": "Haga una copia de seguridad de sus datos importantes y compruebe la salud del disco con el Módulo 11. Un disco externo o una memoria USB mal conectados también producen estos errores.",
   "Score de santé": "Puntuación de salud",
   "Score de santé (ancien barème)": "Puntuación de salud (baremo antiguo)",
+  "Score de santé : {0} → {1} (+{2}).": "Puntuación de salud: {0} → {1} (+{2}).",
+  "Score de santé : {0} → {1} (inchangé).": "Puntuación de salud: {0} → {1} (sin cambios).",
+  "Score de santé : {0} → {1} ({2}).": "Puntuación de salud: {0} → {1} ({2}).",
   "Score partiel : 1 module n'a pas pu être vérifié ({0}). Le score ne tient compte que du reste.": "Puntuación parcial: 1 módulo no ha podido comprobarse ({0}). La puntuación solo tiene en cuenta el resto.",
+  "Score partiel : un module n'a pas pu être vérifié.": "Puntuación parcial: un módulo no ha podido comprobarse.",
   "Score partiel : {0} modules n'ont pas pu être vérifiés ({1}). Le score ne tient compte que du reste.": "Puntuación parcial: {0} módulos no han podido comprobarse ({1}). La puntuación solo tiene en cuenta el resto.",
   "Score stable depuis le {0:d} ({1} audits).": "Puntuación estable desde el {0:d} ({1} auditorías).",
   "Secondaires": "Secundarios",
@@ -3359,5 +3364,6 @@
   "• MAUS ne coupe jamais une protection importante (antivirus, pare-feu, mises à jour, protections du processeur) ni une fonction utile de Windows pour gagner quelques pour cent.": "• MAUS nunca desactiva una protección importante (antivirus, firewall, actualizaciones, protecciones del procesador) ni una función útil de Windows para ganar unos pocos por ciento.",
   "• Méfiez-vous des outils qui promettent +30 % : la plupart de leurs réglages sont sans effet mesurable, ou retirent des fonctions de Windows dont vous aurez besoin un jour.": "• Desconfíe de las herramientas que prometen +30 %: la mayoría de sus ajustes no tienen efecto medible o eliminan funciones de Windows que algún día necesitará.",
   "• Overclocking et undervolting : quelques pour cent, très variables d'une puce à l'autre, et seulement après des tests de stabilité (onglet Tests de l'Atelier).": "• Overclocking y undervolting: unos pocos por ciento, muy variables de un chip a otro, y solo después de pruebas de estabilidad (pestaña Pruebas del Taller).",
-  "• SFC remplace ensuite les fichiers système abîmés par une copie saine.": "• SFC sustituye después los archivos del sistema dañados por una copia sana."
+  "• SFC remplace ensuite les fichiers système abîmés par une copie saine.": "• SFC sustituye después los archivos del sistema dañados por una copia sana.",
+  "… et {0} autre(s).": "… y {0} más."
 }

@@ -7,11 +7,14 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.App.ViewModels;
 
 /// <summary>Une correction proposée, avec sa case à cocher.</summary>
-public sealed class ChangeViewModel(PlannedChange change) : ObservableObject
+/// <param name="group">Titre du groupe dans la liste (le module : « M04 · Confidentialité et télémétrie »).</param>
+public sealed class ChangeViewModel(PlannedChange change, string? group = null) : ObservableObject
 {
     private bool _isSelected = change.Recommended && !change.Advanced;
 
     public PlannedChange Change { get; } = change;
+
+    public string Group { get; } = group ?? change.ModuleId;
 
     public bool IsSelected
     {

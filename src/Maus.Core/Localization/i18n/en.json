@@ -806,6 +806,7 @@
   "Effet décoratif après un clic dans un menu.": "Decorative effect after clicking in a menu.",
   "Effet décoratif autour des fenêtres.": "Decorative effect around windows.",
   "Effet décoratif sous le pointeur de la souris.": "Decorative effect under the mouse pointer.",
+  "Effet immédiat :": "Immediate effect:",
   "Effet purement décoratif sur le Bureau.": "Purely decorative effect on the desktop.",
   "Effets": "Effects",
   "Effets conservés": "Kept effects",
@@ -2007,7 +2008,11 @@
   "Sauvegardez vos données importantes, puis vérifiez la santé du disque avec le Module 11. Un disque externe ou une clé USB mal branchés produisent aussi ces erreurs.": "Back up your important data, then check the disk's health with Module 11. A badly connected external drive or USB stick also produces these errors.",
   "Score de santé": "Health score",
   "Score de santé (ancien barème)": "Health score (old scale)",
+  "Score de santé : {0} → {1} (+{2}).": "Health score: {0} → {1} (+{2}).",
+  "Score de santé : {0} → {1} (inchangé).": "Health score: {0} → {1} (unchanged).",
+  "Score de santé : {0} → {1} ({2}).": "Health score: {0} → {1} ({2}).",
   "Score partiel : 1 module n'a pas pu être vérifié ({0}). Le score ne tient compte que du reste.": "Partial score: 1 module could not be checked ({0}). The score only takes the rest into account.",
+  "Score partiel : un module n'a pas pu être vérifié.": "Partial score: a module could not be checked.",
   "Score partiel : {0} modules n'ont pas pu être vérifiés ({1}). Le score ne tient compte que du reste.": "Partial score: {0} modules could not be checked ({1}). The score only takes the rest into account.",
   "Score stable depuis le {0:d} ({1} audits).": "Score stable since {0:d} ({1} audits).",
   "Secondaires": "Secondary",
@@ -3359,5 +3364,6 @@
   "• MAUS ne coupe jamais une protection importante (antivirus, pare-feu, mises à jour, protections du processeur) ni une fonction utile de Windows pour gagner quelques pour cent.": "• MAUS never turns off an important protection (antivirus, firewall, updates, processor protections) or a useful Windows feature to gain a few percent.",
   "• Méfiez-vous des outils qui promettent +30 % : la plupart de leurs réglages sont sans effet mesurable, ou retirent des fonctions de Windows dont vous aurez besoin un jour.": "• Beware of tools that promise +30 %: most of their tweaks have no measurable effect, or remove Windows features you will need one day.",
   "• Overclocking et undervolting : quelques pour cent, très variables d'une puce à l'autre, et seulement après des tests de stabilité (onglet Tests de l'Atelier).": "• Overclocking and undervolting: a few percent, highly variable from one chip to another, and only after stability tests (Tests tab of the Workshop).",
-  "• SFC remplace ensuite les fichiers système abîmés par une copie saine.": "• SFC then replaces damaged system files with a healthy copy."
+  "• SFC remplace ensuite les fichiers système abîmés par une copie saine.": "• SFC then replaces damaged system files with a healthy copy.",
+  "… et {0} autre(s).": "… and {0} more."
 }
