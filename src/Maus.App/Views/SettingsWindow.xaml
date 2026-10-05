@@ -27,7 +27,7 @@
                 <TextBlock Text="{x:Static app:Ui.SettingsIntro}" Style="{StaticResource Muted}" Margin="0,4,0,16" />
 
                 <!-- Apparence -->
-                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" Margin="0,0,0,12">
                     <StackPanel>
                         <TextBlock Text="{x:Static app:Ui.AppearanceTitle}" Style="{StaticResource CardTitle}" />
                         <TextBlock Text="{x:Static app:Ui.ThemeLabel}" Style="{StaticResource SectionLabel}" Margin="0,8,0,4" />
@@ -64,7 +64,7 @@
                 </Border>
 
                 <!-- Animations -->
-                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}" Margin="0,0,0,12">
                     <StackPanel>
                         <TextBlock Text="{x:Static app:Ui.AnimationsTitle}" Style="{StaticResource CardTitle}" />
                         <ComboBox ItemsSource="{Binding AnimationOptions}" SelectedItem="{Binding Animations}" DisplayMemberPath="Label" Margin="0,6,0,0"
@@ -74,7 +74,7 @@
                 </Border>
 
                 <!-- Mesures en direct -->
-                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}" Margin="0,0,0,12">
                     <StackPanel>
                         <TextBlock Text="{x:Static app:Ui.RefreshTitle}" Style="{StaticResource CardTitle}" />
                         <ComboBox ItemsSource="{Binding RefreshOptions}" SelectedItem="{Binding Refresh}" DisplayMemberPath="Label" Margin="0,6,0,0"
@@ -84,7 +84,7 @@
                 </Border>
 
                 <!-- Fenêtre de surveillance -->
-                <Border Style="{StaticResource Card}">
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
                     <StackPanel>
                         <TextBlock Text="{x:Static app:Ui.MonitorTitle}" Style="{StaticResource CardTitle}" />
                         <TextBlock Text="{x:Static app:Ui.MonitorIntro}" FontSize="12" Style="{StaticResource Muted}" Margin="0,2,0,8" />

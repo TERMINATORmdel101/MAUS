@@ -55,7 +55,7 @@
         </Grid>
 
         <!-- Relevé : démarré à la main ou automatiquement pendant un test de stabilité, puis bilan et export CSV -->
-        <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Padding="12,10" Margin="0,0,0,10">
+        <Border DockPanel.Dock="Top" Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" Padding="12,10" Margin="0,0,0,10">
             <StackPanel>
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.ExportCsv}" Command="{Binding ExportRecordingCommand}" Padding="12,4" Margin="8,0,0,0"
@@ -120,7 +120,7 @@
                 <ItemsControl ItemsSource="{Binding Groups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type ws:MonitorGroupViewModel}">
-                            <Border Style="{StaticResource Card}" Padding="12,10" Margin="0,0,0,8">
+                            <Border Style="{StaticResource SoftCard}" Padding="12,10" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Component}" FontWeight="SemiBold" Margin="0,0,0,4" TextTrimming="CharacterEllipsis" />
                                     <ItemsControl ItemsSource="{Binding Rows}">

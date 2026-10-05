@@ -29,7 +29,7 @@
                 <TextBlock x:Name="Summary" TextWrapping="Wrap" Margin="0,12,0,0" />
                 <!-- Score partiel : modules en erreur ou en délai dépassé, qui ne retirent ni n'ajoutent de points. -->
                 <Border x:Name="PartialPanel" Margin="0,12,0,0" Padding="12,8" CornerRadius="8" BorderThickness="4,1,1,1" Visibility="Collapsed"
-                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{StaticResource MausGrey}">
+                        Background="{DynamicResource PastelGrey}" BorderBrush="{StaticResource MausGrey}">
                     <TextBlock x:Name="PartialNote" TextWrapping="Wrap" />
                 </Border>
 
@@ -38,8 +38,8 @@
                 <ItemsControl x:Name="Rows">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type views:ScoreRow}">
-                            <Border Margin="0,0,0,6" Padding="12,8" CornerRadius="8" BorderThickness="4,1,1,1"
-                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{Binding Brush}">
+                            <Border Margin="0,0,0,6" Padding="12,8" CornerRadius="10" BorderThickness="4,1,1,1"
+                                    Background="{Binding Brush, Converter={StaticResource Pastel}}" BorderBrush="{Binding Brush}">
                                 <DockPanel>
                                     <TextBlock DockPanel.Dock="Left" Text="{Binding Points}" Width="44" FontSize="15" FontWeight="Bold" Foreground="{Binding Brush}" VerticalAlignment="Center" />
                                     <StackPanel>
@@ -54,6 +54,7 @@
                 <TextBlock x:Name="CapNote" TextWrapping="Wrap" Margin="0,6,0,0" FontWeight="SemiBold" Visibility="Collapsed" />
 
                 <TextBlock Text="{x:Static app:Ui.ScoreRulesTitle}" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,8" />
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
                 <ItemsControl ItemsSource="{x:Static app:Ui.ScoreRules}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -64,6 +65,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </DockPanel>
