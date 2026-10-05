@@ -394,7 +394,7 @@ public static class Ui
 
     public static string StopTest => T("Arrêter le test");
 
-    public static string TestSafety => T("Pendant un test, MAUS surveille les températures lisibles et s'arrête de lui-même au seuil de danger. Fermez les jeux et programmes lourds pour un résultat fiable.");
+    public static string TestSafety => T("Pendant un test, MAUS surveille les températures lisibles : il s'arrête de lui-même au seuil de danger, et par prudence si ses mesures cessent de répondre ou si une température suivie n'est plus lue. Fermez les jeux et programmes lourds pour un résultat fiable.");
 
     public static string CoreTestTitle => T("Processeur : test cœur par cœur (Curve Optimizer, undervolt)");
 

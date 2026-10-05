@@ -146,18 +146,16 @@ public static class SensorAlarms
                 alarms.Add(new($"gpu-warm:{gpu.Name}", AlarmLevel.Attention,
                     Localization.Texts.T("{0} approche de son seuil de ralentissement ({1:0} °C sur {2} °C).", gpu.Name, temperature, near)));
             }
-            else if (gpu.SlowdownTemperatureC is null && temperature >= 90)
-            {
-                alarms.Add(new($"gpu-hot:{gpu.Name}", AlarmLevel.Attention,
-                    Localization.Texts.T("{0} est très chaude ({1:0} °C).", gpu.Name, temperature)));
-            }
+
+            // Carte qui ne donne pas son seuil (hors NVML) : aucun seuil commun à toutes les cartes n'est publié (chaque
+            // fabricant fixe le sien, par modèle), donc pas d'alarme inventée (principe 7). La carte se protège elle-même
+            // en baissant ses fréquences.
         }
 
-        if (snapshot.ThermalZoneC is >= 95)
-        {
-            alarms.Add(new("thermal-zone", AlarmLevel.Danger,
-                Localization.Texts.T("La zone thermique de la carte mère indique {0:0} °C : le PC surchauffe.", snapshot.ThermalZoneC)));
-        }
+        // Zone thermique ACPI : pas d'alarme. Aucun seuil publié ne vaut pour toutes les cartes mères, et le seul seuil propre
+        // à la zone, son point critique (_CRT, spécification ACPI), déclenche l'arrêt immédiat du PC par Windows : une alarme
+        // à ce niveau arriverait trop tard. MAUS ne le lit pas (classe WMI MSAcpi_ThermalZoneTemperature, non documentée
+        // sur Microsoft Learn). La zone reste affichée comme indication approximative.
 
         if (snapshot.MemoryPercent is >= 95)
         {

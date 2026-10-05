@@ -26,6 +26,9 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private readonly Func<AuditContext?> _context;
     private readonly IPreferencesStore _preferences;
     private readonly DispatcherTimer _liveTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+
+    /// <summary>Arrêt automatique des tests, d'après des mesures fraîches (jamais une alarme figée).</summary>
+    private readonly ThermalWatchdog _watchdog = new();
     private readonly DispatcherTimer _processTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly ProcessCatalog _catalog = ProcessCatalog.Default;
     private ISensorSource? _sensors;
@@ -334,15 +337,21 @@ public sealed partial class WorkshopViewModel : ObservableObject
             : Environment.NewLine + Environment.NewLine + T("Charge « {0} » : les calculs vectoriels font consommer et chauffer le processeur davantage que le mélange automatique. Gardez un œil sur la température affichée pendant le test.", mode.Label);
 
     /// <summary>
-    /// La température du processeur n'est lue qu'avec PawnIO : sans elle, l'arrêt automatique ne se fait pas sur la chaleur du
-    /// processeur. Dernière mesure si les capteurs ont déjà tourné, sinon présence du pilote. Vide si la température est lue.
+    /// L'arrêt automatique sur la chaleur du processeur demande sa température (pilote PawnIO) et sa limite : sinon, la
+    /// confirmation le dit, avec la raison. Vide si la température et la limite sont lues.
     /// </summary>
-    private string TemperatureCaveat()
+    private string TemperatureCaveat() =>
+        ThermalWatchdog.Caveat(CpuTemperatureState()) is { } caveat ? Environment.NewLine + Environment.NewLine + caveat : string.Empty;
+
+    /// <summary>
+    /// État de l'arrêt automatique sur la chaleur du processeur : d'après la dernière mesure si les capteurs ont déjà tourné,
+    /// sinon d'après la présence du pilote (lue dans le registre : <see cref="IsPawnIoInstalled"/> n'est connu qu'une fois les
+    /// capteurs ouverts).
+    /// </summary>
+    private CpuTemperatureWatch CpuTemperatureState()
     {
-        var unreadable = Live.Samples.LastOrDefault() is { } sample ? sample.CpuTemperatureC is null : !IsPawnIoInstalled;
-        return unreadable
-            ? Environment.NewLine + Environment.NewLine + T("Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température.")
-            : string.Empty;
+        var installed = _sensors is not null ? IsPawnIoInstalled : PawnIo.State(new WindowsRegistryReader()).Installed;
+        return ThermalWatchdog.Assess(Live.Samples.LastOrDefault(), Live.CpuMaxC, installed);
     }
 
     /// <summary>Mesures montrées pendant un test : processeur (tests processeur, mémoire, cœur par cœur) ou carte graphique (mémoire vidéo).</summary>
@@ -711,7 +720,18 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             _sensors ??= await Task.Run(CreateSensors);
             var snapshot = await Task.Run(_sensors.Sample);
+            // Le chien de garde d'abord : l'arrêt automatique ne dépend pas de l'affichage.
+            if (_watchdog.Record(snapshot, Live.CpuMaxC, IsPawnIoInstalled) is > 0 and var failures)
+            {
+                Maus.Core.Diagnostics.Breadcrumbs.Add($"mesures en direct rétablies après {failures} échec(s)");
+            }
+
             Live.Add(snapshot);
+            if (IsTesting && _watchdog.Notice() is { } notice)
+            {
+                Live.Alarms.Add(notice);
+            }
+
             OnRecordedSample(snapshot);
             Sampled?.Invoke(this, snapshot);
             CheckAdvancedSensors();
@@ -722,10 +742,24 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            // Une mesure impossible ne doit jamais faire tomber la fenêtre : on s'arrête et on le dit.
-            _liveTimer.Stop();
+            // Une mesure impossible ne doit jamais faire tomber la fenêtre. Premier échec d'une série noté (pas un par seconde).
+            if (_watchdog.RecordFailure(ex.Message) == 1)
+            {
+                Maus.Core.Diagnostics.Breadcrumbs.Add("mesure en direct en échec (" + ex.GetType().Name + ")");
+            }
+
             Live.Alarms.Clear();
-            Live.Alarms.Add(T("Les mesures en direct se sont arrêtées : {0}", ex.Message));
+            if (IsTesting)
+            {
+                // Pendant un test, les mesures continuent : l'arrêt automatique en dépend. Si elles ne reviennent pas, le chien
+                // de garde arrête le test par prudence.
+                Live.Alarms.Add(T("Une mesure en direct a échoué : {0}. MAUS réessaie à chaque mesure ; si les mesures ne reviennent pas d'ici {1:0} s, le test s'arrêtera par prudence.", ex.Message, ThermalWatchdog.Grace.TotalSeconds));
+            }
+            else
+            {
+                _liveTimer.Stop();
+                Live.Alarms.Add(T("Les mesures en direct se sont arrêtées : {0}", ex.Message));
+            }
         }
         finally
         {
@@ -865,7 +899,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 CpuProgress = Math.Min(100, 100 * p.Elapsed.TotalSeconds / duration.TotalSeconds);
                 CpuStatus = T("{0:0} s · {1} tours vérifiés · {2} erreur(s)", p.Elapsed.TotalSeconds, p.Rounds, p.Errors);
             });
-            var result = await CpuTest.RunAsync(new CpuTestOptions(duration, Environment.ProcessorCount, mode), progress, () => Live.DangerAlarm, cancellation.Token);
+            var result = await CpuTest.RunAsync(new CpuTestOptions(duration, Environment.ProcessorCount, mode), progress, _watchdog.AbortReason, cancellation.Token);
             CpuProgress = 100;
             var history = BenchmarkHistory.CreateDefault();
             var previous = history.Load();
@@ -920,7 +954,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 RamProgress = p.Percent;
                 RamStatus = T("{0} · {1:0} % · {2} erreur(s)", p.Step, p.Percent, p.Errors);
             });
-            var result = await MemoryTest.RunAsync(new MemoryTestOptions(bytes), progress, () => Live.DangerAlarm, cancellation.Token);
+            var result = await MemoryTest.RunAsync(new MemoryTestOptions(bytes), progress, _watchdog.AbortReason, cancellation.Token);
             RamProgress = 100;
             if (!result.Aborted)
             {
@@ -1020,7 +1054,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 CoreStatus = T("{0} ({1}/{2}) · {3} · {4:0} % · {5} cœur(s) en erreur", Name(p.Core), p.Position + 1, p.CoreCount, p.Phase, p.Percent, p.FailedCores);
             });
             var logs = new Maus.Core.Platform.WindowsEventLogReader();
-            var result = await CoreCycleTest.RunAsync(_topology, _checkpoint, plan, progress, () => Live.DangerAlarm, since => WheaEvents.CountSince(logs, since), cancellation.Token);
+            var result = await CoreCycleTest.RunAsync(_topology, _checkpoint, plan, progress, _watchdog.AbortReason, since => WheaEvents.CountSince(logs, since), cancellation.Token);
             CoreProgress = 100;
             foreach (var verdict in result.Cores)
             {
@@ -1100,7 +1134,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 VramProgress = p.Percent;
                 VramStatus = T("{0} · {1:0} % · {2} erreur(s)", p.Step, p.Percent, p.Errors);
             });
-            var result = await VramTest.RunAsync(_gpuProvider, adapter, new VramTestOptions(bytes), progress, () => Live.DangerAlarm, cancellation.Token);
+            var result = await VramTest.RunAsync(_gpuProvider, adapter, new VramTestOptions(bytes), progress, _watchdog.AbortReason, cancellation.Token);
             VramProgress = 100;
             if (!result.Aborted)
             {
@@ -1133,12 +1167,15 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _graphicsTest = graphics;
         OnPropertyChanged(nameof(TestLoad));
         OnPropertyChanged(nameof(TestTemperature));
+        // Avant la première mesure du test, qui compte déjà ; même état de la température qu'à la confirmation.
+        _watchdog.Begin(graphics ? ThermalTarget.Gpu : ThermalTarget.Cpu, CpuTemperatureState());
         IsTesting = true;
         await RefreshActivityAsync();
     }
 
     private async Task StopTestAsync()
     {
+        _watchdog.End();
         IsTesting = false;
         _stopTest = null;
         KeepAwake.End();

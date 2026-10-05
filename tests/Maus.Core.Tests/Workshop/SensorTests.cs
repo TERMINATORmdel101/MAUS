@@ -34,15 +34,18 @@ public class SensorTests
         Assert.Empty(SensorAlarms.Check(Snapshot(10, gpuTemperature: 70, slowdown: 90)));
         Assert.Equal(AlarmLevel.Attention, SensorAlarms.Check(Snapshot(10, gpuTemperature: 86, slowdown: 90)).Single().Level);
         Assert.Equal(AlarmLevel.Danger, SensorAlarms.Check(Snapshot(10, gpuTemperature: 91, slowdown: 90)).Single().Level);
-        Assert.Equal(AlarmLevel.Attention, SensorAlarms.Check(Snapshot(10, gpuTemperature: 92)).Single().Level);
+
+        // Carte qui ne donne pas son seuil : aucun seuil commun publié, donc aucune alarme inventée (principe 7).
+        Assert.Empty(SensorAlarms.Check(Snapshot(10, gpuTemperature: 92)));
     }
 
     [Fact]
-    public void Overheating_and_full_memory_raise_alarms()
+    public void Full_memory_raises_an_alarm_but_the_acpi_thermal_zone_does_not()
     {
         var alarms = SensorAlarms.Check(Snapshot(10, thermal: 97, used: 99, total: 100));
 
-        Assert.Contains(alarms, a => a.Id == "thermal-zone" && a.Level == AlarmLevel.Danger);
+        // Zone thermique ACPI : aucun seuil publié commun à toutes les cartes mères, donc pas d'alarme (principe 7).
+        Assert.DoesNotContain(alarms, a => a.Id == "thermal-zone");
         Assert.Contains(alarms, a => a.Id == "memory-full");
     }
 }

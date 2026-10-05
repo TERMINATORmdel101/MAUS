@@ -118,9 +118,6 @@ public sealed class LiveViewModel : ObservableObject
 
     public IReadOnlyCollection<SensorSnapshot> Samples => _history.Samples;
 
-    /// <summary>Dernière alarme « danger », consultée par les tests pour s'arrêter d'eux-mêmes.</summary>
-    public string? DangerAlarm { get; private set; }
-
     public string ThermalNote => _history.Latest switch
     {
         { CpuTemperatureC: not null } => T("Température, tension et puissance du processeur lues par le pilote PawnIO."),
@@ -175,8 +172,9 @@ public sealed class LiveViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(HasReadings));
+        // Affichage seulement : l'arrêt automatique des tests passe par le chien de garde (ThermalWatchdog), d'après des
+        // mesures fraîches.
         var alarms = SensorAlarms.Check(snapshot, CpuMaxC);
-        DangerAlarm = alarms.FirstOrDefault(a => a.Level == AlarmLevel.Danger)?.Message;
         Alarms.Clear();
         foreach (var alarm in alarms)
         {
