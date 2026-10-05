@@ -15,6 +15,8 @@ public static class Ui
 
     public static string HomeTools => T("Outils");
 
+    public static string OtherTools => T("Autres outils");
+
     public static string ByImportance => T("Par importance");
 
     public static string ByModule => T("Par module");

@@ -37,6 +37,13 @@ public sealed class ChangeViewModel(PlannedChange change) : ObservableObject
 
     public bool HasWarning => Change.Warning is not null;
 
+    /// <summary>Teinte de la carte : rose si avertissement, sable si avancée, vert d'eau si recommandée, bleu sinon.</summary>
+    public Maus.App.Appearance.Tone Tone => Change.Warning is not null
+        ? Maus.App.Appearance.Tone.Rose
+        : Change.Advanced
+            ? Maus.App.Appearance.Tone.Sand
+            : Change.Recommended ? Maus.App.Appearance.Tone.Mint : Maus.App.Appearance.Tone.Blue;
+
     public string Badges => string.Join("  ·  ", new[]
     {
         Change.ModuleId,
