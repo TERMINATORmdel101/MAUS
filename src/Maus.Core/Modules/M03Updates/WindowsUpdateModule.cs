@@ -74,7 +74,6 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static readonly string[] PauseValueNames = ["PauseUpdatesExpiryTime", "PauseQualityUpdatesEndTime"];
 
     private static readonly TimeSpan DefaultSearchTimeout = TimeSpan.FromSeconds(150);
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
     private static readonly Lazy<WindowsLifecycleCatalog> Catalog = new(WindowsLifecycleCatalog.LoadEmbedded);
 
     private readonly IWindowsUpdateAgent _agent;
@@ -155,7 +154,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 Category = VersionCategory,
                 Status = FindingStatusExtensions.ForDeviation(Severity.High),
                 Severity = Severity.High,
-                Current = T("Windows 10 (build {0}) : support terminé le {1}", windows.FullBuild, LongDate(catalog.Windows10EndOfSupport)),
+                Current = T("Windows 10 (build {0}) : support terminé le {1}", windows.FullBuild, ShortDate(catalog.Windows10EndOfSupport)),
                 Expected = T("Windows 11 23H2 ou plus récent"),
                 Explanation = T("MAUS vise Windows 11 uniquement : Windows 10 est hors périmètre. Sans correctifs de sécurité, "
                     + "le PC reste exposé aux failles découvertes depuis la fin du support."),
@@ -187,15 +186,15 @@ public sealed class WindowsUpdateModule : IAuditModule
         var channelLabel = WindowsLifecycleCatalog.Describe(channel);
         var current = daysLeft < 0
             ? T("Windows 11 {0} ({1}) : correctifs arrêtés depuis le {2}", release.Version, channelLabel, ShortDate(end))
-            : T("Windows 11 {0} ({1}) : correctifs jusqu'au {2}, dans {3}", release.Version, channelLabel, ShortDate(end), Plural(daysLeft, "jour", "jours"));
+            : T("Windows 11 {0} ({1}) : correctifs jusqu'au {2}, dans {3}", release.Version, channelLabel, ShortDate(end), Plural(daysLeft, T("jour"), T("jours")));
 
         string? advice = null;
         var fixable = false;
         if (severity != Severity.Info)
         {
             var status = daysLeft < 0
-                ? T("Windows 11 {0} ne reçoit plus de correctifs de sécurité depuis le {1}.", release.Version, LongDate(end))
-                : T("Windows 11 {0} ne recevra plus de correctifs de sécurité après le {1}.", release.Version, LongDate(end));
+                ? T("Windows 11 {0} ne reçoit plus de correctifs de sécurité depuis le {1}.", release.Version, ShortDate(end))
+                : T("Windows 11 {0} ne recevra plus de correctifs de sécurité après le {1}.", release.Version, ShortDate(end));
             if (release.EnablementPackage is { } package && channel is ServicingChannel.HomePro or ServicingChannel.EnterpriseEducation)
             {
                 advice = T("{0} Passez à {1} par le package d'activation {2} : un seul redémarrage, "
@@ -619,7 +618,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Category = UpdateCategory,
             Status = stale ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
-            Current = $"le {ShortDate(DateOnly.FromDateTime(lastUtc.ToLocalTime()))} ({Ago(age)})",
+            Current = T("le {0} ({1})", ShortDate(DateOnly.FromDateTime(lastUtc.ToLocalTime())), Ago(age)),
             Expected = T("moins de {0} jours", MaxSearchAgeDays),
             Explanation = T("Windows cherche seul de nouvelles mises à jour environ une fois par jour. Une dernière recherche réussie "
                 + "vieille de plus de deux semaines signale un Windows Update bloqué."),
@@ -671,7 +670,7 @@ public sealed class WindowsUpdateModule : IAuditModule
         }
 
         var stale = age > MaxSignatureAgeDays;
-        var current = age == 0 ? T("à jour (moins d'un jour)") : T("âge : {0}", Plural((int)Math.Min(age, int.MaxValue), "jour", "jours"));
+        var current = age == 0 ? T("à jour (moins d'un jour)") : T("âge : {0}", Plural((int)Math.Min(age, int.MaxValue), T("jour"), T("jours")));
         if (row.GetString("AntivirusSignatureVersion") is { Length: > 0 } version)
         {
             current += $", version {version}";
@@ -679,7 +678,7 @@ public sealed class WindowsUpdateModule : IAuditModule
 
         if (row.GetDateTime("AntivirusSignatureLastUpdated") is { } updated)
         {
-            current += $" (du {ShortDate(DateOnly.FromDateTime(updated))})";
+            current += T(" (du {0})", ShortDate(DateOnly.FromDateTime(updated)));
         }
 
         return new Finding
@@ -814,9 +813,8 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static string Plural(int count, string singular, string plural) =>
         $"{count.ToString(CultureInfo.InvariantCulture)} {(count > 1 ? plural : singular)}";
 
-    private static string ShortDate(DateOnly date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-
-    private static string LongDate(DateOnly date) => date.ToString("d MMMM yyyy", French);
+    /// <summary>Date courte dans la langue de MAUS (13/10/2026 en français, 10/13/2026 en anglais), jamais un format figé.</summary>
+    private static string ShortDate(DateOnly date) => date.ToString("d", Culture);
 
     /// <summary>Mises à jour trouvées, ou raison de l'échec de la recherche.</summary>
     private sealed record SearchOutcome(IReadOnlyList<PendingUpdate>? Updates, string? Error);

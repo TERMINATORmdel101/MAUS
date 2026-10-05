@@ -57,7 +57,7 @@ public class WindowsUpdateModuleTests
         Results = new AutomaticUpdatesResults(new DateTime(2026, 9, 24, 6, 0, 0, DateTimeKind.Utc), new DateTime(2026, 9, 23, 20, 0, 0, DateTimeKind.Utc)),
     };
 
-    private static Task<IReadOnlyList<Finding>> Detect(
+    internal static Task<IReadOnlyList<Finding>> Detect(
         FakeUpdateAgent? agent = null,
         FakeRegistry? registry = null,
         FakeCim? cim = null,
@@ -68,7 +68,7 @@ public class WindowsUpdateModuleTests
             TestContext.Create(registry ?? HealthyRegistry(), cim ?? HealthyCim(), windows: windows ?? Pro25H2, now: now ?? Now, hardware: hardware, elevated: false),
             CancellationToken.None);
 
-    private static Finding Get(IReadOnlyList<Finding> findings, string id) => findings.Single(f => f.Id == id);
+    internal static Finding Get(IReadOnlyList<Finding> findings, string id) => findings.Single(f => f.Id == id);
 
     private static PendingUpdate Update(string title, string category, bool browseOnly = false, string? msrc = null, bool isDriver = false) =>
         new(Guid.NewGuid().ToString(), title, [], ["{" + category + "}"], msrc, browseOnly, isDriver);
@@ -157,7 +157,7 @@ public class WindowsUpdateModuleTests
         Assert.Equal(Severity.Medium, finding.Severity);
         Assert.Contains("13/10/2026", finding.Current, StringComparison.Ordinal);
         Assert.Contains("19 jours", finding.Current, StringComparison.Ordinal);
-        Assert.Contains("13 octobre 2026", finding.Advice, StringComparison.Ordinal);
+        Assert.Contains("après le 13/10/2026", finding.Advice, StringComparison.Ordinal);
         Assert.Contains("KB5054156", finding.Advice, StringComparison.Ordinal);
         Assert.DoesNotContain("révision", finding.Advice, StringComparison.Ordinal);
         Assert.True(finding.Fixable);
@@ -231,7 +231,7 @@ public class WindowsUpdateModuleTests
 
         Assert.Equal(FindingStatus.Problem, finding.Status);
         Assert.Equal(Severity.High, finding.Severity);
-        Assert.Contains("14 octobre 2025", finding.Current, StringComparison.Ordinal);
+        Assert.Contains("support terminé le 14/10/2025", finding.Current, StringComparison.Ordinal);
         Assert.Contains("hors périmètre", finding.Explanation, StringComparison.Ordinal);
         Assert.Null(finding.SettingsPage);
     }
@@ -759,7 +759,7 @@ public class WindowsUpdateModuleTests
     }
 
     /// <summary>Agent Windows Update simulé : aucune recherche réseau.</summary>
-    private sealed class FakeUpdateAgent : IWindowsUpdateAgent
+    internal sealed class FakeUpdateAgent : IWindowsUpdateAgent
     {
         public List<PendingUpdate> Updates { get; } = [];
 

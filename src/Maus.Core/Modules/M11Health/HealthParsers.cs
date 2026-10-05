@@ -126,9 +126,8 @@ internal static partial class HealthParsers
         return char.IsAsciiLetter(letter) ? char.ToUpperInvariant(letter) : null;
     }
 
-    /// <summary>Taille lisible en Go (1 Go = 1024³ octets, comme l'Explorateur).</summary>
-    public static string FormatGigabytes(long bytes) =>
-        (bytes / 1024d / 1024d / 1024d).ToString("0.0", CultureInfo.GetCultureInfo("fr-FR")) + " Go";
+    /// <summary>Taille lisible en Go (1 Go = 1024³ octets, comme l'Explorateur), dans la langue de MAUS (« 465,8 Go », « 465.8 GB »).</summary>
+    public static string FormatGigabytes(long bytes) => T("{0:0.0} Go", bytes / 1024d / 1024d / 1024d);
 
     /// <summary>Type de mémoire selon SMBIOS (<c>Win32_PhysicalMemory.SMBIOSMemoryType</c>).</summary>
     public static string? MemoryTypeLabel(long? smbiosType) => smbiosType switch

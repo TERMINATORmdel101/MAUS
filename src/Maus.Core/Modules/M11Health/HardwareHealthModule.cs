@@ -33,7 +33,6 @@ public sealed class HardwareHealthModule : IAuditModule
     internal const string CleanupRecommendationsPage = "ms-settings:storagerecommendations";
 
     private static readonly string[] TrimArguments = ["behavior", "query", "DisableDeleteNotify"];
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
 
     public string Id => "M11";
 
@@ -367,7 +366,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Category = StorageCategory,
             Status = low ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = Severity.Medium,
-            Current = T("{0} libres sur {1} ({2})", HealthParsers.FormatGigabytes(drive.FreeBytes), HealthParsers.FormatGigabytes(drive.TotalBytes), ratio.ToString("0 %", French)),
+            Current = T("{0} libres sur {1} ({2})", HealthParsers.FormatGigabytes(drive.FreeBytes), HealthParsers.FormatGigabytes(drive.TotalBytes), ratio.ToString("0 %", Culture)),
             Expected = T("au moins 15 % libres"),
             Explanation = T("Windows a besoin de place sur {0}: pour ses mises à jour, sa mémoire virtuelle et ses fichiers temporaires. "
                 + "Un SSD presque plein ralentit aussi en écriture.", systemLetter),
@@ -423,7 +422,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Title = title,
             Category = MemoryCategory,
             Status = FindingStatus.Info,
-            Current = $"{gigabytesPerSecond.ToString("0.0", French)} Go/s",
+            Current = T("{0:0.0} Go/s", gigabytesPerSecond),
             Explanation = T("Calcul : {0} canal(aux){1} × {2} MT/s × 8 octets. {3}. "
                 + "C'est un plafond théorique : le test de la mémoire vive de l'Atelier mesure le débit réel, à comparer à cette valeur.", channels, (estimated ? T(" (estimation)") : string.Empty), mts, description),
             Advice = T("Nombre de canaux et profil XMP/EXPO : voir Module 10."),
@@ -459,7 +458,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = !throttled ? FindingStatus.Ok : laptop ? FindingStatus.Info : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = throttled
-                ? T("{0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("dd/MM/yyyy", French))
+                ? T("{0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("d", Culture))
                 : T("aucune alerte en 30 jours"),
             Expected = T("aucune alerte"),
             Explanation = T("Windows note (événement 37 de Kernel-Processor-Power) chaque fois que le BIOS limite la vitesse du processeur : "

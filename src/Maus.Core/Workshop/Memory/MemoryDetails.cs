@@ -417,5 +417,5 @@ public static class MemoryDetails
 
     private static string Volts(double? value) => value is { } v ? v.ToString("0.000", CultureInfo.InvariantCulture) + " V" : "?";
 
-    private static string Gb(long bytes) => (bytes / (1024.0 * 1024 * 1024)).ToString("0.#", CultureInfo.InvariantCulture) + " Go";
+    private static string Gb(long bytes) => T("{0:0.#} Go", bytes / (1024.0 * 1024 * 1024));
 }

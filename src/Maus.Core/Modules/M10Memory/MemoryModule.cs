@@ -24,7 +24,6 @@ public sealed partial class MemoryModule : IAuditModule
 
     private static string StabilityAdvice => T("En cas de plantages ou d'écrans bleus : BIOS récent (Module 8), test de la mémoire avec MemTest86, TestMem5 ou OCCT, puis profil plus lent.");
 
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
 
     public string Id => "M10";
 
@@ -424,7 +423,7 @@ public sealed partial class MemoryModule : IAuditModule
     internal static string FormatCapacity(long bytes)
     {
         var gigabytes = bytes / (1024d * 1024 * 1024);
-        return gigabytes.ToString(gigabytes >= 1 ? "0.#" : "0.##", French) + " Go";
+        return gigabytes >= 1 ? T("{0:0.#} Go", gigabytes) : T("{0:0.##} Go", gigabytes);
     }
 
     [GeneratedRegex(@"^[0-9A-F]{4}$", RegexOptions.CultureInvariant)]

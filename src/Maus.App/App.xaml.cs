@@ -16,6 +16,9 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+        // Réglages régionaux de Windows (séparateur de liste, virgule décimale), gardés pour les exports CSV avant que
+        // UseLanguage ne remplace la culture du fil par celle de la langue de MAUS.
+        Texts.UseRegionalCulture(CultureInfo.CurrentCulture);
         var preferences = FilePreferencesStore.CreateDefault().Load();
         UseLanguage(preferences.Language);
 

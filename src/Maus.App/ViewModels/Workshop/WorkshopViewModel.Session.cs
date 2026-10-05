@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows.Input;
@@ -162,8 +161,9 @@ public sealed partial class WorkshopViewModel
 
         try
         {
+            // Format régional de Windows (séparateur, virgule décimale), pas celui de la langue de MAUS : c'est lui qu'Excel attend.
             // Encodage avec BOM : Excel reconnaît alors les accents des en-têtes.
-            await File.WriteAllTextAsync(dialog.FileName, recording.ToCsv(CultureInfo.CurrentCulture), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+            await File.WriteAllTextAsync(dialog.FileName, recording.ToCsv(RegionalCulture), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
             SessionStatus = T("Relevé enregistré : {0}", dialog.FileName);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

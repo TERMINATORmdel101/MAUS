@@ -77,13 +77,17 @@ public static class TaskSchedulerClient
 
     private static async Task<(int Code, string Output)> RunAsync(IEnumerable<string> arguments)
     {
+        // schtasks écrit dans la page de code OEM du système, y compris ses messages d'erreur (« Erreur : Le fichier spécifié
+        // est introuvable. » : octets 0xFF et 0x82 en page 850, relevé le 30/09/2026) : lus en UTF-8, les accents seraient cassés.
+        var oem = Maus.Core.Platform.OemEncoding.Current;
         var info = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "schtasks.exe"))
         {
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
+            StandardOutputEncoding = oem,
+            StandardErrorEncoding = oem,
         };
         foreach (var argument in arguments)
         {

@@ -24,7 +24,6 @@ public sealed class DisplayModule : IAuditModule
     /// <summary>Tolérance entre la fréquence exacte (59,94 Hz) et la valeur entière des modes (60 Hz).</summary>
     private const double RefreshTolerance = 1.0;
 
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
 
     private readonly IDisplayConfigReader _reader;
 
@@ -474,7 +473,7 @@ public sealed class DisplayModule : IAuditModule
         return DisplayParsers.IsInternal(path.Output) ? T("écran intégré") : T("écran {0}", index);
     }
 
-    private static string Hz(double value) => Math.Round(value, 2).ToString("0.##", French);
+    private static string Hz(double value) => Math.Round(value, 2).ToString("0.##", Culture);
 
     private sealed record Screen(DisplayPath Path, int Index, string Label)
     {

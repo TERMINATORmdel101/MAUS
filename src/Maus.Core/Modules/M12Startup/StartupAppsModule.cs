@@ -34,7 +34,6 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     /// <summary>Page « Applications > Démarrage » des Paramètres (Microsoft Learn, « Launch Windows Settings »).</summary>
     internal const string StartupAppsPage = "ms-settings:startupapps";
 
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
     private static readonly Lazy<StartupCatalog> Catalog = new(StartupCatalog.LoadEmbedded);
 
     private static RegistrySource[] RegistrySources =>     [
@@ -287,7 +286,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             : enabled
                 ? T("activé")
                 : entry.Approval.DisabledOnUtc is { } date
-                    ? T("désactivé le {0}", date.ToLocalTime().ToString("dd/MM/yyyy", French))
+                    ? T("désactivé le {0}", date.ToLocalTime().ToString("d", Culture))
                     : T("désactivé");
         var publisher = company ?? (isStore ? T("application du Store") : executable is null ? null : T("éditeur inconnu"));
 
@@ -446,7 +445,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             + "redémarrage et peut être faussée (voir Module 5).");
         if (StartupParsers.ParseMilliseconds(boot.Data, "MainPathBootTime") is { } mainPath)
         {
-            explanation += T(" Dont {0} s avant l'affichage du bureau.", mainPath.ToString("0.0", French));
+            explanation += T(" Dont {0} s avant l'affichage du bureau.", mainPath.ToString("0.0", Culture));
         }
 
         var slowApps = events
@@ -462,7 +461,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         if (slowApps.Count > 0)
         {
             explanation += T(" Programmes signalés par Windows comme ralentissant le démarrage : ")
-                + string.Join(", ", slowApps.Select(a => $"{a.Name} (+{a.Delay.ToString("0.0", French)} s)")) + ".";
+                + string.Join(", ", slowApps.Select(a => $"{a.Name} (+{a.Delay.ToString("0.0", Culture)} s)")) + ".";
         }
 
         return new Finding
@@ -471,7 +470,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Title = title,
             Category = MeasureCategory,
             Status = FindingStatus.Info,
-            Current = $"{seconds.Value.ToString("0.0", French)} s, le {boot.TimeCreated.ToString("dd/MM/yyyy", French)}",
+            Current = T("{0} s, le {1}", seconds.Value.ToString("0.0", Culture), boot.TimeCreated.ToString("d", Culture)),
             Explanation = explanation,
             Advice = T("Notez cette durée, désactivez les entrées inutiles, redémarrez, puis comparez."),
         };

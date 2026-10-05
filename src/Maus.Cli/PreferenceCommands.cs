@@ -16,7 +16,7 @@ internal static class PreferenceCommands
         output.WriteLine(T("Constats marqués « voulu » : {0}", preferences.Acknowledged.Count));
         foreach (var mark in preferences.Acknowledged)
         {
-            output.WriteLine(T("  {0} (valeur : {1}, le {2:dd/MM/yyyy})", mark.FindingId, mark.Current ?? "—", mark.At.ToLocalTime()));
+            output.WriteLine(T("  {0} (valeur : {1}, le {2:d})", mark.FindingId, mark.Current ?? "—", mark.At.ToLocalTime()));
         }
 
         return 0;

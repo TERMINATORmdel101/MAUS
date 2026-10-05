@@ -29,6 +29,25 @@ public static class Texts
     /// <summary>Culture utilisée pour les nombres et les dates dans la langue active.</summary>
     public static CultureInfo Culture { get; private set; } = CultureInfo.GetCultureInfo("fr-FR");
 
+    /// <summary>
+    /// Réglages régionaux de Windows de l'utilisateur (séparateur de liste, virgule décimale…, personnalisations comprises),
+    /// indépendants de la langue de MAUS : ceux des fichiers ouverts ensuite par d'autres logiciels (CSV pour Excel ou LibreOffice).
+    /// Cas courant : Windows en anglais avec le format régional français, où Excel attend « ; » et « 12,5 ». Relevés au premier
+    /// usage de cette classe ; l'application les mémorise aussi par <see cref="UseRegionalCulture"/> avant de remplacer la culture
+    /// du fil par celle de sa langue.
+    /// </summary>
+    public static CultureInfo RegionalCulture { get; private set; } = CultureInfo.ReadOnly(CultureInfo.CurrentCulture);
+
+    /// <summary>
+    /// Mémorise les réglages régionaux de Windows. À appeler au démarrage, tant que <see cref="CultureInfo.CurrentCulture"/>
+    /// est encore celle de Windows (elle comprend alors les personnalisations de l'utilisateur).
+    /// </summary>
+    public static void UseRegionalCulture(CultureInfo culture)
+    {
+        ArgumentNullException.ThrowIfNull(culture);
+        RegionalCulture = CultureInfo.ReadOnly(culture);
+    }
+
     /// <summary>Langue de Windows si MAUS la parle, sinon l'anglais.</summary>
     public static string FromWindows() => CultureInfo.InstalledUICulture.TwoLetterISOLanguageName switch
     {
