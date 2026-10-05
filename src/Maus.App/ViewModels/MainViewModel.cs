@@ -165,6 +165,7 @@ public sealed partial class MainViewModel : ObservableObject
             await RebindAcknowledgementsAsync(findings);
             OnPropertyChanged(nameof(HasAudit));
             OnPropertyChanged(nameof(IsFirstAudit));
+            OnPropertyChanged(nameof(ShowWelcome));
             LoadChoices(context);
             var fixContext = await Task.Run(() => FixContext.CreateDefault(context));
             BlockingReason = new FixEngine(fixContext).GetBlockingReason()

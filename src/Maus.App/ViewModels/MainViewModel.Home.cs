@@ -216,11 +216,15 @@ public sealed partial class MainViewModel
             if (SetProperty(ref _healthTrend, value))
             {
                 OnPropertyChanged(nameof(HasHealthTrend));
+                OnPropertyChanged(nameof(ShowWelcome));
             }
         }
     }
 
     public bool HasHealthTrend => HealthTrend.Count >= 2;
+
+    /// <summary>Tout premier lancement (aucun audit ni score enregistré) : carte « Bienvenue » en trois étapes.</summary>
+    public bool ShowWelcome => !HasAudit && HealthTrend.Count == 0;
 
     public string HealthTrendText
     {

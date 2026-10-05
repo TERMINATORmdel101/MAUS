@@ -141,6 +141,35 @@
                         </DockPanel>
                     </Border>
 
+                    <!-- Tout premier lancement : MAUS en trois étapes. -->
+                    <Border Style="{StaticResource SoftCard}" Margin="0,16,0,0" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}"
+                            Visibility="{Binding ShowWelcome, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="{x:Static app:Ui.WelcomeTitle}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource PastelLilacInk}" Margin="0,0,0,10" />
+                            <UniformGrid Columns="3">
+                                <DockPanel Margin="0,0,16,0">
+                                    <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelLilacStroke}" VerticalAlignment="Top">
+                                        <TextBlock Text="1" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PastelLilacInk}" />
+                                    </Border>
+                                    <TextBlock Text="{x:Static app:Ui.WelcomeStep1}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <DockPanel Margin="0,0,16,0">
+                                    <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelLilacStroke}" VerticalAlignment="Top">
+                                        <TextBlock Text="2" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PastelLilacInk}" />
+                                    </Border>
+                                    <TextBlock Text="{x:Static app:Ui.WelcomeStep2}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelLilacStroke}" VerticalAlignment="Top">
+                                        <TextBlock Text="3" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PastelLilacInk}" />
+                                    </Border>
+                                    <TextBlock Text="{x:Static app:Ui.WelcomeStep3}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </UniformGrid>
+                            <TextBlock Text="{x:Static app:Ui.WelcomeNever}" FontSize="12" Style="{StaticResource Muted}" Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
+
                     <Grid Margin="0,16,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="270" />
