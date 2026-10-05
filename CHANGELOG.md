@@ -2,6 +2,22 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.7.0 — 05/10/2026
+
+Améliorations proposées au porteur et acceptées (« tu peux tout faire ») : modifications moyennes, chiffre du milieu.
+
+- **« Corriger » sur chaque constat corrigeable** : le bouton coche la ou les corrections du constat, les remonte en tête de liste, les entoure et ouvre l'onglet Corrections. Rien n'est appliqué avant que vous cliquiez sur « Appliquer ».
+- **Un seul constat par sujet** : Secure Boot, signalé par les modules 1 et 8, n'apparaît plus qu'une fois dans « À traiter d'abord », avec la mention « Aussi signalé par ».
+- **Liens web** : une adresse écrite dans un conseil est réduite au nom du site (« www.msi.com »), et un bouton « Ouvrir la page web » ouvre l'adresse complète.
+- **Voyant juste** : un module qui n'a que des constats conformes et des informations est vert, et non plus gris comme un module non vérifié (liste des modules, rapport HTML).
+- **Phrases plus naturelles** : « 18 corrections proposées », « 0 problème · 4 à surveiller · 20 optimisations », « Score stable depuis le … » ou « En hausse de 6 points depuis le … ». La ligne d'état donne l'heure de l'audit au lieu de répéter les comptes. Le nom de la langue n'est plus coupé dans la barre de navigation.
+- **Avant / après** : après les corrections, « Score de santé : 80 → 86 (+6). » en tête du compte rendu et sur l'accueil.
+- **Récapitulatif avant d'appliquer** : la confirmation liste les corrections, regroupées selon le moment où leur effet sera complet (immédiat, Explorateur, prochaine session, redémarrage du PC).
+- **Corrections rangées par module**, sous des titres repliables avec leur nombre.
+- **Carte « Bienvenue »** au tout premier lancement : MAUS en trois étapes.
+- **Pastel dans les fenêtres annexes** (Paramètres, surveillance, « Pourquoi ce score ? »).
+- **Correction (signalée par le porteur)** : en passant en thème sombre pendant que MAUS était ouvert, les cartes restaient en pastel clair, avec un texte blanc illisible dessus. WPF figeait les couleurs rangées dans les ressources : elles sont maintenant remplacées par des copies neuves à chaque changement de thème.
+
 ## 0.6.0 — 05/10/2026
 
 Nouvelle présentation, demandée par le porteur (modification moyenne : chiffre du milieu). Rien ne change dans ce que MAUS lit ou corrige.
