@@ -526,6 +526,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
         }
 
         _stopTest?.Invoke();
+        StopFrameCapture();
         _stopNet?.Invoke();
         _stopScan?.Invoke();
         _liveTimer.Stop();

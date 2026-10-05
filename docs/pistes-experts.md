@@ -27,7 +27,7 @@ Question du porteur (30/09/2026) : « qu'est-ce qui manque pour les experts du P
 - **Effort** : moyen à gros. **Risque** : aucun (mesure seule).
 - Sources : [Resplendence, LatencyMon](https://www.resplendence.com/latencymon) ; [Microsoft Learn, About Event Tracing](https://learn.microsoft.com/en-us/windows/win32/etw/about-event-tracing) ; [Microsoft Learn, Windows Performance Toolkit Xperf](https://learn.microsoft.com/en-us/archive/blogs/ntdebugging/windows-performance-toolkit-xperf) ; [OSR, Collecting Detailed Performance Data with Xperf](https://www.osr.com/nt-insider/2010-issue1/collecting-detailed-performance-data-xperf/).
 
-### 3. Jeux : images par seconde et « 1 % low » dans le relevé de partie
+### 3. Jeux : images par seconde et « 1 % low » dans le relevé de partie — FAIT le 05/10/2026
 
 - **Ce que font les experts** : PresentMon (Intel, **licence MIT**) mesure la durée de chaque image, la latence et l'affichage, pour DirectX, OpenGL et Vulkan.
 - **Ce qui manque à MAUS** : le relevé de partie mesure processeur, carte graphique, températures et mémoire, mais pas les images par seconde.
@@ -35,7 +35,7 @@ Question du porteur (30/09/2026) : « qu'est-ce qui manque pour les experts du P
 - **Effort** : moyen. **Risque** : aucun.
 - Sources : [GitHub, GameTechDev/PresentMon](https://github.com/gametechdev/presentmon).
 
-### 4. Santé détaillée des SSD NVMe
+### 4. Santé détaillée des SSD NVMe — FAIT le 05/10/2026 (module 11)
 
 - **Ce que font les experts** : CrystalDiskInfo ou smartctl lisent le journal de santé NVMe : « Available Spare » (réserve restante) et son seuil, « Percentage Used » (estimation du fabricant, peut dépasser 100 %), erreurs de média.
 - **Ce qui manque à MAUS** : il lit l'usure par le compteur de fiabilité de Windows, mais pas la réserve ni son seuil, qui sont fournis par le disque lui-même (donc des seuils sourcés).

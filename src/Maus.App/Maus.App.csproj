@@ -29,6 +29,10 @@
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="licenses\THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\licenses\LGPL-2.1.txt" Link="licenses\LGPL-2.1.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\TRADEMARKS.md" Link="licenses\TRADEMARKS.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- PresentMon (Intel, licence MIT) : images par seconde pendant le relevé de partie. Binaire signé par Intel, lancé
+         seulement si son empreinte SHA-256 est celle de third-party/PresentMon (voir PresentMonCapture). -->
+    <None Include="..\..\third-party\PresentMon\PresentMon.exe" Link="PresentMon\PresentMon.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\third-party\PresentMon\LICENSE.txt" Link="licenses\PresentMon-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

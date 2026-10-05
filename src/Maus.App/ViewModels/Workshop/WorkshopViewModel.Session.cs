@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Windows.Input;
+using Maus.Core.Diagnostics;
 using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
 
@@ -10,6 +11,9 @@ namespace Maus.App.ViewModels.Workshop;
 public sealed partial class WorkshopViewModel
 {
     private SessionRecording? _recording;
+
+    /// <summary>Images par seconde (PresentMon) pendant le relevé ; <c>null</c> si indisponible.</summary>
+    private PresentMonCapture? _frameCapture;
     private SessionRecording? _lastRecording;
     private TimeSpan? _recordLimit;
     private bool _isRecording;
@@ -76,7 +80,10 @@ public sealed partial class WorkshopViewModel
         _recording = new SessionRecording(DateTimeOffset.Now);
         _recordLimit = SessionDuration.Value;
         SessionSummary = string.Empty;
-        SessionStatus = T("Enregistrement en cours… lancez votre jeu.");
+        _frameCapture = PresentMonCapture.TryStart();
+        SessionStatus = _frameCapture is null
+            ? T("Enregistrement en cours… lancez votre jeu. (Images par seconde non mesurées : PresentMon indisponible.)")
+            : T("Enregistrement en cours… lancez votre jeu.");
         IsRecording = true;
     }));
 
@@ -110,6 +117,12 @@ public sealed partial class WorkshopViewModel
         _recording = null;
         _lastRecording = recording;
         IsRecording = false;
+        if (_frameCapture is { } capture)
+        {
+            _frameCapture = null;
+            FinishFramesAsync(capture).Forget("relevé : images par seconde");
+        }
+
         if (recording.Count < 5)
         {
             SessionStatus = T("Enregistrement trop court pour un bilan.");
@@ -138,6 +151,38 @@ public sealed partial class WorkshopViewModel
 
         SessionSummary = text.ToString().TrimEnd();
         SessionStatus = T("Session terminée : {0:hh\\:mm\\:ss}, {1} mesures.", summary.Duration, summary.Samples);
+    }
+
+    /// <summary>Arrête PresentMon hors du fil de l'interface (quelques secondes), puis ajoute son bilan en tête du relevé.</summary>
+    private async Task FinishFramesAsync(PresentMonCapture capture)
+    {
+        var frames = await Task.Run(() =>
+        {
+            using (capture)
+            {
+                return capture.Stop();
+            }
+        });
+        var line = frames is null
+            ? T("Images par seconde : pas assez d'images d'un même jeu pendant le relevé (au moins {0}).", FrameTimeLog.MinimumFrames)
+            : T("Images par seconde : {0}", frames.Describe());
+        SessionSummary = SessionSummary.Length == 0 ? line : line + Environment.NewLine + Environment.NewLine + SessionSummary;
+    }
+
+    /// <summary>
+    /// Fermeture de MAUS pendant un relevé : PresentMon est arrêté tout de suite (quelques secondes au plus), sinon la fin
+    /// du processus de MAUS pourrait le laisser tourner avec sa session d'écoute ouverte.
+    /// </summary>
+    private void StopFrameCapture()
+    {
+        if (_frameCapture is { } capture)
+        {
+            _frameCapture = null;
+            using (capture)
+            {
+                capture.Stop();
+            }
+        }
     }
 
     private async Task ExportSessionAsync()
