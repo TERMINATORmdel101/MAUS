@@ -89,6 +89,7 @@ public sealed class PastelConverter : IValueConverter
             Tone t => t,
             FindingStatus status => Pastel.OfStatus(status),
             string letter => Pastel.OfLetter(letter),
+            SolidColorBrush brush => OfLogoColor(brush.Color),
             _ => Tone.Grey,
         };
         return (parameter as string) switch
@@ -98,6 +99,14 @@ public sealed class PastelConverter : IValueConverter
             _ => Pastel.Fill(tone),
         };
     }
+
+    /// <summary>Teinte pastel d'une couleur du logo (courbes des mesures en direct) ; gris pour toute autre couleur.</summary>
+    private static Tone OfLogoColor(Color color) =>
+        color == Palette.BlueColor ? Tone.Blue
+        : color == Palette.RedColor ? Tone.Rose
+        : color == Palette.GreenColor ? Tone.Mint
+        : color == Palette.GoldColor ? Tone.Sand
+        : Tone.Grey;
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();

@@ -608,7 +608,9 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type ws:ComponentCardViewModel}">
-                                            <Border Style="{StaticResource Card}" Margin="6" appearance:Motion.EnterOnLoad="True">
+                                            <Border Style="{StaticResource SoftCard}" Margin="6" appearance:Motion.EnterOnLoad="True"
+                                                    Background="{Binding Letter, Converter={StaticResource Pastel}}"
+                                                    BorderBrush="{Binding Letter, Converter={StaticResource Pastel}, ConverterParameter=Stroke}">
                                                 <DockPanel>
                                                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
                                                         <controls:LetterTile DockPanel.Dock="Left" Width="40" Height="40" Margin="0,0,12,0"
@@ -673,7 +675,9 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type ws:MetricViewModel}">
-                                            <Border Style="{StaticResource Card}" Margin="6" MinHeight="140">
+                                            <Border Style="{StaticResource SoftCard}" Margin="6" MinHeight="140"
+                                                    Background="{Binding Stroke, Converter={StaticResource Pastel}}"
+                                                    BorderBrush="{Binding Stroke, Converter={StaticResource Pastel}, ConverterParameter=Stroke}">
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Title}" Style="{StaticResource SectionLabel}" />
                                                     <TextBlock Margin="0,4,0,6" TextTrimming="CharacterEllipsis">
@@ -1426,23 +1430,29 @@
                 </StackPanel>
             </TabItem.Header>
             <DockPanel>
-                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                    <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Refresh}" Padding="12,4" Command="{Binding RefreshJournalCommand}" />
-                    <TextBlock Text="{Binding JournalSummary}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                </DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="{x:Static app:Ui.TabHistory}" Style="{StaticResource PageTitle}" Margin="0,0,0,10" />
+                <Border DockPanel.Dock="Top" Style="{StaticResource SoftCard}" Margin="0,0,0,14" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Refresh}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                Command="{Binding RefreshJournalCommand}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelLilacStroke}" />
+                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource CardIcon}" Text="&#xE81C;" Margin="0,0,14,0" VerticalAlignment="Center" Foreground="{DynamicResource PastelLilacInk}" />
+                        <TextBlock Text="{Binding JournalSummary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding Sessions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:SessionViewModel}">
-                                <Border Margin="0,0,0,8" Style="{StaticResource Card}" Padding="12,10">
+                                <Border Margin="0,0,0,10" Style="{StaticResource SoftCard}" Padding="16,12" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
                                     <StackPanel>
                                         <DockPanel>
-                                            <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.RevertSession}" Padding="12,4"
+                                            <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.RevertSession}"
+                                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelBlueStroke}"
                                                     Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
                                             <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
                                         </DockPanel>
                                         <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                        <Expander Header="{x:Static app:Ui.SessionChanges}" Margin="0,4,0,0">
+                                        <Expander Style="{StaticResource QuietExpander}" Header="{x:Static app:Ui.SessionChanges}" Margin="0,8,0,0">
                                             <ItemsControl ItemsSource="{Binding Changes}" Margin="0,6,0,0">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate DataType="{x:Type vm:SessionChangeViewModel}">
