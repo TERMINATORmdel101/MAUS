@@ -43,7 +43,7 @@ Question du porteur (30/09/2026) : « qu'est-ce qui manque pour les experts du P
 - **Effort** : moyen. **Risque** : aucun.
 - Sources : [Microsoft Learn, NVME_HEALTH_INFO_LOG](https://learn.microsoft.com/en-us/windows/win32/api/nvme/ns-nvme-nvme_health_info_log).
 
-### 5. « Les mythes de l'optimisation »
+### 5. « Les mythes de l'optimisation » — FAIT le 05/10/2026 (onglet Corrections, « Idées reçues que MAUS ne suit pas »)
 
 - **Idée** : une page qui explique, sources à l'appui, pourquoi MAUS ne propose pas certains réglages souvent conseillés sur Internet (dans l'esprit du principe 6). Chaque mythe n'entre que s'il a une source publiée.
 - **Effort** : petit à moyen (surtout de la recherche). **Risque** : aucun.

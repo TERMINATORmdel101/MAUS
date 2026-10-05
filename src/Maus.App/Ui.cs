@@ -31,6 +31,8 @@ public static class Ui
 
     public static string OpenWebPage => T("Ouvrir la page web");
 
+    public static string SeeSource => T("Voir la source");
+
     public static string FixThisTip => T("Coche la correction de ce constat et ouvre l'onglet Corrections : rien n'est modifié avant que vous cliquiez sur « Appliquer ».");
 
     public static string TestsStability => T("Stabilité");

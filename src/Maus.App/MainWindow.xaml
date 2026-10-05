@@ -645,6 +645,25 @@
                                 </StackPanel>
                             </Border>
                         </Expander>
+                        <Expander Header="{Binding MythsTitle}" Margin="0,0,0,8">
+                            <ItemsControl ItemsSource="{Binding Myths}" Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:MythViewModel}">
+                                        <Border Style="{StaticResource SoftCard}" Margin="0,0,0,8" Padding="14,10" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.SeeSource}" ToolTip="{Binding Source}"
+                                                        Command="{Binding OpenSourceCommand}" VerticalAlignment="Top" Margin="12,0,0,0" FontSize="12" Padding="12,3"
+                                                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelLilacStroke}" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Claim}" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{DynamicResource PastelLilacInk}" />
+                                                    <TextBlock Text="{Binding Truth}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
             </DockPanel>

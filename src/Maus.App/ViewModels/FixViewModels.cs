@@ -6,6 +6,22 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
+/// <summary>Une idée reçue sur l'optimisation, avec un bouton vers sa source.</summary>
+public sealed class MythViewModel(Maus.Core.Reporting.OptimizationMyth myth)
+{
+    public string Claim => myth.Claim;
+
+    public string Truth => myth.Truth;
+
+    public string Source => myth.Source.Host;
+
+    public ICommand OpenSourceCommand { get; } = new AsyncCommand(() =>
+    {
+        ShellLauncher.OpenUrl(myth.Source);
+        return Task.CompletedTask;
+    });
+}
+
 /// <summary>Une correction proposée, avec sa case à cocher.</summary>
 /// <param name="group">Titre du groupe dans la liste (le module : « M04 · Confidentialité et télémétrie »).</param>
 public sealed class ChangeViewModel(PlannedChange change, string? group = null) : ObservableObject

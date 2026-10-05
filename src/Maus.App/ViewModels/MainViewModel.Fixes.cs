@@ -25,6 +25,11 @@ public sealed partial class MainViewModel
 
     public ObservableCollection<ChangeViewModel> Changes { get; } = [];
 
+    /// <summary>Idées reçues que MAUS ne suit pas, chacune avec sa source (onglet Corrections).</summary>
+    public IReadOnlyList<MythViewModel> Myths { get; } = Maus.Core.Reporting.OptimizationMyths.All.Select(m => new MythViewModel(m)).ToList();
+
+    public string MythsTitle => T("Idées reçues que MAUS ne suit pas ({0})", Myths.Count);
+
     public IReadOnlyList<ProfileViewModel> Profiles { get; }
 
     public ICommand ApplyCommand { get; }
