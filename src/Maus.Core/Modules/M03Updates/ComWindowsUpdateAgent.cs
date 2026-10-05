@@ -46,22 +46,27 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
         }
     }
 
-    public Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken) =>
+        RunOnDedicatedThread(() => Search(criteria), timeout, cancellationToken);
+
+    /// <summary>
+    /// La recherche WUA est bloquante et ne s'annule pas : elle tourne sur un fil dédié qu'on abandonne au-delà du délai.
+    /// Aucune erreur ne sort de ce fil (elle fermerait MAUS sans trace) : toutes deviennent l'erreur de la tâche, donc un
+    /// constat « recherche impossible ».
+    /// </summary>
+    internal static Task<IReadOnlyList<PendingUpdate>> RunOnDedicatedThread(
+        Func<IReadOnlyList<PendingUpdate>> search, TimeSpan timeout, CancellationToken cancellationToken)
     {
-        // La recherche WUA est bloquante et ne s'annule pas : elle tourne sur un fil dédié qu'on abandonne au-delà du délai.
         var completion = new TaskCompletionSource<IReadOnlyList<PendingUpdate>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
             try
             {
-                completion.TrySetResult(Search(criteria));
+                completion.TrySetResult(search());
             }
-            catch (Exception ex) when (ex is COMException or RuntimeBinderException or UnauthorizedAccessException
-                or InvalidCastException or InvalidOperationException or DataSourceUnavailableException)
+            catch (Exception ex)
             {
-                completion.TrySetException(ex is RuntimeBinderException or InvalidCastException
-                    ? new InvalidOperationException(T("Réponse inattendue de l'agent Windows Update."), ex)
-                    : ex);
+                completion.TrySetException(AsSearchFailure(ex));
             }
         })
         {
@@ -71,6 +76,18 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
         thread.Start();
         return completion.Task.WaitAsync(timeout, cancellationToken);
     }
+
+    /// <summary>
+    /// Erreurs déjà décrites par le module (code COM, accès refusé, échec annoncé par l'agent) : telles quelles. Toute autre
+    /// (liaison tardive, conversion, et ce que l'interop COM produit pour E_INVALIDARG, E_NOTIMPL ou E_POINTER :
+    /// <see cref="ArgumentException"/>, <see cref="NotImplementedException"/>, <see cref="NullReferenceException"/>…) :
+    /// « réponse inattendue ».
+    /// </summary>
+    internal static Exception AsSearchFailure(Exception exception) =>
+        exception is COMException or UnauthorizedAccessException or MausAccessDeniedException
+            or InvalidOperationException or DataSourceUnavailableException
+            ? exception
+            : new InvalidOperationException(T("Réponse inattendue de l'agent Windows Update."), exception);
 
     private static List<PendingUpdate> Search(string criteria)
     {

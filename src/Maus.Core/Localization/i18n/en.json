@@ -3336,5 +3336,11 @@
   "fichier": "file",
   "fichiers": "files",
   "{0} fois": "{0} time(s)",
-  "{0}  {1:g}  {2}  ({3} valeur(s))": "{0}  {1:g}  {2}  ({3} value(s))"
+  "{0}  {1:g}  {2}  ({3} valeur(s))": "{0}  {1:g}  {2}  ({3} value(s))",
+  "La langue n'a pas pu être changée : {0}": "The language could not be changed: {0}",
+  "Votre choix n'a pas pu être appliqué : {0}": "Your choice could not be applied: {0}",
+  "L'état de l'audit automatique n'a pas pu être lu : {0}": "The state of the automatic audit could not be read: {0}",
+  "L'audit automatique n'a pas pu être modifié : {0}": "The automatic audit could not be changed: {0}",
+  "Le bilan du relevé n'a pas pu être établi : {0}": "The recording summary could not be produced: {0}",
+  "Cette partie de l'atelier n'a pas pu être actualisée : {0}": "This part of the workshop could not be refreshed: {0}"
 }

@@ -11,62 +11,56 @@ public static partial class SingleInstance
     /// <summary>Autres processus « MAUS » (l'interface ; l'outil en ligne de commande s'appelle « maus » et n'en fait pas partie).</summary>
     public static int OtherInterfaceProcesses()
     {
-        using var current = Process.GetCurrentProcess();
-        var others = 0;
-        foreach (var process in Process.GetProcessesByName(current.ProcessName))
+        var others = OtherInterfaces();
+        foreach (var process in others)
         {
-            using (process)
-            {
-                if (process.Id != current.Id && string.Equals(process.ProcessName, current.ProcessName, StringComparison.Ordinal))
-                {
-                    others++;
-                }
-            }
+            process.Dispose();
         }
 
-        return others;
+        return others.Count;
     }
 
     /// <summary>Ramène devant la fenêtre de l'autre MAUS ; <c>false</c> s'il n'en a aucune (MAUS bloqué, resté sans fenêtre).</summary>
     public static bool BringExistingToFront()
     {
-        using var current = Process.GetCurrentProcess();
-        foreach (var process in Process.GetProcessesByName(current.ProcessName))
+        var found = false;
+        foreach (var process in OtherInterfaces())
         {
             using (process)
             {
-                if (process.Id == current.Id || process.MainWindowHandle == 0)
+                var window = MainWindowOf(process);
+                if (found || window == 0)
                 {
                     continue;
                 }
 
-                if (IsIconic(process.MainWindowHandle))
+                if (IsIconic(window))
                 {
-                    ShowWindow(process.MainWindowHandle, RestoreCommand);
+                    ShowWindow(window, RestoreCommand);
                 }
 
-                SetForegroundWindow(process.MainWindowHandle);
-                return true;
+                SetForegroundWindow(window);
+                found = true;
             }
         }
 
-        return false;
+        return found;
     }
 
     /// <summary>
     /// Ferme les autres MAUS restés sans fenêtre (à la demande de l'utilisateur) et attend leur fin, 10 secondes au plus.
-    /// Un MAUS qui a une fenêtre n'est jamais fermé ici.
+    /// Un MAUS qui a une fenêtre n'est jamais fermé ici, ni l'outil en ligne de commande « maus » (une correction ou une
+    /// annulation peut y être en cours, dans une console qui n'appartient pas à son processus).
     /// </summary>
     /// <returns>Le nombre de MAUS fermés.</returns>
     public static int CloseWindowlessOthers()
     {
-        using var current = Process.GetCurrentProcess();
         var closed = 0;
-        foreach (var process in Process.GetProcessesByName(current.ProcessName))
+        foreach (var process in OtherInterfaces())
         {
             using (process)
             {
-                if (process.Id == current.Id || process.MainWindowHandle != 0)
+                if (MainWindowOf(process) != 0)
                 {
                     continue;
                 }
@@ -85,6 +79,47 @@ public static partial class SingleInstance
         }
 
         return closed;
+    }
+
+    /// <summary>
+    /// Vrai si le processus <paramref name="id"/> / <paramref name="name"/> est un autre MAUS avec interface. Windows ne
+    /// distingue pas les majuscules dans les noms de programmes : chercher « MAUS » renvoie aussi « maus », l'outil en ligne
+    /// de commande, que seule une comparaison exacte écarte.
+    /// </summary>
+    internal static bool IsOtherInterface(int id, string name, int currentId, string currentName) =>
+        id != currentId && string.Equals(name, currentName, StringComparison.Ordinal);
+
+    /// <summary>Les autres MAUS avec interface ; à libérer par l'appelant.</summary>
+    private static List<Process> OtherInterfaces()
+    {
+        using var current = Process.GetCurrentProcess();
+        var others = new List<Process>();
+        foreach (var process in Process.GetProcessesByName(current.ProcessName))
+        {
+            if (IsOtherInterface(process.Id, process.ProcessName, current.Id, current.ProcessName))
+            {
+                others.Add(process);
+            }
+            else
+            {
+                process.Dispose();
+            }
+        }
+
+        return others;
+    }
+
+    /// <summary>Fenêtre principale du processus, ou 0 s'il n'en a pas (ou s'il vient de se terminer).</summary>
+    private static nint MainWindowOf(Process process)
+    {
+        try
+        {
+            return process.MainWindowHandle;
+        }
+        catch (InvalidOperationException)
+        {
+            return 0;
+        }
     }
 
     [LibraryImport("user32.dll")]

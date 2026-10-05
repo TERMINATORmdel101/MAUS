@@ -1,4 +1,5 @@
 using Maus.Core;
+using Maus.Core.Diagnostics;
 using Maus.Core.Fixes;
 using Maus.Core.Preferences;
 using static Maus.Core.Localization.Texts;
@@ -49,7 +50,7 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            _ = ChangeLanguageAsync(value.Value);
+            ChangeLanguageAsync(value.Value).Forget("changement de langue", ex => StatusText = T("La langue n'a pas pu être changée : {0}", ex.Message));
         }
     }
 
@@ -86,7 +87,7 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            _ = ChangeGameBarAsync(previous, value);
+            ChangeGameBarAsync(previous, value).Forget("choix du profil Game Bar", ReportChoiceError);
         }
     }
 
@@ -100,7 +101,7 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            _ = UpdatePreferencesAsync(p => p with { LaptopPower = value.Value }, "M05");
+            UpdatePreferencesAsync(p => p with { LaptopPower = value.Value }, "M05").Forget("choix de l'alimentation du portable", ReportChoiceError);
         }
     }
 
@@ -119,8 +120,11 @@ public sealed partial class MainViewModel
             _loadingChoices = false;
         }
 
-        _ = LoadScheduleAsync();
+        LoadScheduleAsync().Forget("audit hebdomadaire : lecture", ex => StatusText = T("L'état de l'audit automatique n'a pas pu être lu : {0}", ex.Message));
     }
+
+    /// <summary>Erreur imprévue pendant l'application d'un choix (la trace est déjà dans le journal).</summary>
+    private void ReportChoiceError(Exception ex) => StatusText = T("Votre choix n'a pas pu être appliqué : {0}", ex.Message);
 
     private async Task ChangeGameBarAsync(ChoiceOption<int?> previous, ChoiceOption<int?> chosen)
     {

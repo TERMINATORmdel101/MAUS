@@ -3336,5 +3336,11 @@
   "fichier": "archivo",
   "fichiers": "archivos",
   "{0} fois": "{0} vez/veces",
-  "{0}  {1:g}  {2}  ({3} valeur(s))": "{0}  {1:g}  {2}  ({3} valor(es))"
+  "{0}  {1:g}  {2}  ({3} valeur(s))": "{0}  {1:g}  {2}  ({3} valor(es))",
+  "La langue n'a pas pu être changée : {0}": "No se pudo cambiar el idioma: {0}",
+  "Votre choix n'a pas pu être appliqué : {0}": "No se pudo aplicar su elección: {0}",
+  "L'état de l'audit automatique n'a pas pu être lu : {0}": "No se pudo leer el estado de la auditoría automática: {0}",
+  "L'audit automatique n'a pas pu être modifié : {0}": "No se pudo modificar la auditoría automática: {0}",
+  "Le bilan du relevé n'a pas pu être établi : {0}": "No se pudo elaborar el balance del registro: {0}",
+  "Cette partie de l'atelier n'a pas pu être actualisée : {0}": "No se pudo actualizar esta parte del taller: {0}"
 }

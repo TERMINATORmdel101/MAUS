@@ -60,12 +60,35 @@ public static class TaskSchedulerClient
         {
             // schtasks attend un fichier UTF-16, comme l'annonce l'en-tête XML.
             await File.WriteAllTextAsync(path, xml, Encoding.Unicode);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Dossier temporaire plein, protégé ou inaccessible : aucune tâche n'est créée, et on le dit.
+            DeleteQuietly(path);
+            return ex.Message;
+        }
+
+        try
+        {
             var (code, output) = await RunAsync(ScheduledAudit.CreateArguments(path));
             return code == 0 ? null : output.Trim();
         }
         finally
         {
+            DeleteQuietly(path);
+        }
+    }
+
+    /// <summary>Retire le fichier XML temporaire ; s'il résiste (antivirus qui l'analyse), il reste dans le dossier temporaire.</summary>
+    private static void DeleteQuietly(string path)
+    {
+        try
+        {
             File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Maus.Core.Diagnostics.Breadcrumbs.Add("audit hebdomadaire : fichier temporaire non supprimé (" + ex.GetType().Name + ")");
         }
     }
 

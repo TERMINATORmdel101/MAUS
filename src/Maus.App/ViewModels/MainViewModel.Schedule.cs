@@ -1,3 +1,4 @@
+using Maus.Core.Diagnostics;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
@@ -31,7 +32,7 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            _ = ChangeScheduleAsync(value);
+            ChangeScheduleAsync(value).Forget("audit hebdomadaire : changement", ex => StatusText = T("L'audit automatique n'a pas pu être modifié : {0}", ex.Message));
         }
     }
 
@@ -60,7 +61,6 @@ public sealed partial class MainViewModel
 
     private async Task ChangeScheduleAsync(ChoiceOption<DayOfWeek?> choice)
     {
-        string? error;
         if (choice.Value is { } day)
         {
             if (TaskSchedulerClient.Refusal() is { } refusal)
@@ -77,16 +77,30 @@ public sealed partial class MainViewModel
                 OnPropertyChanged(nameof(ScheduleChoice));
                 return;
             }
-
-            error = await TaskSchedulerClient.CreateAsync(day);
-            StatusText = error is null ? T("Audit automatique programmé (« {0} »).", choice.Label) : T("La tâche n'a pas pu être créée : {0}", error);
         }
-        else
+
+        try
         {
-            error = await TaskSchedulerClient.DeleteAsync();
-            StatusText = error is null ? T("Audit automatique arrêté : la tâche planifiée a été retirée.") : T("La tâche n'a pas pu être retirée : {0}", error);
+            if (choice.Value is { } chosenDay)
+            {
+                var error = await TaskSchedulerClient.CreateAsync(chosenDay);
+                StatusText = error is null ? T("Audit automatique programmé (« {0} »).", choice.Label) : T("La tâche n'a pas pu être créée : {0}", error);
+            }
+            else
+            {
+                var error = await TaskSchedulerClient.DeleteAsync();
+                StatusText = error is null ? T("Audit automatique arrêté : la tâche planifiée a été retirée.") : T("La tâche n'a pas pu être retirée : {0}", error);
+            }
         }
-
-        await LoadScheduleAsync();
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException
+            or System.ComponentModel.Win32Exception or System.Security.SecurityException)
+        {
+            StatusText = T("L'audit automatique n'a pas pu être modifié : {0}", ex.Message);
+        }
+        finally
+        {
+            // Toujours l'état réel : la liste ne doit jamais afficher un jour pour lequel aucune tâche n'existe.
+            await LoadScheduleAsync();
+        }
     }
 }
