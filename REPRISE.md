@@ -2,6 +2,26 @@
 
 Fichier écrit à la fin des sessions cloud du 25/09/2026 pour reprendre le travail **sur le PC Windows du porteur**. À lire après `CLAUDE.md` (qui reste la mémoire complète du projet). Le mettre à jour, ou le vider, une fois la reprise faite.
 
+## À FAIRE EN PREMIER : reprise locale du 05/10/2026
+
+Le porteur repasse en local (Claude Code installé sur son nouveau PC). Branche de travail : **`claude/youthful-ride-ivazlw`** (sessions cloud du 03 au 05/10), à récupérer par `git fetch origin` puis `git checkout claude/youthful-ride-ivazlw`. Elle contient, par-dessus `main` :
+- défaut 2 (module en échec = faux vert) : repris de `8fd44d6`, relu, testé ;
+- défaut 1 (`ThermalWatchdog`) : terminé et testé. **À dire au porteur** : l'agent a retiré les alarmes « carte graphique très chaude » (90 °C, carte sans seuil NVML) et « zone thermique » (95 °C), faute de seuil publié (principe 7) ; seuls le seuil de la carte, celui du processeur et la mémoire pleine déclenchent encore une alarme ;
+- défauts 3 et 6 : **en cours**, commit `4b10b8b` marqué « NON vérifié ».
+
+Ordre de travail :
+1. **Finir les défauts 3 et 6** : supprimer les champs `French` devenus inutiles (M02 `WindowsHealthModule`, M10 `MemoryModule`, M11 `HardwareHealthModule`, M12 `StartupAppsModule`, M14 `DisplayModule`) ; traduire `{0:0.0} Go`, `{0:0.0} Go/s` et `{0:0.##} Go` dans `en.json` et `es.json` (« GB ») ; tests : dates et nombres en anglais (`Texts.Use("en")` dans la collection `LanguageSwitch` ; `WindowsUpdateModuleTests.Detect` et `FakeUpdateAgent` sont désormais internes pour cela), `OemEncoding.Get(850)` (octet 0x82 = « é »), CSV au format régional (`Texts.RegionalCulture`) ; compiler (0 avertissement) et tester.
+2. **Défauts 4 et 5** : branche `worktree-wf_bb647255-789-4` (`8968aab`, NON vérifié) : filet de sécurité (`Diagnostics/CrashLog`, `BackgroundTasks`), un seul MAUS (`SingleInstance`), M03 `ComWindowsUpdateAgent`. Conflits attendus dans `App.xaml.cs`, `TaskSchedulerClient.cs` et les traductions : fusionner les JSON clé par clé (ajouts et retraits de la branche), jamais à la main ligne à ligne.
+3. **Défaut 7** : branche `worktree-wf_bb647255-789-5` (`471d279`, NON vérifié, **sans tests**) : `Platform/AtomicFile`, `JournalStore`, `PreferencesStore`, `BenchmarkHistory`, `MemorySnapshots`. Écrire les tests (fichier tronqué, écriture interrompue, fichier illisible).
+4. **Version 0.5.3** : `Directory.Build.props`, `AppVersionTests`, `CHANGELOG.md`.
+5. **Demandes d'interface du porteur (05/10/2026)**, après la 0.5.3. C'est une modification moyenne, donc la version **0.6.0** :
+   - **Accueil** plus simple ; une fois l'audit terminé, proposer directement de corriger.
+   - **Constats** : ne pas montrer ce qui va bien ; montrer d'abord les plus importants (ce qui pose problème), le reste seulement à la demande.
+   - **Corrections** : alléger la page, séparer les zones par de petites barres.
+   - **Atelier > Tests** : bien démarquer visuellement chaque partie.
+   - **Tout le programme** : beaucoup plus de couleurs pastel (thèmes clair et sombre, textes toujours lisibles).
+   Vérifier chaque écran sur le PC (copie de test `asInvoker`, voir « Tests d'interface » dans `CLAUDE.md`) ; les scripts `_smoke` sont dans `Documents\MAUS-ancien\.worktrees\_smoke` (chemins `C:\Users\CARO` à adapter).
+
 ## Nouveau PC (03/10/2026)
 
 L'ancien Windows (`C:\Users\CARO`) est perdu. Les chemins `C:\Users\CARO\Documents\MAUS\…` ci-dessous deviennent `C:\Users\T-800-MODEL-101\Documents\MAUS-ancien\…` (ancien dossier récupéré) ; le dépôt de travail est un clone neuf dans `C:\Users\T-800-MODEL-101\Documents\MAUS`. Les branches des agents de la 0.5.3 sont maintenant **sur GitHub** (`git fetch origin` puis `git checkout worktree-wf_bb647255-789-2`, etc.). `scan.md` et `wf-053.js` : `MAUS-ancien\.worktrees\_smoke\` ou `Documents\MAUS-notes-sauvegarde.zip`. À réinstaller au besoin : Inno Setup 7.1.0 (installateur ; GitHub Actions le fabrique aussi), Claude Code.
