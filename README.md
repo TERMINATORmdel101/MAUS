@@ -32,7 +32,7 @@
 
 ## État du projet
 
-Version actuelle : **0.5.2** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
+Version actuelle : **0.5.3** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
 
 | Version | Contenu | État |
 |---|---|---|
@@ -44,6 +44,7 @@ Version actuelle : **0.5.2** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a c
 | 4.0.0 | Sept charges pour les tests du processeur (dont AVX2 + FMA et AVX-512), programme complet de validation du Curve Optimizer (cœur par cœur puis transitoires, 1 h ou 4 h), température du processeur pendant les tests, plus de fausse alerte PCIe sur portable, anti-veille pendant les tests | Codée et relue ; programme à essayer sur un vrai Ryzen |
 | 0.4.2 / 0.5.1 | Score de santé selon la gravité (« Pourquoi ce score ? »), liste complète des pilotes, actions sur le pilote de la carte graphique (redémarrer, retirer, sauvegarder, supprimer avec point de restauration), pilotes vérifiés dans l'audit de base | Testées sur le PC du porteur ; actions sur le pilote à essayer dans Windows Sandbox |
 | 0.5.2 | Neuf corrections (tests arrêtés proprement, corrections interrompues annulables, rapport HTML sans nom d'utilisateur…), bouton « Ouvrir dans Windows » sur les constats, installateur | Testée sur le PC du porteur |
+| 0.5.3 | Sept défauts corrigés : arrêt des tests longs si les températures ne sont plus lues, score dit « partiel » quand un module échoue, dates et nombres dans la langue choisie, filet de sécurité sur tous les fils, un seul MAUS à la fois, fichiers de MAUS jamais écrasés après une lecture ratée | Compilée et testée (1 421 tests) ; interface à vérifier sur le PC du porteur |
 | Suite | Écran et HDR, signature du code, publication sur le Microsoft Store | À venir |
 
 **Aucune donnée inventée.** Chaque seuil (température, tension) cite sa source publiée dans `src/Maus.Core/Catalog/hw-safety-limits.json`. Sans source, MAUS n'affiche pas de seuil et ne déclenche pas d'alarme.

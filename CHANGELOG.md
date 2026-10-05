@@ -2,6 +2,17 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.5.3 — 05/10/2026
+
+Corrections (règle du porteur : dernier chiffre). Sept défauts trouvés par une deuxième analyse complète, acceptés par le porteur (« OK pour TOUS »), corrigés puis relus.
+
+- **Tests longs plus prudents** : pendant un test du processeur, de la mémoire ou de la carte graphique, MAUS s'arrête de lui-même si ses mesures ou la température cessent de répondre (sans elles, l'arrêt automatique en cas de surchauffe ne peut plus fonctionner). Les alarmes « carte graphique très chaude » (90 °C) et « zone thermique » (95 °C) sont retirées, faute de seuil publié (principe « aucune donnée inventée ») : seuls le seuil donné par la carte, celui du processeur et la mémoire pleine déclenchent encore une alarme.
+- **Score honnête quand un module échoue** : un module en erreur ou en délai dépassé était compté comme « tout va bien ». Le score est maintenant dit « partiel », n'est pas gardé dans l'historique, et la famille concernée est marquée « non vérifiée ». Même chose pour les corrections dont l'effet n'a pas pu être relu.
+- **Dates et nombres dans la langue choisie** : dates courtes, virgule ou point, « Go » ou « GB » suivent la langue de MAUS (avant : format français figé partout). Les exports CSV suivent le format régional de Windows (séparateur, virgule décimale), celui qu'attend Excel. Les messages des outils de Windows (schtasks, powercfg…) sont lus dans la bonne page de code : plus d'accents cassés.
+- **Filet de sécurité complet** : une erreur sur un autre fil que celui de la fenêtre, ou dans une tâche lancée en arrière-plan, laisse maintenant une trace dans `%LOCALAPPDATA%\MAUS\logs` et un message sur place, au lieu de fermer MAUS sans explication ou de disparaître. La recherche Windows Update ne peut plus faire tomber MAUS (réponse inattendue = constat « indéterminé »).
+- **Un seul MAUS à la fois, sans trou** : « Ouvrir » après l'audit hebdomadaire ramène le MAUS déjà ouvert au lieu d'en ouvrir un second, et montre les avertissements s'ils n'ont jamais été acceptés. L'outil en ligne de commande `maus` n'est jamais fermé par l'application.
+- **Vos fichiers jamais écrasés par erreur** : un fichier de MAUS momentanément illisible (ouvert par un antivirus, une sauvegarde) était pris pour un fichier vide, puis réécrit : choix « voulus », accord des avertissements, historique des scores ou séance du journal pouvaient être perdus. MAUS retente maintenant la lecture, garde les choix en mémoire sans toucher au fichier s'il reste illisible, et garde une copie (`….illisible-AAAAMMJJ-HHMMSS`) d'un fichier abîmé avant de le remplacer. Toutes les écritures sont « tout ou rien » : une coupure laisse l'ancien fichier ou le nouveau, jamais un fichier à moitié écrit.
+
 ## 0.5.2 — 29/09/2026
 
 Corrections et petites améliorations (règle du porteur : dernier chiffre). Trouvées par une analyse complète du logiciel (trois angles : vitesse, solidité, clarté pour l'utilisateur), chaque correction vérifiée par un agent chargé de la réfuter avant d'être faite.
