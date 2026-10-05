@@ -103,9 +103,25 @@ public sealed class FindingViewModel
 
     public bool HasValues => finding.Current is not null;
 
-    public string Explanation => finding.Explanation;
+    /// <summary>Explication, les adresses web réduites au nom du site (bouton « Ouvrir la page web » pour l'adresse complète).</summary>
+    public string Explanation => LinkText.Shorten(finding.Explanation)!;
 
-    public string? Advice => finding.Advice is null ? null : $"→ {finding.Advice}";
+    public string? Advice => finding.Advice is null ? null : $"→ {LinkText.Shorten(finding.Advice)}";
+
+    /// <summary>Première adresse web du conseil (ou de l'explication) : bouton « Ouvrir la page web ».</summary>
+    public Uri? Link => LinkText.FirstLink(finding.Advice) ?? LinkText.FirstLink(finding.Explanation);
+
+    public bool HasLink => Link is not null;
+
+    public ICommand OpenLinkCommand => new AsyncCommand(() =>
+    {
+        if (Link is { } link)
+        {
+            ShellLauncher.OpenUrl(link);
+        }
+
+        return Task.CompletedTask;
+    });
 
     public bool HasAdvice => finding.Advice is not null;
 }

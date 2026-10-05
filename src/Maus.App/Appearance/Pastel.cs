@@ -21,9 +21,12 @@ public enum Tone
 /// garde la couleur du thème, très contrastée sur tous ces fonds.
 /// </summary>
 /// <remarks>
-/// Les pinceaux restent les mêmes objets toute la vie de MAUS : changer de thème change leur couleur, et tout ce qui les
-/// affiche (ressources dynamiques comme convertisseurs) suit à chaud. Ils ne servent que sur le fil de l'interface.
-/// En contraste élevé, Windows impose ses couleurs : fond de fenêtre et texte de fenêtre.
+/// Deux usages, deux sortes de pinceaux. Les pinceaux rendus par <see cref="Fill"/>, <see cref="Stroke"/> et
+/// <see cref="Ink"/> (convertisseur <c>Pastel</c>) restent les mêmes objets toute la vie de MAUS : changer de thème change
+/// leur couleur et l'affichage suit à chaud. Ils ne doivent jamais entrer dans un dictionnaire de ressources de
+/// l'application, qui les figerait (WPF) : la recoloration échouerait, et les cartes resteraient claires en thème sombre
+/// (signalé par le porteur le 05/10/2026). Les ressources <c>Pastel…</c> reçoivent donc des copies figées, remplacées à
+/// chaque changement de thème (les <c>DynamicResource</c> suivent). En contraste élevé, Windows impose ses couleurs.
 /// </remarks>
 public static class Pastel
 {
@@ -79,12 +82,12 @@ public static class Pastel
         Use(dark, highContrast);
         foreach (var (tone, (fill, stroke, ink)) in Brushes)
         {
-            resources["Pastel" + tone] = fill;
-            resources["Pastel" + tone + "Stroke"] = stroke;
-            resources["Pastel" + tone + "Ink"] = ink;
+            resources["Pastel" + tone] = Copy(fill);
+            resources["Pastel" + tone + "Stroke"] = Copy(stroke);
+            resources["Pastel" + tone + "Ink"] = Copy(ink);
         }
 
-        resources["PastelPage"] = Page;
+        resources["PastelPage"] = Copy(Page);
     }
 
     private static void Use(bool dark, bool highContrast)
@@ -106,6 +109,14 @@ public static class Pastel
         }
 
         Page.Color = highContrast ? SystemColors.WindowColor : dark ? System.Windows.Media.Colors.Transparent : Rgb(0xF7F8FC);
+    }
+
+    /// <summary>Copie figée, pour les ressources (le pinceau d'origine reste recolorable).</summary>
+    private static SolidColorBrush Copy(SolidColorBrush brush)
+    {
+        var copy = new SolidColorBrush(brush.Color);
+        copy.Freeze();
+        return copy;
     }
 
     private static Color Rgb(uint rgb) => Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);

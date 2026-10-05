@@ -43,6 +43,9 @@
                         <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.FixThis}" Padding="14,4" FontSize="12" Margin="0,0,6,0"
                                 ToolTip="{x:Static app:Ui.FixThisTip}" Command="{Binding FixCommand}"
                                 Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenWebPage}" Padding="12,3" FontSize="12" Margin="0,0,6,0"
+                                ToolTip="{Binding Link, Mode=OneWay}" Command="{Binding OpenLinkCommand}"
+                                Visibility="{Binding HasLink, Converter={StaticResource BoolToVisibility}}" />
                         <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenInWindows}" Padding="12,3" FontSize="12" Margin="0,0,6,0"
                                 Command="{Binding OpenSettingsPageCommand}"
                                 Visibility="{Binding HasSettingsPage, Converter={StaticResource BoolToVisibility}}" />
@@ -153,8 +156,18 @@
                                                         Stroke="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                         <TextBlock Text="{Binding ScoreText}" FontSize="46" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                        <TextBlock Text="{Binding ScoreWord}" FontWeight="SemiBold" HorizontalAlignment="Center"
-                                                   Foreground="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
+                                        <!-- Avant le premier audit : couleur du texte du thème (suit un changement de thème) ; ensuite, couleur du score. -->
+                                        <TextBlock Text="{Binding ScoreWord}" FontWeight="SemiBold" HorizontalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasScore, Mode=OneWay}" Value="True">
+                                                            <Setter Property="Foreground" Value="{Binding Score, Converter={StaticResource ScoreToBrush}}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <TextBlock Text="{x:Static app:Ui.HealthCaption}" FontSize="11" Opacity="{DynamicResource MutedOpacity}" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </Grid>
