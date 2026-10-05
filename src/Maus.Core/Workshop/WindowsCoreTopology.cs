@@ -79,6 +79,13 @@ public sealed unsafe partial class WindowsCoreTopology : ICoreTopology
 /// Trace du test cœur par cœur dans %LOCALAPPDATA%\MAUS, écrite directement sur le disque (sans cache) pour survivre à un gel
 /// ou à une coupure : si elle est encore là au lancement suivant, le test s'est interrompu brutalement sur ce cœur.
 /// </summary>
+/// <remarks>
+/// Écriture « tout ou rien » (<see cref="Platform.AtomicFile.WriteAllText"/>) : la nouvelle trace est écrite sans cache dans un
+/// fichier temporaire, puis remplace l'ancienne par MoveFileEx avec MOVEFILE_WRITE_THROUGH, qui ne rend la main qu'une fois le
+/// remplacement fait sur le disque. <see cref="Save"/> est appelé avant de lancer la charge sur le cœur suivant : un gel pendant
+/// l'écriture laisse l'ancienne trace, qui désigne alors le dernier cœur réellement testé ; un gel après laisse la nouvelle.
+/// Jamais un fichier vide (un fichier vidé puis réécrit en laissait un si le PC gelait entre les deux).
+/// </remarks>
 public sealed class FileCoreTestCheckpoint(string path) : ICoreTestCheckpoint
 {
     public static FileCoreTestCheckpoint CreateDefault() =>
@@ -101,13 +108,13 @@ public sealed class FileCoreTestCheckpoint(string path) : ICoreTestCheckpoint
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough);
-            JsonSerializer.Serialize(stream, state);
-            stream.Flush(flushToDisk: true);
+            Platform.AtomicFile.WriteAllText(path, JsonSerializer.Serialize(state));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Sans trace, un gel ne sera simplement pas expliqué au lancement suivant.
+            // Trace non mise à jour : l'ancienne désignerait un autre cœur que celui qui va être testé. Mieux vaut aucune
+            // explication au lancement suivant qu'une fausse.
+            Clear();
         }
     }
 

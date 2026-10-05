@@ -58,7 +58,7 @@ public partial class App : Application
         SplashScreen? splash = new SplashScreen(typeof(App).Assembly, "Assets/splash.png");
         splash.Show(autoClose: false);
 
-        if (preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version)
+        if (MustAskDisclaimer(preferences))
         {
             splash.Close(TimeSpan.Zero);
             splash = null;
@@ -91,6 +91,14 @@ public partial class App : Application
         s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
         return first || TakeOverFromWindowlessInstance();
     }
+
+    /// <summary>
+    /// Avertissements à montrer : jamais acceptés, ou texte changé depuis. Un fichier des choix présent mais momentanément
+    /// illisible n'est pas un premier lancement : la fenêtre ne revient pas pour autant.
+    /// </summary>
+    private static bool MustAskDisclaimer(UserPreferences preferences) =>
+        preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version
+        && FilePreferencesStore.CreateDefault().State != PreferencesFileState.Unavailable;
 
     /// <summary>
     /// Avertissements au premier lancement (et après chaque changement de fond du texte).
@@ -259,7 +267,7 @@ public partial class App : Application
             return;
         }
 
-        if (FilePreferencesStore.CreateDefault().Load().DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version && !AskDisclaimer())
+        if (MustAskDisclaimer(FilePreferencesStore.CreateDefault().Load()) && !AskDisclaimer())
         {
             Shutdown(0);
             return;

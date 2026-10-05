@@ -38,6 +38,12 @@ public sealed partial class MainViewModel : ObservableObject
         _gameBarChoice = GameBarOptions[0];
         _laptopChoice = LaptopOptions[0];
         LoadHealthTrend();
+
+        // Fichier des choix illisible ou abîmé au démarrage : l'utilisateur le sait dès l'ouverture.
+        if (FilePreferencesStore.CreateDefault().Notice is { } notice)
+        {
+            _statusText = notice;
+        }
     }
 
     /// <summary>Demande de confirmation (titre, message) ; remplaçable pour les tests.</summary>

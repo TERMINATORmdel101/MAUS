@@ -138,7 +138,13 @@ internal static class FixCommands
 
     public static int PrintJournal(IJournalStore journal, TextWriter output)
     {
-        var sessions = journal.List();
+        var listing = journal.Browse();
+        var sessions = listing.Sessions;
+        if (listing.UnreadableNotice is { } notice)
+        {
+            output.WriteLine(notice);
+        }
+
         if (sessions.Count == 0)
         {
             output.WriteLine(T("Journal vide : MAUS n'a encore rien modifié sur ce PC."));

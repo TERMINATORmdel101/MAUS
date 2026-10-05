@@ -26,6 +26,10 @@ public sealed class WindowsDirectoryProtector : IDirectoryProtector
         Protect(directory);
     }
 
+    /// <exception cref="IOException">
+    /// Propriétaire momentanément illisible : ce n'est pas la preuve d'un fichier douteux, l'appelant retente puis laisse le
+    /// fichier intact (<see cref="Platform.AtomicFile.ReadText"/>), au lieu de le prendre pour un fichier à remplacer.
+    /// </exception>
     public bool IsTrusted(string file)
     {
         try
@@ -39,8 +43,9 @@ public sealed class WindowsDirectoryProtector : IDirectoryProtector
             var owner = info.GetAccessControl().GetOwner(typeof(SecurityIdentifier));
             return owner is not null && (owner.Equals(System) || owner.Equals(Administrators));
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or PrivilegeNotHeldException)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or PrivilegeNotHeldException)
         {
+            // Propriétaire illisible même pour un administrateur : fichier douteux, ignoré.
             return false;
         }
     }

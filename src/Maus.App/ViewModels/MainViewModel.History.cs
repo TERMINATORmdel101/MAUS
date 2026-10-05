@@ -14,20 +14,33 @@ public sealed partial class MainViewModel
 
     public ICommand RefreshJournalCommand { get; }
 
-    public string JournalSummary => Sessions.Count == 0
-        ? T("Aucune séance de corrections : MAUS n'a encore rien modifié sur ce PC.")
-        : T("Chaque séance, ou chaque correction, peut être annulée : MAUS remet les valeurs d'origine enregistrées avant d'écrire. Une valeur que vous (ou Windows) avez changée depuis est laissée telle quelle.");
+    public string JournalSummary
+    {
+        get
+        {
+            var summary = Sessions.Count == 0 && _journalNotice is null
+                ? T("Aucune séance de corrections : MAUS n'a encore rien modifié sur ce PC.")
+                : T("Chaque séance, ou chaque correction, peut être annulée : MAUS remet les valeurs d'origine enregistrées avant d'écrire. Une valeur que vous (ou Windows) avez changée depuis est laissée telle quelle.");
+            return _journalNotice is null ? summary : summary + "\n" + _journalNotice;
+        }
+    }
+
+    /// <summary>Séances du journal qui n'ont pas pu être lues (laissées intactes), ou journal illisible.</summary>
+    private string? _journalNotice;
 
     private async Task RefreshJournalAsync()
     {
         IReadOnlyList<JournalSession> sessions;
         try
         {
-            sessions = await Task.Run(() => FileJournalStore.CreateDefault().List());
+            var listing = await Task.Run(() => FileJournalStore.CreateDefault().Browse());
+            sessions = listing.Sessions;
+            _journalNotice = listing.UnreadableNotice;
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
             sessions = [];
+            _journalNotice = T("Le journal des corrections n'a pas pu être lu : {0}", ex.Message);
         }
 
         Sessions.Clear();
