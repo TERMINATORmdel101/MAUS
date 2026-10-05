@@ -13,6 +13,44 @@
     <Window.Resources>
         <!-- Tous les textes de la fenêtre prennent la couleur de texte du thème (blanc en thème sombre), sauf couleur voulue. -->
         <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
+
+        <!-- Carte d'un constat (onglet Constats, par importance comme par module) : fond pastel et bord de la couleur du verdict. -->
+        <DataTemplate x:Key="FindingCard" DataType="{x:Type vm:FindingViewModel}">
+            <Border appearance:Motion.EnterOnLoad="True" Margin="0,0,0,10" Padding="16,12" CornerRadius="12" BorderThickness="5,1,1,1"
+                    Background="{Binding Status, Converter={StaticResource Pastel}}"
+                    BorderBrush="{Binding Status, Converter={StaticResource StatusToBrush}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Module}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,2"
+                               Foreground="{Binding Status, Converter={StaticResource Pastel}, ConverterParameter=Ink}"
+                               Visibility="{Binding HasModule, Converter={StaticResource BoolToVisibility}}" />
+                    <DockPanel>
+                        <Border DockPanel.Dock="Right" CornerRadius="10" Padding="8,1" Margin="8,0,0,0" VerticalAlignment="Top" BorderThickness="1"
+                                BorderBrush="{Binding Status, Converter={StaticResource Pastel}, ConverterParameter=Ink}">
+                            <TextBlock Text="{Binding StatusLabel}" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{Binding Status, Converter={StaticResource Pastel}, ConverterParameter=Ink}" />
+                        </Border>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Values}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
+                               Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenInWindows}" Padding="12,3" FontSize="12" Margin="0,0,6,0"
+                                Command="{Binding OpenSettingsPageCommand}"
+                                Visibility="{Binding HasSettingsPage, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Wanted}" Padding="12,3" FontSize="12"
+                                ToolTip="{x:Static app:Ui.WantedTip}"
+                                Command="{Binding AcknowledgeCommand}"
+                                Visibility="{Binding CanAcknowledge, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ReportAgain}" Padding="12,3" FontSize="12"
+                                Command="{Binding UnacknowledgeCommand}"
+                                Visibility="{Binding IsAcknowledged, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
     <Window.DataContext>
         <vm:MainViewModel />
@@ -271,75 +309,93 @@
                 </StackPanel>
             </TabItem.Header>
             <DockPanel>
-            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14" LastChildFill="True">
-                <Button DockPanel.Dock="Left" Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" />
-                <ProgressBar DockPanel.Dock="Right" Width="180" Height="6" Margin="12,0,0,0" VerticalAlignment="Center"
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12" LastChildFill="True">
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="{Binding FixNowLabel}" Command="{Binding GoToCommand}" CommandParameter="2" Margin="12,0,0,0"
+                        Visibility="{Binding HasProposedChanges, Converter={StaticResource BoolToVisibility}}" />
+                <Button DockPanel.Dock="Left" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SoftButton}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasAudit, Mode=OneWay}" Value="False">
+                                    <Setter Property="Background" Value="{DynamicResource MausAccentStrong}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource MausAccentStrong}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <ProgressBar DockPanel.Dock="Right" Width="160" Height="6" Margin="12,0,0,0" VerticalAlignment="Center"
                              Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
                              Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
                 <TextBlock Text="{Binding StatusText}" Margin="16,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
             </DockPanel>
+
+            <!-- Deux façons de lire l'audit : par importance (par défaut) ou module par module. -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,14">
+                <RadioButton Style="{StaticResource Segment}" GroupName="FindingsView" Content="{x:Static app:Ui.ByImportance}" IsChecked="{Binding ShowByImportance}" />
+                <RadioButton Style="{StaticResource Segment}" GroupName="FindingsView" Content="{x:Static app:Ui.ByModule}" IsChecked="{Binding ShowByModule}" />
+            </StackPanel>
+
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="340" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <ListBox Grid.Column="0" ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModule}"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:ModuleViewModel}">
-                            <DockPanel Margin="2,6">
-                                <Ellipse DockPanel.Dock="Left" Width="12" Height="12" Margin="0,4,10,0" VerticalAlignment="Top"
-                                         Fill="{Binding Status, Converter={StaticResource StatusToBrush}}" />
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </DockPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-
-                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                <!-- Par importance : ce qui demande une action, du plus grave au plus léger ; le reste à la demande. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding ShowByImportance, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
-                        <TextBlock Text="{Binding SelectedModule.Header}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="{DynamicResource MutedOpacity}" Margin="0,0,0,12" />
-                        <ItemsControl ItemsSource="{Binding SelectedModule.Findings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:FindingViewModel}">
-                                    <Border appearance:Motion.EnterOnLoad="True" Margin="0,0,0,10" Padding="14,10" CornerRadius="8" BorderThickness="4,1,1,1" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                                            BorderBrush="{Binding Status, Converter={StaticResource StatusToBrush}}">
-                                        <StackPanel>
-                                            <DockPanel>
-                                                <TextBlock DockPanel.Dock="Right" Text="{Binding StatusLabel}" FontSize="12" FontWeight="SemiBold"
-                                                           Foreground="{Binding Status, Converter={StaticResource StatusToBrush}}" />
-                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                            </DockPanel>
-                                            <TextBlock Text="{Binding Values}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                                       Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
-                                            <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
-                                                       Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-                                                <Button Content="{x:Static app:Ui.OpenInWindows}" Padding="10,2" FontSize="12" Margin="0,0,6,0"
-                                                        Command="{Binding OpenSettingsPageCommand}"
-                                                        Visibility="{Binding HasSettingsPage, Converter={StaticResource BoolToVisibility}}" />
-                                                <Button Content="{x:Static app:Ui.Wanted}" Padding="10,2" FontSize="12"
-                                                        ToolTip="{x:Static app:Ui.WantedTip}"
-                                                        Command="{Binding AcknowledgeCommand}"
-                                                        Visibility="{Binding CanAcknowledge, Converter={StaticResource BoolToVisibility}}" />
-                                                <Button Content="{x:Static app:Ui.ReportAgain}" Padding="10,2" FontSize="12"
-                                                        Command="{Binding UnacknowledgeCommand}"
-                                                        Visibility="{Binding IsAcknowledged, Converter={StaticResource BoolToVisibility}}" />
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}"
+                                Visibility="{Binding IsFirstAudit, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{x:Static app:Ui.FindingsBeforeAudit}" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Text="{Binding PriorityTitle}" Style="{StaticResource ZoneTitle}" Foreground="{DynamicResource PastelRoseInk}"
+                                   Visibility="{Binding HasPriorityFindings, Converter={StaticResource BoolToVisibility}}" />
+                        <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}" Margin="0,0,0,4"
+                                Visibility="{Binding NothingToHandle, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{x:Static app:Ui.NothingToHandle}" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{DynamicResource PastelMintInk}" />
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding PriorityFindings}" ItemTemplate="{StaticResource FindingCard}" />
+                        <Border Style="{StaticResource Divider}" Visibility="{Binding HasOtherFindings, Converter={StaticResource BoolToVisibility}}" />
+                        <Expander Header="{Binding OthersLabel}" IsExpanded="{Binding ShowOthers}" Margin="0,0,0,8"
+                                  Visibility="{Binding HasOtherFindings, Converter={StaticResource BoolToVisibility}}">
+                            <ItemsControl ItemsSource="{Binding OtherFindings}" ItemTemplate="{StaticResource FindingCard}" Margin="0,10,0,0" />
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
+
+                <!-- Par module : la liste des modules à gauche, les constats du module choisi à droite (conformes masqués). -->
+                <Grid Visibility="{Binding ShowByModule, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ListBox Grid.Column="0" ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModule}" AutomationProperties.Name="{x:Static app:Ui.ByModule}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:ModuleViewModel}">
+                                <DockPanel Margin="2,6">
+                                    <Ellipse DockPanel.Dock="Left" Width="12" Height="12" Margin="0,4,10,0" VerticalAlignment="Top"
+                                             Fill="{Binding Status, Converter={StaticResource StatusToBrush}}" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Header}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedModule.Header}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding SelectedModule.Summary}" Opacity="{DynamicResource MutedOpacity}" Margin="0,0,0,8" />
+                            <DockPanel Margin="0,0,0,12">
+                                <CheckBox DockPanel.Dock="Right" Content="{x:Static app:Ui.ShowConforming}" IsChecked="{Binding ShowConforming}" Margin="12,0,0,0" />
+                                <TextBlock Text="{Binding HiddenConformingNote}" Style="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding SelectedModuleFindings}" ItemTemplate="{StaticResource FindingCard}" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
             </Grid>
             </DockPanel>
         </TabItem>

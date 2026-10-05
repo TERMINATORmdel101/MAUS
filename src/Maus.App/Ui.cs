@@ -15,6 +15,16 @@ public static class Ui
 
     public static string HomeTools => T("Outils");
 
+    public static string ByImportance => T("Par importance");
+
+    public static string ByModule => T("Par module");
+
+    public static string FindingsBeforeAudit => T("Lancez l'audit : les constats s'afficheront ici, en commençant par ce qui demande votre attention.");
+
+    public static string NothingToHandle => T("Rien à traiter : aucun problème, rien à surveiller et aucune optimisation proposée.");
+
+    public static string ShowConforming => T("Afficher aussi ce qui est conforme");
+
     public static string TabFindings => T("Constats");
 
     public static string Wanted => T("C'est voulu");

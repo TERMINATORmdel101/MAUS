@@ -89,7 +89,14 @@ public sealed partial class MainViewModel : ObservableObject
     public ModuleViewModel? SelectedModule
     {
         get => _selectedModule;
-        set => SetProperty(ref _selectedModule, value);
+        set
+        {
+            if (SetProperty(ref _selectedModule, value))
+            {
+                OnPropertyChanged(nameof(SelectedModuleFindings));
+                OnPropertyChanged(nameof(HiddenConformingNote));
+            }
+        }
     }
 
     public bool IsRunning

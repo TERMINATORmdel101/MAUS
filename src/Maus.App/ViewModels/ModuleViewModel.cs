@@ -9,9 +9,11 @@ public sealed class FindingViewModel
 {
     private readonly Finding finding;
 
-    public FindingViewModel(Finding finding, Func<Finding, bool, Task> onAcknowledge)
+    /// <param name="module">Module d'origine (« M01 · … »), affiché dans la liste par importance de l'onglet Constats.</param>
+    public FindingViewModel(Finding finding, Func<Finding, bool, Task> onAcknowledge, string? module = null)
     {
         this.finding = finding;
+        Module = module;
         AcknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, true));
         UnacknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, false));
         OpenSettingsPageCommand = new AsyncCommand(() =>
@@ -26,6 +28,10 @@ public sealed class FindingViewModel
     }
 
     public string Title => finding.Title;
+
+    public string? Module { get; }
+
+    public bool HasModule => Module is not null;
 
     public FindingStatus Status => finding.Status;
 

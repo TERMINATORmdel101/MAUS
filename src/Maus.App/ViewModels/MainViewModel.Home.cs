@@ -288,6 +288,7 @@ public sealed partial class MainViewModel
             findings.Count(f => f.Status == FindingStatus.Warning),
             findings.Count(f => f.Status == FindingStatus.Improvable));
         ScorePartialNote = HealthScore.PartialNote(_breakdown) ?? string.Empty;
+        RefreshFindingLists();
         Families.Clear();
         foreach (var family in HealthScore.Summaries(_results))
         {

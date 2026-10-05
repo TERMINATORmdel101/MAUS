@@ -137,6 +137,36 @@
         </Setter>
     </Style>
 
+    <!-- Choix entre deux vues, en pastilles (« Par importance » / « Par module ») : la vue choisie prend la couleur d'accentuation. -->
+    <Style x:Key="Segment" TargetType="RadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" CornerRadius="15" Padding="16,6" Margin="0,0,8,0" BorderThickness="1"
+                            BorderBrush="{DynamicResource PastelGreyStroke}" Background="{DynamicResource PastelGrey}">
+                        <ContentPresenter x:Name="Content" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MausAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MausAccent}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MausAccentStrong}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MausAccentStrong}" />
+                            <Setter TargetName="Content" Property="TextElement.Foreground" Value="White" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Carte pastel : la teinte se donne par Background et BorderBrush (DynamicResource PastelX et PastelXStroke). -->
     <Style x:Key="SoftCard" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource PastelGrey}" />
