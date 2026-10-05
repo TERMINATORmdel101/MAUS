@@ -34,6 +34,21 @@ public sealed class HardwareHealthModule : IAuditModule
 
     private static readonly string[] TrimArguments = ["behavior", "query", "DisableDeleteNotify"];
 
+    /// <summary>Bus NVMe dans <c>MSFT_PhysicalDisk.BusType</c>.</summary>
+    private const long NvmeBus = 17;
+
+    private readonly INvmeHealthReader _nvme;
+
+    public HardwareHealthModule()
+        : this(new WindowsNvmeHealthReader())
+    {
+    }
+
+    internal HardwareHealthModule(INvmeHealthReader nvme)
+    {
+        _nvme = nvme;
+    }
+
     public string Id => "M11";
 
     public string Title => T("Mini-benchmark santé");
@@ -51,6 +66,7 @@ public sealed class HardwareHealthModule : IAuditModule
             findings.Add(DetectSystemDisk(context.Cim, disks, systemLetter));
             findings.AddRange(disks.Select(DetectDiskHealth));
             findings.AddRange(DetectReliability(context.Cim, disks));
+            findings.AddRange(disks.Where(d => d.BusType == NvmeBus).Select(DetectNvmeHealth).OfType<Finding>());
         }
 
         findings.Add(await DetectTrimAsync(context.Commands, disks, cancellationToken).ConfigureAwait(false));
@@ -188,6 +204,96 @@ public sealed class HardwareHealthModule : IAuditModule
             Expected = T("sain"),
             Explanation = T("État de santé global que Windows attribue au disque d'après ses propres diagnostics (SMART). "
                 + "Un disque en avertissement ou défaillant peut perdre des données à tout moment."),
+            Advice = advice,
+        };
+    }
+
+    /// <summary>
+    /// Journal de santé NVMe, tel que le disque le déclare : avertissements critiques et seuil de réserve viennent du disque
+    /// (spécification NVMe, structure NVME_HEALTH_INFO_LOG de Microsoft Learn), aucun seuil n'est ajouté par MAUS. Rien si le
+    /// journal n'est pas accessible (pilote du fabricant, boîtier USB, RAID) : l'état global du disque reste affiché.
+    /// </summary>
+    private Finding? DetectNvmeHealth(PhysicalDiskInfo disk)
+    {
+        if (!int.TryParse(disk.DeviceId, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+        {
+            return null;
+        }
+
+        NvmeHealthLog? log;
+        try
+        {
+            log = _nvme.Read(number);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            log = null;
+        }
+
+        if (log is null)
+        {
+            return null;
+        }
+
+        var alerts = new List<string>();
+        if (log.ReadOnly)
+        {
+            alerts.Add(T("passé en lecture seule"));
+        }
+
+        if (log.ReliabilityDegraded)
+        {
+            alerts.Add(T("fiabilité dégradée"));
+        }
+
+        if (log.SpareBelowThreshold || log.AvailableSpare < log.AvailableSpareThreshold)
+        {
+            alerts.Add(T("réserve sous le seuil du fabricant"));
+        }
+
+        if (log.BackupDeviceFailed)
+        {
+            alerts.Add(T("sauvegarde de la mémoire volatile en panne"));
+        }
+
+        var temperatureOnly = alerts.Count == 0 && log.TemperatureAlert;
+        var status = alerts.Count > 0
+            ? FindingStatus.Problem
+            : temperatureOnly
+                ? FindingStatus.Warning
+                : log.MediaErrors > 0 || log.PercentageUsed >= 100 ? FindingStatus.Info : FindingStatus.Ok;
+
+        var current = T("réserve {0} % (seuil du fabricant {1} %) · usure estimée {2} % · {3} h d'utilisation · {4:0.##} To écrits · {5} erreur(s) de données non corrigée(s)",
+            log.AvailableSpare, log.AvailableSpareThreshold, log.PercentageUsed, log.PowerOnHours, log.TerabytesWritten, log.MediaErrors);
+        if (alerts.Count > 0)
+        {
+            current = T("alerte du disque : {0}", string.Join(", ", alerts)) + " · " + current;
+        }
+        else if (temperatureOnly)
+        {
+            current = T("alerte de température du disque") + " · " + current;
+        }
+
+        string? advice = status switch
+        {
+            FindingStatus.Problem => T("Sauvegardez vos données tout de suite : le disque lui-même signale un état critique. Prévoyez son remplacement (garantie du fabricant)."),
+            FindingStatus.Warning => T("Le disque signale une température hors de ses seuils : vérifiez sa ventilation (dissipateur de la carte mère, flux d'air du boîtier)."),
+            _ when log.MediaErrors > 0 => T("Des erreurs de données non corrigées ont déjà eu lieu : gardez une sauvegarde à jour et surveillez si ce nombre augmente."),
+            _ when log.PercentageUsed >= 100 => T("L'endurance garantie par le fabricant est atteinte : ce n'est pas une panne, mais gardez une sauvegarde à jour."),
+            _ => null,
+        };
+
+        return new Finding
+        {
+            Id = $"M11.disk-{Slug(disk.DeviceId)}-nvme",
+            Title = T("Journal de santé NVMe : {0}", disk.Name),
+            Category = StorageCategory,
+            Status = status,
+            Severity = status == FindingStatus.Problem ? Severity.High : Severity.Medium,
+            Current = current,
+            Expected = T("aucune alerte du disque, réserve au-dessus du seuil du fabricant"),
+            Explanation = T("Un SSD NVMe tient lui-même un journal de santé : réserve de cellules de remplacement, usure estimée par le fabricant, heures d'utilisation, erreurs. "
+                + "L'usure estimée peut dépasser 100 % sans que le disque soit en panne : c'est la fin de l'endurance garantie."),
             Advice = advice,
         };
     }

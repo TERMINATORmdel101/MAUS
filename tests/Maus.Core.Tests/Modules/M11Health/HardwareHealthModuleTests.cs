@@ -242,8 +242,63 @@ public class HardwareHealthModuleTests
         Assert.Equal("type de disque inconnu", new PhysicalDiskInfo("0", "a", 0, 7, 0, null, null).MediaLabel);
     }
 
-    private static Task<IReadOnlyList<Finding>> Detect(AuditContext context) =>
-        new HardwareHealthModule().DetectAsync(context, CancellationToken.None);
+    private static Task<IReadOnlyList<Finding>> Detect(AuditContext context, NvmeHealthLog? nvme = null) =>
+        new HardwareHealthModule(new FakeNvme(nvme)).DetectAsync(context, CancellationToken.None);
+
+    /// <summary>Journal NVMe simulé (jamais le vrai disque de la machine de test).</summary>
+    private sealed class FakeNvme(NvmeHealthLog? log) : INvmeHealthReader
+    {
+        public NvmeHealthLog? Read(int diskNumber) => log;
+    }
+
+    private static NvmeHealthLog Healthy => new(0, 31, 100, 10, 2, 20_000_000, 37, 27, 0);
+
+    [Fact]
+    public async Task Healthy_nvme_log_is_compliant_and_shows_the_drive_values()
+    {
+        var finding = (await Detect(Context(NvmeDisk(), "NTFS DisableDeleteNotify = 0"), Healthy)).Single(f => f.Id == "M11.disk-0-nvme");
+
+        Assert.Equal(FindingStatus.Ok, finding.Status);
+        Assert.Contains("réserve 100 % (seuil du fabricant 10 %)", finding.Current, StringComparison.Ordinal);
+        Assert.Contains("10,24 To écrits", finding.Current, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0x08, "passé en lecture seule")]
+    [InlineData(0x04, "fiabilité dégradée")]
+    [InlineData(0x01, "réserve sous le seuil du fabricant")]
+    public async Task Critical_warning_declared_by_the_drive_is_a_problem(byte warning, string expected)
+    {
+        var finding = (await Detect(Context(NvmeDisk(), "NTFS DisableDeleteNotify = 0"), Healthy with { CriticalWarning = warning })).Single(f => f.Id == "M11.disk-0-nvme");
+
+        Assert.Equal(FindingStatus.Problem, finding.Status);
+        Assert.Contains(expected, finding.Current, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Spare_under_the_drive_threshold_is_a_problem_even_without_the_bit()
+    {
+        var finding = (await Detect(Context(NvmeDisk(), "NTFS DisableDeleteNotify = 0"), Healthy with { AvailableSpare = 5 })).Single(f => f.Id == "M11.disk-0-nvme");
+
+        Assert.Equal(FindingStatus.Problem, finding.Status);
+    }
+
+    [Fact]
+    public async Task Temperature_alert_alone_is_a_warning_and_wear_over_100_is_information()
+    {
+        var hot = (await Detect(Context(NvmeDisk(), "NTFS DisableDeleteNotify = 0"), Healthy with { CriticalWarning = 0x02 })).Single(f => f.Id == "M11.disk-0-nvme");
+        var worn = (await Detect(Context(NvmeDisk(), "NTFS DisableDeleteNotify = 0"), Healthy with { PercentageUsed = 104 })).Single(f => f.Id == "M11.disk-0-nvme");
+
+        Assert.Equal(FindingStatus.Warning, hot.Status);
+        Assert.Equal(FindingStatus.Info, worn.Status);
+        Assert.Contains("pas une panne", worn.Advice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Unreadable_nvme_log_adds_no_finding()
+    {
+        Assert.DoesNotContain(await Detect(Context(NvmeDisk(), "NTFS DisableDeleteNotify = 0")), f => f.Id.EndsWith("-nvme", StringComparison.Ordinal));
+    }
 
     private static FindingStatus Status(IReadOnlyList<Finding> findings, string id) => findings.Single(f => f.Id == id).Status;
 
