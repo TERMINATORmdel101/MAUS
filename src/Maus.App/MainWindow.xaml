@@ -843,11 +843,16 @@
                     <TabItem Header="{x:Static app:Ui.SectionTests}" Style="{StaticResource PillTab}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <Border Style="{StaticResource Banner}" BorderBrush="{DynamicResource MausAccent}">
+                                <!-- Avant de commencer : sécurité et fenêtre de surveillance, en une seule carte. -->
+                                <Border Style="{StaticResource SoftCard}" Padding="16,12" Margin="0,0,0,12" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
                                     <DockPanel>
-                                        <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.OpenMonitor}" Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center"
-                                                Command="{Binding OpenMonitorCommand}" />
-                                        <TextBlock Text="{x:Static app:Ui.MonitorTestsHint}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenMonitor}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                Command="{Binding OpenMonitorCommand}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelBlueStroke}" />
+                                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource CardIcon}" Text="&#xE7BA;" Margin="0,0,14,0" VerticalAlignment="Center" Foreground="{DynamicResource PastelBlueInk}" />
+                                        <StackPanel>
+                                            <TextBlock Text="{x:Static app:Ui.TestSafety}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{x:Static app:Ui.MonitorTestsHint}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                                        </StackPanel>
                                     </DockPanel>
                                 </Border>
                                 <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausRed}"
@@ -861,9 +866,6 @@
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>
-                                <Border Style="{StaticResource Banner}" BorderBrush="{StaticResource MausBlue}">
-                                    <TextBlock Text="{x:Static app:Ui.TestSafety}" TextWrapping="Wrap" />
-                                </Border>
                                 <ItemsControl ItemsSource="{Binding Workshop.Live.Alarms}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -874,6 +876,29 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
+                                <!-- Test en cours : arrêt toujours à portée de main, avec la charge et la température. -->
+                                <Border Style="{StaticResource SoftCard}" Padding="14,10" Margin="0,0,0,12" BorderThickness="5,1,1,1"
+                                        Background="{DynamicResource PastelRose}" BorderBrush="{StaticResource MausRed}"
+                                        Visibility="{Binding Workshop.IsTesting, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Left" Style="{StaticResource DangerButton}" Content="{x:Static app:Ui.StopTest}" Command="{Binding Workshop.StopTestCommand}" />
+                                        <TextBlock VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap">
+                                            <Run Text="{Binding Workshop.TestLoad.Title, Mode=OneWay}" />
+                                            <Run Text=" : " />
+                                            <Run Text="{Binding Workshop.TestLoad.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                            <Run Text="{Binding Workshop.TestLoad.DetailSuffix, Mode=OneWay}" />
+                                            <Run Text="   ·   " />
+                                            <Run Text="{Binding Workshop.TestTemperature.Title, Mode=OneWay}" />
+                                            <Run Text=" : " />
+                                            <Run Text="{Binding Workshop.TestTemperature.Value, Mode=OneWay}" FontWeight="SemiBold" />
+                                            <Run Text="{Binding Workshop.TestTemperature.DetailSuffix, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DockPanel>
+                                </Border>
+
+                                <!-- Partie 1 : stabilité -->
+                                <TextBlock Text="{x:Static app:Ui.TestsStability}" Style="{StaticResource ZoneTitle}" FontSize="17" />
+                                <TextBlock Text="{x:Static app:Ui.TestsStabilityIntro}" Style="{StaticResource Muted}" FontSize="12" Margin="0,-4,0,10" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -881,10 +906,14 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
 
-                                    <Border Style="{StaticResource Card}">
+                                    <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
                                         <StackPanel>
-                                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" Foreground="{StaticResource MausBlue}" />
-                                            <TextBlock Text="{x:Static app:Ui.CpuTestTitle}" Style="{StaticResource CardTitle}" />
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelBlueStroke}">
+                                                    <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE9D9;" Foreground="{DynamicResource PastelBlueInk}" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static app:Ui.CpuTestTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelBlueInk}" />
+                                            </DockPanel>
                                             <TextBlock Text="{x:Static app:Ui.CpuTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
                                             <DockPanel Margin="0,12,0,0">
                                                 <TextBlock Text="{x:Static app:Ui.LoadLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -904,10 +933,14 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                                    <Border Grid.Column="2" Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}">
                                         <StackPanel>
-                                            <TextBlock Style="{StaticResource CardIcon}" Text="&#xE964;" Foreground="{StaticResource MausGreen}" />
-                                            <TextBlock Text="{x:Static app:Ui.RamTestTitle}" Style="{StaticResource CardTitle}" />
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelMintStroke}">
+                                                    <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE964;" Foreground="{DynamicResource PastelMintInk}" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static app:Ui.RamTestTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelMintInk}" />
+                                            </DockPanel>
                                             <TextBlock Text="{x:Static app:Ui.RamTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
                                             <DockPanel Margin="0,12,0,0">
                                                 <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -922,25 +955,38 @@
                                     </Border>
                                 </Grid>
 
-                                <DockPanel Margin="0,12,0,0" Visibility="{Binding Workshop.IsTesting, Converter={StaticResource BoolToVisibility}}">
-                                    <Button DockPanel.Dock="Left" Style="{StaticResource DangerButton}" Content="{x:Static app:Ui.StopTest}" Command="{Binding Workshop.StopTestCommand}" />
-                                    <TextBlock VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap">
-                                        <Run Text="{Binding Workshop.TestLoad.Title, Mode=OneWay}" />
-                                        <Run Text=" : " />
-                                        <Run Text="{Binding Workshop.TestLoad.Value, Mode=OneWay}" FontWeight="SemiBold" />
-                                        <Run Text="{Binding Workshop.TestLoad.DetailSuffix, Mode=OneWay}" />
-                                        <Run Text="   ·   " />
-                                        <Run Text="{Binding Workshop.TestTemperature.Title, Mode=OneWay}" />
-                                        <Run Text=" : " />
-                                        <Run Text="{Binding Workshop.TestTemperature.Value, Mode=OneWay}" FontWeight="SemiBold" />
-                                        <Run Text="{Binding Workshop.TestTemperature.DetailSuffix, Mode=OneWay}" />
-                                    </TextBlock>
-                                </DockPanel>
-
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                <Border Style="{StaticResource SoftCard}" Margin="0,12,0,0" Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}">
                                     <StackPanel>
-                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xE945;" Foreground="{StaticResource MausGold}" />
-                                        <TextBlock Text="{x:Static app:Ui.CoreTestTitle}" Style="{StaticResource CardTitle}" />
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelRoseStroke}">
+                                                <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE7F4;" Foreground="{DynamicResource PastelRoseInk}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Static app:Ui.VramTestTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelRoseInk}" />
+                                        </DockPanel>
+                                        <TextBlock Text="{x:Static app:Ui.VramTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.CardLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.CardLabel}" MinWidth="260" Margin="0,0,16,4" ItemsSource="{Binding Workshop.VramAdapters}" SelectedItem="{Binding Workshop.VramAdapter}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.SizeLabel}" MinWidth="200" Margin="0,0,16,4" ItemsSource="{Binding Workshop.VramSizes}" SelectedItem="{Binding Workshop.VramSize}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartVramTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                        </WrapPanel>
+                                        <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.VramProgress, Mode=OneWay}" />
+                                        <TextBlock Text="{Binding Workshop.VramStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource SoftCard}" Margin="0,12,0,0" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelSandStroke}">
+                                                <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE945;" Foreground="{DynamicResource PastelSandInk}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Static app:Ui.CoreTestTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelSandInk}" />
+                                        </DockPanel>
                                         <TextBlock Text="{x:Static app:Ui.CoreTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
                                         <WrapPanel Margin="0,12,0,0">
                                             <TextBlock Text="{x:Static app:Ui.LoadLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -959,7 +1005,8 @@
                                         <TextBlock Text="{Binding Workshop.CoreStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
 
                                         <!-- Programme complet : phase cœur par cœur puis phase de transitoires, sur plusieurs heures. -->
-                                        <TextBlock Text="{x:Static app:Ui.CurveProgramTitle}" FontWeight="SemiBold" Margin="0,16,0,0" />
+                                        <Border Style="{StaticResource Divider}" Margin="0,14,0,12" Background="{DynamicResource PastelSandStroke}" />
+                                        <TextBlock Text="{x:Static app:Ui.CurveProgramTitle}" FontWeight="SemiBold" Foreground="{DynamicResource PastelSandInk}" />
                                         <TextBlock Text="{x:Static app:Ui.CurveProgramIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
                                         <WrapPanel Margin="0,8,0,0">
                                             <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -987,67 +1034,73 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xE7F4;" Foreground="{StaticResource MausRed}" />
-                                        <TextBlock Text="{x:Static app:Ui.VramTestTitle}" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="{x:Static app:Ui.VramTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
-                                        <WrapPanel Margin="0,12,0,0">
-                                            <TextBlock Text="{x:Static app:Ui.CardLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.CardLabel}" MinWidth="260" Margin="0,0,16,4" ItemsSource="{Binding Workshop.VramAdapters}" SelectedItem="{Binding Workshop.VramAdapter}"
-                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
-                                            <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.SizeLabel}" MinWidth="200" Margin="0,0,16,4" ItemsSource="{Binding Workshop.VramSizes}" SelectedItem="{Binding Workshop.VramSize}"
-                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
-                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
-                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartVramTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
-                                        </WrapPanel>
-                                        <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.VramProgress, Mode=OneWay}" />
-                                        <TextBlock Text="{Binding Workshop.VramStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
-                                    </StackPanel>
-                                </Border>
+                                <!-- Partie 2 : vitesse -->
+                                <Border Style="{StaticResource Divider}" Margin="0,22,0,16" />
+                                <TextBlock Text="{x:Static app:Ui.TestsSpeed}" Style="{StaticResource ZoneTitle}" FontSize="17" />
+                                <TextBlock Text="{x:Static app:Ui.TestsSpeedIntro}" Style="{StaticResource Muted}" FontSize="12" Margin="0,-4,0,10" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
 
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xEDA2;" Foreground="{StaticResource MausGreen}" />
-                                        <TextBlock Text="{x:Static app:Ui.DiskTestTitle}" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="{x:Static app:Ui.DiskTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
-                                        <WrapPanel Margin="0,12,0,0">
-                                            <TextBlock Text="{x:Static app:Ui.DriveLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.DriveLabel}" MinWidth="260" Margin="0,0,16,4" ItemsSource="{Binding Workshop.Drives}" SelectedItem="{Binding Workshop.Drive}"
-                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
-                                            <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.SizeLabel}" MinWidth="160" Margin="0,0,16,4" ItemsSource="{Binding Workshop.DiskSizes}" SelectedItem="{Binding Workshop.DiskSize}"
-                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
-                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
-                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartDiskTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
-                                        </WrapPanel>
-                                        <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.DiskProgress, Mode=OneWay}" />
-                                        <TextBlock Text="{Binding Workshop.DiskStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
-                                    </StackPanel>
-                                </Border>
+                                    <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelAqua}" BorderBrush="{DynamicResource PastelAquaStroke}">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelAquaStroke}">
+                                                    <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xEDA2;" Foreground="{DynamicResource PastelAquaInk}" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static app:Ui.DiskTestTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelAquaInk}" />
+                                            </DockPanel>
+                                            <TextBlock Text="{x:Static app:Ui.DiskTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                            <WrapPanel Margin="0,12,0,0">
+                                                <TextBlock Text="{x:Static app:Ui.DriveLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                <ComboBox AutomationProperties.Name="{x:Static app:Ui.DriveLabel}" MinWidth="200" Margin="0,0,12,4" ItemsSource="{Binding Workshop.Drives}" SelectedItem="{Binding Workshop.Drive}"
+                                                          DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                                <TextBlock Text="{x:Static app:Ui.SizeLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                <ComboBox AutomationProperties.Name="{x:Static app:Ui.SizeLabel}" MinWidth="140" Margin="0,0,12,4" ItemsSource="{Binding Workshop.DiskSizes}" SelectedItem="{Binding Workshop.DiskSize}"
+                                                          DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                                <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                        Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartDiskTestCommand}" IsEnabled="{Binding Workshop.IsIdle, Mode=OneWay}" />
+                                            </WrapPanel>
+                                            <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.DiskProgress, Mode=OneWay}" />
+                                            <TextBlock Text="{Binding Workshop.DiskStatus}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        </StackPanel>
+                                    </Border>
 
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xE701;" Foreground="{StaticResource MausBlue}" />
-                                        <TextBlock Text="{x:Static app:Ui.NetTestTitle}" Style="{StaticResource CardTitle}" />
-                                        <TextBlock Text="{x:Static app:Ui.NetTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
-                                        <WrapPanel Margin="0,12,0,0">
-                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4"
-                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartNetTestCommand}" IsEnabled="{Binding Workshop.IsNotNetTesting, Mode=OneWay}" />
-                                            <Button Style="{StaticResource DangerButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.Stop}"
-                                                    Command="{Binding Workshop.StopNetTestCommand}" Visibility="{Binding Workshop.IsNetTesting, Converter={StaticResource BoolToVisibility}}" />
-                                        </WrapPanel>
-                                        <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.NetProgress, Mode=OneWay}" />
-                                        <TextBox Text="{Binding Workshop.NetStatus, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                                 TextWrapping="Wrap" Margin="0,8,0,0" />
-                                    </StackPanel>
-                                </Border>
+                                    <Border Grid.Column="2" Style="{StaticResource SoftCard}" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelLilacStroke}">
+                                                    <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE701;" Foreground="{DynamicResource PastelLilacInk}" />
+                                                </Border>
+                                                <TextBlock Text="{x:Static app:Ui.NetTestTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelLilacInk}" />
+                                            </DockPanel>
+                                            <TextBlock Text="{x:Static app:Ui.NetTestIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                            <WrapPanel Margin="0,12,0,0">
+                                                <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4"
+                                                        Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartNetTestCommand}" IsEnabled="{Binding Workshop.IsNotNetTesting, Mode=OneWay}" />
+                                                <Button Style="{StaticResource DangerButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.Stop}"
+                                                        Command="{Binding Workshop.StopNetTestCommand}" Visibility="{Binding Workshop.IsNetTesting, Converter={StaticResource BoolToVisibility}}" />
+                                            </WrapPanel>
+                                            <ProgressBar Height="6" Margin="0,8,0,0" Maximum="100" Value="{Binding Workshop.NetProgress, Mode=OneWay}" />
+                                            <TextBox Text="{Binding Workshop.NetStatus, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                     TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
 
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                <!-- Partie 3 : historique des scores -->
+                                <Border Style="{StaticResource Divider}" Margin="0,22,0,16" />
+                                <Border Style="{StaticResource SoftCard}" Margin="0,0,0,4">
                                     <StackPanel>
-                                        <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D2;" Foreground="{StaticResource MausGold}" />
-                                        <TextBlock Text="{x:Static app:Ui.ScoreHistoryTitle}" Style="{StaticResource CardTitle}" />
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelGreyStroke}">
+                                                <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE9D2;" Foreground="{DynamicResource PastelGreyInk}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Static app:Ui.ScoreHistoryTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" />
+                                        </DockPanel>
                                         <TextBlock Text="{x:Static app:Ui.ScoreHistoryIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
                                         <ComboBox AutomationProperties.Name="{x:Static app:Ui.ScoreHistoryTitle}" MinWidth="260" Margin="0,10,0,4" HorizontalAlignment="Left" ItemsSource="{Binding Workshop.ScoreKinds}" SelectedItem="{Binding Workshop.ScoreKind}"
                                                   DisplayMemberPath="Label" Visibility="{Binding Workshop.HasScores, Converter={StaticResource BoolToVisibility}}" />

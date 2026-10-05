@@ -17,6 +17,14 @@ public static class Ui
 
     public static string OtherTools => T("Autres outils");
 
+    public static string TestsStability => T("Stabilité");
+
+    public static string TestsStabilityIntro => T("Ces tests font travailler le matériel à fond pour révéler une erreur ou une instabilité. Un seul test à la fois.");
+
+    public static string TestsSpeed => T("Vitesse");
+
+    public static string TestsSpeedIntro => T("Mesures courtes du disque (avec un fichier temporaire, supprimé à la fin) et de la connexion à Internet.");
+
     public static string ByImportance => T("Par importance");
 
     public static string ByModule => T("Par module");
