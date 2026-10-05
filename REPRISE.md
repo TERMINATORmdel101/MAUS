@@ -9,6 +9,8 @@ Le porteur repasse en local (Claude Code installé sur son nouveau PC). Branche 
 - défaut 1 (`ThermalWatchdog`) : terminé et testé. **À dire au porteur** : l'agent a retiré les alarmes « carte graphique très chaude » (90 °C, carte sans seuil NVML) et « zone thermique » (95 °C), faute de seuil publié (principe 7) ; seuls le seuil de la carte, celui du processeur et la mémoire pleine déclenchent encore une alarme ;
 - défauts 3 et 6 : **en cours**, commit `4b10b8b` marqué « NON vérifié ».
 
+**Étape 5 FAITE le 05/10/2026 : version 0.6.0** (accueil, constats, corrections, tests, pastel ; captures vérifiées en clair et en sombre). Reste : avis du porteur sur la nouvelle présentation ; fenêtres annexes (paramètres, à propos, score, surveillance) en pastel si le porteur le souhaite ; fusion de la branche dans `main` et nouvel installateur avec son accord.
+
 **Étapes 1 à 4 FAITES le 05/10/2026 (local)** : défauts 3 et 6 finis (`c460a7c`), défauts 4 et 5 repris et fusionnés (`008d23f`), défaut 7 repris, testé et branché à l'écran (`9693700`), version **0.5.3** (0 avertissement, 1 421 tests). Reste : faire essayer l'interface de la 0.5.3 au porteur, puis l'étape 5 (0.6.0). Python 3.13 installé le 05/10 par winget (accord du porteur : « tu peux installer ce que tu as besoin »), dans `%LOCALAPPDATA%ProgramsPythonPython313python.exe` (absent du PATH des consoles ouvertes avant l'installation).
 
 Ordre de travail (historique) :

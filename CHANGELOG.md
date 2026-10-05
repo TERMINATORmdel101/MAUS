@@ -2,6 +2,16 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.6.0 — 05/10/2026
+
+Nouvelle présentation, demandée par le porteur (modification moyenne : chiffre du milieu). Rien ne change dans ce que MAUS lit ou corrige.
+
+- **Accueil plus simple** : une carte « prochaine étape » guide l'utilisateur. Avant l'audit, elle propose de le lancer. Dès la fin de l'audit, elle annonce le nombre de corrections proposées, avec un bouton **« Corriger maintenant »**. Les quatre familles M·A·U·S sont des tuiles colorées. Quatre outils restent en cartes (PC lent, tester, mon matériel, demander de l'aide), les autres deviennent de petits boutons.
+- **Constats par importance** : par défaut, seulement ce qui demande une action (problèmes, points à surveiller, optimisations), du plus grave au plus léger, tous modules confondus, avec le module d'origine. Ce qui est conforme, les informations et les points illisibles se déplient à la demande (« Voir le reste »). La vue « Par module » existe toujours, sans les constats conformes sauf si on coche « Afficher aussi ce qui est conforme ». « Corriger maintenant » est aussi en haut de cette page.
+- **Corrections allégée** : la liste des corrections occupe le centre de la page (elle était écrasée par les panneaux). « Appliquer » et le point de restauration restent visibles en bas. Les autres outils, vos choix et « Soyons honnêtes » sont sous la liste, séparés par de petites barres. Chaque correction est teintée selon sa nature : recommandée, au choix, avancée ou avec avertissement. Les détails techniques s'ouvrent par un simple lien.
+- **Atelier > Tests** : trois parties titrées et séparées (Stabilité, Vitesse, Historique). Chaque test a sa carte de couleur et sa pastille. La sécurité et la fenêtre de surveillance sont réunies en une seule carte, et l'arrêt d'un test en cours apparaît dans une carte rose.
+- **Couleurs pastel partout**, en thème clair comme en thème sombre (teintes sourdes et texte clair), avec un texte toujours bien contrasté. En contraste élevé, Windows garde ses propres couleurs. Fiches de « Mon PC », mesures « En direct » et Historique comprises.
+
 ## 0.5.3 — 05/10/2026
 
 Corrections (règle du porteur : dernier chiffre). Sept défauts trouvés par une deuxième analyse complète, acceptés par le porteur (« OK pour TOUS »), corrigés puis relus.
