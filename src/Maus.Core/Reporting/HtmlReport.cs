@@ -125,7 +125,7 @@ public static class HtmlReport
         html.Append(CultureInfo.InvariantCulture, $"<section><h2>{E(T("Constats détaillés"))}</h2>");
         foreach (var module in after.Modules)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<details{(module.WorstStatus.Rank() >= FindingStatus.Improvable.Rank() ? " open" : string.Empty)}><summary><span class=\"dot s-{Css(module.WorstStatus)}\"></span>{E($"{module.ModuleId} · {module.Title}")}</summary>");
+            html.Append(CultureInfo.InvariantCulture, $"<details{(module.WorstStatus.Rank() >= FindingStatus.Improvable.Rank() ? " open" : string.Empty)}><summary><span class=\"dot s-{Css(module.Verdict)}\"></span>{E($"{module.ModuleId} · {module.Title}")}</summary>");
             if (module.Error is not null)
             {
                 html.Append(CultureInfo.InvariantCulture, $"<p class=\"err\">{E(module.Error)}</p>");

@@ -102,7 +102,7 @@
                                 </StackPanel>
                                 <!-- Place réservée aux réglages du bas (langue, surveillance, paramètres), posés hors du gabarit
                                      pour rester accessibles aux lecteurs d'écran : voir la fin de la fenêtre. -->
-                                <Border DockPanel.Dock="Bottom" Height="36" />
+                                <Border DockPanel.Dock="Bottom" Height="84" />
                                 <StackPanel IsItemsHost="True" />
                             </DockPanel>
                         </Border>
@@ -1510,15 +1510,18 @@
     </TabControl>
 
     <!-- Bas de la barre de navigation : langue, fenêtre de surveillance, paramètres (posés sur la barre, hors du gabarit). -->
-    <DockPanel Width="232" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,16">
-        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE713;" Margin="6,0,14,0"
-                Command="{Binding OpenSettingsCommand}" ToolTip="{x:Static app:Ui.SettingsTitle}" AutomationProperties.Name="{x:Static app:Ui.SettingsTitle}" />
-        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE946;" Margin="6,0,0,0"
-                Command="{Binding OpenAboutCommand}" ToolTip="{x:Static app:Ui.AboutTitle}" AutomationProperties.Name="{x:Static app:Ui.AboutTitle}" />
-        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE9D9;" Margin="6,0,0,0"
-                Command="{Binding OpenMonitorCommand}" ToolTip="{x:Static app:Ui.MonitorTitle}" AutomationProperties.Name="{x:Static app:Ui.MonitorTitle}" />
-        <ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding LanguageChoice}" DisplayMemberPath="Label" VerticalAlignment="Center" Margin="14,0,0,0"
+    <StackPanel Width="232" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,16">
+        <!-- Langue sur toute la largeur (le nom de la langue était coupé à côté des boutons), puis les trois boutons ronds. -->
+        <ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding LanguageChoice}" DisplayMemberPath="Label" Margin="14,0,14,8"
                   AutomationProperties.Name="Language / Langue / Idioma" ToolTip="Language · Langue · Idioma" />
-    </DockPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button Style="{StaticResource IconButton}" Content="&#xE9D9;" Margin="0,0,12,0"
+                    Command="{Binding OpenMonitorCommand}" ToolTip="{x:Static app:Ui.MonitorTitle}" AutomationProperties.Name="{x:Static app:Ui.MonitorTitle}" />
+            <Button Style="{StaticResource IconButton}" Content="&#xE946;" Margin="0,0,12,0"
+                    Command="{Binding OpenAboutCommand}" ToolTip="{x:Static app:Ui.AboutTitle}" AutomationProperties.Name="{x:Static app:Ui.AboutTitle}" />
+            <Button Style="{StaticResource IconButton}" Content="&#xE713;"
+                    Command="{Binding OpenSettingsCommand}" ToolTip="{x:Static app:Ui.SettingsTitle}" AutomationProperties.Name="{x:Static app:Ui.SettingsTitle}" />
+        </StackPanel>
+    </StackPanel>
     </Grid>
 </Window>

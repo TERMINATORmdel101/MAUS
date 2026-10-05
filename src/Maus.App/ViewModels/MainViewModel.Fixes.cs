@@ -41,7 +41,9 @@ public sealed partial class MainViewModel
         ? T("Lancez d'abord l'audit : les corrections proposées apparaîtront ici.")
         : Changes.Count == 0
             ? T("Aucune correction à proposer : tout ce que MAUS sait corriger est déjà en ordre (ou marqué « voulu »).")
-            : T("{0} correction(s) proposée(s). Cochez celles que vous voulez, ou choisissez un profil. Rien n'est modifié sans votre accord.", Changes.Count);
+            : Changes.Count == 1
+                ? T("1 correction proposée. Cochez-la si vous la voulez : rien n'est modifié sans votre accord.")
+                : T("{0} corrections proposées. Cochez celles que vous voulez, ou choisissez un profil. Rien n'est modifié sans votre accord.", Changes.Count);
 
     public string? BlockingReason
     {

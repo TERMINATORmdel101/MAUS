@@ -117,9 +117,11 @@ public sealed partial class MainViewModel
     /// <summary>Carte « prochaine étape » de l'accueil : l'audit d'abord, puis, dès qu'il est fini, les corrections.</summary>
     public string NextStepTitle => !HasAudit
         ? T("Première étape : l'audit")
-        : Changes.Count > 0
-            ? T("{0} correction(s) proposée(s)", Changes.Count)
-            : T("Rien à corriger pour l'instant");
+        : Changes.Count > 1
+            ? T("{0} corrections proposées", Changes.Count)
+            : Changes.Count == 1
+                ? T("1 correction proposée")
+                : T("Rien à corriger pour l'instant");
 
     public string NextStepText => !HasAudit
         ? T("MAUS lit la configuration de votre PC sans rien modifier, puis vous propose des corrections. Chacune ne s'applique qu'avec votre accord et peut être annulée.")
@@ -231,7 +233,7 @@ public sealed partial class MainViewModel
     {
         var series = Maus.Core.Workshop.ScoreTrends.Series(Maus.Core.Workshop.BenchmarkHistory.CreateHealth().Load(), Maus.Core.Workshop.ScoreTrends.HealthKind);
         HealthTrend = series.Select(e => e.Score).ToList();
-        HealthTrendText = Maus.Core.Workshop.ScoreTrends.Describe(series);
+        HealthTrendText = Maus.Core.Workshop.ScoreTrends.DescribeHealth(series);
     }
 
     /// <summary>
@@ -259,7 +261,7 @@ public sealed partial class MainViewModel
             return Maus.Core.Workshop.ScoreTrends.Series(history.Load(), Maus.Core.Workshop.ScoreTrends.HealthKind);
         });
         HealthTrend = series.Select(e => e.Score).ToList();
-        HealthTrendText = Maus.Core.Workshop.ScoreTrends.Describe(series);
+        HealthTrendText = Maus.Core.Workshop.ScoreTrends.DescribeHealth(series);
     }
 
     private ScoreBreakdown? _breakdown;
@@ -277,16 +279,23 @@ public sealed partial class MainViewModel
         return Task.CompletedTask;
     });
 
+    /// <summary>« 1 problème · 4 à surveiller · 20 optimisations », accordé au singulier ou au pluriel.</summary>
+    private static string CountsText(IReadOnlyCollection<Finding> findings)
+    {
+        static string Count(int n, string one, string many) => string.Format(Culture, n > 1 ? many : one, n);
+        return string.Join(" · ",
+            Count(findings.Count(f => f.Status == FindingStatus.Problem), T("{0} problème"), T("{0} problèmes")),
+            Count(findings.Count(f => f.Status == FindingStatus.Warning), T("{0} à surveiller"), T("{0} à surveiller")),
+            Count(findings.Count(f => f.Status == FindingStatus.Improvable), T("{0} optimisation"), T("{0} optimisations")));
+    }
+
     /// <summary>Met à jour le score et les familles après un audit ou un changement de constat.</summary>
     private void RefreshDashboard()
     {
         _breakdown = HealthScore.Explain(_results);
         Score = _breakdown.Score;
         var findings = _results.SelectMany(r => r.Findings).ToList();
-        ScoreDetail = T("{0} problème(s) · {1} à surveiller · {2} optimisation(s)",
-            findings.Count(f => f.Status == FindingStatus.Problem),
-            findings.Count(f => f.Status == FindingStatus.Warning),
-            findings.Count(f => f.Status == FindingStatus.Improvable));
+        ScoreDetail = CountsText(findings);
         ScorePartialNote = HealthScore.PartialNote(_breakdown) ?? string.Empty;
         RefreshFindingLists();
         Families.Clear();

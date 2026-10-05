@@ -77,6 +77,35 @@ public static class ScoreTrends
         entries.Where(e => e.Kind == kind && e.Stable).OrderBy(e => e.At).TakeLast(50).ToList();
 
     /// <summary>« 85 /100 le 25/09/2026 · 72 → 85 depuis le 20/09/2026 (+18 %) », ou le seul score connu.</summary>
+    /// <summary>
+    /// Tendance du score de santé en une phrase simple, en points (et non en pourcentage) : « Score stable depuis le
+    /// 05/10/2026 », « En hausse de 6 points depuis le … », « En baisse de 4 points depuis le … ».
+    /// </summary>
+    public static string DescribeHealth(IReadOnlyList<BenchmarkEntry> series)
+    {
+        if (series.Count == 0)
+        {
+            return T("Pas encore de résultat.");
+        }
+
+        var first = series[0];
+        var last = series[^1];
+        if (series.Count < 2)
+        {
+            return T("Premier score enregistré le {0:d}.", first.At.LocalDateTime);
+        }
+
+        var points = (int)Math.Round(last.Score - first.Score);
+        return points switch
+        {
+            0 => T("Score stable depuis le {0:d} ({1} audits).", first.At.LocalDateTime, series.Count),
+            1 => T("En hausse d'1 point depuis le {0:d}.", first.At.LocalDateTime),
+            > 1 => T("En hausse de {0} points depuis le {1:d}.", points, first.At.LocalDateTime),
+            -1 => T("En baisse d'1 point depuis le {0:d}.", first.At.LocalDateTime),
+            _ => T("En baisse de {0} points depuis le {1:d}.", -points, first.At.LocalDateTime),
+        };
+    }
+
     public static string Describe(IReadOnlyList<BenchmarkEntry> series)
     {
         if (series.Count == 0)

@@ -26,5 +26,11 @@ public sealed record ModuleResult(
         }
     }
 
+    /// <summary>
+    /// Verdict à afficher pour le module : une simple information ne signale rien, un module qui n'a que des constats
+    /// conformes et des informations est donc « en ordre » (vert), pas gris comme un module non vérifié.
+    /// </summary>
+    public FindingStatus Verdict => WorstStatus == FindingStatus.Info ? FindingStatus.Ok : WorstStatus;
+
     public int Count(FindingStatus status) => Findings.Count(f => f.Status == status);
 }

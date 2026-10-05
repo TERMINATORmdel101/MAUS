@@ -80,4 +80,16 @@ public class ScoreTrendsTests
             }
         }
     }
+
+    [Fact]
+    public void Health_trend_is_told_in_points()
+    {
+        BenchmarkEntry At(double score, int day) => new(ScoreTrends.HealthKind, score, true, Day.AddDays(day));
+        var date = Day.LocalDateTime.ToString("d", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+
+        Assert.Equal($"Premier score enregistré le {date}.", ScoreTrends.DescribeHealth([At(80, 0)]));
+        Assert.Equal($"Score stable depuis le {date} (2 audits).", ScoreTrends.DescribeHealth([At(80, 0), At(80, 1)]));
+        Assert.Equal($"En hausse de 6 points depuis le {date}.", ScoreTrends.DescribeHealth([At(80, 0), At(84, 1), At(86, 2)]));
+        Assert.Equal($"En baisse d'1 point depuis le {date}.", ScoreTrends.DescribeHealth([At(80, 0), At(79, 1)]));
+    }
 }

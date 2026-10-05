@@ -144,7 +144,7 @@ public sealed class ModuleViewModel : ObservableObject
 
     public string Header => $"{Id} · {Title}";
 
-    public FindingStatus Status => _result?.WorstStatus ?? FindingStatus.Unknown;
+    public FindingStatus Status => _result?.Verdict ?? FindingStatus.Unknown;
 
     public string Summary => _result switch
     {

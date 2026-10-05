@@ -156,10 +156,8 @@ public sealed partial class MainViewModel : ObservableObject
 
             _results = [.. await _engine.RunAsync(context, progress)];
             var findings = _results.SelectMany(r => r.Findings).ToList();
-            StatusText = T("Audit terminé : {0} problème(s), {1} à surveiller, {2} optimisation(s) possible(s).",
-                findings.Count(f => f.Status == FindingStatus.Problem),
-                findings.Count(f => f.Status == FindingStatus.Warning),
-                findings.Count(f => f.Status == FindingStatus.Improvable));
+            // Les comptes sont déjà sous le score et dans « À traiter d'abord » : ici, seulement l'heure de l'audit.
+            StatusText = T("Audit terminé à {0:t}.", DateTime.Now);
             OnPropertyChanged(nameof(SelectedModule));
 
             _lastContext = context;
