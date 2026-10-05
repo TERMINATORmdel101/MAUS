@@ -74,6 +74,13 @@ public static class HealthScore
         ["M01.secure-boot", "M08.secure-boot"],
     ];
 
+    /// <summary>
+    /// Sujet commun d'un constat signalé par plusieurs modules (le premier identifiant du groupe), ou <c>null</c>. L'onglet
+    /// Constats n'en montre qu'une carte, comme le score n'en compte qu'un.
+    /// </summary>
+    public static string? SubjectOf(string findingId) =>
+        SameSubject.FirstOrDefault(group => group.Contains(findingId, StringComparer.Ordinal))?[0];
+
     /// <summary>Points retirés par un constat selon sa gravité retenue.</summary>
     public static double PointsFor(Severity gravity) => gravity switch
     {

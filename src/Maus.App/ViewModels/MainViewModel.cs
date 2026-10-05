@@ -27,7 +27,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
-        Modules = new ObservableCollection<ModuleViewModel>(_engine.Modules.Select(m => new ModuleViewModel(m, OnAcknowledgeAsync)));
+        Modules = new ObservableCollection<ModuleViewModel>(_engine.Modules.Select(m => new ModuleViewModel(m, this)));
         SelectedModule = Modules.FirstOrDefault();
         RunAuditCommand = new AsyncCommand(RunAuditAsync);
         ApplyCommand = new AsyncCommand(ApplyAsync);

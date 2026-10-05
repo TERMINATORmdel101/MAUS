@@ -8,7 +8,7 @@ namespace Maus.App.ViewModels;
 /// Onglet Constats (demande du porteur, 05/10/2026) : d'abord ce qui demande une action, du plus grave au plus léger, tous
 /// modules confondus ; ce qui va bien, les informations et les points illisibles seulement à la demande.
 /// </summary>
-public sealed partial class MainViewModel
+public sealed partial class MainViewModel : IFindingActions
 {
     private bool _showByModule;
     private bool _showConforming;
@@ -95,15 +95,35 @@ public sealed partial class MainViewModel
             .ThenBy(x => order.GetValueOrDefault(x.Result.ModuleId, int.MaxValue))
             .Select(x => new FindingViewModel(
                 x.Finding,
-                (finding, acknowledge) => OnAcknowledgeAsync(x.Result.ModuleId, finding, acknowledge),
+                x.Result.ModuleId,
+                this,
                 Modules.FirstOrDefault(m => m.Id == x.Result.ModuleId)?.Header))
             .ToList();
 
         PriorityFindings.Clear();
         OtherFindings.Clear();
+        var subjects = new Dictionary<string, FindingViewModel>(StringComparer.Ordinal);
         foreach (var finding in all)
         {
-            (IsPriority(finding.Status) ? PriorityFindings : OtherFindings).Add(finding);
+            if (!IsPriority(finding.Status))
+            {
+                OtherFindings.Add(finding);
+                continue;
+            }
+
+            // Même sujet signalé par plusieurs modules (Secure Boot dans M01 et M08) : une seule carte, la plus grave.
+            if (Maus.Core.Reporting.HealthScore.SubjectOf(finding.Id) is { } subject)
+            {
+                if (subjects.TryGetValue(subject, out var first))
+                {
+                    first.AddAlsoIn(finding.Module);
+                    continue;
+                }
+
+                subjects[subject] = finding;
+            }
+
+            PriorityFindings.Add(finding);
         }
 
         OnPropertyChanged(nameof(HasPriorityFindings));
@@ -114,6 +134,37 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(SelectedModuleFindings));
         OnPropertyChanged(nameof(HiddenConformingNote));
     }
+
+    Task IFindingActions.AcknowledgeAsync(string moduleId, Finding finding, bool acknowledge) => OnAcknowledgeAsync(moduleId, finding, acknowledge);
+
+    bool IFindingActions.CanFix(Finding finding) => ChangesFor(finding).Any();
+
+    /// <summary>
+    /// « Corriger » sur un constat : ses corrections sont cochées, remontées en tête de liste et entourées, puis l'onglet
+    /// Corrections s'ouvre. Rien n'est appliqué : l'utilisateur relit et clique lui-même sur « Appliquer ».
+    /// </summary>
+    void IFindingActions.Fix(Finding finding)
+    {
+        var matches = ChangesFor(finding).ToList();
+        foreach (var change in Changes)
+        {
+            change.IsHighlighted = false;
+        }
+
+        for (var i = matches.Count - 1; i >= 0; i--)
+        {
+            matches[i].IsSelected = true;
+            matches[i].IsHighlighted = true;
+            Changes.Move(Changes.IndexOf(matches[i]), 0);
+        }
+
+        SelectedTab = TabFixes;
+        StatusText = T("« {0} » : {1} correction(s) cochée(s), en tête de liste. Relisez-les, puis cliquez sur « Appliquer ».", finding.Title, matches.Count);
+    }
+
+    /// <summary>Corrections proposées pour un constat (même identifiant, ou constat d'origine déclaré par la correction).</summary>
+    private IEnumerable<ChangeViewModel> ChangesFor(Finding finding) =>
+        Changes.Where(c => string.Equals(c.Change.FindingId ?? c.Change.Id, finding.Id, StringComparison.Ordinal));
 
     private static bool IsPriority(FindingStatus status) =>
         status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable;

@@ -33,10 +33,16 @@
                     </DockPanel>
                     <TextBlock Text="{Binding Values}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,4,0,0" TextWrapping="Wrap"
                                Visibility="{Binding HasValues, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding AlsoIn}" FontSize="12" FontStyle="Italic" Margin="0,2,0,0" TextWrapping="Wrap"
+                               Foreground="{Binding Status, Converter={StaticResource Pastel}, ConverterParameter=Ink}"
+                               Visibility="{Binding HasAlsoIn, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock Text="{Binding Explanation}" Margin="0,6,0,0" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" FontStyle="Italic" TextWrapping="Wrap"
                                Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.FixThis}" Padding="14,4" FontSize="12" Margin="0,0,6,0"
+                                ToolTip="{x:Static app:Ui.FixThisTip}" Command="{Binding FixCommand}"
+                                Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}" />
                         <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenInWindows}" Padding="12,3" FontSize="12" Margin="0,0,6,0"
                                 Command="{Binding OpenSettingsPageCommand}"
                                 Visibility="{Binding HasSettingsPage, Converter={StaticResource BoolToVisibility}}" />
@@ -470,7 +476,8 @@
                         <ItemsControl ItemsSource="{Binding Changes}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:ChangeViewModel}">
-                                    <Border Style="{StaticResource SoftCard}" Margin="0,0,0,8" Padding="14,10"
+                                    <Grid Margin="0,0,0,8">
+                                    <Border Style="{StaticResource SoftCard}" Padding="14,10"
                                             Background="{Binding Tone, Converter={StaticResource Pastel}}"
                                             BorderBrush="{Binding Tone, Converter={StaticResource Pastel}, ConverterParameter=Stroke}">
                                         <DockPanel>
@@ -496,6 +503,10 @@
                                             </StackPanel>
                                         </DockPanel>
                                     </Border>
+                                    <!-- Correction choisie depuis un constat : entourée de la couleur d'accentuation. -->
+                                    <Border BorderThickness="2" CornerRadius="14" BorderBrush="{DynamicResource MausAccent}" IsHitTestVisible="False"
+                                            Visibility="{Binding IsHighlighted, Converter={StaticResource BoolToVisibility}}" />
+                                    </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

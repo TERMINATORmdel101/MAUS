@@ -19,6 +19,15 @@ public sealed class ChangeViewModel(PlannedChange change) : ObservableObject
         set => SetProperty(ref _isSelected, value);
     }
 
+    /// <summary>Correction choisie depuis un constat (bouton « Corriger ») : entourée pour qu'on la retrouve.</summary>
+    public bool IsHighlighted
+    {
+        get => _isHighlighted;
+        set => SetProperty(ref _isHighlighted, value);
+    }
+
+    private bool _isHighlighted;
+
     public string Title => Change.Title;
 
     public string Module => Change.ModuleId;

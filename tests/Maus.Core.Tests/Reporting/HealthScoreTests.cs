@@ -102,4 +102,12 @@ public class HealthScoreTests
     {
         Assert.Equal(expected, HealthScore.Describe(score));
     }
+
+    [Fact]
+    public void Findings_on_the_same_subject_share_one_subject()
+    {
+        Assert.Equal("M01.secure-boot", HealthScore.SubjectOf("M01.secure-boot"));
+        Assert.Equal("M01.secure-boot", HealthScore.SubjectOf("M08.secure-boot"));
+        Assert.Null(HealthScore.SubjectOf("M08.secure-boot-events"));
+    }
 }

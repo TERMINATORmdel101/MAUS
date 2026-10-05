@@ -5,17 +5,35 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
 
+/// <summary>Ce que l'onglet Constats peut demander à la fenêtre pour un constat : le marquer « voulu », le corriger.</summary>
+public interface IFindingActions
+{
+    Task AcknowledgeAsync(string moduleId, Finding finding, bool acknowledge);
+
+    /// <summary>Au moins une correction proposée corrige ce constat.</summary>
+    bool CanFix(Finding finding);
+
+    /// <summary>Coche les corrections de ce constat et ouvre l'onglet Corrections.</summary>
+    void Fix(Finding finding);
+}
+
 public sealed class FindingViewModel
 {
     private readonly Finding finding;
 
     /// <param name="module">Module d'origine (« M01 · … »), affiché dans la liste par importance de l'onglet Constats.</param>
-    public FindingViewModel(Finding finding, Func<Finding, bool, Task> onAcknowledge, string? module = null)
+    public FindingViewModel(Finding finding, string moduleId, IFindingActions actions, string? module = null)
     {
         this.finding = finding;
         Module = module;
-        AcknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, true));
-        UnacknowledgeCommand = new AsyncCommand(() => onAcknowledge(finding, false));
+        CanFix = actions.CanFix(finding);
+        FixCommand = new AsyncCommand(() =>
+        {
+            actions.Fix(finding);
+            return Task.CompletedTask;
+        });
+        AcknowledgeCommand = new AsyncCommand(() => actions.AcknowledgeAsync(moduleId, finding, true));
+        UnacknowledgeCommand = new AsyncCommand(() => actions.AcknowledgeAsync(moduleId, finding, false));
         OpenSettingsPageCommand = new AsyncCommand(() =>
         {
             if (finding.SettingsPage is { } page)
@@ -29,7 +47,25 @@ public sealed class FindingViewModel
 
     public string Title => finding.Title;
 
+    public string Id => finding.Id;
+
     public string? Module { get; }
+
+    private readonly List<string> _alsoIn = [];
+
+    /// <summary>« Aussi signalé par M08 · BIOS » quand d'autres modules décrivent le même sujet ; vide sinon.</summary>
+    public string AlsoIn => _alsoIn.Count == 0 ? string.Empty : T("Aussi signalé par : {0}", string.Join(", ", _alsoIn));
+
+    public bool HasAlsoIn => _alsoIn.Count > 0;
+
+    /// <summary>Ajoute un autre module qui signale le même sujet (avant l'affichage de la carte).</summary>
+    public void AddAlsoIn(string? module)
+    {
+        if (module is not null && !_alsoIn.Contains(module, StringComparer.Ordinal))
+        {
+            _alsoIn.Add(module);
+        }
+    }
 
     public bool HasModule => Module is not null;
 
@@ -41,6 +77,11 @@ public sealed class FindingViewModel
     public bool CanAcknowledge => finding.Status is FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem;
 
     public bool IsAcknowledged => finding.AcknowledgedFrom is not null;
+
+    /// <summary>MAUS sait corriger ce constat : bouton « Corriger » (coche la correction et ouvre l'onglet Corrections).</summary>
+    public bool CanFix { get; }
+
+    public ICommand FixCommand { get; }
 
     public ICommand AcknowledgeCommand { get; }
 
@@ -71,14 +112,14 @@ public sealed class FindingViewModel
 
 public sealed class ModuleViewModel : ObservableObject
 {
-    private readonly Func<string, Finding, bool, Task> _onAcknowledge;
+    private readonly IFindingActions _actions;
     private ModuleResult? _result;
 
-    public ModuleViewModel(IAuditModule module, Func<string, Finding, bool, Task> onAcknowledge)
+    public ModuleViewModel(IAuditModule module, IFindingActions actions)
     {
         Id = module.Id;
         Title = module.Title;
-        _onAcknowledge = onAcknowledge;
+        _actions = actions;
     }
 
     public string Id { get; }
@@ -99,7 +140,7 @@ public sealed class ModuleViewModel : ObservableObject
     public IReadOnlyList<FindingViewModel> Findings =>
         _result?.Findings
             .OrderByDescending(f => f.Status.Rank())
-            .Select(f => new FindingViewModel(f, (finding, acknowledge) => _onAcknowledge(Id, finding, acknowledge)))
+            .Select(f => new FindingViewModel(f, Id, _actions))
             .ToList() ?? [];
 
     public void SetResult(ModuleResult result)
