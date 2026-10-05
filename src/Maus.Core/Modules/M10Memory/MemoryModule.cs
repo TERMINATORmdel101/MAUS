@@ -24,7 +24,6 @@ public sealed partial class MemoryModule : IAuditModule
 
     private static string StabilityAdvice => T("En cas de plantages ou d'écrans bleus : BIOS récent (Module 8), test de la mémoire avec MemTest86, TestMem5 ou OCCT, puis profil plus lent.");
 
-
     public string Id => "M10";
 
     public string Title => T("RAM : XMP / EXPO et dual channel");

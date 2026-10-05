@@ -60,7 +60,6 @@ public sealed class WindowsHealthModule : IAuditModule
     private static readonly int[] MemoryErrorIds = [1102, 1202];
     private static readonly int[] MemoryResultIds = [.. MemoryHealthyIds, .. MemoryErrorIds];
 
-
     /// <summary>Délai laissé à DISM pour lire l'indicateur d'altération.</summary>
     internal static readonly TimeSpan ImageHealthTimeout = TimeSpan.FromSeconds(45);
 

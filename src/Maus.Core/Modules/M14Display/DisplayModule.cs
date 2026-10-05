@@ -24,7 +24,6 @@ public sealed class DisplayModule : IAuditModule
     /// <summary>Tolérance entre la fréquence exacte (59,94 Hz) et la valeur entière des modes (60 Hz).</summary>
     private const double RefreshTolerance = 1.0;
 
-
     private readonly IDisplayConfigReader _reader;
 
     public DisplayModule()
