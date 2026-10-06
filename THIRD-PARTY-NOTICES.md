@@ -14,7 +14,25 @@ MAUS (GPL-3.0-only) utilise les bibliothèques libres suivantes, sans les modifi
 | Vortice.Mathematics | 2.1.0 | MIT (Copyright (c) Amer Koleci and Contributors) | https://github.com/amerkoleci/Vortice.Mathematics | Dépendance de Vortice |
 | SharpGen.Runtime, SharpGen.Runtime.COM | 2.4.2-beta | MIT ((c) 2010-2017 Alexandre Mutel, 2017-2023 Jeremy Koritzinsky, 2023-2024 Amer Koleci) | https://github.com/SharpGenTools/SharpGenTools | Dépendance de Vortice |
 
-**Benchmark visuel** : toutes les scènes (fractale, collision de galaxies, anneau de planète), les shaders et les tests du processeur sont écrits pour MAUS et calculés à partir de formules (aucun modèle 3D, aucune texture ni aucun code de démo tiers). Les techniques publiées dont ils s'inspirent sont citées dans les commentaires du code (Mandelbox de T. Lowe, problème restreint à trois corps de Toomre et Toomre, anticrénelage temporel de B. Karis, halo de J. Jimenez, courbe filmique de K. Narkowicz, transformée en distance de Felzenszwalb et Huttenlocher). La police Segoe UI de Windows est dessinée par DirectWrite sur le PC de l'utilisateur ; elle n'est pas redistribuée.
+**Benchmark visuel** : les scènes « Anneau de la géante », « Champ de bataille » (chars compris), « Collision galactique » et « Forge fractale », les shaders et les tests du processeur sont écrits pour MAUS et calculés à partir de formules (aucun modèle 3D, aucune texture ni aucun code de démo tiers). Seule la scène « Cabinet de curiosités » utilise des modèles scannés, des textures et un ciel HDR de Poly Haven (ci-dessous) ; son code, ses shaders et ses lecteurs de fichiers glTF et HDR sont écrits pour MAUS. Les techniques publiées dont ils s'inspirent sont citées dans les commentaires du code (Mandelbox de T. Lowe, problème restreint à trois corps de Toomre et Toomre, anticrénelage temporel de B. Karis, halo de J. Jimenez, courbe filmique de K. Narkowicz, transformée en distance de Felzenszwalb et Huttenlocher, éclairage par harmoniques sphériques de Ramamoorthi et Hanrahan, environnement préfiltré de B. Karis et de Colbert et Křivánek, tangentes de E. Lengyel, relief par parallaxe de Brawley et Tatarchuk, ombres douces de R. Fernando). La police Segoe UI de Windows est dessinée par DirectWrite sur le PC de l'utilisateur ; elle n'est pas redistribuée.
+
+**Poly Haven** (https://polyhaven.com) : modèles, textures et ciel HDR publiés sous licence **CC0 1.0** (domaine public : utilisation, modification et redistribution libres, même commerciales, mention non obligatoire ; https://polyhaven.com/license). La scène « Cabinet de curiosités » du benchmark utilise les fichiers ci-dessous, sans les modifier, dans le dossier `Assets/PolyHaven` livré à côté de MAUS.exe (33 Mo). Leurs auteurs sont cités par reconnaissance :
+
+| Fichiers | Contenu | Auteurs |
+|---|---|---|
+| `ballroom` (2K, HDR) | Ciel HDR d'une salle de bal (lumière et reflets de la scène) | Sergej Majboroda |
+| `rosewood_veneer1` (2K) | Texture : plaqué de bois de rose (table) | Jenelle van Heerden |
+| `herringbone_parquet` (1K) | Texture : parquet en point de Hongrie | Jenelle van Heerden (traitement), Sergej Majboroda (photographie) |
+| `marble_bust_01` (2K) | Modèle : buste en marbre | Rico Cilliers |
+| `horse_statue_01` (2K) | Modèle : statue de cheval | Rico Cilliers |
+| `brass_vase_03` (1K) | Modèle : vase en laiton | Rico Cilliers |
+| `antique_ceramic_vase_01` (1K) | Modèle : vase ancien en céramique | James Ray Cock |
+| `tea_set_01` (1K) | Modèle : service à thé | Rico Cilliers (modélisation), James Ray Cock (textures), Jurita Burger (motifs) |
+| `alarm_clock_01` (1K) | Modèle : réveil | James Ray Cock (modélisation et textures), Yann Kervran (armature) |
+| `Lantern_01` (1K) | Modèle : lanterne | Rajil Jose Macatangay |
+| `Camera_01` (1K) | Modèle : appareil photo | Rajil Jose Macatangay |
+| `carved_wooden_elephant` (1K) | Modèle : éléphant en bois sculpté | Greg Zaal |
+| `antique_katana_01` (1K) | Modèle : katana ancien | Tal Swicegood |
 
 Le texte de la MPL-2.0 : https://mozilla.org/MPL/2.0/. Les fichiers couverts par la MPL-2.0 restent sous cette licence ; MAUS n'en modifie aucun.
 

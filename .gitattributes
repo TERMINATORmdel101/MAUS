@@ -1,0 +1,6 @@
+# Fichiers binaires du benchmark (modèles, textures, ciel HDR) : jamais de conversion des fins de ligne.
+*.hdr binary
+*.bin binary
+*.jpg binary
+*.png binary
+*.dxil binary
