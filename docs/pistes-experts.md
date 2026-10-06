@@ -19,7 +19,7 @@ Question du porteur (30/09/2026) : « qu'est-ce qui manque pour les experts du P
 - **Effort** : gros. **Risque** : aucun pour le PC (lecture seule).
 - Sources : [Microsoft Learn, Analyze Bug Check Blue Screen Data](https://learn.microsoft.com/en-ie/windows-hardware/drivers/debugger/blue-screen-data) ; [Dell, How to Analyze Blue Screen Dump Files Using WinDbg](https://www.dell.com/support/kbdoc/en-us/000149411/how-to-read-mini-dump-files).
 
-### 2. Craquements audio et saccades : latence DPC / ISR
+### 2. Craquements audio et saccades : latence DPC / ISR — FAIT le 06/10/2026 (Atelier > Tests, trace ETW lue par MAUS, vérifiée sur le PC du porteur)
 
 - **Ce que font les experts** : LatencyMon (logiciel propriétaire) mesure le temps d'exécution des routines DPC et ISR des pilotes et nomme les pilotes qui bloquent le processeur trop longtemps (cause classique de craquements audio et de micro-saccades).
 - **Ce qui manque à MAUS** : rien de tel aujourd'hui.

@@ -1199,6 +1199,29 @@
                                     </Border>
                                 </Grid>
 
+                                <!-- Latence des pilotes : craquements audio, micro-saccades (trace du noyau, lecture seule). -->
+                                <Border Style="{StaticResource SoftCard}" Margin="0,12,0,0" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelBlueStroke}">
+                                                <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE767;" Foreground="{DynamicResource PastelBlueInk}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Static app:Ui.LatencyTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelBlueInk}" />
+                                        </DockPanel>
+                                        <TextBlock Text="{x:Static app:Ui.LatencyIntro}" FontSize="12" Style="{StaticResource Muted}" />
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.DurationLabel}" MinWidth="200" Margin="0,0,12,4" ItemsSource="{Binding Workshop.LatencyDurations, Mode=OneWay}" SelectedItem="{Binding Workshop.LatencyDuration}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotLatencyRunning, Mode=OneWay}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartLatencyCommand}" IsEnabled="{Binding Workshop.IsNotLatencyRunning, Mode=OneWay}" />
+                                        </WrapPanel>
+                                        <ProgressBar IsIndeterminate="True" Height="4" Margin="0,8,0,0" Visibility="{Binding Workshop.IsLatencyRunning, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBox Text="{Binding Workshop.LatencyStatus, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                 TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.Name="{x:Static app:Ui.LatencyTitle}" />
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Partie 3 : historique des scores -->
                                 <Border Style="{StaticResource Divider}" Margin="0,22,0,16" />
                                 <Border Style="{StaticResource SoftCard}" Margin="0,0,0,4">
