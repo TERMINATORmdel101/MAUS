@@ -17,6 +17,7 @@ public sealed partial class WorkshopViewModel
     private bool _isBenchmarkRunning;
     private string? _benchmarkStatus;
     private TestOption<string>? _benchmarkApi;
+    private TestOption<string>? _benchmarkResolution;
     private ICommand? _startBenchmark;
 
     /// <summary>Interfaces graphiques proposées : DirectX 12 recommandé (le plus moderne), DirectX 11 pour comparer.</summary>
@@ -30,6 +31,20 @@ public sealed partial class WorkshopViewModel
     {
         get => _benchmarkApi ?? BenchmarkApis[0];
         set => SetProperty(ref _benchmarkApi, value);
+    }
+
+    /// <summary>Résolution de calcul : 1080p natif recommandé ; 1440p et 4K pour pousser les grosses cartes.</summary>
+    public IReadOnlyList<TestOption<string>> BenchmarkResolutions { get; } =
+    [
+        new(T("1080p natif (recommandé)"), "1080p"),
+        new(T("1440p"), "1440p"),
+        new(T("4K (très exigeant)"), "4k"),
+    ];
+
+    public TestOption<string> BenchmarkResolution
+    {
+        get => _benchmarkResolution ?? BenchmarkResolutions[0];
+        set => SetProperty(ref _benchmarkResolution, value);
     }
 
     public bool IsBenchmarkRunning
@@ -69,6 +84,8 @@ public sealed partial class WorkshopViewModel
             start.ArgumentList.Add("--benchmark");
             start.ArgumentList.Add("--api");
             start.ArgumentList.Add(BenchmarkApi.Value);
+            start.ArgumentList.Add("--resolution");
+            start.ArgumentList.Add(BenchmarkResolution.Value);
             start.ArgumentList.Add("--lang");
             start.ArgumentList.Add(Texts.Language);
             using var process = Process.Start(start);
@@ -112,7 +129,7 @@ public sealed partial class WorkshopViewModel
         }
 
         text.AppendLine();
-        text.AppendLine(T("Carte graphique : {0} points · Processeur : {1} points · {2}", Points(last.GpuScore), Points(last.CpuScore), last.Api));
+        text.AppendLine(T("Carte graphique : {0} points · Processeur : {1} points · {2}", Points(last.GpuScore), Points(last.CpuScore), last.Api) + " · " + last.RenderResolution);
         text.AppendLine(last.Gpu + " · " + last.Cpu);
         foreach (var test in last.Tests)
         {
@@ -143,6 +160,7 @@ internal static class BenchmarkNames
         "fractal" => T("Forge fractale (calcul)"),
         "galaxy" => T("Collision galactique (bande passante)"),
         "ring" => T("Anneau de la géante (géométrie)"),
+        "battle" => T("Champ de bataille (effets)"),
         "cpu-render" => T("Rendu sur tous les cœurs"),
         "cpu-single" => T("Rendu sur un seul cœur"),
         "cpu-vector" => T("Calcul vectoriel"),

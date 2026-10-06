@@ -21,13 +21,17 @@ internal sealed class RingScene : BenchScene
     private static readonly Vector3 Sun = Vector3.Normalize(new Vector3(0.55f, 0.22f, -0.8f));
 
     private static readonly CameraPath Path = new(
-        (0, new CameraPose(OnRing(-0.25f, 100f, 22f), OnRing(0.1f, 80f, 0f), 55f)),
-        (20, new CameraPose(OnRing(0.02f, 90f, 10f), OnRing(0.22f, 82f, 2f), 58f, -6f)),
-        (40, new CameraPose(OnRing(0.32f, 85f, 6.5f), OnRing(0.48f, 78f, 1f), 62f, 4f)),
-        (60, new CameraPose(OnRing(0.6f, 82f, -8f), new Vector3(0f, 4f, 0f), 60f, -3f)),
-        (75, new CameraPose(OnRing(0.85f, 88f, 7f), OnRing(1.0f, 80f, 0f), 58f, 5f)),
-        (92, new CameraPose(OnRing(1.05f, 114f, 24f), OnRing(0.6f, 70f, 0f), 52f)));
+        // La géante reste presque toujours dans le champ : la caméra rase l'anneau en regardant vers elle.
+        (0, new CameraPose(OnRing(-0.3f, 125f, 30f), new Vector3(0f, 2f, 0f), 50f)),
+        (18, new CameraPose(OnRing(-0.05f, 98f, 9f), OnRing(0.6f, 30f, 4f), 56f, -5f)),
+        (36, new CameraPose(OnRing(0.25f, 90f, 4.5f), OnRing(0.75f, 35f, 0f), 60f, 3f)),
+        (54, new CameraPose(OnRing(0.5f, 86f, -7f), new Vector3(0f, 8f, 0f), 62f, -4f)),
+        (72, new CameraPose(OnRing(0.78f, 92f, 5f), OnRing(1.2f, 30f, 2f), 58f, 6f)),
+        (92, new CameraPose(OnRing(1.0f, 140f, 34f), new Vector3(0f, -4f, 0f), 50f)));
 
+    private const int Variants = 3;
+    private readonly IBuffer?[] _variantVertices = new IBuffer?[Variants];
+    private readonly IBuffer?[] _variantIndices = new IBuffer?[Variants];
     private IBuffer? _rocks;
     private IBuffer? _detailedVertices;
     private IBuffer? _detailedIndices;
@@ -52,6 +56,13 @@ internal sealed class RingScene : BenchScene
     {
         var device = context.Device;
         var shaders = context.Shaders;
+        for (var v = 0; v < Variants; v++)
+        {
+            var (vv, vi) = RockMesh.Create(subdivisions: 2, seed: 11 + (v * 17));
+            _variantVertices[v] = device.CreateBuffer(new BufferDesc(vv.Length * 4, BufferUsage.Vertex, 24, "Rocher détaillé " + v), MemoryMarshal.AsBytes(vv.AsSpan()));
+            _variantIndices[v] = device.CreateBuffer(new BufferDesc(vi.Length * 4, BufferUsage.Index, 4, "Rocher détaillé " + v + " : indices"), MemoryMarshal.AsBytes(vi.AsSpan()));
+        }
+
         var (dv, di) = RockMesh.Create(subdivisions: 2, seed: 7);
         var (cv, ci) = RockMesh.Create(subdivisions: 1, seed: 7);
         _detailedVertices = device.CreateBuffer(new BufferDesc(dv.Length * 4, BufferUsage.Vertex, 24, "Rocher détaillé"), MemoryMarshal.AsBytes(dv.AsSpan()));
@@ -118,9 +129,7 @@ internal sealed class RingScene : BenchScene
         cmd.SetPipeline(_shadowPipeline!);
         cmd.SetBuffer(0, _rocks);
         cmd.SetConstants(1, constants);
-        cmd.SetVertexBuffer(0, _detailedVertices, 24);
-        cmd.SetIndexBuffer(_detailedIndices);
-        cmd.DrawIndexed(_detailedIndexCount, Detailed);
+        DrawDetailed(cmd, constants);
         cmd.Flush();
 
         var post = context.Post;
@@ -133,9 +142,7 @@ internal sealed class RingScene : BenchScene
         cmd.SetPipeline(_rocksPipeline!);
         cmd.SetBuffer(0, _rocks);
         cmd.SetTexture(1, _shadowMap);
-        cmd.SetVertexBuffer(0, _detailedVertices, 24);
-        cmd.SetIndexBuffer(_detailedIndices);
-        cmd.DrawIndexed(_detailedIndexCount, Detailed);
+        DrawDetailed(cmd, constants);
         cmd.Flush();
         cmd.SetConstants(1, constants with { RingParams = constants.RingParams with { X = Detailed } });
         cmd.SetVertexBuffer(0, _coarseVertices, 24);
@@ -145,10 +152,28 @@ internal sealed class RingScene : BenchScene
         cmd.SetBuffer(0, null);
     }
 
+    /// <summary>Les rochers détaillés, en trois modèles différents (un tiers chacun).</summary>
+    private void DrawDetailed(ICommandList cmd, RingConstants constants)
+    {
+        var perVariant = Detailed / Variants;
+        for (var v = 0; v < Variants; v++)
+        {
+            cmd.SetConstants(1, constants with { RingParams = constants.RingParams with { X = v * perVariant } });
+            cmd.SetVertexBuffer(0, _variantVertices[v], 24);
+            cmd.SetIndexBuffer(_variantIndices[v]);
+            cmd.DrawIndexed(_detailedIndexCount, v == Variants - 1 ? Detailed - (perVariant * (Variants - 1)) : perVariant);
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
+            foreach (var buffer in _variantVertices.Concat(_variantIndices))
+            {
+                buffer?.Dispose();
+            }
+
             _rocks?.Dispose();
             _detailedVertices?.Dispose();
             _detailedIndices?.Dispose();
@@ -175,6 +200,42 @@ internal sealed class RingScene : BenchScene
         var random = new Random(20261006);
         var rocks = new RockInstance[Detailed + Coarse];
         var corridor = Enumerable.Range(0, 400).Select(k => Path.Evaluate(k * Path.Duration / 399).Position).ToArray();
+
+        // Grille de voisinage : un rocher n'est gardé que s'il ne touche aucun autre (pas d'interpénétration).
+        const float cell = 1.6f;
+        var cells = new Dictionary<(int, int, int), int>();
+        var next = new int[rocks.Length];
+        (int, int, int) CellOf(Vector3 p) => ((int)MathF.Floor(p.X / cell), (int)MathF.Floor(p.Y / cell), (int)MathF.Floor(p.Z / cell));
+        bool Overlaps(Vector3 p, float r)
+        {
+            var (cx, cy, cz) = CellOf(p);
+            for (var dx = -1; dx <= 1; dx++)
+            {
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dz = -1; dz <= 1; dz++)
+                    {
+                        if (!cells.TryGetValue((cx + dx, cy + dy, cz + dz), out var other))
+                        {
+                            continue;
+                        }
+
+                        for (; other >= 0; other = next[other])
+                        {
+                            var o = rocks[other].PositionScale;
+                            var reach = r + (o.W * 1.35f);
+                            if (Vector3.DistanceSquared(p, new Vector3(o.X, o.Y, o.Z)) < reach * reach)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
         for (var i = 0; i < rocks.Length; i++)
         {
             var detailed = i < Detailed;
@@ -188,9 +249,11 @@ internal sealed class RingScene : BenchScene
             while (random.NextSingle() > 0.35f + (0.65f * MathF.Pow(MathF.Sin(radius * 0.21f) * 0.5f + 0.5f, 2f)));
 
             var height = ((random.NextSingle() + random.NextSingle() + random.NextSingle()) - 1.5f) * 5f;
-            var size = 0.04f + (1.1f * MathF.Pow(random.NextSingle(), 11f));
+            // Surtout des petits rochers : peu de gros blocs qui masqueraient la géante.
+            var size = 0.03f + (0.5f * MathF.Pow(random.NextSingle(), 8f));
             var position = new Vector3(radius * MathF.Cos(angle), height, radius * MathF.Sin(angle));
-            if (detailed && Array.Exists(corridor, c => Vector3.DistanceSquared(c, position) < MathF.Pow(1.6f + (size * 2f), 2f)))
+            if ((detailed && Array.Exists(corridor, c => Vector3.DistanceSquared(c, position) < MathF.Pow(1.6f + (size * 2f), 2f)))
+                || Overlaps(position, size * 1.35f))
             {
                 i--;
                 continue;
@@ -204,6 +267,9 @@ internal sealed class RingScene : BenchScene
                 new Vector4(position, size),
                 new Vector4(axis, (0.1f + (0.5f * random.NextSingle())) * (random.NextSingle() < 0.5f ? -1f : 1f)),
                 new Vector4(color, ice));
+            var key = CellOf(position);
+            next[i] = cells.TryGetValue(key, out var head) ? head : -1;
+            cells[key] = i;
         }
 
         return rocks;
@@ -270,9 +336,13 @@ internal static class RockMesh
             faces = next;
         }
 
-        // Déformation : quelques grandes bosses et des facettes, reproductibles d'un lancement à l'autre.
+        // Déformation : bosses, éclats taillés à plat (plans de coupe, comme une roche cassée) et forme allongée,
+        // différents pour chaque graine, reproductibles d'un lancement à l'autre.
         var random = new Random(seed);
-        var bumps = Enumerable.Range(0, 7).Select(_ => (Direction: Vector3.Normalize(new Vector3(random.NextSingle() - 0.5f, random.NextSingle() - 0.5f, random.NextSingle() - 0.5f)), Strength: (random.NextSingle() - 0.4f) * 0.5f)).ToArray();
+        Vector3 RandomDirection() => Vector3.Normalize(new Vector3(random.NextSingle() - 0.5f, random.NextSingle() - 0.5f, random.NextSingle() - 0.5f) + new Vector3(1e-4f));
+        var bumps = Enumerable.Range(0, 9).Select(_ => (Direction: RandomDirection(), Strength: (random.NextSingle() - 0.45f) * 0.45f)).ToArray();
+        var cuts = Enumerable.Range(0, 7).Select(_ => (Normal: RandomDirection(), Distance: 0.62f + (0.3f * random.NextSingle()))).ToArray();
+        var stretch = new Vector3(1f, 0.55f + (0.35f * random.NextSingle()), 0.7f + (0.3f * random.NextSingle()));
         for (var i = 0; i < positions.Count; i++)
         {
             var p = positions[i];
@@ -282,8 +352,18 @@ internal static class RockMesh
                 radius += strength * MathF.Pow(MathF.Max(0f, Vector3.Dot(p, direction)), 3f);
             }
 
-            radius += 0.06f * MathF.Sin(p.X * 9.1f) * MathF.Sin(p.Y * 7.3f + 1f) * MathF.Sin(p.Z * 8.7f + 2f);
-            positions[i] = p * radius * new Vector3(1f, 0.78f, 0.9f);
+            radius += 0.05f * MathF.Sin(p.X * 11.1f + seed) * MathF.Sin(p.Y * 9.3f + 1f) * MathF.Sin(p.Z * 10.7f + 2f);
+            var q = p * radius;
+            foreach (var (normal, distance) in cuts)
+            {
+                var d = Vector3.Dot(q, normal);
+                if (d > distance)
+                {
+                    q -= normal * (d - distance);
+                }
+            }
+
+            positions[i] = q * stretch;
         }
 
         var normals = new Vector3[positions.Count];

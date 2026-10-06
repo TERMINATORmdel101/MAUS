@@ -396,7 +396,7 @@ internal sealed class BenchmarkRunner : IDisposable
             y += 50 * s;
             _ui.Text(Points(report.OverallScore), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
             y += 130 * s;
-            _ui.Text(T("score combiné  ·  10 000 = Core i7-8700K et RTX 2080 Ti"), cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
+            _ui.Text(T("score combiné en {0}  ·  10 000 = Core i7-8700K et RTX 2080 Ti", ResolutionName(_options.RenderSize)), cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
             y += 60 * s;
 
             var colW = 520 * s;
@@ -459,11 +459,19 @@ internal sealed class BenchmarkRunner : IDisposable
 
     private static string Points(double score) => score > 0 ? score.ToString("N0", Culture) : "—";
 
+    internal static string ResolutionName(RenderSize size) => size.Height switch
+    {
+        >= 2160 => "4K",
+        >= 1440 => "1440p",
+        _ => "1080p",
+    };
+
     internal static string TestName(string id) => id switch
     {
         "fractal" => T("Forge fractale (calcul)"),
         "galaxy" => T("Collision galactique (bande passante)"),
         "ring" => T("Anneau de la géante (géométrie)"),
+        "battle" => T("Champ de bataille (effets)"),
         "cpu-render" => T("Rendu sur tous les cœurs"),
         "cpu-single" => T("Rendu sur un seul cœur"),
         "cpu-vector" => T("Calcul vectoriel"),
@@ -499,25 +507,49 @@ internal sealed class BenchmarkRunner : IDisposable
 }
 
 /// <summary>
-/// Mesures de la machine de référence (Core i7-8700K, GeForce RTX 2080 Ti, Direct3D 12, calcul en 2560×1440) : chaque
-/// test y vaut 10 000 points. Valeurs mesurées par le projet sur cette machine (étalonnage du benchmark).
+/// Mesures de la machine de référence (Core i7-8700K, GeForce RTX 2080 Ti, Direct3D 12) : chaque test y vaut 10 000
+/// points. Les scènes de la carte graphique ont une référence par résolution (1080p, 1440p, 4K) : les points ne se
+/// comparent qu'à résolution égale. Valeurs mesurées par le projet sur cette machine (étalonnage du benchmark).
 /// </summary>
 internal static class BenchReference
 {
+    // Mesures du 06/10/2026 sur la machine de référence (Direct3D 12, passes accélérées qui parcourent les mêmes trajets).
+    private static readonly Dictionary<string, double> At1080 = new(StringComparer.Ordinal)
+    {
+        ["ring"] = 26.3,
+        ["battle"] = 46.9,
+        ["galaxy"] = 12.0,
+        ["fractal"] = 18.6,
+    };
+
+    private static readonly Dictionary<string, double> At2160 = new(StringComparer.Ordinal)
+    {
+        ["ring"] = 24.3,
+        ["battle"] = 13.9,
+        ["galaxy"] = 3.70,
+        ["fractal"] = 4.64,
+    };
+
+    /// <summary>1440p, et tests du processeur (indépendants de la résolution).</summary>
     private static readonly Dictionary<string, double> Values = new(StringComparer.Ordinal)
     {
-        // Mesuré le 06/10/2026 sur la machine de référence (Direct3D 12, passe accélérée qui parcourt les mêmes trajets).
-        ["ring"] = 25.4,
-        ["galaxy"] = 15.4,
-        ["fractal"] = 12.9,
+        ["ring"] = 25.5,
+        ["battle"] = 29.0,
+        ["galaxy"] = 6.68,
+        ["fractal"] = 11.0,
         ["cpu-render"] = 6.79,
-        ["cpu-single"] = 0.69,
-        ["cpu-vector"] = 1.33,
+        ["cpu-single"] = 0.693,
+        ["cpu-vector"] = 1.32,
     };
 
     public static double For(string id, BenchOptions options)
     {
-        _ = options;
-        return Values.TryGetValue(id, out var value) ? value : 0;
+        var table = options.RenderSize.Height switch
+        {
+            >= 2160 => At2160,
+            >= 1440 => Values,
+            _ => At1080,
+        };
+        return table.TryGetValue(id, out var value) || Values.TryGetValue(id, out value) ? value : 0;
     }
 }

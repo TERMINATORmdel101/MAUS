@@ -18,8 +18,9 @@ internal sealed class PathTracerTest : CpuBenchTest
     private readonly Vector3[] _accumulation;
     private readonly int[] _samples;
 
+    // Tous les cœurs : image en 1080p natif ; un seul cœur : 960×540 (sinon l'image n'aurait pas le temps de se former).
     public PathTracerTest(bool singleCore)
-        : base(960, 540)
+        : base(singleCore ? 960 : 1920, singleCore ? 540 : 1080)
     {
         _singleCore = singleCore;
         _accumulation = new Vector3[Width * Height];

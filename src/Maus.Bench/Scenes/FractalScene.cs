@@ -71,7 +71,7 @@ internal sealed class FractalScene : BenchScene
             SunColor = new Vector3(1f, 0.78f, 0.55f) * 1.4f,
             Params0 = new Vector4(-1.77f, 0.25f, 1f, 14f),
             Params1 = new Vector4(orb, 1.6f),
-            Params2 = new Vector4(0.06f, 0.35f, 260f, 64f),
+            Params2 = new Vector4(0.06f, 0.35f, 320f, 80f),
             Params3 = new Vector4(t * 0.01f, 2.4f, 1f, 0.06f),
         };
     }

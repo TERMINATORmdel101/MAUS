@@ -143,13 +143,20 @@ struct BackgroundOut
 float3 PlanetBands(float3 p)
 {
     float latitude = p.y;
-    float turbulence = Fbm(float3(p.x * 2.0, p.y * 9.0, p.z * 2.0) + Time * 0.01, 6);
-    float band = latitude * 7.0 + turbulence * 1.6;
-    float3 cream = float3(0.95, 0.86, 0.68);
-    float3 rust = float3(0.72, 0.42, 0.24);
-    float3 brown = float3(0.42, 0.26, 0.17);
+    // Les bandes glissent les unes sur les autres (cisaillement selon la latitude) et se déchirent en tourbillons.
+    float shear = sin(latitude * 23.0) * 0.35;
+    float3 q = float3(p.x * cos(shear) - p.z * sin(shear), p.y, p.x * sin(shear) + p.z * cos(shear));
+    float turbulence = Fbm(float3(q.x * 2.5, q.y * 11.0, q.z * 2.5) + Time * 0.008, 7);
+    float fine = Fbm(float3(q.x * 9.0, q.y * 40.0, q.z * 9.0), 4);
+    float band = latitude * 7.5 + turbulence * 1.4 + fine * 0.25;
+    float3 cream = float3(0.96, 0.88, 0.72);
+    float3 rust = float3(0.76, 0.44, 0.24);
+    float3 brown = float3(0.40, 0.25, 0.16);
     float3 color = lerp(cream, rust, 0.5 + 0.5 * sin(band * 2.1));
     color = lerp(color, brown, saturate(sin(band * 0.7 + 1.0) * 0.8));
+    color *= 0.9 + 0.2 * fine;
+    // Pôles plus sombres et bleutés.
+    color = lerp(color, float3(0.35, 0.38, 0.45), smoothstep(0.75, 0.98, abs(latitude)) * 0.7);
     // Une tempête ovale.
     float2 storm = float2(atan2(p.z, p.x) - 0.9, (latitude + 0.32) * 3.5);
     color = lerp(color, float3(0.85, 0.35, 0.2), smoothstep(0.35, 0.1, length(storm)) * 0.8);

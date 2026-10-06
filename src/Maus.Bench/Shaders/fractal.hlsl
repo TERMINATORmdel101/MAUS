@@ -182,7 +182,7 @@ float SunVisibility(float3 p, int steps)
 // Le point de départ change à chaque pixel et à chaque image, l'anticrénelage temporel lisse le résultat.
 float4 VolumetricLight(float3 origin, float3 direction, float distance, float2 pixel)
 {
-    const int samples = 32;
+    const int samples = 48;
     float stepSize = min(distance, 10.0) / samples;
     float offset = InterleavedNoise(pixel);
     float phase = PhaseHG(dot(direction, SunDir), 0.6) * 4.0 * PI;
@@ -196,7 +196,7 @@ float4 VolumetricLight(float3 origin, float3 direction, float distance, float2 p
         // Brume concentrée autour de la fractale : le ciel lointain reste sombre et contrasté.
         float aura = exp(-max(length(p) - 1.6, 0.0) * 2.2);
         float density = Params2.x * aura * (0.45 + 1.1 * ValueNoise(p * 2.5 + float3(0.0, Time * 0.03, Time * 0.02)));
-        float visibility = SunVisibility(p, 18);
+        float visibility = SunVisibility(p, 24);
         light += transmittance * density * stepSize * SunColor * (visibility * phase * 0.9 + 0.003);
         transmittance *= exp(-density * stepSize);
     }

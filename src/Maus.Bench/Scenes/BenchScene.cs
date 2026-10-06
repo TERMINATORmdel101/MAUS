@@ -12,6 +12,7 @@ public enum GpuCapability
     Compute,
     Textures,
     Volumetrics,
+    Effects,
 }
 
 /// <summary>État d'une scène à un instant : caméra, soleil, paramètres des shaders, étalonnage.</summary>
@@ -93,8 +94,16 @@ internal abstract class BenchScene : IDisposable
 
     public abstract GpuCapability Capability { get; }
 
-    /// <summary>Durée mesurée, en secondes (2 min 30 par scène : environ 8 minutes de carte graphique en tout).</summary>
-    public virtual double Duration => 150;
+    /// <summary>Durée mesurée, en secondes (2 minutes par scène : environ 8 minutes de carte graphique en tout).</summary>
+    public virtual double Duration => 120;
+
+    /// <summary>Vrai si la scène dessine aussi des effets transparents après l'anticrénelage (feu, fumée).</summary>
+    public virtual bool HasOverlay => false;
+
+    /// <summary>Effets transparents dessinés après l'anticrénelage, dans l'image HDR <paramref name="target"/>.</summary>
+    public virtual void RenderOverlay(SceneContext context, ITexture target)
+    {
+    }
 
     /// <summary>Temps du trajet de caméra : le trajet entier est parcouru pendant la durée de la scène.</summary>
     protected double PathTime(double time, CameraPath path) => time * path.Duration / Duration;

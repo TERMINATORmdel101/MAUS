@@ -16,7 +16,7 @@ internal sealed class MandelbrotTest : CpuBenchTest
     private readonly float[] _smooth;
 
     public MandelbrotTest()
-        : base(960, 540)
+        : base(1920, 1080)
     {
         _smooth = new float[Width * Height];
     }

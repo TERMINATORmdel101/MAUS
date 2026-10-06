@@ -1172,6 +1172,9 @@
                                             <TextBlock Text="{x:Static app:Ui.ApiLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                             <ComboBox AutomationProperties.Name="{x:Static app:Ui.ApiLabel}" MinWidth="220" Margin="0,0,12,4" ItemsSource="{Binding Workshop.BenchmarkApis, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkApi}"
                                                       DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Static app:Ui.ResolutionLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.ResolutionLabel}" MinWidth="200" Margin="0,0,12,4" ItemsSource="{Binding Workshop.BenchmarkResolutions, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkResolution}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
                                             <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
                                                     Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartBenchmarkCommand}" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
                                         </WrapPanel>

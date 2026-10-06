@@ -181,7 +181,7 @@ internal sealed class GalaxyScene : BenchScene
         CoreA = new Vector4(_a.Position, _a.Mass),
         CoreB = new Vector4(_b.Position, _b.Mass),
         Simulation = new Vector4(Step, Softening, Stars, Total),
-        Look = new Vector4(1.5f, 0.2f, 0.0016f, 0.035f),
+        Look = new Vector4(1.3f, 0.3f, 0.0011f, 0.035f),
         InitA = new Vector4(_a.Velocity, _a.Tilt),
         InitB = new Vector4(_b.Velocity, _b.Tilt),
     };

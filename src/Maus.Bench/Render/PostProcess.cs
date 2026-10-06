@@ -60,6 +60,7 @@ internal sealed class PostProcess : IDisposable
     private readonly IPipeline _bloomDown;
     private readonly IPipeline _bloomUp;
     private readonly IPipeline _final;
+    private readonly ITexture _composite;
     private int _current;
     private bool _historyValid;
 
@@ -75,6 +76,7 @@ internal sealed class PostProcess : IDisposable
             _history[i] = device.CreateTexture(TextureDesc.Target(size.Width, size.Height, PixelFormat.Rgba16Float, "Historique " + i));
         }
 
+        _composite = device.CreateTexture(TextureDesc.Target(size.Width, size.Height, PixelFormat.Rgba16Float, "Image et effets"));
         var width = size.Width;
         var height = size.Height;
         for (var i = 0; i < BloomLevels; i++)
@@ -110,7 +112,7 @@ internal sealed class PostProcess : IDisposable
         new(name, vs, ps, [], blend, DepthMode.None, CullMode.None, [target]);
 
     /// <summary>Anticrénelage, halo et image finale vers l'image affichée.</summary>
-    public void Run(ICommandList cmd, ColorGrade grade, bool temporal)
+    public void Run(ICommandList cmd, ColorGrade grade, bool temporal, Action<ITexture>? overlay = null)
     {
         var size = new Vector4(Size.Width, Size.Height, 1f / Size.Width, 1f / Size.Height);
         var previous = _history[_current];
@@ -125,6 +127,14 @@ internal sealed class PostProcess : IDisposable
         cmd.SetConstants(1, new PostConstants { SourceSize = size, Extra = new Vector4(_historyValid && temporal ? 0.1f : 1f, 0, 0, 0) });
         cmd.Draw(3);
         _historyValid = true;
+
+        // Effets transparents (feu, fumée) : ajoutés à une copie, pour ne pas laisser de traînées dans l'historique.
+        if (overlay is not null)
+        {
+            cmd.CopyTexture(_composite, resolved);
+            overlay(_composite);
+            resolved = _composite;
+        }
 
         // Halo : réductions successives…
         var source = resolved;
@@ -188,6 +198,7 @@ internal sealed class PostProcess : IDisposable
     public void Dispose()
     {
         HdrColor.Dispose();
+        _composite.Dispose();
         Velocity.Dispose();
         Depth.Dispose();
         foreach (var texture in _history)

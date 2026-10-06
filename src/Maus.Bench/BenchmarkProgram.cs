@@ -61,7 +61,7 @@ public static partial class BenchmarkProgram
 
     internal static IReadOnlyList<BenchScene> CreateScenes(IReadOnlyCollection<string> only)
     {
-        BenchScene[] all = [new RingScene(), new GalaxyScene(), new FractalScene()];
+        BenchScene[] all = [new RingScene(), new BattleScene(), new GalaxyScene(), new FractalScene()];
         return only.Count == 0 ? all : all.Where(s => only.Contains(s.Id)).ToArray();
     }
 
@@ -149,7 +149,7 @@ public static partial class BenchmarkProgram
         cmd.SetConstants(0, frame);
         scene.Render(context);
         cmd.SetConstants(0, frame);
-        post.Run(cmd, state.Grade, state.Temporal);
+        post.Run(cmd, state.Grade, state.Temporal, scene.HasOverlay ? target => scene.RenderOverlay(context, target) : null);
     }
 
     [LibraryImport("user32.dll")]
@@ -172,7 +172,8 @@ internal sealed record BenchOptions
 
     public int OutputHeight { get; init; } = 1080;
 
-    public RenderSize RenderSize { get; init; } = new(2560, 1440);
+    /// <summary>Résolution de calcul des scènes : 1080p par défaut (recommandé), 1440p ou 4K au choix.</summary>
+    public RenderSize RenderSize { get; init; } = new(1920, 1080);
 
     public double DurationScale { get; init; } = 1;
 
@@ -221,6 +222,19 @@ internal sealed record BenchOptions
         if (Value("--size") is { } size && size.Split('x') is [var w, var h])
         {
             options = options with { OutputWidth = int.Parse(w, CultureInfo.InvariantCulture), OutputHeight = int.Parse(h, CultureInfo.InvariantCulture) };
+        }
+
+        if (Value("--resolution") is { } resolution)
+        {
+            options = options with
+            {
+                RenderSize = resolution.ToLowerInvariant() switch
+                {
+                    "1440p" => new RenderSize(2560, 1440),
+                    "4k" or "2160p" => new RenderSize(3840, 2160),
+                    _ => new RenderSize(1920, 1080),
+                },
+            };
         }
 
         if (Value("--duration-scale") is { } scale)
