@@ -21,10 +21,13 @@ public sealed class PresentMonCapture : IDisposable
 
     private readonly Process _process;
 
-    private PresentMonCapture(Process process, FrameTimeLog log)
+    private readonly string _sessionName;
+
+    private PresentMonCapture(Process process, FrameTimeLog log, string sessionName)
     {
         _process = process;
         Log = log;
+        _sessionName = sessionName;
     }
 
     public FrameTimeLog Log { get; }
@@ -32,7 +35,9 @@ public sealed class PresentMonCapture : IDisposable
     public static string ExecutablePath => Path.Combine(AppContext.BaseDirectory, "PresentMon", "PresentMon.exe");
 
     /// <summary>Démarre la mesure ; <c>null</c> si PresentMon est absent, modifié ou refuse de démarrer.</summary>
-    public static PresentMonCapture? TryStart()
+    /// <param name="keep">Durée gardée en mémoire (compteur en direct) ; <c>null</c> = toute la mesure (relevé de partie).</param>
+    /// <param name="sessionName">Nom de la session d'écoute de Windows (une par usage, pour que les deux puissent coexister).</param>
+    public static PresentMonCapture? TryStart(TimeSpan? keep = null, string sessionName = SessionName)
     {
         var path = ExecutablePath;
         if (!IsGenuine(path))
@@ -41,7 +46,7 @@ public sealed class PresentMonCapture : IDisposable
             return null;
         }
 
-        var log = new FrameTimeLog();
+        var log = new FrameTimeLog(keep);
         var start = new ProcessStartInfo(path)
         {
             UseShellExecute = false,
@@ -49,7 +54,7 @@ public sealed class PresentMonCapture : IDisposable
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
-        foreach (var argument in new[] { "--output_stdout", "--v1_metrics", "--no_console_stats", "--stop_existing_session", "--session_name", SessionName })
+        foreach (var argument in new[] { "--output_stdout", "--v1_metrics", "--no_console_stats", "--stop_existing_session", "--session_name", sessionName })
         {
             start.ArgumentList.Add(argument);
         }
@@ -62,7 +67,7 @@ public sealed class PresentMonCapture : IDisposable
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            return new PresentMonCapture(process, log);
+            return new PresentMonCapture(process, log, sessionName);
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
         {
@@ -87,14 +92,14 @@ public sealed class PresentMonCapture : IDisposable
             // Déjà terminé.
         }
 
-        CloseSession();
+        CloseSession(_sessionName);
         return Log.Summarize();
     }
 
     public void Dispose() => _process.Dispose();
 
     /// <summary>Une session d'écoute laissée ouverte par un arrêt brutal est refermée par PresentMon lui-même.</summary>
-    private static void CloseSession()
+    private static void CloseSession(string sessionName)
     {
         if (!IsGenuine(ExecutablePath))
         {
@@ -106,7 +111,7 @@ public sealed class PresentMonCapture : IDisposable
             var start = new ProcessStartInfo(ExecutablePath) { UseShellExecute = false, CreateNoWindow = true };
             start.ArgumentList.Add("--terminate_existing_session");
             start.ArgumentList.Add("--session_name");
-            start.ArgumentList.Add(SessionName);
+            start.ArgumentList.Add(sessionName);
             using var closer = Process.Start(start);
             closer?.WaitForExit(5000);
         }

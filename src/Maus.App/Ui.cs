@@ -33,6 +33,22 @@ public static class Ui
 
     public static string SeeSource => T("Voir la source");
 
+    public static string FpsTitle => T("Images par seconde");
+
+    public static string FpsAverage => T("MOYENNE");
+
+    public static string FpsLow1 => T("1 % LE PLUS LENT");
+
+    public static string FpsLow01 => T("0,1 % LE PLUS LENT");
+
+    public static string FpsGpu => T("CARTE GRAPHIQUE");
+
+    public static string FpsAverageTip => T("Images par seconde sur les dix dernières secondes : nombre d'images divisé par le temps.");
+
+    public static string FpsLowTip => T("Images par seconde des images les plus lentes : 1 % (ou 0,1 %) des images ont duré au moins aussi longtemps. Un chiffre bas par rapport à la moyenne se ressent comme des saccades.");
+
+    public static string FpsGpuTip => T("Part de la durée de chaque image pendant laquelle la carte graphique a travaillé (méthode « GPU Busy » d'Intel PresentMon). Proche de 100 % : la carte graphique limite. Nettement moins : le processeur, la mémoire ou une limite d'images freinent.");
+
     public static string FixThisTip => T("Coche la correction de ce constat et ouvre l'onglet Corrections : rien n'est modifié avant que vous cliquiez sur « Appliquer ».");
 
     public static string TestsStability => T("Stabilité");

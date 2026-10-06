@@ -88,7 +88,7 @@ public sealed class WatchedEventViewModel(WatchedEvent e)
 /// Fenêtre de surveillance, façon HWMonitor simplifié : relit les mesures de l'atelier (aucune mesure en double), garde les
 /// extrêmes, et relève toutes les 5 secondes les erreurs matérielles (WHEA, dont PCI Express) et de Windows depuis son ouverture.
 /// </summary>
-public sealed class MonitorViewModel : ObservableObject, IDisposable
+public sealed partial class MonitorViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan ErrorPeriod = TimeSpan.FromSeconds(5);
 
@@ -198,6 +198,7 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        StopFps();
         _errorTimer.Stop();
         _workshop.Sampled -= OnSampled;
         _workshop.PropertyChanged -= OnWorkshopChanged;

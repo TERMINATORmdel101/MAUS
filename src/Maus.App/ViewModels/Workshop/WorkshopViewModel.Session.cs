@@ -163,9 +163,10 @@ public sealed partial class WorkshopViewModel
                 return capture.Stop();
             }
         });
+        var refresh = Maus.Core.Platform.DisplayRefresh.PrimaryHz();
         var line = frames is null
             ? T("Images par seconde : pas assez d'images d'un même jeu pendant le relevé (au moins {0}).", FrameTimeLog.MinimumFrames)
-            : T("Images par seconde : {0}", frames.Describe());
+            : string.Join(Environment.NewLine, [T("Images par seconde : {0}", frames.Describe()), .. FrameAdvice.Explain(frames, refresh).Select(l => "• " + l)]);
         SessionSummary = SessionSummary.Length == 0 ? line : line + Environment.NewLine + Environment.NewLine + SessionSummary;
     }
 
