@@ -459,14 +459,23 @@ internal sealed class BenchmarkRunner : IDisposable
             var y = 70 * s;
             _ui.Text(report.Completed ? T("Résultats") : T("Résultats partiels (benchmark arrêté)"), cx, y, 30 * s, UiColors.Grey(), bold: true, TextAlign.Center);
             y += 50 * s;
-            _ui.Text(Points(report.OverallScore * reveal), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
+            // Passe partielle (carte graphique seule ou processeur seul) : le score du composant testé passe au premier plan.
+            var (headline, caption) = report.OverallScore > 0
+                ? (report.OverallScore, T("score combiné en {0}  ·  10 000 = Core i7-8700K et RTX 2080 Ti", ResolutionName(_options.RenderSize)))
+                : report.GpuScore > 0
+                    ? (report.GpuScore, T("score de la carte graphique en {0}  ·  10 000 = RTX 2080 Ti", ResolutionName(_options.RenderSize)))
+                    : (report.CpuScore, T("score du processeur  ·  10 000 = Core i7-8700K"));
+            _ui.Text(Points(headline * reveal), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
             y += 130 * s;
-            _ui.Text(T("score combiné en {0}  ·  10 000 = Core i7-8700K et RTX 2080 Ti", ResolutionName(_options.RenderSize)), cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
+            _ui.Text(caption, cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
             y += 60 * s;
 
             var colW = 520 * s;
-            DrawScoreColumn(T("Carte graphique"), report.GpuScore, report.Tests.Where(t => t.Device == "gpu").ToList(), cx - colW - (30 * s), y, colW, UiColors.Blue(), reveal);
-            DrawScoreColumn(T("Processeur"), report.CpuScore, report.Tests.Where(t => t.Device == "cpu").ToList(), cx + (30 * s), y, colW, UiColors.Mint(), reveal);
+            var gpuTests = report.Tests.Where(t => t.Device == "gpu").ToList();
+            var cpuTests = report.Tests.Where(t => t.Device == "cpu").ToList();
+            var both = gpuTests.Count > 0 && cpuTests.Count > 0;
+            DrawScoreColumn(T("Carte graphique"), report.GpuScore, gpuTests, both ? cx - colW - (30 * s) : cx - (colW / 2), y, colW, UiColors.Blue(), reveal);
+            DrawScoreColumn(T("Processeur"), report.CpuScore, cpuTests, both ? cx + (30 * s) : cx - (colW / 2), y, colW, UiColors.Mint(), reveal);
 
             var bottom = _ui.Height - (150 * s);
             if (strongest is not null && weakest is not null && strongest.Id != weakest.Id)
@@ -477,7 +486,7 @@ internal sealed class BenchmarkRunner : IDisposable
 
             _ui.Text(T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark)."), cx, _ui.Height - (56 * s), 17 * s, UiColors.Grey(0.85f), align: TextAlign.Center);
             _ui.Flush(cmd);
-            Screenshot("results", true);
+            Screenshot("results", age > 2.2);
             _device.Present();
             Thread.Sleep(10);
         }

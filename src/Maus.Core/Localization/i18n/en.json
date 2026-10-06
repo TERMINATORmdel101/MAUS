@@ -3138,6 +3138,8 @@
   "santé du PC · sur 100": "PC health · out of 100",
   "sauvegarde de la mémoire volatile en panne": "volatile memory backup failed",
   "score combiné en {0}  ·  10 000 = Core i7-8700K et RTX 2080 Ti": "combined score at {0}  ·  10,000 = Core i7-8700K and RTX 2080 Ti",
+  "score de la carte graphique en {0}  ·  10 000 = RTX 2080 Ti": "graphics card score at {0}  ·  10,000 = RTX 2080 Ti",
+  "score du processeur  ·  10 000 = Core i7-8700K": "processor score  ·  10,000 = Core i7-8700K",
   "script de configuration : {0}": "configuration script: {0}",
   "secteur défectueux (disk 7)": "bad sector (disk 7)",
   "selon le profil choisi": "depending on the chosen profile",
