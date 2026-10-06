@@ -85,6 +85,22 @@ public static class Ui
 
     public static string BenchmarkImageFolder => T("Afficher dans le dossier");
 
+    public static string BenchmarkCompareHeading => T("Comparer avec un autre résultat");
+
+    public static string BenchmarkCompareDetail => T("Collez le texte copié par un ami avec le bouton « Copier le résultat » de son MAUS (il contient une ligne MAUS-BENCH-1), ou comparez avec votre passe précédente. Rien n'est envoyé : tout se fait sur votre PC.");
+
+    public static string BenchmarkCompareButton => T("Comparer");
+
+    public static string BenchmarkComparePrevious => T("Avec ma passe précédente");
+
+    public static string BenchmarkCompareTest => T("Test");
+
+    public static string BenchmarkCompareMine => T("Vous");
+
+    public static string BenchmarkCompareTheirs => T("L'autre");
+
+    public static string BenchmarkCompareGap => T("Écart");
+
     public static string BenchmarkPointer => T("Le benchmark visuel a sa propre page dans le menu de gauche : lancement, dernier résultat et historique.");
 
     public static string GpuLabel => T("Carte graphique");

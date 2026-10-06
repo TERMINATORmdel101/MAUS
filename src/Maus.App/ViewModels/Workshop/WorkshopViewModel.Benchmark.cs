@@ -19,6 +19,9 @@ public sealed record BenchmarkRow(string Name, string Points, string Detail, dou
 /// <summary>Une passe de l'historique.</summary>
 public sealed record BenchmarkRunRow(string When, string Summary);
 
+/// <summary>Une ligne de la comparaison : test, vos points, les points de l'autre résultat, écart (+ = l'autre est plus rapide).</summary>
+public sealed record BenchmarkCompareRow(string Name, string Mine, string Theirs, string Difference);
+
 /// <summary>
 /// Page Benchmark : lancement (processus séparé, MAUS.exe --benchmark, avec sa propre fenêtre plein écran : un plantage
 /// du pilote graphique n'emporte pas MAUS), dernier résultat détaillé, historique des passes, copie du résultat.
@@ -36,6 +39,11 @@ public sealed partial class WorkshopViewModel
     private ICommand? _copyBenchmarkImage;
     private ICommand? _openBenchmarkImage;
     private ICommand? _showBenchmarkImage;
+    private ICommand? _compareBenchmark;
+    private ICommand? _compareWithPrevious;
+    private string _benchmarkCompareText = "";
+    private string? _benchmarkCompareStatus;
+    private BenchmarkReport? _compared;
     private IReadOnlyList<BenchmarkReport>? _benchmarkHistory;
 
     /// <summary>Interfaces graphiques proposées : DirectX 12 recommandé (le plus moderne), DirectX 11 pour comparer.</summary>
@@ -187,6 +195,74 @@ public sealed partial class WorkshopViewModel
 
     public ICommand StartBenchmarkCommand => _startBenchmark ??= new AsyncCommand(RunBenchmarkAsync);
 
+    /// <summary>Texte collé par l'utilisateur (le message d'un ami), qui contient un code MAUS-BENCH-1.</summary>
+    public string BenchmarkCompareText
+    {
+        get => _benchmarkCompareText;
+        set => SetProperty(ref _benchmarkCompareText, value ?? "");
+    }
+
+    public string BenchmarkCompareStatus
+    {
+        get => _benchmarkCompareStatus ?? "";
+        private set => SetProperty(ref _benchmarkCompareStatus, value);
+    }
+
+    public bool HasBenchmarkComparison => _compared is not null && LastBenchmark is not null;
+
+    public string BenchmarkCompareTitle => _compared is { } other
+        ? T("Comparé à : {0} · {1} ({2}, {3}, {4})", other.Gpu, other.Cpu, other.RenderResolution, other.Api, other.Date.ToLocalTime().ToString("d", Texts.Culture))
+        : "";
+
+    /// <summary>Les points ne se comparent qu'à résolution égale : avertissement sinon.</summary>
+    public string BenchmarkCompareWarning => _compared is { } other && LastBenchmark is { } mine && !BenchmarkComparison.Comparable(mine, other)
+        ? T("Attention : résolutions différentes ({0} contre {1}), les points ne se comparent pas vraiment.", mine.RenderResolution, other.RenderResolution)
+        : "";
+
+    public bool HasBenchmarkCompareWarning => BenchmarkCompareWarning.Length > 0;
+
+    public IReadOnlyList<BenchmarkCompareRow> BenchmarkCompareRows => _compared is { } other && LastBenchmark is { } mine
+        ? [.. BenchmarkComparison.Compare(mine, other).Select(r => new BenchmarkCompareRow(
+            r.Id switch
+            {
+                "overall" => T("Score combiné"),
+                "gpu" => T("Carte graphique"),
+                "cpu" => T("Processeur"),
+                _ => BenchmarkNames.Of(r.Id),
+            },
+            Points(r.Mine),
+            Points(r.Theirs),
+            r.Difference is { } d ? (d > 0 ? "+" : "") + d.ToString("0.0", Texts.Culture) + " %" : "—"))]
+        : [];
+
+    public ICommand CompareBenchmarkCommand => _compareBenchmark ??= new AsyncCommand(() =>
+    {
+        if (BenchmarkShareCode.Decode(BenchmarkCompareText) is { } other)
+        {
+            ShowComparison(other, "");
+        }
+        else
+        {
+            BenchmarkCompareStatus = T("Aucun code MAUS-BENCH-1 valable dans ce texte : demandez à votre ami le texte de son bouton « Copier le résultat ».");
+        }
+
+        return Task.CompletedTask;
+    });
+
+    public ICommand CompareWithPreviousCommand => _compareWithPrevious ??= new AsyncCommand(() =>
+    {
+        if (VisualRuns.Count >= 2)
+        {
+            ShowComparison(VisualRuns[^2], "");
+        }
+        else
+        {
+            BenchmarkCompareStatus = T("Il faut au moins deux passes dans l'historique pour comparer.");
+        }
+
+        return Task.CompletedTask;
+    });
+
     /// <summary>Image du résultat de la dernière passe (fichier PNG enregistré par le benchmark), si elle existe encore.</summary>
     private string? BenchmarkImagePath => LastBenchmark?.Image is { } path && File.Exists(path) ? path : null;
 
@@ -296,6 +372,7 @@ public sealed partial class WorkshopViewModel
             nameof(BenchmarkGpuSensors), nameof(HasBenchmarkGpuSensors), nameof(BenchmarkCpuSensors), nameof(HasBenchmarkCpuSensors),
             nameof(BenchmarkGpuWarning), nameof(HasBenchmarkGpuWarning), nameof(BenchmarkCpuWarning), nameof(HasBenchmarkCpuWarning),
             nameof(HasBenchmarkImage), nameof(BenchmarkImageSource),
+            nameof(HasBenchmarkComparison), nameof(BenchmarkCompareTitle), nameof(BenchmarkCompareWarning), nameof(HasBenchmarkCompareWarning), nameof(BenchmarkCompareRows),
         })
         {
             OnPropertyChanged(name);
@@ -341,8 +418,19 @@ public sealed partial class WorkshopViewModel
             text.AppendLine("  • " + BenchmarkNames.Of(test.Id) + " : " + Points(test.Score) + " (" + value + ")");
         }
 
-        text.Append(T("10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti). Deux fois plus de points = deux fois plus rapide."));
+        text.AppendLine(T("10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti). Deux fois plus de points = deux fois plus rapide."));
+        text.Append(T("Code à coller dans MAUS (page Benchmark) pour comparer : {0}", BenchmarkShareCode.Encode(report)));
         return text.ToString();
+    }
+
+    private void ShowComparison(BenchmarkReport other, string status)
+    {
+        _compared = other;
+        BenchmarkCompareStatus = status;
+        foreach (var name in new[] { nameof(HasBenchmarkComparison), nameof(BenchmarkCompareTitle), nameof(BenchmarkCompareWarning), nameof(HasBenchmarkCompareWarning), nameof(BenchmarkCompareRows) })
+        {
+            OnPropertyChanged(name);
+        }
     }
 
     private static BitmapImage? LoadImage(string path)
