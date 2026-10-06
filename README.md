@@ -70,9 +70,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File installer\build-installer.ps
 
 ## Code signing policy
 
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+MAUS has applied for free code signing by [SignPath.io](https://about.signpath.io), with a certificate from the [SignPath Foundation](https://signpath.org).
 
-**Status:** the application to the SignPath Foundation is being prepared; current releases are **not signed yet**. Once accepted, only installers built by the project's own build from this repository's source code will be signed.
+**Status:** the application was **declined for now** (October 2026: the project is still too new and not yet widely known); it will be submitted again later. Current releases are **not signed**. If it is accepted, only installers built by the project's own build from this repository's source code will be signed.
 
 Team roles:
 
@@ -81,7 +81,7 @@ Team roles:
 
 Privacy policy: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. (MAUS has no telemetry. Network access happens only for actions the user starts: Windows Update search during an audit, software update list with winget, web search about a process, connection test, links to GitHub.)
 
-*En français :* la signature du code sera fournie gratuitement par SignPath.io, avec un certificat de la SignPath Foundation. La demande est en préparation : les versions actuelles ne sont **pas encore signées**. MAUS n'envoie aucune information sur le réseau sans une action de l'utilisateur.
+*En français :* MAUS a demandé une signature du code gratuite à SignPath.io, avec un certificat de la SignPath Foundation. La demande a été **refusée pour l'instant** (octobre 2026 : projet encore trop récent et peu connu) ; elle sera refaite plus tard. Les versions actuelles ne sont **pas signées**. MAUS n'envoie aucune information sur le réseau sans une action de l'utilisateur.
 
 ## Compiler
 
@@ -131,4 +131,4 @@ Les suggestions d'amélioration sont les bienvenues : ouvrez une *issue* ou prop
 MAUS est un logiciel libre distribué sous licence **GNU GPL version 3** (GPL-3.0-only, texte complet dans [LICENSE](LICENSE)), avec les conditions additionnelles de l'article 7 décrites dans [TRADEMARKS.md](TRADEMARKS.md). Il est fourni sans aucune garantie.
 
 MAUS est un logiciel indépendant. Il n'est affilié ni à Microsoft, NVIDIA, AMD, Intel ou Anthropic, ni approuvé par eux. Windows et Xbox sont des marques du groupe Microsoft ; les autres marques citées appartiennent à leurs propriétaires respectifs.
-This project uses the SignPath Foundation for code signing.
+This project has applied to the SignPath Foundation for code signing (not accepted yet: releases are currently unsigned).
