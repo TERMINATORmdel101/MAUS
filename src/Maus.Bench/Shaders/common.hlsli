@@ -33,6 +33,13 @@ cbuffer FrameConstants : register(b0)
     float4 Params3;
 };
 
+// Mode léger (720p, cartes intégrées) : les shaders compilés avec MAUS_LIGHT allègent leurs calculs par pixel.
+#ifdef MAUS_LIGHT
+static const bool Light = true;
+#else
+static const bool Light = false;
+#endif
+
 static const float PI = 3.14159265358979;
 static const float TAU = 6.28318530717959;
 

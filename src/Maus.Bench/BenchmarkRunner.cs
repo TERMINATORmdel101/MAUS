@@ -174,7 +174,7 @@ internal sealed class BenchmarkRunner : IDisposable
     private bool RunScene(BenchScene scene, int index, int total)
     {
         // Chargement (non mesuré), à l'intérieur d'une image : une scène peut y préparer ses données par la carte.
-        var context = new SceneContext(_device, _shaders, _post);
+        var context = new SceneContext(_device, _shaders, _post) { Light = _options.Light };
         DrawMessage(T("Chargement : {0}", scene.Title), index, total, () => scene.Load(context));
         _device.WaitIdle();
         _post.ResetHistory();
@@ -592,7 +592,8 @@ internal sealed class BenchmarkRunner : IDisposable
     {
         >= 2160 => "4K",
         >= 1440 => "1440p",
-        _ => "1080p",
+        >= 1080 => "1080p",
+        _ => T("720p léger"),
     };
 
     internal static string TestName(string id) => id switch
@@ -653,6 +654,15 @@ internal static class BenchReference
         ["fractal"] = 28.6,
     };
 
+    // Mode léger (720p, scènes allégées) : pour les cartes intégrées ; points comparables entre passes légères seulement.
+    private static readonly Dictionary<string, double> At720 = new(StringComparer.Ordinal)
+    {
+        ["ring"] = 164,
+        ["battle"] = 200,
+        ["galaxy"] = 179,
+        ["fractal"] = 141,
+    };
+
     private static readonly Dictionary<string, double> At2160 = new(StringComparer.Ordinal)
     {
         ["ring"] = 30.8,
@@ -679,7 +689,8 @@ internal static class BenchReference
         {
             >= 2160 => At2160,
             >= 1440 => Values,
-            _ => At1080,
+            >= 1080 => At1080,
+            _ => At720,
         };
         return table.TryGetValue(id, out var value) || Values.TryGetValue(id, out value) ? value : 0;
     }

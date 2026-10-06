@@ -85,7 +85,7 @@ public static partial class BenchmarkProgram
         Console.WriteLine($"{device.Api} : {device.AdapterName} ({device.DedicatedVideoMemory / (1024 * 1024)} Mo)");
         var shaders = new ShaderLibrary();
         using var post = new PostProcess(device, shaders, options.RenderSize);
-        var context = new SceneContext(device, shaders, post);
+        var context = new SceneContext(device, shaders, post) { Light = options.Light };
         var builder = new FrameBuilder();
         foreach (var scene in CreateScenes(options.Scenes))
         {
@@ -178,8 +178,11 @@ internal sealed record BenchOptions
 
     public int OutputHeight { get; init; } = 1080;
 
-    /// <summary>Résolution de calcul des scènes : 1080p par défaut (recommandé), 1440p ou 4K au choix.</summary>
+    /// <summary>Résolution de calcul des scènes : 1080p par défaut (recommandé), 720p léger, 1440p ou 4K au choix.</summary>
     public RenderSize RenderSize { get; init; } = new(1920, 1080);
+
+    /// <summary>Mode léger : 720p et scènes allégées (cartes intégrées, petits portables).</summary>
+    public bool Light => RenderSize.Height < 1080;
 
     public double DurationScale { get; init; } = 1;
 
@@ -239,6 +242,7 @@ internal sealed record BenchOptions
             {
                 RenderSize = resolution.ToLowerInvariant() switch
                 {
+                    "720p" => new RenderSize(1280, 720),
                     "1440p" => new RenderSize(2560, 1440),
                     "4k" or "2160p" => new RenderSize(3840, 2160),
                     _ => new RenderSize(1920, 1080),

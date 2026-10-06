@@ -13,10 +13,12 @@ namespace Maus.Bench.Scenes;
 /// </summary>
 internal sealed class RingScene : BenchScene
 {
-    private const int Detailed = 180_000;
-    private const int Coarse = 360_000;
     private const float PlanetRadius = 40f;
-    private const int ShadowSize = 4096;
+
+    // Mode léger : deux fois moins de rochers, quatre fois moins de triangles chacun, ombres deux fois moins fines.
+    private int _detailed = 180_000;
+    private int _coarse = 360_000;
+    private int _shadowSize = 4096;
 
     private static readonly Vector3 Sun = Vector3.Normalize(new Vector3(0.55f, 0.22f, -0.8f));
 
@@ -56,15 +58,17 @@ internal sealed class RingScene : BenchScene
     {
         var device = context.Device;
         var shaders = context.Shaders;
+        var detail = context.Light ? 1 : 2;
+        (_detailed, _coarse, _shadowSize) = context.Light ? (90_000, 180_000, 2048) : (180_000, 360_000, 4096);
         for (var v = 0; v < Variants; v++)
         {
-            var (vv, vi) = RockMesh.Create(subdivisions: 2, seed: 11 + (v * 17));
+            var (vv, vi) = RockMesh.Create(subdivisions: detail, seed: 11 + (v * 17));
             _variantVertices[v] = device.CreateBuffer(new BufferDesc(vv.Length * 4, BufferUsage.Vertex, 24, "Rocher détaillé " + v), MemoryMarshal.AsBytes(vv.AsSpan()));
             _variantIndices[v] = device.CreateBuffer(new BufferDesc(vi.Length * 4, BufferUsage.Index, 4, "Rocher détaillé " + v + " : indices"), MemoryMarshal.AsBytes(vi.AsSpan()));
         }
 
-        var (dv, di) = RockMesh.Create(subdivisions: 2, seed: 7);
-        var (cv, ci) = RockMesh.Create(subdivisions: 1, seed: 7);
+        var (dv, di) = RockMesh.Create(subdivisions: detail, seed: 7);
+        var (cv, ci) = RockMesh.Create(subdivisions: detail - 1, seed: 7);
         _detailedVertices = device.CreateBuffer(new BufferDesc(dv.Length * 4, BufferUsage.Vertex, 24, "Rocher détaillé"), MemoryMarshal.AsBytes(dv.AsSpan()));
         _detailedIndices = device.CreateBuffer(new BufferDesc(di.Length * 4, BufferUsage.Index, 4, "Rocher détaillé : indices"), MemoryMarshal.AsBytes(di.AsSpan()));
         _coarseVertices = device.CreateBuffer(new BufferDesc(cv.Length * 4, BufferUsage.Vertex, 24, "Rocher simple"), MemoryMarshal.AsBytes(cv.AsSpan()));
@@ -72,16 +76,16 @@ internal sealed class RingScene : BenchScene
         _detailedIndexCount = di.Length;
         _coarseIndexCount = ci.Length;
 
-        var rocks = CreateRocks();
+        var rocks = CreateRocks(_detailed, _coarse);
         _rocks = device.CreateBuffer(new BufferDesc(rocks.Length * 48L, BufferUsage.Structured, 48, "Rochers"), MemoryMarshal.AsBytes(rocks.AsSpan()));
-        _shadowMap = device.CreateTexture(TextureDesc.DepthTarget(ShadowSize, ShadowSize, "Ombres du soleil"));
+        _shadowMap = device.CreateTexture(TextureDesc.DepthTarget(_shadowSize, _shadowSize, "Ombres du soleil"));
 
         VertexElement[] layout = [new("POSITION", 0, VertexFormat.Float3, 0), new("NORMAL", 0, VertexFormat.Float3, 12)];
         _background = device.CreatePipeline(new GraphicsPipelineDesc(
-            "Anneau : fond", shaders.Get("common.hlsli", "FullscreenVS", "vs_5_0"), shaders.Get("ring.hlsl", "BackgroundPS", "ps_5_0"), [],
+            "Anneau : fond", shaders.Get("common.hlsli", "FullscreenVS", "vs_5_0"), shaders.Get("ring.hlsl", "BackgroundPS", "ps_5_0", context.Defines), [],
             BlendMode.Opaque, DepthMode.TestWrite, CullMode.None, [PixelFormat.Rgba16Float, PixelFormat.Rg16Float], PixelFormat.D32Float));
         _rocksPipeline = device.CreatePipeline(new GraphicsPipelineDesc(
-            "Anneau : rochers", shaders.Get("ring.hlsl", "RockVS", "vs_5_0"), shaders.Get("ring.hlsl", "RockPS", "ps_5_0"), layout,
+            "Anneau : rochers", shaders.Get("ring.hlsl", "RockVS", "vs_5_0"), shaders.Get("ring.hlsl", "RockPS", "ps_5_0", context.Defines), layout,
             BlendMode.Opaque, DepthMode.TestWrite, CullMode.Back, [PixelFormat.Rgba16Float, PixelFormat.Rg16Float], PixelFormat.D32Float));
         _shadowPipeline = device.CreatePipeline(new GraphicsPipelineDesc(
             "Anneau : ombres", shaders.Get("ring.hlsl", "ShadowVS", "vs_5_0"), null, layout,
@@ -120,7 +124,7 @@ internal sealed class RingScene : BenchScene
         var constants = new RingConstants
         {
             ShadowViewProj = lightView * lightProj,
-            RingParams = new Vector4(0, frame.Time, PlanetRadius, 1f / ShadowSize),
+            RingParams = new Vector4(0, frame.Time, PlanetRadius, 1f / _shadowSize),
             PlanetCenter = new Vector4(0, 0, 0, 0),
         };
 
@@ -144,10 +148,10 @@ internal sealed class RingScene : BenchScene
         cmd.SetTexture(1, _shadowMap);
         DrawDetailed(cmd, constants);
         cmd.Flush();
-        cmd.SetConstants(1, constants with { RingParams = constants.RingParams with { X = Detailed } });
+        cmd.SetConstants(1, constants with { RingParams = constants.RingParams with { X = _detailed } });
         cmd.SetVertexBuffer(0, _coarseVertices, 24);
         cmd.SetIndexBuffer(_coarseIndices);
-        cmd.DrawIndexed(_coarseIndexCount, Coarse);
+        cmd.DrawIndexed(_coarseIndexCount, _coarse);
         cmd.SetTexture(1, null);
         cmd.SetBuffer(0, null);
     }
@@ -155,13 +159,13 @@ internal sealed class RingScene : BenchScene
     /// <summary>Les rochers détaillés, en trois modèles différents (un tiers chacun).</summary>
     private void DrawDetailed(ICommandList cmd, RingConstants constants)
     {
-        var perVariant = Detailed / Variants;
+        var perVariant = _detailed / Variants;
         for (var v = 0; v < Variants; v++)
         {
             cmd.SetConstants(1, constants with { RingParams = constants.RingParams with { X = v * perVariant } });
             cmd.SetVertexBuffer(0, _variantVertices[v], 24);
             cmd.SetIndexBuffer(_variantIndices[v]);
-            cmd.DrawIndexed(_detailedIndexCount, v == Variants - 1 ? Detailed - (perVariant * (Variants - 1)) : perVariant);
+            cmd.DrawIndexed(_detailedIndexCount, v == Variants - 1 ? _detailed - (perVariant * (Variants - 1)) : perVariant);
         }
     }
 
@@ -195,10 +199,10 @@ internal sealed class RingScene : BenchScene
     /// Les rochers : détaillés sur l'arc parcouru par la caméra, simples ailleurs. Tirage reproductible ; un couloir
     /// est dégagé autour du trajet de la caméra pour qu'elle ne traverse jamais un rocher.
     /// </summary>
-    private static RockInstance[] CreateRocks()
+    private static RockInstance[] CreateRocks(int detailedCount, int coarseCount)
     {
         var random = new Random(20261006);
-        var rocks = new RockInstance[Detailed + Coarse];
+        var rocks = new RockInstance[detailedCount + coarseCount];
         var corridor = Enumerable.Range(0, 400).Select(k => Path.Evaluate(k * Path.Duration / 399).Position).ToArray();
 
         // Grille de voisinage : un rocher n'est gardé que s'il ne touche aucun autre (pas d'interpénétration).
@@ -238,7 +242,7 @@ internal sealed class RingScene : BenchScene
 
         for (var i = 0; i < rocks.Length; i++)
         {
-            var detailed = i < Detailed;
+            var detailed = i < detailedCount;
             var angle = detailed ? -0.45f + (1.8f * random.NextSingle()) : 1.35f + ((MathF.Tau - 1.8f) * random.NextSingle());
             // Densité plus forte dans des sillons de l'anneau (divisions comme celles des vraies planètes à anneaux).
             float radius;

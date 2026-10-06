@@ -15,14 +15,16 @@ namespace Maus.Bench.Scenes;
 internal sealed class BattleScene : BenchScene
 {
     private const int Tanks = 24;
-    private const int DebrisPerTank = 320;
-    private const int FirePerTank = 6000;
-    private const int SmokePerTank = 2200;
-    private const int SparksPerTank = 5000;
     private const int MuzzlePerTank = 48;
     private const float TankSpeed = 1.6f;
     private const float TankTravel = 20f;
-    private const int ShadowSize = 4096;
+
+    // Par char : éclats, flammèches, bouffées de fumée, étincelles (environ trois fois moins en mode léger).
+    private int _debrisPerTank = 320;
+    private int _firePerTank = 6000;
+    private int _smokePerTank = 2200;
+    private int _sparksPerTank = 5000;
+    private int _shadowSize = 4096;
 
     private static readonly Vector3 Sun = Vector3.Normalize(new Vector3(-0.75f, 0.2f, 0.45f));
 
@@ -63,26 +65,31 @@ internal sealed class BattleScene : BenchScene
     {
         var device = context.Device;
         var shaders = context.Shaders;
+        if (context.Light)
+        {
+            (_debrisPerTank, _firePerTank, _smokePerTank, _sparksPerTank, _shadowSize) = (120, 1500, 700, 1200, 2048);
+        }
+
         _tankBuffer = device.CreateBuffer(new BufferDesc(Tanks * 32, BufferUsage.Structured, 32, "Chars"), MemoryMarshal.AsBytes(_tanks.AsSpan()));
         _hull = Mesh.Create(device, "Char : caisse", TankMeshes.Hull());
         _turret = Mesh.Create(device, "Char : tourelle", TankMeshes.Turret());
         _debris = Mesh.Create(device, "Éclat", TankMeshes.Shard());
-        _shadowMap = device.CreateTexture(TextureDesc.DepthTarget(ShadowSize, ShadowSize, "Ombres du soleil couchant"));
+        _shadowMap = device.CreateTexture(TextureDesc.DepthTarget(_shadowSize, _shadowSize, "Ombres du soleil couchant"));
 
         VertexElement[] layout = [new("POSITION", 0, VertexFormat.Float3, 0), new("NORMAL", 0, VertexFormat.Float3, 12), new("TEXCOORD", 0, VertexFormat.Float1, 24)];
         PixelFormat[] targets = [PixelFormat.Rgba16Float, PixelFormat.Rg16Float];
         _ground = device.CreatePipeline(new GraphicsPipelineDesc(
-            "Bataille : sol", shaders.Get("common.hlsli", "FullscreenVS", "vs_5_0"), shaders.Get("battle.hlsl", "GroundPS", "ps_5_0"), [],
+            "Bataille : sol", shaders.Get("common.hlsli", "FullscreenVS", "vs_5_0"), shaders.Get("battle.hlsl", "GroundPS", "ps_5_0", context.Defines), [],
             BlendMode.Opaque, DepthMode.TestWrite, CullMode.None, targets, PixelFormat.D32Float));
         _solid = device.CreatePipeline(new GraphicsPipelineDesc(
-            "Bataille : chars et éclats", shaders.Get("battle.hlsl", "SolidVS", "vs_5_0"), shaders.Get("battle.hlsl", "SolidPS", "ps_5_0"), layout,
+            "Bataille : chars et éclats", shaders.Get("battle.hlsl", "SolidVS", "vs_5_0"), shaders.Get("battle.hlsl", "SolidPS", "ps_5_0", context.Defines), layout,
             BlendMode.Opaque, DepthMode.TestWrite, CullMode.None, targets, PixelFormat.D32Float));
         _shadow = device.CreatePipeline(new GraphicsPipelineDesc(
             "Bataille : ombres", shaders.Get("battle.hlsl", "SolidShadowVS", "vs_5_0"), null, layout,
             BlendMode.Opaque, DepthMode.TestWrite, CullMode.None, [], PixelFormat.D32Float, DepthBias: 1500, SlopeScaledDepthBias: 2f));
         var particles = shaders.Get("battle.hlsl", "ParticleVS", "vs_5_0");
         _smoke = device.CreatePipeline(new GraphicsPipelineDesc(
-            "Bataille : fumée", particles, shaders.Get("battle.hlsl", "SmokePS", "ps_5_0"), [],
+            "Bataille : fumée", particles, shaders.Get("battle.hlsl", "SmokePS", "ps_5_0", context.Defines), [],
             BlendMode.Premultiplied, DepthMode.TestOnly, CullMode.None, [PixelFormat.Rgba16Float], PixelFormat.D32Float));
         _fire = device.CreatePipeline(new GraphicsPipelineDesc(
             "Bataille : feu", particles, shaders.Get("battle.hlsl", "FirePS", "ps_5_0"), [],
@@ -148,13 +155,13 @@ internal sealed class BattleScene : BenchScene
         cmd.SetBuffer(0, _tankBuffer);
         cmd.SetPipeline(_smoke!);
         cmd.SetConstants(1, Constants(time, 0, 0));
-        cmd.Draw(6, Tanks * SmokePerTank);
+        cmd.Draw(6, Tanks * _smokePerTank);
         cmd.Flush();
         cmd.SetPipeline(_fire!);
         cmd.SetConstants(1, Constants(time, 0, 1));
-        cmd.Draw(6, Tanks * FirePerTank);
+        cmd.Draw(6, Tanks * _firePerTank);
         cmd.SetConstants(1, Constants(time, 0, 2));
-        cmd.Draw(6, Tanks * SparksPerTank);
+        cmd.Draw(6, Tanks * _sparksPerTank);
         cmd.SetConstants(1, Constants(time, 0, 3));
         cmd.Draw(6, Tanks * MuzzlePerTank);
         cmd.SetBuffer(0, null);
@@ -189,7 +196,7 @@ internal sealed class BattleScene : BenchScene
         cmd.DrawIndexed(_turret.IndexCount, Tanks);
         _debris!.Bind(cmd);
         cmd.SetConstants(1, constants with { Battle = constants.Battle with { Z = 2 } });
-        cmd.DrawIndexed(_debris.IndexCount, Tanks * DebrisPerTank);
+        cmd.DrawIndexed(_debris.IndexCount, Tanks * _debrisPerTank);
     }
 
     /// <summary>
@@ -251,7 +258,11 @@ internal sealed class BattleScene : BenchScene
         var constants = new BattleConstants
         {
             ShadowViewProj = lightView * lightProj,
-            Battle = new Vector4(time, offset, kind, 1f / ShadowSize),
+            Battle = new Vector4(time, offset, kind, 1f / _shadowSize),
+            Counts = new Vector4(_debrisPerTank, _firePerTank, _smokePerTank, _sparksPerTank),
+
+            // Moins de flammèches : chacune porte plus de lumière, la boule de feu garde son éclat ; la fumée s'épaissit un peu.
+            Gains = new Vector4(6000f / _firePerTank, MathF.Sqrt(2200f / _smokePerTank), 1f, 0f),
         };
         _lightPosition.CopyTo(constants.LightPositions);
         _lightColor.CopyTo(constants.LightColors);
@@ -315,6 +326,8 @@ internal sealed class BattleScene : BenchScene
     {
         public Matrix4x4 ShadowViewProj;
         public Vector4 Battle;
+        public Vector4 Counts;
+        public Vector4 Gains;
         public LightArray LightPositions;
         public LightArray LightColors;
     }

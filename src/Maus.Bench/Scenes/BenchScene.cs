@@ -54,6 +54,15 @@ internal sealed class SceneContext(IGpuDevice device, ShaderLibrary shaders, Pos
 
     public RenderSize Size => Post.Size;
 
+    /// <summary>
+    /// Mode léger (720p, pour les cartes intégrées et les petits portables) : chaque scène garde ses images mais allège son
+    /// travail (moins de triangles, de particules, d'étoiles, de pas de calcul). Points comparables seulement entre passes légères.
+    /// </summary>
+    public bool Light { get; init; }
+
+    /// <summary>Définitions de compilation des shaders : MAUS_LIGHT en mode léger.</summary>
+    public (string Name, string Value)[] Defines => Light ? [("MAUS_LIGHT", "1")] : [];
+
     /// <summary>Constantes de l'image en cours (registre b0), déjà envoyées avant <see cref="BenchScene.Render"/>.</summary>
     public FrameConstants Frame { get; set; }
 

@@ -13,9 +13,8 @@ namespace Maus.Bench.Scenes;
 /// </summary>
 internal sealed class GalaxyScene : BenchScene
 {
-    private const int Stars = 4 * 1024 * 1024;
-    private const int Gas = 3 * 512 * 1024;
-    private const int Total = Stars + Gas;
+    private const int StandardStars = 4 * 1024 * 1024;
+    private const int StandardGas = 3 * 512 * 1024;
     private const float Step = 0.02f;
     private const float SimulationSpeed = 0.7f;
     private const float Softening = 0.04f;
@@ -39,6 +38,12 @@ internal sealed class GalaxyScene : BenchScene
     private float _simulated;
     private float _lastTarget;
 
+    // Mode léger : quatre fois moins d'étoiles et trois fois moins de gaz, chacun plus lumineux (même éclat d'ensemble).
+    private int _starCount = StandardStars;
+    private int _gasCount = StandardGas;
+
+    private int Total => _starCount + _gasCount;
+
     public override string Id => "galaxy";
 
     public override string Title => T("Collision galactique");
@@ -51,6 +56,11 @@ internal sealed class GalaxyScene : BenchScene
     {
         var device = context.Device;
         var shaders = context.Shaders;
+        if (context.Light)
+        {
+            (_starCount, _gasCount) = (1024 * 1024, 512 * 1024);
+        }
+
         _particles = device.CreateBuffer(new BufferDesc((long)Total * 32, BufferUsage.Structured | BufferUsage.Storage, 32, "Particules"));
         _init = device.CreateComputePipeline(shaders.Get("galaxy.hlsl", "InitCS", "cs_5_0"));
         _update = device.CreateComputePipeline(shaders.Get("galaxy.hlsl", "UpdateCS", "cs_5_0"));
@@ -105,10 +115,10 @@ internal sealed class GalaxyScene : BenchScene
         cmd.SetBuffer(0, _particles);
         cmd.SetConstants(1, Constants());
         cmd.SetPipeline(_gas!);
-        cmd.Draw(6, Gas);
+        cmd.Draw(6, _gasCount);
         cmd.Flush();
         cmd.SetPipeline(_stars!);
-        cmd.Draw(6, Stars);
+        cmd.Draw(6, _starCount);
         cmd.SetBuffer(0, null);
     }
 
@@ -180,8 +190,8 @@ internal sealed class GalaxyScene : BenchScene
     {
         CoreA = new Vector4(_a.Position, _a.Mass),
         CoreB = new Vector4(_b.Position, _b.Mass),
-        Simulation = new Vector4(Step, Softening, Stars, Total),
-        Look = new Vector4(1.4f, 0.17f, 0.0019f, 0.045f),
+        Simulation = new Vector4(Step, Softening, _starCount, Total),
+        Look = new Vector4(1.4f, 0.17f, 0.0019f * StandardGas / _gasCount, 0.045f * StandardStars / _starCount),
         InitA = new Vector4(_a.Velocity, _a.Tilt),
         InitB = new Vector4(_b.Velocity, _b.Tilt),
     };

@@ -24,6 +24,9 @@ internal sealed class FractalScene : BenchScene
 
     private IPipeline? _pipeline;
 
+    // Mode léger : pas de la marche et des ombres réduits (les pixels, plus gros, en demandent moins).
+    private Vector2 _steps = new(260f, 56f);
+
     public override string Id => "fractal";
 
     public override string Title => T("Forge fractale");
@@ -34,10 +37,11 @@ internal sealed class FractalScene : BenchScene
 
     public override void Load(SceneContext context)
     {
+        _steps = context.Light ? new Vector2(170f, 28f) : new Vector2(260f, 56f);
         _pipeline = context.Device.CreatePipeline(new GraphicsPipelineDesc(
             "Fractale",
             context.Shaders.Get("common.hlsli", "FullscreenVS", "vs_5_0"),
-            context.Shaders.Get("fractal.hlsl", "FractalPS", "ps_5_0"),
+            context.Shaders.Get("fractal.hlsl", "FractalPS", "ps_5_0", context.Defines),
             [],
             BlendMode.Opaque,
             DepthMode.None,
@@ -71,7 +75,7 @@ internal sealed class FractalScene : BenchScene
             SunColor = new Vector3(1f, 0.78f, 0.55f) * 1.4f,
             Params0 = new Vector4(-1.77f, 0.25f, 1f, 14f),
             Params1 = new Vector4(orb, 1.6f),
-            Params2 = new Vector4(0.06f, 0.35f, 260f, 56f),
+            Params2 = new Vector4(0.06f, 0.35f, _steps.X, _steps.Y),
             Params3 = new Vector4(t * 0.01f, 2.4f, 1f, 0.06f),
         };
     }

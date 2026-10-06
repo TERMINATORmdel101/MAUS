@@ -45,10 +45,14 @@ public sealed partial class WorkshopViewModel
         set => SetProperty(ref _benchmarkApi, value);
     }
 
-    /// <summary>Résolution de calcul : 1080p natif recommandé (toutes les cartes) ; 1440p et 4K pour les grosses cartes.</summary>
+    /// <summary>
+    /// Résolution de calcul : 1080p natif recommandé (toutes les cartes) ; 720p léger pour les cartes intégrées et les petits
+    /// portables (scènes allégées) ; 1440p et 4K pour les grosses cartes.
+    /// </summary>
     public IReadOnlyList<TestOption<string>> BenchmarkResolutions { get; } =
     [
         new(T("1080p natif (recommandé)"), "1080p"),
+        new(T("720p léger (cartes intégrées, petits portables)"), "720p"),
         new(T("1440p"), "1440p"),
         new(T("4K (très exigeant)"), "4k"),
     ];

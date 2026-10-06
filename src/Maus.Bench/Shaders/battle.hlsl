@@ -6,16 +6,14 @@
 #include "common.hlsli"
 
 static const uint Tanks = 24;
-static const uint DebrisPerTank = 320;
-static const uint FirePerTank = 6000;
-static const uint SmokePerTank = 2200;
-static const uint SparksPerTank = 5000;
 static const float Gravity = 9.81;
 
 cbuffer BattleConstants : register(b1)
 {
     float4x4 ShadowViewProj;
     float4 Battle;              // x = temps, y = premier dessin (décalage d'instance), z = genre de maillage (0 caisse, 1 tourelle, 2 éclat), w = taille d'un texel d'ombre
+    float4 Counts;              // par char : éclats (x), flammèches (y), bouffées de fumée (z), étincelles (w) ; moins en mode léger
+    float4 Gains;               // lumière d'une flammèche (x), opacité d'une bouffée (y) : le mode léger garde le même éclat d'ensemble
     float4 LightPosition[8];    // lumières des explosions : position (xyz), intensité (w)
     float4 LightColor[8];
 };
@@ -153,8 +151,7 @@ float3 SolidWorld(MeshVertex v, uint instance, out float3 normal, out float4 inf
     if (kind == 2)
     {
         // Éclat : index = char × éclats + numéro.
-        uint tank = index / DebrisPerTank;
-        uint piece = index % DebrisPerTank;
+        uint tank = index / (uint)Counts.x;
         TankData data = TankList[tank];
         float t = time - data.Explosion.x;
         uint seed = index * 7u + 3u;
@@ -245,26 +242,29 @@ float SunShadow(float3 world, float3 normal)
         return 1.0;
     }
 
+    // Mode léger : filtre 2×2.
+    const int taps = Light ? 2 : 4;
     float sum = 0.0;
     [unroll]
-    for (int y = -1; y <= 2; y++)
+    for (int y = 0; y < taps; y++)
     {
         [unroll]
-        for (int x = -1; x <= 2; x++)
+        for (int x = 0; x < taps; x++)
         {
-            sum += ShadowMap.SampleCmpLevelZero(ShadowCompare, uv + (float2(x, y) - 0.5) * Battle.w, uvz.z - 0.0008);
+            sum += ShadowMap.SampleCmpLevelZero(ShadowCompare, uv + (float2(x, y) - (taps - 1) * 0.5) * Battle.w, uvz.z - 0.0008);
         }
     }
 
-    return sum / 16.0;
+    return sum / (taps * taps);
 }
 
 // Lumière des explosions : sources ponctuelles, décroissance en carré de la distance.
 float3 ExplosionLight(float3 world, float3 n, float3 albedo)
 {
     float3 sum = 0.0;
+    // Les sources sont triées par intensité : le mode léger ne garde que les quatre plus fortes.
     [unroll]
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < (Light ? 4 : 8); i++)
     {
         float3 toLight = LightPosition[i].xyz - world;
         float d2 = dot(toLight, toLight);
@@ -293,7 +293,7 @@ SceneOut SolidPS(SolidPixel input)
     float ember = input.Info.z;
 
     // Camouflage : trois schémas selon le char (désert, forêt, gris urbain), taches nettes découpées dans un bruit.
-    float pattern = Fbm(input.Local * 0.55 + hue * 13.0, 3);
+    float pattern = Fbm(input.Local * 0.55 + hue * 13.0, Light ? 2 : 3);
     float scheme = floor(hue * 3.0);
     float3 c1, c2, c3;
     if (scheme < 0.5)
@@ -367,7 +367,7 @@ SceneOut SolidPS(SolidPixel input)
     color += fresnel * Sky(reflected) * (1.0 - roughness) * (reflected.y > 0.0 ? 0.7 : 0.15) * shadow;
 
     // Braises : lueur rouge dans les fissures du métal brûlé, qui s'éteint peu à peu.
-    float crack = pow(saturate(Fbm(input.Local * 3.0 + 7.0, 3) * 2.0 + 0.2), 6.0);
+    float crack = pow(saturate(Fbm(input.Local * 3.0 + 7.0, Light ? 2 : 3) * 2.0 + 0.2), 6.0);
     color += float3(1.6, 0.45, 0.1) * crack * ember * burnt;
 
     o.Color = float4(color, 1.0);
@@ -403,19 +403,20 @@ GroundOut GroundPS(FullscreenOut input)
 
     // Dunes : relief simulé par le gradient d'un bruit (la surface reste plane, l'éclairage ondule).
     float e = 0.15;
-    float h0 = Fbm(float3(p.xz * 0.02, 0.0), 5);
-    float hx = Fbm(float3((p.xz + float2(e, 0)) * 0.02, 0.0), 5);
-    float hz = Fbm(float3((p.xz + float2(0, e)) * 0.02, 0.0), 5);
+    const int dunes = Light ? 3 : 5;
+    float h0 = Fbm(float3(p.xz * 0.02, 0.0), dunes);
+    float hx = Fbm(float3((p.xz + float2(e, 0)) * 0.02, 0.0), dunes);
+    float hz = Fbm(float3((p.xz + float2(0, e)) * 0.02, 0.0), dunes);
     float3 n = normalize(float3(-(hx - h0) * 9.0, 1.0, -(hz - h0) * 9.0));
-    float ripples = sin(p.x * 1.7 + Fbm(float3(p.xz * 0.3, 1.0), 3) * 6.0) * 0.5 + 0.5;
+    float ripples = sin(p.x * 1.7 + Fbm(float3(p.xz * 0.3, 1.0), Light ? 2 : 3) * 6.0) * 0.5 + 0.5;
     n = normalize(n + float3(ripples * 0.06, 0, 0));
 
     float3 albedo = lerp(float3(0.5, 0.36, 0.23), float3(0.64, 0.48, 0.31), saturate(h0 * 2.0 + 0.5)) * (0.9 + 0.1 * ripples);
     // Graviers et cailloux (bruit cellulaire), plaques de terre plus sombre, traînées laissées par le vent.
-    float2 pebbles = Cellular(float3(p.xz * 1.6, 0.5));
+    float2 pebbles = Light ? float2(1.0, 1.0) : Cellular(float3(p.xz * 1.6, 0.5));
     float stone = smoothstep(0.32, 0.18, pebbles.x) * step(0.55, Hash31(floor(float3(p.xz * 1.6, 0.5))));
     albedo = lerp(albedo, float3(0.32, 0.27, 0.22) * (0.7 + 0.6 * Hash31(floor(float3(p.xz * 1.6, 3.0)))), stone * 0.8);
-    albedo *= 0.85 + 0.15 * smoothstep(-0.3, 0.3, Fbm(float3(p.xz * 0.06, 9.0), 3));
+    albedo *= 0.85 + 0.15 * smoothstep(-0.3, 0.3, Fbm(float3(p.xz * 0.06, 9.0), Light ? 2 : 3));
     albedo *= 0.94 + 0.06 * sin(p.z * 0.9 + Fbm(float3(p.xz * 0.15, 4.0), 2) * 5.0);
     n = normalize(n + float3(0, 0, 0) + stone * normalize(float3(p.x - floor(p.x * 1.6) / 1.6, 3.0, p.z - floor(p.z * 1.6) / 1.6)) * 0.3);
 
@@ -457,7 +458,7 @@ GroundOut GroundPS(FullscreenOut input)
 
     // Mirage : au ras de l'horizon, l'air brûlant au-dessus du sable renvoie le ciel comme un miroir qui tremble.
     float grazing = smoothstep(-0.07, -0.004, d.y);
-    float shimmer = Fbm(float3(p.xz * 0.05, Time * 1.5), 3) * 0.025;
+    float shimmer = Fbm(float3(p.xz * 0.05, Time * 1.5), Light ? 2 : 3) * 0.025;
     float3 mirrored = Sky(normalize(float3(d.x, -d.y + shimmer, d.z)));
     color = lerp(color, mirrored, grazing * 0.75);
 
@@ -558,7 +559,7 @@ ParticlePixel ParticleVS(uint vertex : SV_VertexID, uint instance : SV_InstanceI
         return o;
     }
 
-    uint perTank = kind == 0 ? SmokePerTank : (kind == 1 ? FirePerTank : SparksPerTank);
+    uint perTank = (uint)(kind == 0 ? Counts.z : (kind == 1 ? Counts.y : Counts.w));
     uint tank = instance / perTank;
     uint seed = instance * 3u + kind * 0x51ED27u;
     TankData data = TankList[tank];
@@ -581,7 +582,7 @@ ParticlePixel ParticleVS(uint vertex : SV_VertexID, uint instance : SV_InstanceI
         size = 0.5 + 2.8 * sqrt(a) * (0.6 + Rand(seed, 5));
         // Des milliers de flammèches se superposent : chacune ne porte qu'une petite part de la lumière.
         float3 hot = lerp(float3(0.09, 0.062, 0.028), float3(0.07, 0.02, 0.005), saturate(a * 2.0));
-        color = float4(lerp(hot, float3(0.008, 0.002, 0.0005), saturate(a * 1.6 - 0.6)), 1.0 - a);
+        color = float4(lerp(hot, float3(0.008, 0.002, 0.0005), saturate(a * 1.6 - 0.6)) * Gains.x, 1.0 - a);
     }
     else if (kind == 2)
     {
@@ -616,7 +617,7 @@ ParticlePixel ParticleVS(uint vertex : SV_VertexID, uint instance : SV_InstanceI
         size = 0.9 + 3.2 * sqrt(a) + rise * 0.07;
         // Fumée noire à la base, plus grise en hauteur.
         float shade = lerp(0.035, 0.16, saturate(rise / 30.0)) * (0.8 + 0.4 * Rand(seed, 10));
-        color = float4(shade.xxx, 0.42 * smoothstep(0.0, 0.08, a) * (1.0 - a));
+        color = float4(shade.xxx, min(0.42 * Gains.y, 0.85) * smoothstep(0.0, 0.08, a) * (1.0 - a));
         t = local;
     }
 
@@ -645,7 +646,7 @@ float4 SmokePS(ParticlePixel input) : SV_Target
     // lueur du feu par-dessous.
     float r2 = dot(input.Corner, input.Corner);
     float seed = input.Color.r * 97.0 + input.Color.a * 13.0;
-    float billow = Fbm(float3(input.Corner * 1.8, seed), 3);
+    float billow = Fbm(float3(input.Corner * 1.8, seed), Light ? 2 : 3);
     float shape = saturate(1.0 - r2 + billow * 0.6);
     float alpha = input.Color.a * shape * shape;
     float thickness = saturate(1.0 - r2 * 0.8);

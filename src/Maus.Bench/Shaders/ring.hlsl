@@ -82,17 +82,19 @@ float SunShadow(float3 world, float3 normal)
     }
 
     // Filtre 4×4 sur la carte d'ombre (comparaison matérielle, bords doux).
+    // Mode léger : filtre 2×2.
+    const int taps = Light ? 2 : 4;
     float sum = 0.0;
     [unroll]
-    for (int y = -1; y <= 2; y++)
+    for (int y = 0; y < taps; y++)
     {
         [unroll]
-        for (int x = -1; x <= 2; x++)
+        for (int x = 0; x < taps; x++)
         {
-            sum += ShadowMap.SampleCmpLevelZero(ShadowCompare, uv + (float2(x, y) - 0.5) * RingParams.w, uvz.z - 0.0015);
+            sum += ShadowMap.SampleCmpLevelZero(ShadowCompare, uv + (float2(x, y) - (taps - 1) * 0.5) * RingParams.w, uvz.z - 0.0015);
         }
     }
-    return sum / 16.0;
+    return sum / (taps * taps);
 }
 
 float3 PlanetBands(float3 p)
@@ -101,8 +103,8 @@ float3 PlanetBands(float3 p)
     // Les bandes glissent les unes sur les autres (cisaillement selon la latitude) et se déchirent en tourbillons.
     float shear = sin(latitude * 23.0) * 0.35;
     float3 q = float3(p.x * cos(shear) - p.z * sin(shear), p.y, p.x * sin(shear) + p.z * cos(shear));
-    float turbulence = Fbm(float3(q.x * 2.5, q.y * 11.0, q.z * 2.5) + Time * 0.008, 7);
-    float fine = Fbm(float3(q.x * 9.0, q.y * 40.0, q.z * 9.0), 4);
+    float turbulence = Fbm(float3(q.x * 2.5, q.y * 11.0, q.z * 2.5) + Time * 0.008, Light ? 4 : 7);
+    float fine = Fbm(float3(q.x * 9.0, q.y * 40.0, q.z * 9.0), Light ? 2 : 4);
     float band = latitude * 7.5 + turbulence * 1.4 + fine * 0.25;
     float3 cream = float3(0.96, 0.88, 0.72);
     float3 rust = float3(0.76, 0.44, 0.24);
@@ -132,10 +134,10 @@ SceneOut RockPS(RockPixel input)
     float ice = input.Color.a;
 
     // Détail de surface : bruit en trois dimensions sur la position du rocher (cratères, veines claires).
-    float detail = Fbm(input.Local * 2.0, 4);
+    float detail = Fbm(input.Local * 2.0, Light ? 2 : 4);
     float3 albedo = input.Color.rgb * (0.75 + 0.5 * detail);
     // Fissures (frontières de cellules), veines minérales colorées, glace bleutée qui scintille.
-    float2 cells = Cellular(input.Local * 4.0);
+    float2 cells = Light ? float2(0.0, 1.0) : Cellular(input.Local * 4.0);
     float crack = 1.0 - smoothstep(0.0, 0.07, cells.y - cells.x);
     float vein = smoothstep(0.82, 0.97, abs(sin(dot(input.Local, float3(3.1, 5.7, 2.3)) * 2.0 + detail * 5.0)));
     float3 mineral = lerp(float3(1.25, 1.0, 0.7), float3(0.75, 0.95, 1.2), frac(input.Color.r * 37.0));
@@ -199,7 +201,7 @@ BackgroundOut BackgroundPS(FullscreenOut input)
     float3 color = float3(0.001, 0.0015, 0.003);
     float3 cell = floor(direction * 500.0);
     color += Hash31(cell) > 0.9987 ? (0.3 + 2.5 * Hash31(cell + 3.0)) * float3(0.85, 0.9, 1.0) : 0.0;
-    color += float3(0.02, 0.012, 0.03) * pow(saturate(Fbm(direction * 2.5, 4) + 0.3), 3.0);
+    color += float3(0.02, 0.012, 0.03) * pow(saturate(Fbm(direction * 2.5, Light ? 2 : 4) + 0.3), 3.0);
 
     float depth = 1.0;
     float3 hitPoint = CameraPos + direction * 5000.0;
