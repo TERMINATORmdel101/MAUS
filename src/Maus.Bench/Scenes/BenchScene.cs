@@ -13,6 +13,9 @@ public enum GpuCapability
     Textures,
     Volumetrics,
     Effects,
+
+    /// <summary>Lancer de rayons matériel (DXR) : test à part, avec son propre score.</summary>
+    RayTracing,
 }
 
 /// <summary>État d'une scène à un instant : caméra, soleil, paramètres des shaders, étalonnage.</summary>
@@ -103,8 +106,8 @@ internal abstract class BenchScene : IDisposable
 
     public abstract GpuCapability Capability { get; }
 
-    /// <summary>Durée mesurée, en secondes (2 minutes par scène : environ 8 minutes de carte graphique en tout).</summary>
-    public virtual double Duration => 120;
+    /// <summary>Durée mesurée, en secondes (1 min 36 par scène : 8 minutes de carte graphique pour les cinq scènes).</summary>
+    public virtual double Duration => 96;
 
     /// <summary>Vrai si la scène dessine aussi des effets transparents après l'anticrénelage (feu, fumée).</summary>
     public virtual bool HasOverlay => false;

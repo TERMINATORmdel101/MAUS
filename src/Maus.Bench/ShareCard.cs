@@ -11,9 +11,9 @@ namespace Maus.Bench;
 internal sealed record SharePicture(string Id, byte[] Pixels, int Width, int Height);
 
 /// <summary>
-/// Image du résultat à partager (1920 × 1080, PNG) : score combiné, scores de la carte graphique et du processeur, une
-/// vignette de chaque scène prise pendant la mesure, matériel et capteurs. Seulement le matériel : aucun nom
-/// d'utilisateur ni nom de PC.
+/// Image du résultat à partager (1920 × 1080, PNG) : score combiné, scores de la carte graphique, du processeur et du
+/// lancer de rayons (à part), une vignette de chaque scène prise pendant la mesure (six au plus : avec le lancer de rayons,
+/// celle du processeur laisse sa place), matériel et capteurs. Seulement le matériel : aucun nom d'utilisateur ni nom de PC.
 /// </summary>
 internal static class ShareCard
 {
@@ -138,6 +138,7 @@ internal static class ShareCard
         var y = 446f;
         y = DrawDevice(ui, T("Carte graphique"), report.GpuScore, report.Gpu, "gpu", report, UiColors.Blue(), y);
         y = DrawDevice(ui, T("Processeur"), report.CpuScore, report.Cpu + "  ·  " + T("{0} fils de calcul", report.Threads), "cpu", report, UiColors.Mint(), y);
+        y = DrawDevice(ui, T("Lancer de rayons (score à part)"), report.RayTracingScore, T("Galerie des glaces · DirectX Raytracing 1.1"), "rt", report, UiColors.Sand(), y);
 
         var (strongest, weakest) = BenchmarkScoring.Extremes(report.Tests);
         if (strongest is not null && weakest is not null)
@@ -158,7 +159,7 @@ internal static class ShareCard
 
             ui.Text(Trim(ui, ShortName(test.Id), 18, 230), x + 12, top + 202.5f - 37, 18, UiColors.White(0.95f), bold: true);
             ui.Text(Points(test.Score), x + 348, top + 202.5f - 42, 26, UiColors.White(), bold: true, TextAlign.Right);
-            var detail = test.Device == "gpu"
+            var detail = test.Device != "cpu"
                 ? T("{0} images/s", test.Value.ToString("0.0", culture))
                 : test.Value.ToString("0.00", culture) + " " + test.Unit;
             ui.Text(Capability(test.Id) + "  ·  " + detail, x + 2, top + 202.5f + 12, 15, UiColors.Grey(0.9f));
@@ -169,7 +170,7 @@ internal static class ShareCard
         foreach (var test in report.Tests.Where(t => cells.TrueForAll(c => c.Id != t.Id)))
         {
             ui.Text(BenchmarkRunner.TestName(test.Id), 764, listY, 18, UiColors.White(0.9f));
-            var value = test.Device == "gpu" ? T("{0} images/s", test.Value.ToString("0.0", culture)) : test.Value.ToString("0.00", culture) + " " + test.Unit;
+            var value = test.Device != "cpu" ? T("{0} images/s", test.Value.ToString("0.0", culture)) : test.Value.ToString("0.00", culture) + " " + test.Unit;
             ui.Text(value, 1460, listY + 2, 15, UiColors.Grey(0.85f), align: TextAlign.Right);
             ui.Text(Points(test.Score), 1864, listY - 2, 22, UiColors.White(), bold: true, TextAlign.Right);
             listY += 34;
@@ -227,6 +228,7 @@ internal static class ShareCard
         "galaxy" => T("Collision galactique"),
         "fractal" => T("Forge fractale"),
         "materials" => T("Cabinet de curiosités"),
+        "raytracing" => T("Galerie des glaces"),
         _ => BenchmarkRunner.TestName(id),
     };
 
@@ -238,6 +240,7 @@ internal static class ShareCard
         "galaxy" => T("Bande passante"),
         "fractal" => T("Calcul"),
         "materials" => T("Textures"),
+        "raytracing" => T("Lancer de rayons"),
         _ => T("Processeur"),
     };
 

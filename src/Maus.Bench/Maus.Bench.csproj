@@ -42,6 +42,34 @@
     <None Include="Assets\PolyHaven\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Assets\PolyHaven" />
   </ItemGroup>
 
+  <!--
+    Test « Galerie des glaces » (lancer de rayons matériel, DirectX Raytracing 1.1) : ses shaders utilisent le modèle 6.5,
+    que le compilateur de Windows (d3dcompiler_47) ne connaît pas. Ils sont compilés pendant la fabrication de MAUS par le
+    compilateur DXC de Microsoft (paquet NuGet Microsoft.Direct3D.DXC, utilisé comme outil de compilation : il n'est pas
+    livré avec MAUS), puis embarqués dans Maus.Bench.dll. Sous Linux (sessions dans le nuage), dxc.exe ne tourne pas :
+    le test est alors absent de la version compilée, qui le signale.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Direct3D.DXC" Version="1.9.2609.5" ExcludeAssets="all" PrivateAssets="all" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <DxilShader Include="Shaders\Dxil\raytracing.hlsl" Entry="FullscreenVS" Profile="vs_6_5" ShaderName="raytracing.FullscreenVS" Defines="" />
+    <DxilShader Include="Shaders\Dxil\raytracing.hlsl" Entry="TracePS" Profile="ps_6_5" ShaderName="raytracing.TracePS" Defines="" />
+    <DxilShader Include="Shaders\Dxil\raytracing.hlsl" Entry="TracePS" Profile="ps_6_5" ShaderName="raytracing.TracePS.light" Defines="-D MAUS_LIGHT=1" />
+  </ItemGroup>
+
+  <Target Name="CompileDxilShaders" BeforeTargets="BeforeBuild" Condition="'$(OS)' == 'Windows_NT'" Inputs="@(DxilShader);Shaders\common.hlsli" Outputs="$(IntermediateOutputPath)dxil\%(DxilShader.ShaderName).dxil">
+    <MakeDir Directories="$(IntermediateOutputPath)dxil" />
+    <Exec Command="&quot;$(PkgMicrosoft_Direct3D_DXC)\build\native\bin\x64\dxc.exe&quot; -nologo -HV 2018 -Zpr -O3 -Qstrip_debug -Qstrip_reflect -I Shaders %(DxilShader.Defines) -T %(DxilShader.Profile) -E %(DxilShader.Entry) -Fo &quot;$(IntermediateOutputPath)dxil\%(DxilShader.ShaderName).dxil&quot; &quot;%(DxilShader.FullPath)&quot;" IgnoreStandardErrorWarningFormat="true" />
+  </Target>
+
+  <Target Name="EmbedDxilShaders" AfterTargets="CompileDxilShaders" BeforeTargets="BeforeBuild" Condition="'$(OS)' == 'Windows_NT'">
+    <ItemGroup>
+      <EmbeddedResource Include="@(DxilShader->'$(IntermediateOutputPath)dxil\%(ShaderName).dxil')" LogicalName="Maus.Bench.Dxil.%(DxilShader.ShaderName).dxil" WithCulture="false" Type="Non-Resx" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Maus.Core.Tests" />
   </ItemGroup>

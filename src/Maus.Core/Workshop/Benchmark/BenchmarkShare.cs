@@ -41,7 +41,8 @@ public static partial class BenchmarkShareCode
             report.CpuScore,
             report.OverallScore,
             report.Completed,
-            [.. report.Tests.Select(t => new PayloadTest(t.Id, t.Device, t.Value, t.Score, t.Low1, t.Sensors?.MaxTemperatureC, t.Sensors?.AverageClockMhz))]);
+            [.. report.Tests.Select(t => new PayloadTest(t.Id, t.Device, t.Value, t.Score, t.Low1, t.Sensors?.MaxTemperatureC, t.Sensors?.AverageClockMhz))],
+            report.RayTracingScore > 0 ? report.RayTracingScore : null);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, Json);
         using var output = new MemoryStream();
         using (var deflate = new DeflateStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
@@ -90,7 +91,8 @@ public static partial class BenchmarkShareCode
 
     private static BenchmarkReport? ToReport(Payload p)
     {
-        if (p.Tests is null || p.Tests.Count > MaxTests || !Valid(p.GpuScore) || !Valid(p.CpuScore) || !Valid(p.OverallScore) || p.Threads is < 0 or > 4096)
+        if (p.Tests is null || p.Tests.Count > MaxTests || !Valid(p.GpuScore) || !Valid(p.CpuScore) || !Valid(p.OverallScore) || p.Threads is < 0 or > 4096
+            || (p.RayTracingScore is { } rt && !Valid(rt)))
         {
             return null;
         }
@@ -98,7 +100,7 @@ public static partial class BenchmarkShareCode
         var tests = new List<BenchmarkTestResult>();
         foreach (var t in p.Tests)
         {
-            if (t is null || !Valid(t.Value) || !Valid(t.Score) || (t.Low1 is { } low && !Valid(low)) || Clean(t.Id) is not { Length: > 0 } id || t.Device is not ("gpu" or "cpu"))
+            if (t is null || !Valid(t.Value) || !Valid(t.Score) || (t.Low1 is { } low && !Valid(low)) || Clean(t.Id) is not { Length: > 0 } id || t.Device is not ("gpu" or "cpu" or "rt"))
             {
                 return null;
             }
@@ -123,6 +125,7 @@ public static partial class BenchmarkShareCode
             GpuScore = p.GpuScore,
             CpuScore = p.CpuScore,
             OverallScore = p.OverallScore,
+            RayTracingScore = p.RayTracingScore ?? 0,
             Completed = p.Completed,
             Tests = tests,
         };
@@ -159,13 +162,14 @@ public static partial class BenchmarkShareCode
         double CpuScore,
         double OverallScore,
         bool Completed,
-        List<PayloadTest?>? Tests);
+        List<PayloadTest?>? Tests,
+        double? RayTracingScore = null);
 
     private sealed record PayloadTest(string? Id, string? Device, double Value, double Score, double? Low1, double? MaxTemperatureC, double? AverageClockMhz);
 }
 
 /// <summary>Une ligne de comparaison : points de l'utilisateur, points de l'autre résultat, écart en %.</summary>
-/// <param name="Id">« overall », « gpu », « cpu » ou l'identifiant d'un test.</param>
+/// <param name="Id">« overall », « gpu », « cpu », « rt » (lancer de rayons) ou l'identifiant d'un test.</param>
 /// <param name="Difference">Écart de l'autre résultat par rapport au vôtre, en % (+ = plus rapide) ; <c>null</c> si l'un manque.</param>
 public sealed record BenchmarkComparisonRow(string Id, double Mine, double Theirs, double? Difference);
 
@@ -180,6 +184,11 @@ public static class BenchmarkComparison
             Row("gpu", mine.GpuScore, theirs.GpuScore),
             Row("cpu", mine.CpuScore, theirs.CpuScore),
         };
+        if (mine.RayTracingScore > 0 || theirs.RayTracingScore > 0)
+        {
+            rows.Add(Row("rt", mine.RayTracingScore, theirs.RayTracingScore));
+        }
+
         var ids = mine.Tests.Select(t => t.Id).Concat(theirs.Tests.Select(t => t.Id)).Distinct(StringComparer.Ordinal);
         foreach (var id in ids)
         {

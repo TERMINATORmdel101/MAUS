@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Maus.Bench.Gpu;
 
 public interface ITexture : IDisposable
@@ -18,6 +20,42 @@ public interface IPipeline : IDisposable
 public interface IComputePipeline : IDisposable
 {
     string Name { get; }
+}
+
+/// <summary>Structure d'accélération du lancer de rayons (un maillage, ou la scène entière), construite par la carte.</summary>
+public interface IAccelerationStructure : IDisposable
+{
+    string Name { get; }
+}
+
+/// <summary>Une partie d'un maillage de lancer de rayons (une matière) : sommets et indices dans les tampons communs.</summary>
+public readonly record struct MeshRange(int FirstVertex, int VertexCount, int FirstIndex, int IndexCount);
+
+/// <summary>Un maillage placé dans la scène du lancer de rayons.</summary>
+/// <param name="Mesh">Structure du maillage.</param>
+/// <param name="Transform">Placement (matrice en lignes, comme le reste du moteur : position = sommet × matrice).</param>
+/// <param name="Id">Numéro rendu au shader (InstanceID, 24 bits) : ici, la ligne du tableau des matières.</param>
+/// <param name="Mask">Masque de 8 bits : un rayon ne voit que les instances dont le masque croise le sien.</param>
+public readonly record struct RayInstance(IAccelerationStructure Mesh, Matrix4x4 Transform, int Id, byte Mask);
+
+/// <summary>
+/// Lancer de rayons matériel : DirectX Raytracing 1.1, avec des requêtes de rayons directement dans les shaders (modèle
+/// 6.5). Direct3D 12 seulement, sur les cartes et pilotes qui le gèrent.
+/// </summary>
+public interface IRayTracing
+{
+    /// <summary>
+    /// Construit la structure d'un maillage de triangles opaques en une ou plusieurs parties (pendant le chargement, dans
+    /// une image) : les positions sont les trois premiers flottants de chaque sommet ; les indices (32 bits) de chaque
+    /// partie comptent à partir de son premier sommet. Le shader reconnaît la partie touchée (GeometryIndex).
+    /// </summary>
+    IAccelerationStructure BuildMesh(IBuffer vertices, int stride, IBuffer indices, ReadOnlySpan<MeshRange> parts, string name);
+
+    /// <summary>Construit la structure de la scène à partir des maillages placés (pendant le chargement, dans une image).</summary>
+    IAccelerationStructure BuildScene(ReadOnlySpan<RayInstance> instances, string name);
+
+    /// <summary>Donne la scène aux shaders, au registre t<paramref name="slot"/> (RaytracingAccelerationStructure).</summary>
+    void Bind(int slot, IAccelerationStructure? scene);
 }
 
 /// <summary>
@@ -46,6 +84,9 @@ public interface IGpuDevice : IDisposable
 
     /// <summary>Durée de la dernière image mesurée par la carte elle-même (horodatages), avec quelques images de retard.</summary>
     double LastGpuFrameMilliseconds { get; }
+
+    /// <summary>Lancer de rayons matériel (DXR 1.1) ; <c>null</c> avec Direct3D 11 ou sur une carte qui ne le gère pas.</summary>
+    IRayTracing? RayTracing { get; }
 
     ITexture CreateTexture(TextureDesc desc);
 

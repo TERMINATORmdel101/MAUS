@@ -34,6 +34,7 @@ public sealed partial class WorkshopViewModel
     private TestOption<string>? _benchmarkApi;
     private TestOption<string>? _benchmarkResolution;
     private TestOption<string>? _benchmarkScope;
+    private bool _benchmarkIncludeRayTracing = true;
     private ICommand? _startBenchmark;
     private ICommand? _copyBenchmark;
     private ICommand? _copyBenchmarkImage;
@@ -56,7 +57,29 @@ public sealed partial class WorkshopViewModel
     public TestOption<string> BenchmarkApi
     {
         get => _benchmarkApi ?? BenchmarkApis[0];
-        set => SetProperty(ref _benchmarkApi, value);
+        set
+        {
+            if (SetProperty(ref _benchmarkApi, value))
+            {
+                OnPropertyChanged(nameof(BenchmarkDuration));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Test du lancer de rayons (« Galerie des glaces », DirectX 12, cartes compatibles DXR 1.1) : proposé par défaut, son
+    /// score est compté à part ; MAUS vérifie la carte et passe le test si elle ne le gère pas.
+    /// </summary>
+    public bool BenchmarkIncludeRayTracing
+    {
+        get => _benchmarkIncludeRayTracing;
+        set
+        {
+            if (SetProperty(ref _benchmarkIncludeRayTracing, value))
+            {
+                OnPropertyChanged(nameof(BenchmarkDuration));
+            }
+        }
     }
 
     /// <summary>
@@ -97,12 +120,21 @@ public sealed partial class WorkshopViewModel
         }
     }
 
-    public string BenchmarkDuration => BenchmarkScope.Value switch
+    /// <summary>Durée annoncée : cinq scènes de 1 min 36 (8 min 30 avec les chargements), 1 min de lancer de rayons, 2 min de processeur.</summary>
+    public string BenchmarkDuration
     {
-        "gpu" => T("Durée : environ 8 minutes"),
-        "cpu" => T("Durée : environ 2 minutes"),
-        _ => T("Durée : environ 10 minutes"),
-    };
+        get
+        {
+            var rayTracing = BenchmarkIncludeRayTracing && BenchmarkApi.Value == "d3d12" ? 1.1 : 0;
+            var minutes = BenchmarkScope.Value switch
+            {
+                "gpu" => 8.5 + rayTracing,
+                "cpu" => 2.1,
+                _ => 10.6 + rayTracing,
+            };
+            return T("Durée : environ {0} minutes", Math.Round(minutes).ToString("0", Texts.Culture));
+        }
+    }
 
     public bool IsBenchmarkRunning
     {
@@ -138,6 +170,23 @@ public sealed partial class WorkshopViewModel
     public string BenchmarkGpu => Points(LastBenchmark?.GpuScore ?? 0);
 
     public string BenchmarkCpu => Points(LastBenchmark?.CpuScore ?? 0);
+
+    public string BenchmarkRayTracing => Points(LastBenchmark?.RayTracingScore ?? 0);
+
+    public bool HasBenchmarkRayTracing => LastBenchmark?.Tests.Any(t => t.Device == "rt") == true;
+
+    /// <summary>Pourquoi le lancer de rayons n'a pas été mesuré lors de la dernière passe (vide s'il l'a été, ou s'il était écarté).</summary>
+    public string BenchmarkRayTracingNote => LastBenchmark is { RayTracingNote: { } note } last && !last.Tests.Any(t => t.Device == "rt")
+        ? T("Lancer de rayons non mesuré : {0}", note)
+        : "";
+
+    public bool HasBenchmarkRayTracingNote => BenchmarkRayTracingNote.Length > 0;
+
+    public IReadOnlyList<BenchmarkRow> BenchmarkRayTracingTests => Rows("rt");
+
+    public string BenchmarkRayTracingSensors => SensorLine("rt");
+
+    public bool HasBenchmarkRayTracingSensors => BenchmarkRayTracingSensors.Length > 0;
 
     public string BenchmarkWhen => LastBenchmark is { } last
         ? last.Date.ToLocalTime().ToString("g", Texts.Culture) + " · " + last.Api + " · " + last.RenderResolution + (last.Completed ? "" : T(" (passe arrêtée avant la fin, score partiel)"))
@@ -228,6 +277,7 @@ public sealed partial class WorkshopViewModel
                 "overall" => T("Score combiné"),
                 "gpu" => T("Carte graphique"),
                 "cpu" => T("Processeur"),
+                "rt" => T("Lancer de rayons"),
                 _ => BenchmarkNames.Of(r.Id),
             },
             Points(r.Mine),
@@ -322,7 +372,7 @@ public sealed partial class WorkshopViewModel
         }
 
         IsBenchmarkRunning = true;
-        BenchmarkStatus = T("Benchmark en cours dans sa propre fenêtre plein écran (environ dix minutes). Échap l'arrête à tout moment.");
+        BenchmarkStatus = T("Benchmark en cours dans sa propre fenêtre plein écran. Échap l'arrête à tout moment.");
         try
         {
             var start = new ProcessStartInfo(exe) { UseShellExecute = false };
@@ -335,6 +385,12 @@ public sealed partial class WorkshopViewModel
             {
                 start.ArgumentList.Add("--only");
                 start.ArgumentList.Add(BenchmarkScope.Value);
+            }
+
+            if (!BenchmarkIncludeRayTracing)
+            {
+                start.ArgumentList.Add("--raytracing");
+                start.ArgumentList.Add("off");
             }
 
             using var process = Process.Start(start);
@@ -372,6 +428,8 @@ public sealed partial class WorkshopViewModel
             nameof(BenchmarkGpuSensors), nameof(HasBenchmarkGpuSensors), nameof(BenchmarkCpuSensors), nameof(HasBenchmarkCpuSensors),
             nameof(BenchmarkGpuWarning), nameof(HasBenchmarkGpuWarning), nameof(BenchmarkCpuWarning), nameof(HasBenchmarkCpuWarning),
             nameof(HasBenchmarkImage), nameof(BenchmarkImageSource),
+            nameof(BenchmarkRayTracing), nameof(HasBenchmarkRayTracing), nameof(BenchmarkRayTracingNote), nameof(HasBenchmarkRayTracingNote),
+            nameof(BenchmarkRayTracingTests), nameof(BenchmarkRayTracingSensors), nameof(HasBenchmarkRayTracingSensors),
             nameof(HasBenchmarkComparison), nameof(BenchmarkCompareTitle), nameof(BenchmarkCompareWarning), nameof(HasBenchmarkCompareWarning), nameof(BenchmarkCompareRows),
         })
         {
@@ -396,7 +454,7 @@ public sealed partial class WorkshopViewModel
         return [.. last.Tests.Where(t => t.Device == device).Select(t => new BenchmarkRow(
             BenchmarkNames.Of(t.Id),
             Points(t.Score),
-            t.Device == "gpu"
+            t.Device != "cpu"
                 ? T("{0} images/s", t.Value.ToString("0.0", culture)) + (t.Low1 is { } low ? " · " + T("1 % les plus lentes : {0}", low.ToString("0.0", culture)) : "")
                 : t.Value.ToString("0.00", culture) + " " + t.Unit,
             Math.Min(1, t.Score / BarScale),
@@ -412,9 +470,14 @@ public sealed partial class WorkshopViewModel
         AppendSensors(text, report, "gpu");
         text.AppendLine(T("Processeur : {0} points ({1})", Points(report.CpuScore), report.Cpu));
         AppendSensors(text, report, "cpu");
+        if (report.RayTracingScore > 0)
+        {
+            text.AppendLine(T("Lancer de rayons (score à part) : {0} points", Points(report.RayTracingScore)));
+        }
+
         foreach (var test in report.Tests)
         {
-            var value = test.Device == "gpu" ? T("{0} images/s", test.Value.ToString("0.0", Texts.Culture)) : test.Value.ToString("0.00", Texts.Culture) + " " + test.Unit;
+            var value = test.Device != "cpu" ? T("{0} images/s", test.Value.ToString("0.0", Texts.Culture)) : test.Value.ToString("0.00", Texts.Culture) + " " + test.Unit;
             text.AppendLine("  • " + BenchmarkNames.Of(test.Id) + " : " + Points(test.Score) + " (" + value + ")");
         }
 
@@ -473,6 +536,7 @@ internal static class BenchmarkNames
         "galaxy" => T("Collision galactique (bande passante)"),
         "ring" => T("Anneau de la géante (géométrie)"),
         "battle" => T("Champ de bataille (effets)"),
+        "raytracing" => T("Galerie des glaces (lancer de rayons)"),
         "cpu-render" => T("Rendu sur tous les cœurs"),
         "cpu-single" => T("Rendu sur un seul cœur"),
         "cpu-vector" => T("Calcul vectoriel"),

@@ -96,6 +96,7 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
             List = Device.CreateCommandList<ID3D12GraphicsCommandList>(CommandListType.Direct, _frames[0].Allocator),
         };
         _commands.List.Close();
+        RayTracing = D3D12RayTracing.TryCreate(this);
 
         _timestamps = Device.CreateQueryHeap<ID3D12QueryHeap>(new QueryHeapDescription(QueryHeapType.Timestamp, FramesInFlight * 2));
         _timestampReadback = Device.CreateCommittedResource(HeapType.Readback, ResourceDescription.Buffer(FramesInFlight * 16), ResourceStates.CopyDest);
@@ -145,7 +146,12 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
 
     public double LastGpuFrameMilliseconds { get; private set; }
 
+    public IRayTracing? RayTracing { get; }
+
     public ID3D12Device Device { get; }
+
+    /// <summary>Liste de commandes de l'image en cours (constructions du lancer de rayons).</summary>
+    internal D3D12CommandList CommandList => _commands;
 
     public ID3D12RootSignature RootSignature { get; }
 
@@ -398,6 +404,7 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
             frame.Upload.Dispose();
         }
 
+        (RayTracing as IDisposable)?.Dispose();
         _commands.List.Dispose();
         _uploadList.Dispose();
         _uploadAllocator.Dispose();

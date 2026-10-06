@@ -87,10 +87,13 @@ public sealed record BenchmarkSensorSummary
     /// <summary>Part des mesures avec un freinage matériel, fréquence divisée par 2 ou plus (NVIDIA), en %.</summary>
     public double? HardwareBrakePercent { get; init; }
 
-    /// <summary>Résumé des mesures d'un test pour un composant (« gpu » ou « cpu ») ; <c>null</c> si rien n'était lisible.</summary>
+    /// <summary>
+    /// Résumé des mesures d'un test pour un composant (« gpu » ou « cpu » ; le lancer de rayons « rt » est un test de la
+    /// carte graphique) ; <c>null</c> si rien n'était lisible.
+    /// </summary>
     public static BenchmarkSensorSummary? Summarize(IReadOnlyList<BenchmarkSensorSample> samples, string device)
     {
-        var gpu = device == "gpu";
+        var gpu = device != "cpu";
         var temperatures = Values(samples, s => gpu ? s.GpuTemperatureC : s.CpuTemperatureC);
         var clocks = Values(samples, s => gpu ? s.GpuClockMhz : s.CpuMhz);
         var powers = Values(samples, s => gpu ? s.GpuPowerWatts : s.CpuPowerWatts);
@@ -190,7 +193,7 @@ public static class BenchmarkSensorText
         }
 
         var culture = Culture;
-        var gpu = device == "gpu";
+        var gpu = device != "cpu";
         var parts = new List<string>();
         if ((gpu ? sample.GpuTemperatureC : sample.CpuTemperatureC) is { } temperature)
         {
@@ -227,7 +230,7 @@ public static class BenchmarkSensorText
         }
 
         var culture = Culture;
-        if (device == "gpu")
+        if (device != "cpu")
         {
             if (summary.ThermalSlowdownPercent is > 0 and var thermal)
             {

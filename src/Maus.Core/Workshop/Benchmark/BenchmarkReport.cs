@@ -6,7 +6,7 @@ namespace Maus.Core.Workshop.Benchmark;
 
 /// <summary>Résultat d'un test du benchmark visuel (une scène de la carte graphique ou un test du processeur).</summary>
 /// <param name="Id">Identifiant stable du test (« fractal », « cpu-render »…).</param>
-/// <param name="Device">« gpu » ou « cpu ».</param>
+/// <param name="Device">« gpu », « cpu », ou « rt » pour le lancer de rayons (carte graphique, score compté à part).</param>
 /// <param name="Capability">Capacité sollicitée (« compute », « geometry », « bandwidth », « multicore »…).</param>
 /// <param name="Value">Mesure brute : images par seconde (carte graphique) ou unités de travail par seconde (processeur).</param>
 /// <param name="Unit">Unité de la mesure brute, en clair.</param>
@@ -45,6 +45,15 @@ public sealed record BenchmarkReport
 
     public double OverallScore { get; init; }
 
+    /// <summary>
+    /// Score du lancer de rayons (test « Galerie des glaces », Direct3D 12 et cartes compatibles DXR 1.1) : compté à part,
+    /// pour que les cartes sans lancer de rayons restent comparables ; 0 s'il n'a pas tourné.
+    /// </summary>
+    public double RayTracingScore { get; init; }
+
+    /// <summary>Pourquoi le lancer de rayons n'a pas été mesuré (interface ou carte qui ne le gère pas) ; absent sinon.</summary>
+    public string? RayTracingNote { get; init; }
+
     /// <summary>Faux si la passe a été arrêtée (Échap) ou interrompue par une erreur : les scores sont alors partiels.</summary>
     public bool Completed { get; init; }
 
@@ -59,7 +68,8 @@ public sealed record BenchmarkReport
 /// mesurée par le projet) et ses points suivent la vitesse mesurée (deux fois plus rapide = deux fois plus de points).
 /// Score de la carte graphique et du processeur : moyenne géométrique de leurs tests (un point faible pèse autant qu'un
 /// point fort). Score combiné : moyenne harmonique pondérée (75 % carte graphique, 25 % processeur), qui pénalise un
-/// déséquilibre comme le fait un jeu limité par son composant le plus lent.
+/// déséquilibre comme le fait un jeu limité par son composant le plus lent. Le lancer de rayons a son propre score, hors
+/// du score combiné (toutes les cartes ne le gèrent pas).
 /// </summary>
 public static class BenchmarkScoring
 {

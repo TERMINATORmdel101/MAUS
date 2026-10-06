@@ -49,7 +49,13 @@ public static class Ui
 
     public static string BenchmarkTitle => T("Benchmark visuel : carte graphique et processeur");
 
-    public static string BenchmarkIntro => T("Environ dix minutes en plein écran : quatre scènes de deux minutes calculées image par image (DirectX 11 ou 12), puis le processeur. Chaque test pousse une capacité à fond pour montrer les points forts et les points faibles. 10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti) à la même résolution. La carte et le processeur chauffent comme dans un jeu très exigeant ; Échap arrête tout.");
+    public static string BenchmarkIntro => T("Une douzaine de minutes en plein écran : cinq scènes calculées image par image (DirectX 11 ou 12), un test de lancer de rayons (DirectX 12, cartes compatibles, score à part), puis le processeur. Chaque test pousse une capacité à fond pour montrer les points forts et les points faibles. 10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti) à la même résolution. La carte et le processeur chauffent comme dans un jeu très exigeant ; Échap arrête tout.");
+
+    public static string BenchmarkRayTracingOption => T("Lancer de rayons (DirectX 12, score à part)");
+
+    public static string BenchmarkRayTracingTip => T("Test « Galerie des glaces » : reflets, verre, ombres et lumière calculés par le lancer de rayons matériel de la carte (DXR 1.1). Il faut DirectX 12 et une carte qui le gère : MAUS le vérifie et passe le test sinon. Son score est compté à part, pour que les cartes sans lancer de rayons restent comparables.");
+
+    public static string BenchmarkRayTracingTitle => T("Lancer de rayons (score à part)");
 
     public static string ApiLabel => T("Interface graphique");
 

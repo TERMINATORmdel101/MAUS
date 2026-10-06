@@ -73,6 +73,23 @@ public sealed partial class ShaderLibrary
         return _compiled[key] = new ShaderCode($"{file}:{entry}", code);
     }
 
+    /// <summary>
+    /// Shader compilé pendant la fabrication de MAUS par DXC (modèle 6.5, lancer de rayons) ; <c>null</c> s'il est absent de
+    /// cette version (fabriquée sans Windows).
+    /// </summary>
+    public static ShaderCode? Precompiled(string name)
+    {
+        using var stream = Self.GetManifestResourceStream("Maus.Bench.Dxil." + name + ".dxil");
+        if (stream is null)
+        {
+            return null;
+        }
+
+        var bytes = new byte[stream.Length];
+        stream.ReadExactly(bytes);
+        return new ShaderCode(name, bytes);
+    }
+
     /// <summary>Texte d'un fichier embarqué, includes résolus (au plus 8 niveaux).</summary>
     internal static string Resolve(string file, int depth)
     {

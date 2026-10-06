@@ -217,6 +217,16 @@ internal sealed unsafe class D3D12CommandList : ICommandList
         _srvDirty = true;
     }
 
+    /// <summary>
+    /// Vue toute faite au registre t<paramref name="slot"/> (scène du lancer de rayons) : sa ressource garde toujours le
+    /// même état, aucune barrière n'est posée.
+    /// </summary>
+    public void SetRawView(int slot, CpuDescriptorHandle? view)
+    {
+        _srv[slot] = view is { } handle ? new Binding(null, -1, null, handle) : default;
+        _srvDirty = true;
+    }
+
     public void SetStorageTexture(int slot, ITexture? texture, int mip = 0)
     {
         _uav[slot] = new Binding(texture as D3D12Texture, mip, null);
@@ -507,7 +517,7 @@ internal sealed unsafe class D3D12CommandList : ICommandList
             for (var i = 0; i < MaxTextures; i++)
             {
                 var b = _srv[i];
-                _tableScratch[i] = b.Texture is not null ? b.Texture.ShaderView(b.Mip) : b.Buffer is not null ? b.Buffer.ShaderView : _owner.NullTexture;
+                _tableScratch[i] = b.Texture is not null ? b.Texture.ShaderView(b.Mip) : b.Buffer is not null ? b.Buffer.ShaderView : b.Raw ?? _owner.NullTexture;
             }
 
             _srvTable = _owner.Ring.Upload(_tableScratch);
@@ -529,5 +539,5 @@ internal sealed unsafe class D3D12CommandList : ICommandList
         }
     }
 
-    private readonly record struct Binding(D3D12Texture? Texture, int Mip, D3D12Buffer? Buffer);
+    private readonly record struct Binding(D3D12Texture? Texture, int Mip, D3D12Buffer? Buffer, CpuDescriptorHandle? Raw = null);
 }

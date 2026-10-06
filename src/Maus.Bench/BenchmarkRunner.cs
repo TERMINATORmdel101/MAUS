@@ -35,6 +35,7 @@ internal sealed class BenchmarkRunner : IDisposable
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly BenchmarkSensorSampler _sensors;
     private double _fps;
+    private string? _rayTracingNote;
     private readonly Queue<float> _recentFrames = new();
 
     public BenchmarkRunner(BenchOptions options)
@@ -52,14 +53,15 @@ internal sealed class BenchmarkRunner : IDisposable
 
     public BenchmarkReport Run()
     {
-        IReadOnlyList<BenchScene> scenes = _options.Only == "cpu" ? [] : BenchmarkProgram.CreateScenes(_options.Scenes);
+        IReadOnlyList<BenchScene> scenes = _options.Only == "cpu" ? [] : KeepRayTracingIfPossible(BenchmarkProgram.CreateScenes(_options.Scenes));
         IReadOnlyList<CpuBenchTest> cpuTests = _options.Only == "gpu" ? [] : BenchmarkProgram.CreateCpuTests(_options.Scenes);
         var total = scenes.Count + cpuTests.Count;
+        var minutes = ((scenes.Sum(s => s.Duration + WarmupSeconds + 2) + cpuTests.Sum(t => t.Duration + 2)) * _options.DurationScale) + 10;
         string? error = null;
         var completed = false;
         try
         {
-            if (!Intro())
+            if (!Intro(Math.Max(1, (int)Math.Round(minutes / 60)), scenes.Count > 0, cpuTests.Count > 0))
             {
                 return Report(false, null);
             }
@@ -94,6 +96,28 @@ internal sealed class BenchmarkRunner : IDisposable
         return Finish(completed, error);
     }
 
+    /// <summary>
+    /// Le lancer de rayons ne tourne qu'avec Direct3D 12, sur une carte qui le gère, et si l'utilisateur ne l'a pas écarté :
+    /// sinon la scène est retirée (la raison est notée dans le bilan quand ce n'est pas un choix de l'utilisateur).
+    /// </summary>
+    private IReadOnlyList<BenchScene> KeepRayTracingIfPossible(IReadOnlyList<BenchScene> scenes)
+    {
+        if (scenes.OfType<MirrorHallScene>().FirstOrDefault() is not { } hall)
+        {
+            return scenes;
+        }
+
+        var reason = _options.RayTracing ? MirrorHallScene.Unavailable(_device) : null;
+        if (_options.RayTracing && reason is null)
+        {
+            return scenes;
+        }
+
+        _rayTracingNote = reason;
+        hall.Dispose();
+        return [.. scenes.Where(s => !ReferenceEquals(s, hall))];
+    }
+
     public void Dispose()
     {
         _sensors.Dispose();
@@ -120,6 +144,7 @@ internal sealed class BenchmarkRunner : IDisposable
     {
         var gpu = BenchmarkScoring.Combine(_results.Where(r => r.Device == "gpu").Select(r => r.Score));
         var cpu = BenchmarkScoring.Combine(_results.Where(r => r.Device == "cpu").Select(r => r.Score));
+        var rayTracing = BenchmarkScoring.Combine(_results.Where(r => r.Device == "rt").Select(r => r.Score));
         return new BenchmarkReport
         {
             Date = DateTimeOffset.Now,
@@ -132,13 +157,18 @@ internal sealed class BenchmarkRunner : IDisposable
             GpuScore = Math.Round(gpu),
             CpuScore = Math.Round(cpu),
             OverallScore = Math.Round(BenchmarkScoring.Overall(gpu, cpu)),
+            RayTracingScore = Math.Round(rayTracing),
+            RayTracingNote = _rayTracingNote,
             Completed = completed,
             Error = error,
         };
     }
 
-    private bool Intro()
+    private bool Intro(int minutes, bool gpu, bool cpu)
     {
+        var duration = gpu && cpu
+            ? T("Carte graphique et processeur poussés à fond, environ {0} minutes", minutes)
+            : gpu ? T("Carte graphique poussée à fond, environ {0} minutes", minutes) : T("Processeur poussé à fond, environ {0} minutes", minutes);
         var start = _clock.Elapsed.TotalSeconds;
         while (_clock.Elapsed.TotalSeconds - start < 5 * Math.Min(1, _options.DurationScale * 4))
         {
@@ -161,7 +191,7 @@ internal sealed class BenchmarkRunner : IDisposable
             }
 
             _ui.Text("MAUS BENCHMARK", cx, _ui.Height * 0.47f, 74 * s, UiColors.White(fade), bold: true, TextAlign.Center, glow: 0.35f);
-            _ui.Text(T("Carte graphique et processeur poussés à fond, environ dix minutes"), cx, _ui.Height * 0.47f + (96 * s), 26 * s, UiColors.Grey(fade), align: TextAlign.Center);
+            _ui.Text(duration, cx, _ui.Height * 0.47f + (96 * s), 26 * s, UiColors.Grey(fade), align: TextAlign.Center);
             var api = _device.Api == GpuApi.Direct3D11 ? "Direct3D 11" : "Direct3D 12";
             _ui.Text($"{_device.AdapterName}  ·  {api}  ·  {_cpuName}", cx, _ui.Height * 0.47f + (150 * s), 20 * s, UiColors.Blue(fade), align: TextAlign.Center);
             _ui.Text(T("Ne touchez à rien pendant la mesure. Échap pour arrêter."), cx, _ui.Height - (90 * s), 19 * s, UiColors.Grey(0.8f * fade), align: TextAlign.Center);
@@ -259,7 +289,7 @@ internal sealed class BenchmarkRunner : IDisposable
         }
         _results.Add(new BenchmarkTestResult(
             scene.Id,
-            "gpu",
+            scene is MirrorHallScene ? "rt" : "gpu",
             scene.Capability.ToString().ToLowerInvariant(),
             Math.Round(fps, 2),
             T("images par seconde"),
@@ -522,12 +552,20 @@ internal sealed class BenchmarkRunner : IDisposable
             _ui.Text(caption, cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
             y += 60 * s;
 
+            // Carte graphique à gauche ; à droite le processeur, puis le lancer de rayons (score à part) en dessous.
             var colW = 520 * s;
             var gpuTests = report.Tests.Where(t => t.Device == "gpu").ToList();
             var cpuTests = report.Tests.Where(t => t.Device == "cpu").ToList();
-            var both = gpuTests.Count > 0 && cpuTests.Count > 0;
+            var rtTests = report.Tests.Where(t => t.Device == "rt").ToList();
+            var both = gpuTests.Count > 0 && (cpuTests.Count > 0 || rtTests.Count > 0);
+            var rightX = both ? cx + (30 * s) : cx - (colW / 2);
             DrawScoreColumn(T("Carte graphique"), report.GpuScore, gpuTests, both ? cx - colW - (30 * s) : cx - (colW / 2), y, colW, UiColors.Blue(), reveal);
-            DrawScoreColumn(T("Processeur"), report.CpuScore, cpuTests, both ? cx + (30 * s) : cx - (colW / 2), y, colW, UiColors.Mint(), reveal);
+            var below = DrawScoreColumn(T("Processeur"), report.CpuScore, cpuTests, rightX, y, colW, UiColors.Mint(), reveal);
+            DrawScoreColumn(T("Lancer de rayons (score à part)"), report.RayTracingScore, rtTests, rightX, cpuTests.Count > 0 ? below + (18 * s) : y, colW, UiColors.Sand(), reveal);
+            if (rtTests.Count == 0 && report.RayTracingNote is { } note)
+            {
+                _ui.Text(T("Lancer de rayons non mesuré : {0}", note), cx, _ui.Height - (88 * s), 15 * s, UiColors.Grey(0.8f), align: TextAlign.Center);
+            }
 
             var bottom = _ui.Height - (150 * s);
             var warnings = new[] { ShortWarning(gpuTests, "gpu"), ShortWarning(cpuTests, "cpu") }.OfType<string>().ToList();
@@ -581,12 +619,13 @@ internal sealed class BenchmarkRunner : IDisposable
         }
     }
 
-    private void DrawScoreColumn(string title, double score, List<BenchmarkTestResult> tests, float x, float y, float width, Vector4 accent, double reveal)
+    /// <summary>Colonne d'un composant (titre, score, une ligne par test) ; rend le bas de la colonne.</summary>
+    private float DrawScoreColumn(string title, double score, List<BenchmarkTestResult> tests, float x, float y, float width, Vector4 accent, double reveal)
     {
         var s = _ui.Scale;
         if (tests.Count == 0)
         {
-            return;
+            return y;
         }
 
         _ui.Rect(x, y, width, (108 * s) + (tests.Count * 74 * s), new Vector4(1, 1, 1, 0.05f), 18 * s);
@@ -603,7 +642,7 @@ internal sealed class BenchmarkRunner : IDisposable
         {
             _ui.Text(TestName(test.Id), x + (24 * s), rowY, 17 * s, UiColors.White(0.92f));
             _ui.Text(Points(test.Score), x + width - (24 * s), rowY, 17 * s, UiColors.White(0.92f), bold: true, TextAlign.Right);
-            var detail = test.Device == "gpu"
+            var detail = test.Device != "cpu"
                 ? T("{0} images/s", test.Value.ToString("0.0", Culture)) + (test.Low1 is { } low ? "  ·  " + T("1 % les plus lentes : {0}", low.ToString("0.0", Culture)) : "")
                 : test.Value.ToString("0.00", Culture) + " " + test.Unit;
             _ui.Text(detail, x + (24 * s), rowY + (40 * s), 14 * s, UiColors.Grey(0.85f));
@@ -614,6 +653,8 @@ internal sealed class BenchmarkRunner : IDisposable
             _ui.Rect(x + (24 * s) + (float)(barW * BenchmarkScoring.ReferencePoints / max), rowY + (22 * s), 2 * s, 16 * s, UiColors.White(0.6f));
             rowY += 74 * s;
         }
+
+        return y + (108 * s) + (tests.Count * 74 * s);
     }
 
     /// <summary>Capture de contrôle (option --screenshots) : une image par test, prise une seule fois.</summary>
@@ -663,6 +704,7 @@ internal sealed class BenchmarkRunner : IDisposable
         "galaxy" => T("Collision galactique (bande passante)"),
         "ring" => T("Anneau de la géante (géométrie)"),
         "battle" => T("Champ de bataille (effets)"),
+        "raytracing" => T("Galerie des glaces (lancer de rayons)"),
         "cpu-render" => T("Rendu sur tous les cœurs"),
         "cpu-single" => T("Rendu sur un seul cœur"),
         "cpu-vector" => T("Calcul vectoriel"),

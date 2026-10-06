@@ -15,6 +15,9 @@ namespace Maus.Bench;
 /// <summary>
 /// Point d'entrée du benchmark visuel (MAUS.exe --benchmark, ou maus --benchmark pour les essais) :
 ///   --api d3d11|d3d12        interface graphique (par défaut : Direct3D 12)
+///   --resolution 720p|1080p|1440p|4k   résolution de calcul (par défaut : 1080p)
+///   --only gpu|cpu           seulement la carte graphique ou le processeur
+///   --raytracing off         sans le test du lancer de rayons (Direct3D 12, cartes compatibles)
 ///   --scene ID[,ID]          seulement ces scènes
 ///   --capture DOSSIER        rendu hors écran de quelques images (--times 5,20,40 ; --size 1920x1080) en PNG
 ///   --duration-scale X       durées multipliées par X (essais rapides)
@@ -64,7 +67,7 @@ public static partial class BenchmarkProgram
 
     internal static IReadOnlyList<BenchScene> CreateScenes(IReadOnlyCollection<string> only)
     {
-        BenchScene[] all = [new RingScene(), new BattleScene(), new GalaxyScene(), new MaterialsScene(), new FractalScene()];
+        BenchScene[] all = [new RingScene(), new BattleScene(), new GalaxyScene(), new MaterialsScene(), new FractalScene(), new MirrorHallScene()];
         return only.Count == 0 ? all : all.Where(s => only.Contains(s.Id)).ToArray();
     }
 
@@ -198,6 +201,9 @@ internal sealed record BenchOptions
     /// <summary>Bilan fermé tout seul après 4 secondes (essais automatiques).</summary>
     public bool AutoClose { get; init; }
 
+    /// <summary>Test du lancer de rayons (Direct3D 12, cartes compatibles, score à part) : oui, sauf avec « --raytracing off ».</summary>
+    public bool RayTracing { get; init; } = true;
+
     /// <summary>Passe d'essai (accélérée ou fermée automatiquement) : rien n'est gardé dans l'historique de l'utilisateur.</summary>
     public bool IsTrial => DurationScale < 1 || AutoClose;
 
@@ -276,6 +282,7 @@ internal sealed record BenchOptions
             ScreenshotFolder = Value("--screenshots"),
             Only = Value("--only")?.ToLowerInvariant(),
             AutoClose = args.Contains("--auto-close", StringComparer.OrdinalIgnoreCase),
+            RayTracing = !string.Equals(Value("--raytracing"), "off", StringComparison.OrdinalIgnoreCase),
         };
     }
 }

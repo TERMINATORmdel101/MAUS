@@ -89,6 +89,9 @@ internal sealed class D3D11GpuDevice : IGpuDevice
 
     public double LastGpuFrameMilliseconds { get; private set; }
 
+    /// <summary>Le lancer de rayons matériel n'existe pas dans Direct3D 11.</summary>
+    public IRayTracing? RayTracing => null;
+
     public ITexture CreateTexture(TextureDesc desc) => new D3D11Texture(_device, desc);
 
     public unsafe void UploadTexture(ITexture texture, int mip, int slice, ReadOnlySpan<byte> data, int rowPitch)

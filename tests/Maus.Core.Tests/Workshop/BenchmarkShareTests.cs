@@ -73,6 +73,26 @@ public sealed class BenchmarkShareTests
     }
 
     [Fact]
+    public void Ray_tracing_keeps_its_own_score_in_the_code_and_the_comparison()
+    {
+        var mine = Sample() with
+        {
+            RayTracingScore = 10000,
+            Tests = [.. Sample().Tests, new BenchmarkTestResult("raytracing", "rt", "raytracing", 40.2, "images par seconde", 10000, 35.0)],
+        };
+        var theirs = Sample();
+
+        var decoded = BenchmarkShareCode.Decode(BenchmarkShareCode.Encode(mine))!;
+        var rows = BenchmarkComparison.Compare(mine, theirs);
+
+        Assert.Equal(10000, decoded.RayTracingScore);
+        Assert.Equal("rt", decoded.Tests.Single(t => t.Id == "raytracing").Device);
+        Assert.Equal(0, BenchmarkShareCode.Decode(BenchmarkShareCode.Encode(theirs))!.RayTracingScore);
+        Assert.Null(rows.Single(r => r.Id == "rt").Difference);
+        Assert.DoesNotContain(BenchmarkComparison.Compare(theirs, theirs), r => r.Id == "rt");
+    }
+
+    [Fact]
     public void A_test_missing_on_one_side_has_no_gap()
     {
         var theirs = Sample() with { Tests = [] };
