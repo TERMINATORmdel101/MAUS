@@ -2,6 +2,19 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.6.2 — 06/10/2026
+
+Nouvelles fonctions pour les joueurs et les connaisseurs (améliorations : dernier chiffre). Chaque calcul ou seuil s'appuie sur une source publiée.
+
+- **Compteur d'images par seconde en direct** (demande du porteur), dans la fenêtre de surveillance, qui peut rester au-dessus du jeu. Il donne, sur les dix dernières secondes : la moyenne, le 1 % et le 0,1 % les plus lents, et la part de travail de la carte graphique. Il compare aussi à la fréquence de l'écran principal et explique ce qui limite.
+  - **Carte graphique ou reste du PC** : MAUS compare le temps de travail de la carte graphique à la durée de chaque image (méthode « GPU Busy » d'Intel). Proche de 100 %, la carte graphique limite. Nettement en dessous, ce sont le processeur, la mémoire ou une limite d'images (V-Sync, limiteur du jeu) qui freinent.
+  - **Fréquence de l'écran** : atteindre la fréquence de l'écran, c'est déjà bien. Au-delà, le gain est surtout la réactivité (latence, selon NVIDIA), utile dans les jeux compétitifs (CS2, Valorant), beaucoup moins dans un jeu d'aventure (Red Dead Redemption 2, Cyberpunk 2077).
+  - Les bornes « proche » (95 %) et « nettement en dessous » (85 %) sont celles qu'utilise déjà le bilan du relevé de partie. Ce sont des repères de MAUS, pas des normes publiées.
+- **Relevé de partie** : il mesure maintenant les images par seconde du jeu (moyenne, 1 % et 0,1 % les plus lents), avec la même explication. La mesure se fait avec **PresentMon** d'Intel (gratuit, licence MIT), livré avec MAUS. PresentMon ne fait qu'écouter les événements d'affichage de Windows. MAUS ne le lance que si le fichier est exactement celui signé par Intel, et l'arrête avec la mesure.
+- **Santé des SSD NVMe** (module 11) : réserve de cellules et seuil du fabricant, alertes déclarées par le disque, usure estimée, heures d'utilisation, données écrites, erreurs. La lecture se fait sans droits administrateur et sans accès en écriture au disque. Les verdicts viennent uniquement de ce que déclare le disque.
+- **Idées reçues que MAUS ne suit pas** (onglet Corrections) : nettoyeurs de registre, suppression du fichier d'échange, nombre de processeurs dans msconfig, horloge HPET et « dynamic tick », défragmentation des SSD. Chacune a sa source chez Microsoft et un bouton « Voir la source ».
+- Recherche « ce qui manque pour les experts » : `docs/pistes-experts.md`. Deux pistes restent à faire (pilote en cause d'un écran bleu, latence des pilotes).
+
 ## 0.6.1 — 05/10/2026
 
 Améliorations proposées au porteur et acceptées (« tu peux tout faire ») : améliorations et corrections, dernier chiffre (règle du porteur).

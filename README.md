@@ -32,7 +32,7 @@
 
 ## État du projet
 
-Version actuelle : **0.6.1** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
+Version actuelle : **0.6.2** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
 
 | Version | Contenu | État |
 |---|---|---|
@@ -47,6 +47,7 @@ Version actuelle : **0.6.1** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a c
 | 0.5.3 | Sept défauts corrigés : arrêt des tests longs si les températures ne sont plus lues, score dit « partiel » quand un module échoue, dates et nombres dans la langue choisie, filet de sécurité sur tous les fils, un seul MAUS à la fois, fichiers de MAUS jamais écrasés après une lecture ratée | Compilée et testée (1 421 tests) ; interface à vérifier sur le PC du porteur |
 | 0.6.0 | Nouvelle présentation : accueil simplifié qui propose de corriger dès la fin de l'audit, constats rangés par importance (le reste à la demande), page Corrections allégée, tests de l'Atelier en parties bien distinctes, couleurs pastel en thème clair et sombre | Vérifiée à l'écran sur le PC du porteur (captures), à essayer par le porteur |
 | 0.6.1 | Bouton « Corriger » sur les constats, doublons regroupés, liens web en bouton, score avant / après, récapitulatif avant d'appliquer, corrections rangées par module, carte « Bienvenue », pastel dans toutes les fenêtres, thème sombre corrigé | Vérifiée à l'écran (captures), à essayer par le porteur |
+| 0.6.2 | Compteur d'images par seconde en direct (moyenne, 1 % et 0,1 % les plus lents, ce qui limite, fréquence de l'écran), images par seconde dans le relevé de partie (PresentMon d'Intel), santé des SSD NVMe, idées reçues sur l'optimisation avec leurs sources | Vérifiée sur le PC du porteur (SSD NVMe, compteur sans jeu) ; mesure en jeu à essayer |
 | Suite | Écran et HDR, signature du code, publication sur le Microsoft Store | À venir |
 
 **Aucune donnée inventée.** Chaque seuil (température, tension) cite sa source publiée dans `src/Maus.Core/Catalog/hw-safety-limits.json`. Sans source, MAUS n'affiche pas de seuil et ne déclenche pas d'alarme.
