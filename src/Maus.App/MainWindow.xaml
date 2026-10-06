@@ -1777,6 +1777,10 @@
                                         <TextBlock Text="{x:Static app:Ui.GpuLabel}" Foreground="{DynamicResource PastelBlueInk}" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     </DockPanel>
                                     <TextBlock Text="{Binding Workshop.BenchmarkGpuName, Mode=OneWay}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Workshop.BenchmarkGpuSensors, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                               Visibility="{Binding Workshop.HasBenchmarkGpuSensors, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="{Binding Workshop.BenchmarkGpuWarning, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" FontWeight="SemiBold"
+                                               Foreground="{StaticResource MausRed}" Visibility="{Binding Workshop.HasBenchmarkGpuWarning, Converter={StaticResource BoolToVisibility}}" />
                                     <ItemsControl ItemsSource="{Binding Workshop.BenchmarkGpuTests, Mode=OneWay}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -1801,6 +1805,10 @@
                                         <TextBlock Text="{x:Static app:Ui.CpuLabel}" Foreground="{DynamicResource PastelMintInk}" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     </DockPanel>
                                     <TextBlock Text="{Binding Workshop.BenchmarkCpuName, Mode=OneWay}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Workshop.BenchmarkCpuSensors, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                               Visibility="{Binding Workshop.HasBenchmarkCpuSensors, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="{Binding Workshop.BenchmarkCpuWarning, Mode=OneWay}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" FontWeight="SemiBold"
+                                               Foreground="{StaticResource MausRed}" Visibility="{Binding Workshop.HasBenchmarkCpuWarning, Converter={StaticResource BoolToVisibility}}" />
                                     <ItemsControl ItemsSource="{Binding Workshop.BenchmarkCpuTests, Mode=OneWay}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>

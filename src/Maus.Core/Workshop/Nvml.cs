@@ -52,6 +52,12 @@ public sealed record NvidiaGpuState
     public int? PcieWidth { get; init; }
 
     public int? PcieMaxWidth { get; init; }
+
+    /// <summary>
+    /// Raisons qui limitent la fréquence en ce moment : masque de bits <c>nvmlClocksEventReason*</c> de nvml.h (NVIDIA), voir
+    /// <see cref="Benchmark.NvidiaClockReasons"/>.
+    /// </summary>
+    public ulong? ClockEventReasons { get; init; }
 }
 
 /// <summary>Accès en lecture à NVML (NVIDIA Management Library, API publique et documentée par NVIDIA).</summary>
@@ -137,6 +143,8 @@ public sealed unsafe class WindowsNvmlSource : INvmlSource
         var hasUtilization = api.GetUtilization is not null && api.GetUtilization(device, &utilization) == Success;
         Memory memory = default;
         var hasMemory = api.GetMemoryInfo is not null && api.GetMemoryInfo(device, &memory) == Success;
+        ulong reasons = 0;
+        var hasReasons = api.ClockEvents is not null && api.ClockEvents(device, &reasons) == Success;
 
         return new NvidiaGpuState
         {
@@ -162,6 +170,7 @@ public sealed unsafe class WindowsNvmlSource : INvmlSource
             PcieMaxGeneration = U(api.PcieMaxGeneration),
             PcieWidth = U(api.PcieWidth),
             PcieMaxWidth = U(api.PcieMaxWidth),
+            ClockEventReasons = hasReasons ? reasons : null,
         };
     }
 
@@ -239,6 +248,11 @@ public sealed unsafe class WindowsNvmlSource : INvmlSource
         public readonly delegate* unmanaged<nint, uint*, int> PcieWidth = (delegate* unmanaged<nint, uint*, int>)Export(library, "nvmlDeviceGetCurrPcieLinkWidth");
         public readonly delegate* unmanaged<nint, uint*, int> PcieMaxWidth = (delegate* unmanaged<nint, uint*, int>)Export(library, "nvmlDeviceGetMaxPcieLinkWidth");
 
+        // Nom actuel depuis le pilote R535 ; l'ancien (« Throttle »), marqué obsolète, reste lu sur les pilotes plus anciens.
+        public readonly delegate* unmanaged<nint, ulong*, int> ClockEvents = (delegate* unmanaged<nint, ulong*, int>)Export(library, "nvmlDeviceGetCurrentClocksEventReasons", "nvmlDeviceGetCurrentClocksThrottleReasons");
+
         private static nint Export(nint library, string name) => NativeLibrary.TryGetExport(library, name, out var address) ? address : 0;
+
+        private static nint Export(nint library, string name, string older) => Export(library, name) is var address and not 0 ? address : Export(library, older);
     }
 }

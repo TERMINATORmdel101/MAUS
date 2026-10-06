@@ -129,6 +129,25 @@ public sealed partial class WorkshopViewModel
 
     public string BenchmarkCpuName => LastBenchmark is { } last ? last.Cpu + " · " + T("{0} fils de calcul", last.Threads) : "";
 
+    /// <summary>Température, fréquence et puissance relevées pendant les tests de la carte graphique (vide si illisibles).</summary>
+    public string BenchmarkGpuSensors => SensorLine("gpu");
+
+    public bool HasBenchmarkGpuSensors => BenchmarkGpuSensors.Length > 0;
+
+    public string BenchmarkCpuSensors => SensorLine("cpu");
+
+    public bool HasBenchmarkCpuSensors => BenchmarkCpuSensors.Length > 0;
+
+    /// <summary>Ralentissement signalé par la carte elle-même (chaleur, protection matérielle), avec le conseil.</summary>
+    public string BenchmarkGpuWarning => BenchmarkSensorText.Warning(DeviceSensors("gpu"), "gpu") ?? "";
+
+    public bool HasBenchmarkGpuWarning => BenchmarkGpuWarning.Length > 0;
+
+    /// <summary>Processeur arrivé à sa limite de température (lue dans la puce), avec le conseil.</summary>
+    public string BenchmarkCpuWarning => BenchmarkSensorText.Warning(DeviceSensors("cpu"), "cpu") ?? "";
+
+    public bool HasBenchmarkCpuWarning => BenchmarkCpuWarning.Length > 0;
+
     public string BenchmarkVerdict
     {
         get
@@ -225,11 +244,19 @@ public sealed partial class WorkshopViewModel
             nameof(HasBenchmark), nameof(HasNoBenchmark), nameof(BenchmarkOverall), nameof(BenchmarkGpu), nameof(BenchmarkCpu),
             nameof(BenchmarkWhen), nameof(BenchmarkGpuName), nameof(BenchmarkCpuName), nameof(BenchmarkVerdict),
             nameof(BenchmarkGpuTests), nameof(BenchmarkCpuTests), nameof(BenchmarkTrend), nameof(BenchmarkRuns),
+            nameof(BenchmarkGpuSensors), nameof(HasBenchmarkGpuSensors), nameof(BenchmarkCpuSensors), nameof(HasBenchmarkCpuSensors),
+            nameof(BenchmarkGpuWarning), nameof(HasBenchmarkGpuWarning), nameof(BenchmarkCpuWarning), nameof(HasBenchmarkCpuWarning),
         })
         {
             OnPropertyChanged(name);
         }
     }
+
+    private BenchmarkSensorSummary? DeviceSensors(string device) =>
+        LastBenchmark is { } last ? BenchmarkSensorSummary.Merge(last.Tests.Where(t => t.Device == device).Select(t => t.Sensors)) : null;
+
+    private string SensorLine(string device) =>
+        BenchmarkSensorText.Describe(DeviceSensors(device), device) is { } text ? T("Pendant la mesure : {0}", text) : "";
 
     private List<BenchmarkRow> Rows(string device)
     {
@@ -255,7 +282,9 @@ public sealed partial class WorkshopViewModel
         text.AppendLine(T("MAUS Benchmark {0} : {1}", AppVersion.Display, report.Date.ToLocalTime().ToString("g", Texts.Culture)));
         text.AppendLine(T("Score combiné : {0} ({1}, {2})", Points(report.OverallScore), report.RenderResolution, report.Api));
         text.AppendLine(T("Carte graphique : {0} points ({1})", Points(report.GpuScore), report.Gpu));
+        AppendSensors(text, report, "gpu");
         text.AppendLine(T("Processeur : {0} points ({1})", Points(report.CpuScore), report.Cpu));
+        AppendSensors(text, report, "cpu");
         foreach (var test in report.Tests)
         {
             var value = test.Device == "gpu" ? T("{0} images/s", test.Value.ToString("0.0", Texts.Culture)) : test.Value.ToString("0.00", Texts.Culture) + " " + test.Unit;
@@ -264,6 +293,15 @@ public sealed partial class WorkshopViewModel
 
         text.Append(T("10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti). Deux fois plus de points = deux fois plus rapide."));
         return text.ToString();
+    }
+
+    private static void AppendSensors(StringBuilder text, BenchmarkReport report, string device)
+    {
+        var summary = BenchmarkSensorSummary.Merge(report.Tests.Where(t => t.Device == device).Select(t => t.Sensors));
+        if (BenchmarkSensorText.Describe(summary, device) is { } line)
+        {
+            text.AppendLine("  " + T("Pendant la mesure : {0}", line));
+        }
     }
 
     private static string Points(double value) => value > 0 ? value.ToString("N0", CultureInfo.CurrentCulture) : "—";

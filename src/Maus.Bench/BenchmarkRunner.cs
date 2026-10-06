@@ -32,6 +32,7 @@ internal sealed class BenchmarkRunner : IDisposable
     private readonly List<BenchmarkTestResult> _results = [];
     private readonly string _cpuName = CpuName();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly BenchmarkSensorSampler _sensors;
     private double _fps;
     private readonly Queue<float> _recentFrames = new();
 
@@ -44,6 +45,7 @@ internal sealed class BenchmarkRunner : IDisposable
         _font = FontAtlas.Create(_device);
         _ui = new UiRenderer(_device, _shaders, _font);
         _logo = LoadLogo(_device);
+        _sensors = BenchmarkSensorSampler.ForThisPc(_device.AdapterName);
         _window.HideCursor();
     }
 
@@ -93,6 +95,7 @@ internal sealed class BenchmarkRunner : IDisposable
 
     public void Dispose()
     {
+        _sensors.Dispose();
         _logo?.Dispose();
         _ui.Dispose();
         _font.Dispose();
@@ -208,6 +211,7 @@ internal sealed class BenchmarkRunner : IDisposable
                 if (measuredFrames == 0)
                 {
                     measuredStart = now;
+                    _sensors.BeginSegment();
                 }
                 else
                 {
@@ -246,7 +250,10 @@ internal sealed class BenchmarkRunner : IDisposable
             Math.Round(fps, 2),
             T("images par seconde"),
             Math.Round(BenchmarkScoring.TestScore(fps, BenchReference.For(scene.Id, _options))),
-            BenchmarkScoring.Low1Fps(frameTimes) is { } low ? Math.Round(low, 2) : null));
+            BenchmarkScoring.Low1Fps(frameTimes) is { } low ? Math.Round(low, 2) : null)
+        {
+            Sensors = _sensors.EndSegment("gpu"),
+        });
         return true;
     }
 
@@ -277,6 +284,7 @@ internal sealed class BenchmarkRunner : IDisposable
                 {
                     workAtStart = test.Work;
                     measured = true;
+                    _sensors.BeginSegment();
                 }
 
                 if (elapsed >= measureFrom + duration)
@@ -314,6 +322,7 @@ internal sealed class BenchmarkRunner : IDisposable
             var endWork = test.Work;
             var seconds = _clock.Elapsed.TotalSeconds - start - measureFrom;
             cancel.Cancel();
+            var sensors = _sensors.EndSegment("cpu");
             worker.Wait();
             _device.WaitIdle();
             picture.Dispose();
@@ -326,7 +335,10 @@ internal sealed class BenchmarkRunner : IDisposable
                     test.Capability,
                     Math.Round(value, 3),
                     test.Unit,
-                    Math.Round(BenchmarkScoring.TestScore(value, BenchReference.For(test.Id, _options)))));
+                    Math.Round(BenchmarkScoring.TestScore(value, BenchReference.For(test.Id, _options))))
+                {
+                    Sensors = sensors,
+                });
             }
         }
 
@@ -376,7 +388,7 @@ internal sealed class BenchmarkRunner : IDisposable
         var margin = 40 * s;
 
         // Bandeau du haut : titre du test, ce qu'il sollicite.
-        _ui.Rect(0, 0, _ui.Width, 150 * s, new Vector4(0, 0, 0, 0.35f));
+        _ui.Rect(0, 0, _ui.Width, 168 * s, new Vector4(0, 0, 0, 0.35f));
         _ui.Text("MAUS  ·  BENCHMARK", margin, margin * 0.7f, 15 * s, UiColors.Blue(0.9f), bold: true);
         _ui.Text(title, margin, (margin * 0.7f) + (24 * s), 40 * s, UiColors.White(), bold: true, glow: 0.25f);
         _ui.Text(subtitle, margin, (margin * 0.7f) + (76 * s), 19 * s, UiColors.Grey(0.95f));
@@ -392,11 +404,20 @@ internal sealed class BenchmarkRunner : IDisposable
             {
                 _ui.Text(T("carte : {0} ms par image", ms.ToString("0.0", Culture)), right, (margin * 0.55f) + (100 * s), 15 * s, UiColors.Grey(0.8f), align: TextAlign.Right);
             }
+
+            if (BenchmarkSensorText.Live(_sensors.Latest, "gpu") is { } live)
+            {
+                _ui.Text(live, right, (margin * 0.55f) + (121 * s), 15 * s, UiColors.Blue(0.9f), align: TextAlign.Right);
+            }
         }
         else if (cpuRate is not null)
         {
             _ui.Text(cpuRate, right, margin * 0.9f, 26 * s, UiColors.White(), bold: true, TextAlign.Right);
             _ui.Text(T("{0} fils de calcul", threads), right, (margin * 0.9f) + (38 * s), 17 * s, UiColors.Grey(), align: TextAlign.Right);
+            if (BenchmarkSensorText.Live(_sensors.Latest, "cpu") is { } live)
+            {
+                _ui.Text(live, right, (margin * 0.9f) + (62 * s), 15 * s, UiColors.Mint(0.9f), align: TextAlign.Right);
+            }
         }
 
         // Bas de l'écran : progression, numéro du test, matériel.
@@ -418,12 +439,14 @@ internal sealed class BenchmarkRunner : IDisposable
             var gy = barY - (52 * s) - graphH;
             _ui.Rect(gx - (10 * s), gy - (10 * s), graphW + (20 * s), graphH + (20 * s), new Vector4(0, 0, 0, 0.35f), 10 * s);
             var frames = _recentFrames.ToArray();
-            var worst = Math.Max(frames.Max(), 1f);
+            // Une image régulière remplit la moitié de la hauteur ; un à-coup (1,5 fois l'image médiane) passe en rose.
+            var median = frames.Order().ElementAt(frames.Length / 2);
+            var top = MathF.Max(MathF.Max(frames.Max(), median * 2f), 1f);
             var width = graphW / 180f;
             for (var i = 0; i < frames.Length; i++)
             {
-                var h = graphH * MathF.Min(frames[i] / worst, 1f);
-                var color = frames[i] > worst * 0.8f ? UiColors.Rose(0.9f) : UiColors.Blue(0.75f);
+                var h = graphH * MathF.Min(frames[i] / top, 1f);
+                var color = frames[i] > median * 1.5f ? UiColors.Rose(0.9f) : UiColors.Blue(0.75f);
                 _ui.Rect(gx + ((180 - frames.Length + i) * width), gy + graphH - h, MathF.Max(width - (0.5f * s), 1f), h, color);
             }
 
@@ -478,6 +501,12 @@ internal sealed class BenchmarkRunner : IDisposable
             DrawScoreColumn(T("Processeur"), report.CpuScore, cpuTests, both ? cx + (30 * s) : cx - (colW / 2), y, colW, UiColors.Mint(), reveal);
 
             var bottom = _ui.Height - (150 * s);
+            var warnings = new[] { ShortWarning(gpuTests, "gpu"), ShortWarning(cpuTests, "cpu") }.OfType<string>().ToList();
+            for (var w = 0; w < warnings.Count; w++)
+            {
+                _ui.Text(warnings[w], cx, bottom - (44 * s) - ((warnings.Count - 1 - w) * 28 * s), 18 * s, UiColors.Rose(0.95f), align: TextAlign.Center);
+            }
+
             if (strongest is not null && weakest is not null && strongest.Id != weakest.Id)
             {
                 _ui.Text(T("Point fort : {0}", TestName(strongest.Id)), cx, bottom, 22 * s, UiColors.Mint(), bold: true, TextAlign.Center);
@@ -500,10 +529,15 @@ internal sealed class BenchmarkRunner : IDisposable
             return;
         }
 
-        _ui.Rect(x, y, width, (100 * s) + (tests.Count * 74 * s), new Vector4(1, 1, 1, 0.05f), 18 * s);
+        _ui.Rect(x, y, width, (108 * s) + (tests.Count * 74 * s), new Vector4(1, 1, 1, 0.05f), 18 * s);
         _ui.Text(title, x + (24 * s), y + (20 * s), 20 * s, accent, bold: true);
+        var device = tests[0].Device;
+        if (BenchmarkSensorText.Describe(BenchmarkSensorSummary.Merge(tests.Select(t => t.Sensors)), device) is { } sensors)
+        {
+            _ui.Text(sensors, x + (24 * s), y + (62 * s), 14 * s, UiColors.Grey(0.85f));
+        }
         _ui.Text(Points(score * reveal), x + width - (24 * s), y + (12 * s), 40 * s, UiColors.White(), bold: true, TextAlign.Right);
-        var rowY = y + (84 * s);
+        var rowY = y + (92 * s);
         var max = Math.Max(15000, tests.Count > 0 ? tests.Max(t => t.Score) * 1.1 : 1);
         foreach (var test in tests)
         {
@@ -535,6 +569,22 @@ internal sealed class BenchmarkRunner : IDisposable
     }
 
     private readonly HashSet<string> _screenshots = [];
+
+    /// <summary>Avertissement court du bilan (la page Benchmark de MAUS donne le conseil complet).</summary>
+    private static string? ShortWarning(List<BenchmarkTestResult> tests, string device)
+    {
+        var summary = BenchmarkSensorSummary.Merge(tests.Select(t => t.Sensors));
+        if (summary is null || BenchmarkSensorText.Warning(summary, device) is null)
+        {
+            return null;
+        }
+
+        return device == "gpu"
+            ? summary.ThermalSlowdownPercent is > 0 and var thermal
+                ? T("Carte graphique ralentie par la chaleur pendant {0} % de la mesure", thermal.ToString("0.#", Culture))
+                : T("Carte graphique freinée par sa protection matérielle pendant {0} % de la mesure", (summary.HardwareBrakePercent ?? 0).ToString("0.#", Culture))
+            : T("Processeur à sa limite de température ({0} °C) : il a ralenti pour se protéger", summary.LimitTemperatureC ?? 0);
+    }
 
     private static string Points(double score) => score > 0 ? score.ToString("N0", Culture) : "—";
 

@@ -12,7 +12,11 @@ namespace Maus.Core.Workshop.Benchmark;
 /// <param name="Unit">Unité de la mesure brute, en clair.</param>
 /// <param name="Score">Points du test : 10 000 = mesure de la machine de référence.</param>
 /// <param name="Low1">Pour la carte graphique : images par seconde du 1 % des images les plus lentes.</param>
-public sealed record BenchmarkTestResult(string Id, string Device, string Capability, double Value, string Unit, double Score, double? Low1 = null);
+public sealed record BenchmarkTestResult(string Id, string Device, string Capability, double Value, string Unit, double Score, double? Low1 = null)
+{
+    /// <summary>Température, fréquence et puissance relevées pendant la mesure (absent si aucun capteur n'était lisible).</summary>
+    public BenchmarkSensorSummary? Sensors { get; init; }
+}
 
 /// <summary>Bilan d'une passe complète du benchmark, enregistré dans l'historique.</summary>
 public sealed record BenchmarkReport
