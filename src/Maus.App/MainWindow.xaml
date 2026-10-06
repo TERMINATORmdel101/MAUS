@@ -1158,30 +1158,19 @@
                                 <TextBlock Text="{x:Static app:Ui.TestsSpeed}" Style="{StaticResource ZoneTitle}" FontSize="17" />
                                 <TextBlock Text="{x:Static app:Ui.TestsSpeedIntro}" Style="{StaticResource Muted}" FontSize="12" Margin="0,-4,0,10" />
 
-                                <!-- Benchmark visuel : processus séparé en plein écran (option benchmark de MAUS.exe), bilan relu dans l'historique. -->
+                                <!-- Benchmark visuel : la page dédiée (menu de gauche) le lance et garde les résultats. -->
                                 <Border Style="{StaticResource SoftCard}" Margin="0,0,0,12" Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}">
-                                    <StackPanel>
-                                        <DockPanel Margin="0,0,0,8">
-                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelRoseStroke}">
-                                                <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE7FC;" Foreground="{DynamicResource PastelRoseInk}" />
-                                            </Border>
-                                            <TextBlock Text="{x:Static app:Ui.BenchmarkTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelRoseInk}" />
-                                        </DockPanel>
-                                        <TextBlock Text="{x:Static app:Ui.BenchmarkIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
-                                        <WrapPanel Margin="0,12,0,0">
-                                            <TextBlock Text="{x:Static app:Ui.ApiLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.ApiLabel}" MinWidth="220" Margin="0,0,12,4" ItemsSource="{Binding Workshop.BenchmarkApis, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkApi}"
-                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
-                                            <TextBlock Text="{x:Static app:Ui.ResolutionLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.ResolutionLabel}" MinWidth="200" Margin="0,0,12,4" ItemsSource="{Binding Workshop.BenchmarkResolutions, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkResolution}"
-                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
-                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
-                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartBenchmarkCommand}" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
-                                        </WrapPanel>
-                                        <ProgressBar IsIndeterminate="True" Height="4" Margin="0,8,0,0" Visibility="{Binding Workshop.IsBenchmarkRunning, Converter={StaticResource BoolToVisibility}}" />
-                                        <TextBox Text="{Binding Workshop.BenchmarkStatus, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                                 TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.Name="{x:Static app:Ui.BenchmarkTitle}" />
-                                    </StackPanel>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="16,6" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                Content="{x:Static app:Ui.BenchmarkOpen}" Command="{Binding GoToCommand}" CommandParameter="5" />
+                                        <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelRoseStroke}" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE7FC;" Foreground="{DynamicResource PastelRoseInk}" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Static app:Ui.BenchmarkTitle}" Style="{StaticResource CardTitle}" Margin="0" Foreground="{DynamicResource PastelRoseInk}" />
+                                            <TextBlock Text="{x:Static app:Ui.BenchmarkPointer}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DockPanel>
                                 </Border>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1700,6 +1689,149 @@
                     </ItemsControl>
                 </ScrollViewer>
             </DockPanel>
+        </TabItem>
+
+        <!-- Benchmark : lancement (processus séparé en plein écran), dernier résultat détaillé, historique des passes. -->
+        <TabItem Style="{StaticResource NavTab}">
+            <TabItem.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource NavIconBox}" Background="{StaticResource MausRed}">
+                        <TextBlock Style="{StaticResource NavIcon}" Text="&#xE7FC;" />
+                    </Border>
+                    <TextBlock Text="{x:Static app:Ui.NavBenchmark}" VerticalAlignment="Center" />
+                </StackPanel>
+            </TabItem.Header>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="{x:Static app:Ui.NavBenchmark}" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="{x:Static app:Ui.BenchmarkSubtitle}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,14" />
+
+                    <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8">
+                                <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelRoseStroke}">
+                                    <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE7FC;" Foreground="{DynamicResource PastelRoseInk}" />
+                                </Border>
+                                <TextBlock Text="{x:Static app:Ui.BenchmarkTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelRoseInk}" />
+                            </DockPanel>
+                            <TextBlock Text="{x:Static app:Ui.BenchmarkIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                            <WrapPanel Margin="0,14,0,0">
+                                <TextBlock Text="{x:Static app:Ui.BenchmarkScopeLabel}" VerticalAlignment="Center" Margin="0,0,8,6" />
+                                <ComboBox AutomationProperties.Name="{x:Static app:Ui.BenchmarkScopeLabel}" MinWidth="320" Margin="0,0,18,6" ItemsSource="{Binding Workshop.BenchmarkScopes, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkScope}"
+                                          DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
+                                <TextBlock Text="{x:Static app:Ui.ApiLabel}" VerticalAlignment="Center" Margin="0,0,8,6" />
+                                <ComboBox AutomationProperties.Name="{x:Static app:Ui.ApiLabel}" MinWidth="200" Margin="0,0,18,6" ItemsSource="{Binding Workshop.BenchmarkApis, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkApi}"
+                                          DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
+                                <TextBlock Text="{x:Static app:Ui.ResolutionLabel}" VerticalAlignment="Center" Margin="0,0,8,6" />
+                                <ComboBox AutomationProperties.Name="{x:Static app:Ui.ResolutionLabel}" MinWidth="200" Margin="0,0,0,6" ItemsSource="{Binding Workshop.BenchmarkResolutions, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkResolution}"
+                                          DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
+                            </WrapPanel>
+                            <WrapPanel Margin="0,8,0,0">
+                                <Button Style="{StaticResource PrimaryButton}" Padding="24,9" Margin="0,0,14,4" Content="{x:Static app:Ui.BenchmarkStart}"
+                                        Command="{Binding Workshop.StartBenchmarkCommand}" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
+                                <TextBlock Text="{Binding Workshop.BenchmarkDuration, Mode=OneWay}" VerticalAlignment="Center" Style="{StaticResource Muted}" />
+                            </WrapPanel>
+                            <ProgressBar IsIndeterminate="True" Height="4" Margin="0,10,0,0" Visibility="{Binding Workshop.IsBenchmarkRunning, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Text="{Binding Workshop.BenchmarkStatus, Mode=OneWay}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SoftCard}" Margin="0,12,0,0" Visibility="{Binding Workshop.HasNoBenchmark, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{x:Static app:Ui.BenchmarkNone}" TextWrapping="Wrap" Style="{StaticResource Muted}" />
+                    </Border>
+
+                    <StackPanel Visibility="{Binding Workshop.HasBenchmark, Converter={StaticResource BoolToVisibility}}">
+                        <Border Style="{StaticResource Divider}" Margin="0,22,0,16" />
+                        <TextBlock Text="{x:Static app:Ui.BenchmarkLast}" Style="{StaticResource ZoneTitle}" FontSize="17" />
+                        <TextBlock Text="{Binding Workshop.BenchmarkWhen, Mode=OneWay}" Style="{StaticResource Muted}" FontSize="12" Margin="0,-4,0,10" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="0.8*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Static app:Ui.BenchmarkCombined}" Foreground="{DynamicResource PastelLilacInk}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Workshop.BenchmarkOverall, Mode=OneWay}" FontSize="46" FontWeight="SemiBold" Margin="0,2,0,2" />
+                                    <TextBlock Text="{Binding Workshop.BenchmarkVerdict, Mode=OneWay}" TextWrapping="Wrap" FontSize="12" />
+                                    <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkCopy}" Command="{Binding Workshop.CopyBenchmarkCommand}"
+                                            HorizontalAlignment="Left" Margin="0,12,0,0" Padding="14,6" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelLilacStroke}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Workshop.BenchmarkGpu, Mode=OneWay}" FontSize="26" FontWeight="SemiBold" />
+                                        <TextBlock Text="{x:Static app:Ui.GpuLabel}" Foreground="{DynamicResource PastelBlueInk}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding Workshop.BenchmarkGpuName, Mode=OneWay}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" />
+                                    <ItemsControl ItemsSource="{Binding Workshop.BenchmarkGpuTests, Mode=OneWay}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,8,0,0">
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Points, Mode=OneWay}" FontWeight="SemiBold" Margin="8,0,0,0" />
+                                                        <TextBlock Text="{Binding Name, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                                                    </DockPanel>
+                                                    <ProgressBar Height="6" Maximum="1" Value="{Binding Fill, Mode=OneWay}" Margin="0,5,0,3" Foreground="{StaticResource MausBlue}" />
+                                                    <TextBlock Text="{Binding Detail, Mode=OneWay}" FontSize="11" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="4" Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Workshop.BenchmarkCpu, Mode=OneWay}" FontSize="26" FontWeight="SemiBold" />
+                                        <TextBlock Text="{x:Static app:Ui.CpuLabel}" Foreground="{DynamicResource PastelMintInk}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding Workshop.BenchmarkCpuName, Mode=OneWay}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" />
+                                    <ItemsControl ItemsSource="{Binding Workshop.BenchmarkCpuTests, Mode=OneWay}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,8,0,0">
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Points, Mode=OneWay}" FontWeight="SemiBold" Margin="8,0,0,0" />
+                                                        <TextBlock Text="{Binding Name, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                                                    </DockPanel>
+                                                    <ProgressBar Height="6" Maximum="1" Value="{Binding Fill, Mode=OneWay}" Margin="0,5,0,3" Foreground="{StaticResource MausGreen}" />
+                                                    <TextBlock Text="{Binding Detail, Mode=OneWay}" FontSize="11" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Border Style="{StaticResource Divider}" Margin="0,22,0,16" />
+                        <TextBlock Text="{x:Static app:Ui.BenchmarkHistoryTitle}" Style="{StaticResource ZoneTitle}" FontSize="17" />
+                        <Border Style="{StaticResource SoftCard}" Margin="0,0,0,4">
+                            <StackPanel>
+                                <controls:Sparkline Height="70" Values="{Binding Workshop.BenchmarkTrend, Mode=OneWay}" Maximum="0" Stroke="{StaticResource MausRed}" />
+                                <ItemsControl ItemsSource="{Binding Workshop.BenchmarkRuns, Mode=OneWay}" Margin="0,10,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,3">
+                                                <TextBlock DockPanel.Dock="Left" Width="150" Text="{Binding When, Mode=OneWay}" Style="{StaticResource Muted}" />
+                                                <TextBlock Text="{Binding Summary, Mode=OneWay}" TextWrapping="Wrap" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
         </TabItem>
     </TabControl>
 

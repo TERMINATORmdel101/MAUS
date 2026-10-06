@@ -64,6 +64,7 @@ public sealed partial class MainViewModel
     public const int TabFixes = 2;
     public const int TabWorkshop = 3;
     public const int TabHistory = 4;
+    public const int TabBenchmark = 5;
 
     private int _selectedTab;
     private WorkshopViewModel? _workshop;

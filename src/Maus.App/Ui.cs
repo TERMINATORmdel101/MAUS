@@ -55,6 +55,32 @@ public static class Ui
 
     public static string ResolutionLabel => T("Résolution");
 
+    public static string NavBenchmark => T("Benchmark");
+
+    public static string BenchmarkSubtitle => T("Carte graphique et processeur poussés à fond, en plein écran. Les points se comparent à résolution égale : 10 000 = Core i7-8700K et GeForce RTX 2080 Ti.");
+
+    public static string BenchmarkScopeLabel => T("Tests");
+
+    public static string BenchmarkStart => T("Lancer le benchmark");
+
+    public static string BenchmarkNone => T("Aucun benchmark lancé pour l'instant. Le résultat s'affichera ici, avec l'historique de vos passes.");
+
+    public static string BenchmarkLast => T("Dernier résultat");
+
+    public static string BenchmarkCombined => T("Score combiné");
+
+    public static string BenchmarkCopy => T("Copier le résultat");
+
+    public static string BenchmarkHistoryTitle => T("Historique des passes");
+
+    public static string BenchmarkOpen => T("Ouvrir le benchmark");
+
+    public static string BenchmarkPointer => T("Le benchmark visuel a sa propre page dans le menu de gauche : lancement, dernier résultat et historique.");
+
+    public static string GpuLabel => T("Carte graphique");
+
+    public static string CpuLabel => T("Processeur");
+
     public static string LatencyTitle => T("Latence des pilotes (craquements audio, micro-saccades)");
 
     public static string LatencyIntro => T("MAUS écoute la trace du noyau de Windows quelques secondes, sans rien modifier, et nomme les pilotes qui ont gardé le processeur le plus longtemps d'affilée. Droits administrateur nécessaires.");

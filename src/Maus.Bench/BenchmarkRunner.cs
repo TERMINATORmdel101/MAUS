@@ -33,6 +33,7 @@ internal sealed class BenchmarkRunner : IDisposable
     private readonly string _cpuName = CpuName();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private double _fps;
+    private readonly Queue<float> _recentFrames = new();
 
     public BenchmarkRunner(BenchOptions options)
     {
@@ -48,8 +49,8 @@ internal sealed class BenchmarkRunner : IDisposable
 
     public BenchmarkReport Run()
     {
-        var scenes = BenchmarkProgram.CreateScenes(_options.Scenes);
-        var cpuTests = BenchmarkProgram.CreateCpuTests(_options.Scenes);
+        IReadOnlyList<BenchScene> scenes = _options.Only == "cpu" ? [] : BenchmarkProgram.CreateScenes(_options.Scenes);
+        IReadOnlyList<CpuBenchTest> cpuTests = _options.Only == "gpu" ? [] : BenchmarkProgram.CreateCpuTests(_options.Scenes);
         var total = scenes.Count + cpuTests.Count;
         string? error = null;
         var completed = false;
@@ -216,9 +217,20 @@ internal sealed class BenchmarkRunner : IDisposable
                 measuredFrames++;
             }
 
-            BenchmarkProgram.RenderFrame(_device, context, _post, _builder, scene, sceneTime, (float)frameSeconds);
+            // Générique : la scène sort du noir pendant la mise en route et y retourne à la fin.
+            var fadeIn = 1.0 - Math.Clamp(elapsed / 0.9, 0, 1);
+            var fadeOut = Math.Clamp((elapsed - (WarmupSeconds + duration - 0.9)) / 0.9, 0, 1);
+            BenchmarkProgram.RenderFrame(_device, context, _post, _builder, scene, sceneTime, (float)frameSeconds, fade: (float)Math.Max(fadeIn, fadeOut));
             var progress = Math.Clamp((elapsed - WarmupSeconds) / duration, 0, 1);
-            DrawHud(scene.Title, scene.Subtitle, index, total, progress, elapsed < WarmupSeconds, gpu: true);
+            RememberFrame(frameSeconds);
+            if (elapsed < WarmupSeconds)
+            {
+                DrawTitleCard(scene.Title, scene.Subtitle, index, total, elapsed);
+            }
+            else
+            {
+                DrawHud(scene.Title, scene.Subtitle, index, total, progress, warmup: false, gpu: true);
+            }
             _ui.Flush(_device.Commands);
             Screenshot(scene.Id, progress >= 0.5);
             _device.Present();
@@ -335,6 +347,29 @@ internal sealed class BenchmarkRunner : IDisposable
         _device.Present();
     }
 
+    /// <summary>Titre de la scène en grand au centre, comme le générique d'un film, pendant la mise en route.</summary>
+    private void DrawTitleCard(string title, string subtitle, int index, int total, double elapsed)
+    {
+        var s = _ui.Scale;
+        var alpha = (float)(Math.Clamp(elapsed / 0.6, 0, 1) * Math.Clamp((WarmupSeconds - elapsed) / 0.6, 0, 1));
+        var cx = _ui.Width / 2f;
+        var cy = _ui.Height / 2f;
+        _ui.Rect(0, cy - (120 * s), _ui.Width, 240 * s, new Vector4(0, 0, 0, 0.32f * alpha));
+        _ui.Text(T("Test {0} sur {1}", index, total).ToUpperInvariant(), cx, cy - (92 * s), 18 * s, UiColors.Blue(alpha), bold: true, TextAlign.Center);
+        _ui.Text(title, cx, cy - (62 * s), 76 * s, UiColors.White(alpha), bold: true, TextAlign.Center, glow: 0.45f);
+        _ui.Text(subtitle, cx, cy + (36 * s), 24 * s, UiColors.Grey(alpha * 0.95f), align: TextAlign.Center);
+        _ui.Text(T("Mise en route (non mesurée)"), cx, cy + (82 * s), 16 * s, UiColors.Grey(alpha * 0.7f), align: TextAlign.Center);
+    }
+
+    private void RememberFrame(double seconds)
+    {
+        _recentFrames.Enqueue((float)(seconds * 1000));
+        while (_recentFrames.Count > 180)
+        {
+            _recentFrames.Dequeue();
+        }
+    }
+
     private void DrawHud(string title, string subtitle, int index, int total, double progress, bool warmup, bool gpu, string? cpuRate = null, int threads = 0)
     {
         var s = _ui.Scale;
@@ -373,6 +408,27 @@ internal sealed class BenchmarkRunner : IDisposable
         _ui.Text(T("Test {0} sur {1}", index, total) + "  ·  " + state, margin, barY - (28 * s), 16 * s, UiColors.Grey());
         var hardware = gpu ? _device.AdapterName + "  ·  " + (_device.Api == GpuApi.Direct3D11 ? "Direct3D 11" : "Direct3D 12") : _cpuName;
         _ui.Text(hardware, right, barY - (28 * s), 16 * s, UiColors.Grey(), align: TextAlign.Right);
+
+        // Temps des 180 dernières images : une barre par image, les à-coups sautent aux yeux.
+        if (gpu && _recentFrames.Count > 10)
+        {
+            var graphW = 300 * s;
+            var graphH = 54 * s;
+            var gx = right - graphW;
+            var gy = barY - (52 * s) - graphH;
+            _ui.Rect(gx - (10 * s), gy - (10 * s), graphW + (20 * s), graphH + (20 * s), new Vector4(0, 0, 0, 0.35f), 10 * s);
+            var frames = _recentFrames.ToArray();
+            var worst = Math.Max(frames.Max(), 1f);
+            var width = graphW / 180f;
+            for (var i = 0; i < frames.Length; i++)
+            {
+                var h = graphH * MathF.Min(frames[i] / worst, 1f);
+                var color = frames[i] > worst * 0.8f ? UiColors.Rose(0.9f) : UiColors.Blue(0.75f);
+                _ui.Rect(gx + ((180 - frames.Length + i) * width), gy + graphH - h, MathF.Max(width - (0.5f * s), 1f), h, color);
+            }
+
+            _ui.Text(T("carte : {0} ms par image", frames[^1].ToString("0.0", Culture)), gx, gy - (30 * s), 14 * s, UiColors.Grey(0.85f));
+        }
     }
 
     private void ShowResults(BenchmarkReport report)
@@ -391,17 +447,26 @@ internal sealed class BenchmarkRunner : IDisposable
             cmd.Clear(_device.BackBuffer, new ColorF(0.012f, 0.014f, 0.022f, 1f));
             var s = _ui.Scale;
             var cx = _ui.Width / 2f;
+            var age = _clock.Elapsed.TotalSeconds - shown;
+            var reveal = 1.0 - Math.Pow(1.0 - Math.Clamp(age / 1.8, 0, 1), 3.0);
+            for (var band = 0; band < 12; band++)
+            {
+                _ui.Rect(0, _ui.Height * band / 12f, _ui.Width, (_ui.Height / 12f) + 1, new Vector4(0.08f, 0.1f, 0.2f, 0.018f * band));
+            }
+
+            var pulse = 0.5f + (0.5f * MathF.Sin((float)age * 1.4f));
+            _ui.Rect(cx - (380 * s), 95 * s, 760 * s, 210 * s, UiColors.Blue(0.05f + (0.03f * pulse)), 105 * s);
             var y = 70 * s;
             _ui.Text(report.Completed ? T("Résultats") : T("Résultats partiels (benchmark arrêté)"), cx, y, 30 * s, UiColors.Grey(), bold: true, TextAlign.Center);
             y += 50 * s;
-            _ui.Text(Points(report.OverallScore), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
+            _ui.Text(Points(report.OverallScore * reveal), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
             y += 130 * s;
             _ui.Text(T("score combiné en {0}  ·  10 000 = Core i7-8700K et RTX 2080 Ti", ResolutionName(_options.RenderSize)), cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
             y += 60 * s;
 
             var colW = 520 * s;
-            DrawScoreColumn(T("Carte graphique"), report.GpuScore, report.Tests.Where(t => t.Device == "gpu").ToList(), cx - colW - (30 * s), y, colW, UiColors.Blue());
-            DrawScoreColumn(T("Processeur"), report.CpuScore, report.Tests.Where(t => t.Device == "cpu").ToList(), cx + (30 * s), y, colW, UiColors.Mint());
+            DrawScoreColumn(T("Carte graphique"), report.GpuScore, report.Tests.Where(t => t.Device == "gpu").ToList(), cx - colW - (30 * s), y, colW, UiColors.Blue(), reveal);
+            DrawScoreColumn(T("Processeur"), report.CpuScore, report.Tests.Where(t => t.Device == "cpu").ToList(), cx + (30 * s), y, colW, UiColors.Mint(), reveal);
 
             var bottom = _ui.Height - (150 * s);
             if (strongest is not null && weakest is not null && strongest.Id != weakest.Id)
@@ -410,7 +475,7 @@ internal sealed class BenchmarkRunner : IDisposable
                 _ui.Text(T("Point faible : {0}", TestName(weakest.Id)), cx, bottom + (34 * s), 22 * s, UiColors.Rose(), bold: true, TextAlign.Center);
             }
 
-            _ui.Text(T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (Atelier > Tests)."), cx, _ui.Height - (56 * s), 17 * s, UiColors.Grey(0.85f), align: TextAlign.Center);
+            _ui.Text(T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark)."), cx, _ui.Height - (56 * s), 17 * s, UiColors.Grey(0.85f), align: TextAlign.Center);
             _ui.Flush(cmd);
             Screenshot("results", true);
             _device.Present();
@@ -418,12 +483,17 @@ internal sealed class BenchmarkRunner : IDisposable
         }
     }
 
-    private void DrawScoreColumn(string title, double score, List<BenchmarkTestResult> tests, float x, float y, float width, Vector4 accent)
+    private void DrawScoreColumn(string title, double score, List<BenchmarkTestResult> tests, float x, float y, float width, Vector4 accent, double reveal)
     {
         var s = _ui.Scale;
+        if (tests.Count == 0)
+        {
+            return;
+        }
+
         _ui.Rect(x, y, width, (100 * s) + (tests.Count * 74 * s), new Vector4(1, 1, 1, 0.05f), 18 * s);
         _ui.Text(title, x + (24 * s), y + (20 * s), 20 * s, accent, bold: true);
-        _ui.Text(Points(score), x + width - (24 * s), y + (12 * s), 40 * s, UiColors.White(), bold: true, TextAlign.Right);
+        _ui.Text(Points(score * reveal), x + width - (24 * s), y + (12 * s), 40 * s, UiColors.White(), bold: true, TextAlign.Right);
         var rowY = y + (84 * s);
         var max = Math.Max(15000, tests.Count > 0 ? tests.Max(t => t.Score) * 1.1 : 1);
         foreach (var test in tests)
@@ -436,7 +506,7 @@ internal sealed class BenchmarkRunner : IDisposable
             _ui.Text(detail, x + (24 * s), rowY + (40 * s), 14 * s, UiColors.Grey(0.85f));
             var barW = width - (48 * s);
             _ui.Rect(x + (24 * s), rowY + (26 * s), barW, 8 * s, UiColors.White(0.1f), 4 * s);
-            _ui.Rect(x + (24 * s), rowY + (26 * s), (float)(barW * Math.Min(1, test.Score / max)), 8 * s, accent, 4 * s);
+            _ui.Rect(x + (24 * s), rowY + (26 * s), (float)(barW * Math.Min(1, test.Score / max) * reveal), 8 * s, accent, 4 * s);
             // Repère des 10 000 points de la machine de référence.
             _ui.Rect(x + (24 * s) + (float)(barW * BenchmarkScoring.ReferencePoints / max), rowY + (22 * s), 2 * s, 16 * s, UiColors.White(0.6f));
             rowY += 74 * s;

@@ -40,7 +40,8 @@ public static partial class BenchmarkProgram
                 report = runner.Run();
             }
 
-            if (report.Tests.Count > 0)
+            // Les passes d'essai (accélérées ou fermées automatiquement) ne vont pas dans l'historique de l'utilisateur.
+            if (report.Tests.Count > 0 && options.DurationScale >= 1 && !options.AutoClose)
             {
                 BenchmarkHistoryStore.CreateDefault().Add(report);
             }
@@ -129,9 +130,14 @@ public static partial class BenchmarkProgram
         return 0;
     }
 
-    internal static void RenderFrame(IGpuDevice device, SceneContext context, PostProcess post, FrameBuilder builder, BenchScene scene, double time, float deltaTime, CameraPose? cameraOverride = null)
+    internal static void RenderFrame(IGpuDevice device, SceneContext context, PostProcess post, FrameBuilder builder, BenchScene scene, double time, float deltaTime, CameraPose? cameraOverride = null, float fade = 0f)
     {
         var state = scene.Evaluate(time);
+        if (fade > 0f)
+        {
+            state = state with { Grade = state.Grade with { Fade = MathF.Max(state.Grade.Fade, fade) } };
+        }
+
         if (cameraOverride is { } camera)
         {
             state = state with { Camera = camera };
@@ -180,6 +186,9 @@ internal sealed record BenchOptions
     public string? ResultFile { get; init; }
 
     public string? Language { get; init; }
+
+    /// <summary>« gpu » : seulement les scènes de la carte graphique ; « cpu » : seulement les tests du processeur.</summary>
+    public string? Only { get; init; }
 
     /// <summary>Bilan fermé tout seul après 4 secondes (essais automatiques).</summary>
     public bool AutoClose { get; init; }
@@ -256,6 +265,7 @@ internal sealed record BenchOptions
             ResultFile = Value("--result"),
             Language = Value("--lang"),
             ScreenshotFolder = Value("--screenshots"),
+            Only = Value("--only")?.ToLowerInvariant(),
             AutoClose = args.Contains("--auto-close", StringComparer.OrdinalIgnoreCase),
         };
     }
