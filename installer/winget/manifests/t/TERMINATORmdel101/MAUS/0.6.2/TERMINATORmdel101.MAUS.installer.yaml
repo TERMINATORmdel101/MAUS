@@ -1,16 +1,16 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 PackageIdentifier: TERMINATORmdel101.MAUS
-PackageVersion: 0.5.2
+PackageVersion: 0.6.2
 MinimumOSVersion: 10.0.22631.0
 InstallerType: inno
 Scope: machine
 ElevationRequirement: elevatesSelf
 UpgradeBehavior: install
-ReleaseDate: 2026-10-02
+ReleaseDate: 2026-10-06
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/TERMINATORmdel101/MAUS/releases/download/0.5.2/MAUS-0.5.2-installation.exe
-  InstallerSha256: 6C9AB37DD25540D4A238EC22473F3392A796A1A7E1F44719A14666A00AB7B79A
+  InstallerUrl: https://github.com/TERMINATORmdel101/MAUS/releases/download/0.6.2/MAUS-0.6.2-installation.exe
+  InstallerSha256: 77B4A1E9C798A1C95E172EEB80338E642CABB4B7970486BF7661E037D8A913A3
   ProductCode: '{6F3D5F82-4668-473E-9693-0114543FC242}_is1'
   AppsAndFeaturesEntries:
   - DisplayName: MAUS

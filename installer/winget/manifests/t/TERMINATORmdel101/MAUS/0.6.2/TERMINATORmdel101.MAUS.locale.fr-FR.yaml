@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.locale.1.12.0.schema.json
 PackageIdentifier: TERMINATORmdel101.MAUS
-PackageVersion: 0.5.2
+PackageVersion: 0.6.2
 PackageLocale: fr-FR
 Publisher: Projet MAUS (open source)
 PackageName: MAUS
@@ -20,6 +20,6 @@ Tags:
 - diagnostic
 - materiel
 - open-source
-ReleaseNotesUrl: https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.5.2
+ReleaseNotesUrl: https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.6.2
 ManifestType: locale
 ManifestVersion: 1.12.0
