@@ -22,7 +22,7 @@ internal sealed class FrameBuilder
         var proj = Matrix4x4.CreatePerspectiveFieldOfView(fov, aspect, state.NearPlane, state.FarPlane);
         var viewProj = view * proj;
 
-        var jitter = Halton.Jitter(_frame);
+        var jitter = state.Temporal ? Halton.Jitter(_frame) : Vector2.Zero;
         var jittered = proj;
         jittered.M31 -= jitter.X * 2f / size.Width;
         jittered.M32 += jitter.Y * 2f / size.Height;

@@ -169,10 +169,9 @@ internal sealed class BenchmarkRunner : IDisposable
 
     private bool RunScene(BenchScene scene, int index, int total)
     {
-        // Chargement (non mesuré) : une image d'attente, puis les ressources de la scène.
-        DrawMessage(T("Chargement : {0}", scene.Title), index, total);
+        // Chargement (non mesuré), à l'intérieur d'une image : une scène peut y préparer ses données par la carte.
         var context = new SceneContext(_device, _shaders, _post);
-        scene.Load(context);
+        DrawMessage(T("Chargement : {0}", scene.Title), index, total, () => scene.Load(context));
         _device.WaitIdle();
         _post.ResetHistory();
         _builder.Reset();
@@ -322,10 +321,11 @@ internal sealed class BenchmarkRunner : IDisposable
         return !aborted;
     }
 
-    private void DrawMessage(string message, int index, int total)
+    private void DrawMessage(string message, int index, int total, Action? during = null)
     {
         _window.Pump();
         _device.BeginFrame();
+        during?.Invoke();
         var cmd = _device.Commands;
         cmd.Clear(_device.BackBuffer, new ColorF(0.012f, 0.014f, 0.022f, 1f));
         var s = _ui.Scale;
@@ -462,6 +462,8 @@ internal sealed class BenchmarkRunner : IDisposable
     internal static string TestName(string id) => id switch
     {
         "fractal" => T("Forge fractale (calcul)"),
+        "galaxy" => T("Collision galactique (bande passante)"),
+        "ring" => T("Anneau de la géante (géométrie)"),
         "cpu-render" => T("Rendu sur tous les cœurs"),
         "cpu-single" => T("Rendu sur un seul cœur"),
         "cpu-vector" => T("Calcul vectoriel"),
@@ -504,10 +506,13 @@ internal static class BenchReference
 {
     private static readonly Dictionary<string, double> Values = new(StringComparer.Ordinal)
     {
-        ["fractal"] = 18.0,
-        ["cpu-render"] = 30.0,
-        ["cpu-single"] = 3.5,
-        ["cpu-vector"] = 3.0,
+        // Mesuré le 06/10/2026 sur la machine de référence (Direct3D 12, passe accélérée qui parcourt les mêmes trajets).
+        ["ring"] = 25.4,
+        ["galaxy"] = 15.4,
+        ["fractal"] = 12.9,
+        ["cpu-render"] = 6.79,
+        ["cpu-single"] = 0.69,
+        ["cpu-vector"] = 1.33,
     };
 
     public static double For(string id, BenchOptions options)

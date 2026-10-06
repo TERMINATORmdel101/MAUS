@@ -61,7 +61,7 @@ public static partial class BenchmarkProgram
 
     internal static IReadOnlyList<BenchScene> CreateScenes(IReadOnlyCollection<string> only)
     {
-        BenchScene[] all = [new FractalScene()];
+        BenchScene[] all = [new RingScene(), new GalaxyScene(), new FractalScene()];
         return only.Count == 0 ? all : all.Where(s => only.Contains(s.Id)).ToArray();
     }
 
@@ -91,7 +91,10 @@ public static partial class BenchmarkProgram
             using (scene)
             {
                 var watch = Stopwatch.StartNew();
+                device.BeginFrame();
                 scene.Load(context);
+                device.Present();
+                device.WaitIdle();
                 Console.WriteLine($"{scene.Id} : chargée en {watch.Elapsed.TotalSeconds:0.0} s");
                 foreach (var time in options.Times)
                 {
@@ -146,7 +149,7 @@ public static partial class BenchmarkProgram
         cmd.SetConstants(0, frame);
         scene.Render(context);
         cmd.SetConstants(0, frame);
-        post.Run(cmd, state.Grade, state.Grade.Exposure);
+        post.Run(cmd, state.Grade, state.Temporal);
     }
 
     [LibraryImport("user32.dll")]

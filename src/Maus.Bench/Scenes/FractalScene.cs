@@ -32,8 +32,6 @@ internal sealed class FractalScene : BenchScene
 
     public override GpuCapability Capability => GpuCapability.Compute;
 
-    public override double Duration => 90;
-
     public override void Load(SceneContext context)
     {
         _pipeline = context.Device.CreatePipeline(new GraphicsPipelineDesc(
@@ -51,7 +49,7 @@ internal sealed class FractalScene : BenchScene
     {
         var t = (float)time;
         // L'orbe dérive lentement devant la caméra, à travers la structure.
-        var camera = Path.Evaluate(time);
+        var camera = Path.Evaluate(PathTime(time, Path));
         // L'orbe flotte entre la caméra et ce qu'elle regarde : sa lumière balaie la surface pendant le vol.
         var toTarget = camera.Target - camera.Position;
         var orb = camera.Position + (toTarget * 0.42f) + (new Vector3(MathF.Sin(t * 0.37f) * 0.25f, MathF.Sin(t * 0.23f) * 0.18f, MathF.Cos(t * 0.31f) * 0.2f) * MathF.Min(1f, toTarget.Length() * 0.5f));

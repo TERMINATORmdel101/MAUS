@@ -110,7 +110,7 @@ internal sealed class PostProcess : IDisposable
         new(name, vs, ps, [], blend, DepthMode.None, CullMode.None, [target]);
 
     /// <summary>Anticrénelage, halo et image finale vers l'image affichée.</summary>
-    public void Run(ICommandList cmd, ColorGrade grade, float sceneExposure)
+    public void Run(ICommandList cmd, ColorGrade grade, bool temporal)
     {
         var size = new Vector4(Size.Width, Size.Height, 1f / Size.Width, 1f / Size.Height);
         var previous = _history[_current];
@@ -122,7 +122,7 @@ internal sealed class PostProcess : IDisposable
         cmd.SetTexture(0, HdrColor);
         cmd.SetTexture(1, previous);
         cmd.SetTexture(2, Velocity);
-        cmd.SetConstants(1, new PostConstants { SourceSize = size, Extra = new Vector4(_historyValid ? 0.1f : 1f, 0, 0, 0) });
+        cmd.SetConstants(1, new PostConstants { SourceSize = size, Extra = new Vector4(_historyValid && temporal ? 0.1f : 1f, 0, 0, 0) });
         cmd.Draw(3);
         _historyValid = true;
 
@@ -180,7 +180,6 @@ internal sealed class PostProcess : IDisposable
             Gain = new Vector4(grade.Gain, grade.Contrast),
             Extra = new Vector4(0, grade.BloomThreshold, grade.Fade, grade.Sharpen),
         });
-        _ = sceneExposure;
         cmd.Draw(3);
         cmd.SetTexture(0, null);
         cmd.SetTexture(3, null);

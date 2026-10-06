@@ -10,6 +10,11 @@ MAUS (GPL-3.0-only) utilise les bibliothèques libres suivantes, sans les modifi
 | HidSharp | 2.6.4 | Apache-2.0 | https://www.zer7.com/software/hidsharp | Dépendance de LibreHardwareMonitorLib |
 | Mono.Posix.NETStandard | 1.0.0 | MIT | https://github.com/mono/mono | Dépendance de LibreHardwareMonitorLib |
 | System.Management, System.Diagnostics.EventLog et autres paquets .NET | 10.x | MIT | https://github.com/dotnet/runtime | WMI, journaux d'événements |
+| Vortice.Direct3D11, Direct3D12, DXGI, D3DCompiler, Direct2D1 (DirectWrite, WIC) | 3.8.3 | MIT (Copyright (c) Amer Koleci and Contributors) | https://github.com/amerkoleci/Vortice.Windows | Benchmark visuel : accès à Direct3D 11 et 12, compilation des shaders, police de l'interface, images PNG |
+| Vortice.Mathematics | 2.1.0 | MIT (Copyright (c) Amer Koleci and Contributors) | https://github.com/amerkoleci/Vortice.Mathematics | Dépendance de Vortice |
+| SharpGen.Runtime, SharpGen.Runtime.COM | 2.4.2-beta | MIT ((c) 2010-2017 Alexandre Mutel, 2017-2023 Jeremy Koritzinsky, 2023-2024 Amer Koleci) | https://github.com/SharpGenTools/SharpGenTools | Dépendance de Vortice |
+
+**Benchmark visuel** : toutes les scènes (fractale, collision de galaxies, anneau de planète), les shaders et les tests du processeur sont écrits pour MAUS et calculés à partir de formules (aucun modèle 3D, aucune texture ni aucun code de démo tiers). Les techniques publiées dont ils s'inspirent sont citées dans les commentaires du code (Mandelbox de T. Lowe, problème restreint à trois corps de Toomre et Toomre, anticrénelage temporel de B. Karis, halo de J. Jimenez, courbe filmique de K. Narkowicz, transformée en distance de Felzenszwalb et Huttenlocher). La police Segoe UI de Windows est dessinée par DirectWrite sur le PC de l'utilisateur ; elle n'est pas redistribuée.
 
 Le texte de la MPL-2.0 : https://mozilla.org/MPL/2.0/. Les fichiers couverts par la MPL-2.0 restent sous cette licence ; MAUS n'en modifie aucun.
 

@@ -29,6 +29,9 @@ internal sealed record SceneState(CameraPose Camera, ColorGrade Grade)
 
     public Vector4 Params3 { get; init; }
 
+    /// <summary>Anticrénelage temporel (décalage sous-pixel et historique) ; coupé pour les scènes de particules.</summary>
+    public bool Temporal { get; init; } = true;
+
     /// <summary>Plan de coupe : l'anticrénelage oublie l'image précédente.</summary>
     public bool Cut { get; init; }
 
@@ -90,8 +93,11 @@ internal abstract class BenchScene : IDisposable
 
     public abstract GpuCapability Capability { get; }
 
-    /// <summary>Durée mesurée, en secondes.</summary>
-    public virtual double Duration => 90;
+    /// <summary>Durée mesurée, en secondes (2 min 30 par scène : environ 8 minutes de carte graphique en tout).</summary>
+    public virtual double Duration => 150;
+
+    /// <summary>Temps du trajet de caméra : le trajet entier est parcouru pendant la durée de la scène.</summary>
+    protected double PathTime(double time, CameraPath path) => time * path.Duration / Duration;
 
     public abstract void Load(SceneContext context);
 

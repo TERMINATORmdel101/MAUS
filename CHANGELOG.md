@@ -2,6 +2,18 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## Prochaine version (numéro à choisir par le porteur) — benchmark visuel
+
+- **Benchmark visuel** (Atelier > Tests, demande du porteur) : environ dix minutes en plein écran, dans un processus séparé (un plantage du pilote graphique n'emporte pas MAUS). Interface graphique au choix : **DirectX 12** (recommandé) ou **DirectX 11**. Le même moteur sert aux deux, et les deux donnent la même image.
+  - **Carte graphique**, trois scènes de 2 min 30, chacune pousse une capacité à fond :
+    - « Anneau de la géante » (géométrie) : 750 000 rochers et environ 200 millions de triangles par image avec les ombres du soleil ;
+    - « Collision galactique » (bande passante) : 8 millions d'étoiles et de nuages de gaz simulés par la carte et superposés à chaque image ;
+    - « Forge fractale » (calcul pur) : une Mandelbox éclairée par un orbe, avec des rayons de lumière volumétriques.
+  - **Processeur** : rendu par lancer de rayons sur tous les cœurs puis sur un seul, et calcul vectoriel en double précision (ensemble de Mandelbrot, 2, 4 ou 8 calculs à la fois selon le processeur).
+  - **Points** : 10 000 = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti, mesurée par le projet). Deux fois plus rapide = deux fois plus de points. Scores de la carte graphique, du processeur et combiné (moyenne qui pénalise le déséquilibre). Le bilan donne aussi le point fort et le point faible, et le 1 % des images les plus lentes.
+  - Le bilan est gardé dans l'historique (`%LOCALAPPDATA%\MAUSenchmark-history.json`) et affiché dans l'Atelier.
+  - Toutes les scènes sont calculées par formules, écrites pour MAUS. La bibliothèque Vortice (licence MIT) donne accès à DirectX (voir `THIRD-PARTY-NOTICES.md`).
+
 ## 0.6.2 — 06/10/2026
 
 Nouvelles fonctions pour les joueurs et les connaisseurs (améliorations : dernier chiffre). Chaque calcul ou seuil s'appuie sur une source publiée.

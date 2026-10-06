@@ -141,6 +141,8 @@ internal static class BenchmarkNames
     public static string Of(string id) => id switch
     {
         "fractal" => T("Forge fractale (calcul)"),
+        "galaxy" => T("Collision galactique (bande passante)"),
+        "ring" => T("Anneau de la géante (géométrie)"),
         "cpu-render" => T("Rendu sur tous les cœurs"),
         "cpu-single" => T("Rendu sur un seul cœur"),
         "cpu-vector" => T("Calcul vectoriel"),
