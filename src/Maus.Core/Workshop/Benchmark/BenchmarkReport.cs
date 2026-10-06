@@ -49,6 +49,9 @@ public sealed record BenchmarkReport
     public bool Completed { get; init; }
 
     public string? Error { get; init; }
+
+    /// <summary>Image du résultat à partager (PNG : scores, vignettes des scènes, matériel ; aucune donnée personnelle).</summary>
+    public string? Image { get; init; }
 }
 
 /// <summary>
@@ -130,6 +133,41 @@ public sealed class BenchmarkHistoryStore(string path)
         new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "benchmark-history.json"));
 
     public string FilePath { get; } = path;
+
+    /// <summary>Dossier des images du résultat (à côté de l'historique).</summary>
+    public string ImagesFolder => Path.Combine(Path.GetDirectoryName(FilePath)!, "benchmark");
+
+    /// <summary>Nom de l'image d'une passe : MAUS-benchmark-AAAAMMJJ-HHMMSS.png.</summary>
+    public string ImagePathFor(DateTimeOffset date) =>
+        Path.Combine(ImagesFolder, "MAUS-benchmark-" + date.ToLocalTime().ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture) + ".png");
+
+    /// <summary>
+    /// Efface les images du résultat dont la passe n'est plus dans l'historique (50 dernières passes) : seulement les
+    /// fichiers MAUS-benchmark-*.png du dossier des images de MAUS.
+    /// </summary>
+    public void PruneImages()
+    {
+        try
+        {
+            if (!Directory.Exists(ImagesFolder))
+            {
+                return;
+            }
+
+            var kept = Load().Select(r => r.Image).OfType<string>().Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in Directory.EnumerateFiles(ImagesFolder, "MAUS-benchmark-*.png"))
+            {
+                if (!kept.Contains(Path.GetFullPath(file)))
+                {
+                    File.Delete(file);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Une image qui ne s'efface pas (ouverte ailleurs) le sera à la prochaine passe.
+        }
+    }
 
     public IReadOnlyList<BenchmarkReport> Load()
     {

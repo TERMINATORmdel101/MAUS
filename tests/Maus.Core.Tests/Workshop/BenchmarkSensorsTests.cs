@@ -134,3 +134,37 @@ public sealed class BenchmarkSensorsTests
         public void Dispose() => Disposed = true;
     }
 }
+
+public sealed class BenchmarkImagesTests
+{
+    [Fact]
+    public void Images_of_runs_that_left_the_history_are_deleted_and_nothing_else()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "maus-bench-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            var store = new BenchmarkHistoryStore(Path.Combine(folder, "benchmark-history.json"));
+            Directory.CreateDirectory(store.ImagesFolder);
+            var date = new DateTimeOffset(2026, 10, 6, 12, 0, 0, TimeSpan.Zero);
+            var kept = store.ImagePathFor(date);
+            var old = Path.Combine(store.ImagesFolder, "MAUS-benchmark-20260101-000000.png");
+            var other = Path.Combine(store.ImagesFolder, "photo.png");
+            foreach (var file in new[] { kept, old, other })
+            {
+                File.WriteAllText(file, "png");
+            }
+
+            store.Add(new BenchmarkReport { Date = date, Image = kept, Tests = [new BenchmarkTestResult("ring", "gpu", "geometry", 30, "x", 9000)] });
+            store.PruneImages();
+
+            Assert.StartsWith("MAUS-benchmark-", Path.GetFileName(kept), StringComparison.Ordinal);
+            Assert.True(File.Exists(kept));
+            Assert.False(File.Exists(old));
+            Assert.True(File.Exists(other));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+}

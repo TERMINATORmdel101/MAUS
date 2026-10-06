@@ -30,6 +30,7 @@ internal sealed class BenchmarkRunner : IDisposable
     private readonly ITexture? _logo;
     private readonly FrameBuilder _builder = new();
     private readonly List<BenchmarkTestResult> _results = [];
+    private readonly List<SharePicture> _pictures = [];
     private readonly string _cpuName = CpuName();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly BenchmarkSensorSampler _sensors;
@@ -109,7 +110,7 @@ internal sealed class BenchmarkRunner : IDisposable
         var report = Report(completed, error);
         if (error is null)
         {
-            ShowResults(report);
+            report = report with { Image = ShowResults(report) };
         }
 
         return report;
@@ -184,6 +185,8 @@ internal sealed class BenchmarkRunner : IDisposable
         var start = _clock.Elapsed.TotalSeconds;
         var last = start;
         var frameTimes = new List<double>(8192);
+        using var snapshot = _device.CreateTexture(TextureDesc.Target(960, 540, PixelFormat.Rgba8Unorm, "Vignette de la scène"));
+        var snapped = false;
         var measuredFrames = 0;
         var measuredStart = 0.0;
         while (true)
@@ -224,8 +227,10 @@ internal sealed class BenchmarkRunner : IDisposable
             // Générique : la scène sort du noir pendant la mise en route et y retourne à la fin.
             var fadeIn = 1.0 - Math.Clamp(elapsed / 0.9, 0, 1);
             var fadeOut = Math.Clamp((elapsed - (WarmupSeconds + duration - 0.9)) / 0.9, 0, 1);
-            BenchmarkProgram.RenderFrame(_device, context, _post, _builder, scene, sceneTime, (float)frameSeconds, fade: (float)Math.Max(fadeIn, fadeOut));
             var progress = Math.Clamp((elapsed - WarmupSeconds) / duration, 0, 1);
+            var snap = !snapped && progress >= 0.55;
+            snapped |= snap;
+            BenchmarkProgram.RenderFrame(_device, context, _post, _builder, scene, sceneTime, (float)frameSeconds, fade: (float)Math.Max(fadeIn, fadeOut), snapshot: snap ? snapshot : null);
             RememberFrame(frameSeconds);
             if (elapsed < WarmupSeconds)
             {
@@ -243,6 +248,15 @@ internal sealed class BenchmarkRunner : IDisposable
         _device.WaitIdle();
         var seconds = _clock.Elapsed.TotalSeconds - measuredStart;
         var fps = measuredFrames > 1 ? (measuredFrames - 1) / seconds : 0;
+        if (snapped)
+        {
+            // Lecture de la vignette pendant une image noire : la scène vient de finir par un fondu au noir.
+            _device.BeginFrame();
+            _device.Commands.Clear(_device.BackBuffer, new ColorF(0f, 0f, 0f, 1f));
+            _pictures.Add(new SharePicture(scene.Id, _device.ReadTexture(snapshot), snapshot.Desc.Width, snapshot.Desc.Height));
+            _device.Present();
+            _device.WaitIdle();
+        }
         _results.Add(new BenchmarkTestResult(
             scene.Id,
             "gpu",
@@ -328,6 +342,11 @@ internal sealed class BenchmarkRunner : IDisposable
             picture.Dispose();
             if (!aborted && measured && seconds > 0)
             {
+                if (test.Id == "cpu-render")
+                {
+                    _pictures.Add(new SharePicture(test.Id, [.. test.Image], test.Width, test.Height));
+                }
+
                 var value = (endWork - workAtStart) / seconds / test.UnitScale;
                 _results.Add(new BenchmarkTestResult(
                     test.Id,
@@ -454,10 +473,13 @@ internal sealed class BenchmarkRunner : IDisposable
         }
     }
 
-    private void ShowResults(BenchmarkReport report)
+    /// <summary>Bilan à l'écran jusqu'à Entrée ; rend le chemin de l'image du résultat enregistrée (ou <c>null</c>).</summary>
+    private string? ShowResults(BenchmarkReport report)
     {
         var (strongest, weakest) = BenchmarkScoring.Extremes(report.Tests);
         var shown = _clock.Elapsed.TotalSeconds;
+        string? image = null;
+        var imagePending = true;
         while (_window.Pump())
         {
             if (_window.ConfirmPressed || (_options.AutoClose && _clock.Elapsed.TotalSeconds - shown > 4))
@@ -467,6 +489,13 @@ internal sealed class BenchmarkRunner : IDisposable
 
             _device.BeginFrame();
             var cmd = _device.Commands;
+            if (imagePending)
+            {
+                imagePending = false;
+                image = SaveShareImage(report);
+                shown = _clock.Elapsed.TotalSeconds;
+            }
+
             cmd.Clear(_device.BackBuffer, new ColorF(0.012f, 0.014f, 0.022f, 1f));
             var s = _ui.Scale;
             var cx = _ui.Width / 2f;
@@ -513,11 +542,42 @@ internal sealed class BenchmarkRunner : IDisposable
                 _ui.Text(T("Point faible : {0}", TestName(weakest.Id)), cx, bottom + (34 * s), 22 * s, UiColors.Rose(), bold: true, TextAlign.Center);
             }
 
-            _ui.Text(T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark)."), cx, _ui.Height - (56 * s), 17 * s, UiColors.Grey(0.85f), align: TextAlign.Center);
+            var hint = image is not null
+                ? T("Entrée pour fermer. Résultats et image à partager enregistrés dans MAUS (page Benchmark).")
+                : T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark).");
+            _ui.Text(hint, cx, _ui.Height - (56 * s), 17 * s, UiColors.Grey(0.85f), align: TextAlign.Center);
             _ui.Flush(cmd);
             Screenshot("results", age > 2.2);
             _device.Present();
             Thread.Sleep(10);
+        }
+
+        return image;
+    }
+
+    /// <summary>
+    /// Image du résultat à partager : dans le dossier des images de MAUS pour une vraie passe, dans le dossier des captures
+    /// pour un essai (rien n'est laissé dans les fichiers de l'utilisateur).
+    /// </summary>
+    private string? SaveShareImage(BenchmarkReport report)
+    {
+        var path = _options.IsTrial
+            ? (_options.ScreenshotFolder is { } folder ? Path.Combine(folder, "share.png") : null)
+            : BenchmarkHistoryStore.CreateDefault().ImagePathFor(report.Date);
+        if (report.Tests.Count == 0 || path is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var pixels = ShareCard.Render(_device, _ui, _logo, report, _pictures, ResolutionName(_options.RenderSize));
+            ImageFile.SavePng(path, pixels, ShareCard.Width, ShareCard.Height);
+            return path;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SharpGen.Runtime.SharpGenException)
+        {
+            return null;
         }
     }
 

@@ -111,8 +111,11 @@ internal sealed class PostProcess : IDisposable
     public static GraphicsPipelineDesc Fullscreen(string name, ShaderCode vs, ShaderCode ps, PixelFormat target, BlendMode blend) =>
         new(name, vs, ps, [], blend, DepthMode.None, CullMode.None, [target]);
 
-    /// <summary>Anticrénelage, halo et image finale vers l'image affichée.</summary>
-    public void Run(ICommandList cmd, ColorGrade grade, bool temporal, Action<ITexture>? overlay = null)
+    /// <summary>
+    /// Anticrénelage, halo et image finale vers l'image affichée ; avec <paramref name="snapshot"/>, la même image finale
+    /// est aussi dessinée en plus petit dans cette texture (vignette de la scène pour l'image du résultat).
+    /// </summary>
+    public void Run(ICommandList cmd, ColorGrade grade, bool temporal, Action<ITexture>? overlay = null, ITexture? snapshot = null)
     {
         var size = new Vector4(Size.Width, Size.Height, 1f / Size.Width, 1f / Size.Height);
         var previous = _history[_current];
@@ -175,13 +178,7 @@ internal sealed class PostProcess : IDisposable
         var rectH = Size.Height * scale;
         var rect = new Vector4((outW - rectW) * 0.5f, (outH - rectH) * 0.5f, rectW, rectH);
 
-        cmd.SetRenderTarget(back);
-        cmd.SetPipeline(_final);
-        cmd.SetTexture(0, resolved);
-        cmd.SetTexture(1, null);
-        cmd.SetTexture(2, null);
-        cmd.SetTexture(3, _bloom[0]);
-        cmd.SetConstants(1, new PostConstants
+        var constants = new PostConstants
         {
             SourceSize = size,
             OutputRect = rect,
@@ -189,8 +186,26 @@ internal sealed class PostProcess : IDisposable
             Lift = new Vector4(grade.Lift, grade.Saturation),
             Gain = new Vector4(grade.Gain, grade.Contrast),
             Extra = new Vector4(0, grade.BloomThreshold, grade.Fade, grade.Sharpen),
-        });
+        };
+        cmd.SetRenderTarget(back);
+        cmd.SetPipeline(_final);
+        cmd.SetTexture(0, resolved);
+        cmd.SetTexture(1, null);
+        cmd.SetTexture(2, null);
+        cmd.SetTexture(3, _bloom[0]);
+        cmd.SetConstants(1, constants);
         cmd.Draw(3);
+        if (snapshot is not null)
+        {
+            cmd.SetRenderTarget(snapshot);
+            cmd.SetConstants(1, constants with
+            {
+                OutputRect = new Vector4(0, 0, snapshot.Desc.Width, snapshot.Desc.Height),
+                Extra = constants.Extra with { Z = 0f },
+            });
+            cmd.Draw(3);
+        }
+
         cmd.SetTexture(0, null);
         cmd.SetTexture(3, null);
     }

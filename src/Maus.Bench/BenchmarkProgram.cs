@@ -41,9 +41,11 @@ public static partial class BenchmarkProgram
             }
 
             // Les passes d'essai (accélérées ou fermées automatiquement) ne vont pas dans l'historique de l'utilisateur.
-            if (report.Tests.Count > 0 && options.DurationScale >= 1 && !options.AutoClose)
+            if (report.Tests.Count > 0 && !options.IsTrial)
             {
-                BenchmarkHistoryStore.CreateDefault().Add(report);
+                var store = BenchmarkHistoryStore.CreateDefault();
+                store.Add(report);
+                store.PruneImages();
             }
 
             if (options.ResultFile is { } file)
@@ -130,7 +132,7 @@ public static partial class BenchmarkProgram
         return 0;
     }
 
-    internal static void RenderFrame(IGpuDevice device, SceneContext context, PostProcess post, FrameBuilder builder, BenchScene scene, double time, float deltaTime, CameraPose? cameraOverride = null, float fade = 0f)
+    internal static void RenderFrame(IGpuDevice device, SceneContext context, PostProcess post, FrameBuilder builder, BenchScene scene, double time, float deltaTime, CameraPose? cameraOverride = null, float fade = 0f, ITexture? snapshot = null)
     {
         var state = scene.Evaluate(time);
         if (fade > 0f)
@@ -155,7 +157,7 @@ public static partial class BenchmarkProgram
         cmd.SetConstants(0, frame);
         scene.Render(context);
         cmd.SetConstants(0, frame);
-        post.Run(cmd, state.Grade, state.Temporal, scene.HasOverlay ? target => scene.RenderOverlay(context, target) : null);
+        post.Run(cmd, state.Grade, state.Temporal, scene.HasOverlay ? target => scene.RenderOverlay(context, target) : null, snapshot);
     }
 
     [LibraryImport("user32.dll")]
@@ -195,6 +197,9 @@ internal sealed record BenchOptions
 
     /// <summary>Bilan fermé tout seul après 4 secondes (essais automatiques).</summary>
     public bool AutoClose { get; init; }
+
+    /// <summary>Passe d'essai (accélérée ou fermée automatiquement) : rien n'est gardé dans l'historique de l'utilisateur.</summary>
+    public bool IsTrial => DurationScale < 1 || AutoClose;
 
     /// <summary>Dossier des captures de contrôle prises pendant une vraie passe (une par test et le bilan).</summary>
     public string? ScreenshotFolder { get; init; }

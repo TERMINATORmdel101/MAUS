@@ -1,8 +1,11 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Maus.Core;
 using Maus.Core.Localization;
 using Maus.Core.Workshop.Benchmark;
@@ -30,6 +33,9 @@ public sealed partial class WorkshopViewModel
     private TestOption<string>? _benchmarkScope;
     private ICommand? _startBenchmark;
     private ICommand? _copyBenchmark;
+    private ICommand? _copyBenchmarkImage;
+    private ICommand? _openBenchmarkImage;
+    private ICommand? _showBenchmarkImage;
     private IReadOnlyList<BenchmarkReport>? _benchmarkHistory;
 
     /// <summary>Interfaces graphiques proposées : DirectX 12 recommandé (le plus moderne), DirectX 11 pour comparer.</summary>
@@ -181,6 +187,45 @@ public sealed partial class WorkshopViewModel
 
     public ICommand StartBenchmarkCommand => _startBenchmark ??= new AsyncCommand(RunBenchmarkAsync);
 
+    /// <summary>Image du résultat de la dernière passe (fichier PNG enregistré par le benchmark), si elle existe encore.</summary>
+    private string? BenchmarkImagePath => LastBenchmark?.Image is { } path && File.Exists(path) ? path : null;
+
+    public bool HasBenchmarkImage => BenchmarkImagePath is not null;
+
+    /// <summary>Aperçu de l'image (lue en mémoire : le fichier n'est pas verrouillé).</summary>
+    public ImageSource? BenchmarkImageSource => BenchmarkImagePath is { } path ? LoadImage(path) : null;
+
+    public ICommand CopyBenchmarkImageCommand => _copyBenchmarkImage ??= new AsyncCommand(() =>
+    {
+        if (BenchmarkImagePath is { } path && LoadImage(path) is { } image)
+        {
+            Clipboard.SetImage(image);
+            BenchmarkStatus = T("Image copiée : collez-la où vous voulez (Discord, forum, message).");
+        }
+
+        return Task.CompletedTask;
+    });
+
+    public ICommand OpenBenchmarkImageCommand => _openBenchmarkImage ??= new AsyncCommand(() =>
+    {
+        if (BenchmarkImagePath is { } path)
+        {
+            ShellLauncher.OpenFile(path);
+        }
+
+        return Task.CompletedTask;
+    });
+
+    public ICommand ShowBenchmarkImageCommand => _showBenchmarkImage ??= new AsyncCommand(() =>
+    {
+        if (BenchmarkImagePath is { } path)
+        {
+            ShellLauncher.ShowInFolder(path);
+        }
+
+        return Task.CompletedTask;
+    });
+
     /// <summary>Copie un résumé du dernier résultat (à coller sur un forum) : aucune donnée personnelle, seulement le matériel.</summary>
     public ICommand CopyBenchmarkCommand => _copyBenchmark ??= new AsyncCommand(() =>
     {
@@ -250,6 +295,7 @@ public sealed partial class WorkshopViewModel
             nameof(BenchmarkGpuTests), nameof(BenchmarkCpuTests), nameof(BenchmarkTrend), nameof(BenchmarkRuns),
             nameof(BenchmarkGpuSensors), nameof(HasBenchmarkGpuSensors), nameof(BenchmarkCpuSensors), nameof(HasBenchmarkCpuSensors),
             nameof(BenchmarkGpuWarning), nameof(HasBenchmarkGpuWarning), nameof(BenchmarkCpuWarning), nameof(HasBenchmarkCpuWarning),
+            nameof(HasBenchmarkImage), nameof(BenchmarkImageSource),
         })
         {
             OnPropertyChanged(name);
@@ -297,6 +343,24 @@ public sealed partial class WorkshopViewModel
 
         text.Append(T("10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti). Deux fois plus de points = deux fois plus rapide."));
         return text.ToString();
+    }
+
+    private static BitmapImage? LoadImage(string path)
+    {
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(path);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     private static void AppendSensors(StringBuilder text, BenchmarkReport report, string device)

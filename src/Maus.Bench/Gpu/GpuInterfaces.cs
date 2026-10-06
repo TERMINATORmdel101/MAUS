@@ -72,6 +72,12 @@ public interface IGpuDevice : IDisposable
 
     /// <summary>Copie l'image affichée en mémoire (RVBA 8 bits par composante) : captures de contrôle.</summary>
     byte[] CaptureBackBuffer(out int width, out int height);
+
+    /// <summary>
+    /// Copie en mémoire le premier niveau d'une texture 2D RVBA 8 bits (vignettes des scènes, image du résultat). Attend
+    /// que la carte ait fini : à n'appeler qu'en dehors des mesures.
+    /// </summary>
+    byte[] ReadTexture(ITexture texture);
 }
 
 /// <summary>Commandes de rendu, dans l'ordre où la carte les exécutera.</summary>

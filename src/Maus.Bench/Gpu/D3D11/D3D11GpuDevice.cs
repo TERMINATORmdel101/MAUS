@@ -151,12 +151,20 @@ internal sealed class D3D11GpuDevice : IGpuDevice
         }
     }
 
-    public unsafe byte[] CaptureBackBuffer(out int width, out int height)
+    public byte[] CaptureBackBuffer(out int width, out int height)
     {
         width = OutputWidth;
         height = OutputHeight;
+        return ReadTexture(_backBuffer);
+    }
+
+    public unsafe byte[] ReadTexture(ITexture texture)
+    {
+        var source = (D3D11Texture)texture;
+        var width = texture.Desc.Width;
+        var height = texture.Desc.Height;
         using var staging = _device.CreateTexture2D(new Texture2DDescription(Format.R8G8B8A8_UNorm, (uint)width, (uint)height, 1, 1, BindFlags.None, ResourceUsage.Staging, CpuAccessFlags.Read));
-        _context.CopyResource(staging, _backBuffer.Resource);
+        _context.CopySubresourceRegion(staging, 0, 0, 0, 0, source.Resource, 0);
         var mapped = _context.Map(staging, 0, MapMode.Read);
         var pixels = new byte[width * height * 4];
         try

@@ -15,6 +15,7 @@ internal sealed class UiRenderer : IDisposable
     private readonly IPipeline _pipeline;
     private readonly List<UiVertex> _vertices = new(16384);
     private ITexture? _picture;
+    private ITexture? _target;
 
     public UiRenderer(IGpuDevice device, ShaderLibrary shaders, FontAtlas font)
     {
@@ -38,9 +39,12 @@ internal sealed class UiRenderer : IDisposable
 
     public FontAtlas Font { get; }
 
-    public float Width => _device.OutputWidth;
+    public float Width => _target?.Desc.Width ?? _device.OutputWidth;
 
-    public float Height => _device.OutputHeight;
+    public float Height => _target?.Desc.Height ?? _device.OutputHeight;
+
+    /// <summary>Dessine dans une image hors écran (image du résultat) au lieu de l'écran ; <c>null</c> pour revenir à l'écran.</summary>
+    public void UseTarget(ITexture? target) => _target = target;
 
     /// <summary>Échelle de l'interface : 1 pour un écran de 1080 lignes.</summary>
     public float Scale => Height / 1080f;
@@ -58,7 +62,11 @@ internal sealed class UiRenderer : IDisposable
         Quad(x - 1, y - 1, width + 2, height + 2, new Vector2(-half.X - 1, -half.Y - 1), new Vector2(half.X + 1, half.Y + 1), color, shape);
     }
 
-    public void Image(ITexture picture, float x, float y, float width, float height, float opacity = 1f)
+    public void Image(ITexture picture, float x, float y, float width, float height, float opacity = 1f) =>
+        ImagePart(picture, x, y, width, height, Vector2.Zero, Vector2.One, opacity);
+
+    /// <summary>Une partie d'une image (coordonnées de texture <paramref name="uv0"/> à <paramref name="uv1"/>).</summary>
+    public void ImagePart(ITexture picture, float x, float y, float width, float height, Vector2 uv0, Vector2 uv1, float opacity = 1f)
     {
         if (!ReferenceEquals(_picture, picture) && _picture is not null)
         {
@@ -66,7 +74,7 @@ internal sealed class UiRenderer : IDisposable
         }
 
         _picture = picture;
-        Quad(x, y, width, height, Vector2.Zero, Vector2.One, new Vector4(1, 1, 1, opacity), new Vector4(2, 0, 0, 0));
+        Quad(x, y, width, height, uv0, uv1, new Vector4(1, 1, 1, opacity), new Vector4(2, 0, 0, 0));
     }
 
     /// <summary>Largeur d'un texte une fois affiché, en pixels.</summary>
@@ -117,7 +125,7 @@ internal sealed class UiRenderer : IDisposable
             return;
         }
 
-        cmd.SetRenderTarget(_device.BackBuffer);
+        cmd.SetRenderTarget(_target ?? _device.BackBuffer);
         cmd.SetPipeline(_pipeline);
         cmd.SetTexture(0, Font.Texture);
         cmd.SetTexture(1, _picture ?? Font.Texture);

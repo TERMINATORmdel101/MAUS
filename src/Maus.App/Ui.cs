@@ -75,6 +75,16 @@ public static class Ui
 
     public static string BenchmarkOpen => T("Ouvrir le benchmark");
 
+    public static string BenchmarkImageTitle => T("Image du résultat à partager");
+
+    public static string BenchmarkImageDetail => T("Scores, vignettes des scènes et matériel, sans aucune donnée personnelle : à coller sur Discord, un forum ou un réseau social.");
+
+    public static string BenchmarkImageCopy => T("Copier l'image");
+
+    public static string BenchmarkImageOpen => T("Ouvrir l'image");
+
+    public static string BenchmarkImageFolder => T("Afficher dans le dossier");
+
     public static string BenchmarkPointer => T("Le benchmark visuel a sa propre page dans le menu de gauche : lancement, dernier résultat et historique.");
 
     public static string GpuLabel => T("Carte graphique");

@@ -1827,6 +1827,24 @@
                             </Border>
                         </Grid>
 
+                        <Border Style="{StaticResource SoftCard}" Margin="0,12,0,0" Visibility="{Binding Workshop.HasBenchmarkImage, Converter={StaticResource BoolToVisibility}}">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Left" CornerRadius="8" ClipToBounds="True" Margin="0,0,18,0">
+                                    <Image Source="{Binding Workshop.BenchmarkImageSource, Mode=OneWay}" Width="400" Stretch="Uniform"
+                                           AutomationProperties.Name="{x:Static app:Ui.BenchmarkImageTitle}" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Static app:Ui.BenchmarkImageTitle}" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock Text="{x:Static app:Ui.BenchmarkImageDetail}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,4,0,12" />
+                                    <WrapPanel>
+                                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkImageCopy}" Command="{Binding Workshop.CopyBenchmarkImageCommand}" Margin="0,0,8,6" Padding="14,6" />
+                                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkImageOpen}" Command="{Binding Workshop.OpenBenchmarkImageCommand}" Margin="0,0,8,6" Padding="14,6" />
+                                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkImageFolder}" Command="{Binding Workshop.ShowBenchmarkImageCommand}" Margin="0,0,8,6" Padding="14,6" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
                         <Border Style="{StaticResource Divider}" Margin="0,22,0,16" />
                         <TextBlock Text="{x:Static app:Ui.BenchmarkHistoryTitle}" Style="{StaticResource ZoneTitle}" FontSize="17" />
                         <Border Style="{StaticResource SoftCard}" Margin="0,0,0,4">

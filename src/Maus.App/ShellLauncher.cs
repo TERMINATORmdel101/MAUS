@@ -36,6 +36,15 @@ public static class ShellLauncher
         }
     }
 
+    /// <summary>Ouvre un fichier avec le programme choisi par l'utilisateur (visionneuse d'images…), sans les droits de MAUS.</summary>
+    public static void OpenFile(string path)
+    {
+        if (File.Exists(path))
+        {
+            Start($"\"{path}\"");
+        }
+    }
+
     public static void ShowInFolder(string path)
     {
         if (File.Exists(path) || Directory.Exists(path))

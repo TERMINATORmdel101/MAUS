@@ -303,7 +303,14 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
     {
         width = OutputWidth;
         height = OutputHeight;
-        var back = (D3D12Texture)BackBuffer;
+        return ReadTexture(BackBuffer);
+    }
+
+    public byte[] ReadTexture(ITexture texture)
+    {
+        var back = (D3D12Texture)texture;
+        var width = texture.Desc.Width;
+        var height = texture.Desc.Height;
         Span<PlacedSubresourceFootPrint> layouts = stackalloc PlacedSubresourceFootPrint[1];
         Span<uint> rows = stackalloc uint[1];
         Span<ulong> rowSizes = stackalloc ulong[1];
