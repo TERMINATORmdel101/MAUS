@@ -47,6 +47,12 @@ public static class Ui
 
     public static string DriversDateWhy => T("Pourquoi certaines dates sont très anciennes ?");
 
+    public static string BenchmarkTitle => T("Benchmark visuel : carte graphique et processeur");
+
+    public static string BenchmarkIntro => T("Environ dix minutes en plein écran : quatre minutes et demie de scènes calculées image par image (DirectX 11 ou 12), puis le processeur. Chaque test pousse une capacité à fond pour montrer les points forts et les points faibles. 10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti). La carte et le processeur chauffent comme dans un jeu très exigeant ; Échap arrête tout.");
+
+    public static string ApiLabel => T("Interface graphique");
+
     public static string LatencyTitle => T("Latence des pilotes (craquements audio, micro-saccades)");
 
     public static string LatencyIntro => T("MAUS écoute la trace du noyau de Windows quelques secondes, sans rien modifier, et nomme les pilotes qui ont gardé le processeur le plus longtemps d'affilée. Droits administrateur nécessaires.");

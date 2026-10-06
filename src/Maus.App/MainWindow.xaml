@@ -1157,6 +1157,29 @@
                                 <Border Style="{StaticResource Divider}" Margin="0,22,0,16" />
                                 <TextBlock Text="{x:Static app:Ui.TestsSpeed}" Style="{StaticResource ZoneTitle}" FontSize="17" />
                                 <TextBlock Text="{x:Static app:Ui.TestsSpeedIntro}" Style="{StaticResource Muted}" FontSize="12" Margin="0,-4,0,10" />
+
+                                <!-- Benchmark visuel : processus séparé en plein écran (option benchmark de MAUS.exe), bilan relu dans l'historique. -->
+                                <Border Style="{StaticResource SoftCard}" Margin="0,0,0,12" Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelRoseStroke}">
+                                                <TextBlock Style="{StaticResource NavIcon}" FontSize="17" Text="&#xE7FC;" Foreground="{DynamicResource PastelRoseInk}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Static app:Ui.BenchmarkTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelRoseInk}" />
+                                        </DockPanel>
+                                        <TextBlock Text="{x:Static app:Ui.BenchmarkIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <TextBlock Text="{x:Static app:Ui.ApiLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox AutomationProperties.Name="{x:Static app:Ui.ApiLabel}" MinWidth="220" Margin="0,0,12,4" ItemsSource="{Binding Workshop.BenchmarkApis, Mode=OneWay}" SelectedItem="{Binding Workshop.BenchmarkApi}"
+                                                      DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,0,4"
+                                                    Content="{x:Static app:Ui.Start}" Command="{Binding Workshop.StartBenchmarkCommand}" IsEnabled="{Binding Workshop.IsNotBenchmarkRunning, Mode=OneWay}" />
+                                        </WrapPanel>
+                                        <ProgressBar IsIndeterminate="True" Height="4" Margin="0,8,0,0" Visibility="{Binding Workshop.IsBenchmarkRunning, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBox Text="{Binding Workshop.BenchmarkStatus, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                 TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.Name="{x:Static app:Ui.BenchmarkTitle}" />
+                                    </StackPanel>
+                                </Border>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />

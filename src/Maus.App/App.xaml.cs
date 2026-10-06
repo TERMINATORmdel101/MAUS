@@ -43,6 +43,14 @@ public partial class App : Application
             return;
         }
 
+        if (e.Args.Length > 0 && e.Args[0].Equals("--benchmark", StringComparison.OrdinalIgnoreCase))
+        {
+            // Benchmark visuel : processus séparé lancé par l'Atelier, avec sa propre fenêtre plein écran (pas de WPF).
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(Maus.Bench.BenchmarkProgram.Run(e.Args[1..]));
+            return;
+        }
+
         s_interactive = true;
 
         // MAUS s'arrête quand sa fenêtre principale se ferme, même si une fenêtre annexe traîne encore.

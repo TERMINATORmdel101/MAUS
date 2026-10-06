@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using Maus.Bench.Cpu;
 using Maus.Bench.Gpu;
 using Maus.Bench.Gpu.D3D11;
 using Maus.Bench.Gpu.D3D12;
 using Maus.Bench.Platform;
 using Maus.Bench.Render;
 using Maus.Bench.Scenes;
+using Maus.Core.Workshop.Benchmark;
 
 namespace Maus.Bench;
 
@@ -27,7 +29,28 @@ public static partial class BenchmarkProgram
         Maus.Core.Localization.Texts.Use(options.Language);
         try
         {
-            return options.CaptureFolder is not null ? Capture(options) : 0;
+            if (options.CaptureFolder is not null)
+            {
+                return Capture(options);
+            }
+
+            BenchmarkReport report;
+            using (var runner = new BenchmarkRunner(options))
+            {
+                report = runner.Run();
+            }
+
+            if (report.Tests.Count > 0)
+            {
+                BenchmarkHistoryStore.CreateDefault().Add(report);
+            }
+
+            if (options.ResultFile is { } file)
+            {
+                File.WriteAllText(file, BenchmarkHistoryStore.Serialize(report));
+            }
+
+            return report.Error is null ? 0 : 3;
         }
         catch (DeviceLostException ex)
         {
@@ -40,6 +63,12 @@ public static partial class BenchmarkProgram
     {
         BenchScene[] all = [new FractalScene()];
         return only.Count == 0 ? all : all.Where(s => only.Contains(s.Id)).ToArray();
+    }
+
+    internal static IReadOnlyList<CpuBenchTest> CreateCpuTests(IReadOnlyCollection<string> only)
+    {
+        CpuBenchTest[] all = [new PathTracerTest(singleCore: false), new PathTracerTest(singleCore: true), new MandelbrotTest()];
+        return only.Count == 0 ? all : all.Where(t => only.Contains(t.Id)).ToArray();
     }
 
     internal static IGpuDevice CreateDevice(GpuApi api, nint window, int width, int height) => api switch
@@ -148,6 +177,12 @@ internal sealed record BenchOptions
 
     public string? Language { get; init; }
 
+    /// <summary>Bilan fermé tout seul après 4 secondes (essais automatiques).</summary>
+    public bool AutoClose { get; init; }
+
+    /// <summary>Dossier des captures de contrôle prises pendant une vraie passe (une par test et le bilan).</summary>
+    public string? ScreenshotFolder { get; init; }
+
     /// <summary>Caméra imposée (repérages pour les captures) : x,y,z,cibleX,cibleY,cibleZ[,champ].</summary>
     public CameraPose? CameraOverride { get; init; }
 
@@ -199,6 +234,12 @@ internal sealed record BenchOptions
             };
         }
 
-        return options with { ResultFile = Value("--result"), Language = Value("--lang") };
+        return options with
+        {
+            ResultFile = Value("--result"),
+            Language = Value("--lang"),
+            ScreenshotFolder = Value("--screenshots"),
+            AutoClose = args.Contains("--auto-close", StringComparer.OrdinalIgnoreCase),
+        };
     }
 }

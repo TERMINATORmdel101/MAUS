@@ -30,6 +30,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Shaders\*.hlsl" LogicalName="Maus.Bench.Shaders.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Shaders\*.hlsli" LogicalName="Maus.Bench.Shaders.%(Filename)%(Extension)" />
+    <!-- Logo de MAUS fourni par le porteur (écran de présentation du benchmark). -->
+    <EmbeddedResource Include="..\Maus.App\Assets\maus-logo-512.png" LogicalName="Maus.Bench.logo.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -41,7 +41,8 @@ internal sealed class FontAtlas : IDisposable
         var characters = CharacterSet();
         using var factory = DWrite.DWriteCreateFactory<IDWriteFactory>();
         using var collection = factory.GetSystemFontCollection(false);
-        var family = FindFamily(collection, "Segoe UI Variable Display") ?? FindFamily(collection, "Segoe UI") ?? collection.GetFontFamily(0);
+        // Segoe UI classique (la variante « Variable » est refusée par l'analyse de glyphes de DirectWrite 1).
+        var family = FindFamily(collection, "Segoe UI") ?? collection.GetFontFamily(0);
         using (family)
         {
             using var regular = family.GetFirstMatchingFont(FontWeight.Normal, FontStretch.Normal, FontStyle.Normal);
@@ -65,8 +66,15 @@ internal sealed class FontAtlas : IDisposable
                     }
 
                     var advance = glyphMetrics[i].AdvanceWidth / unitsPerEm;
-                    var (sdf, left, top) = RenderGlyph(factory, face, indices[i]);
-                    rendered.Add((characters[i], isBold, sdf, left, top, advance));
+                    try
+                    {
+                        var (sdf, left, top) = RenderGlyph(factory, face, indices[i]);
+                        rendered.Add((characters[i], isBold, sdf, left, top, advance));
+                    }
+                    catch (SharpGen.Runtime.SharpGenException)
+                    {
+                        // Caractère que DirectWrite refuse de dessiner : il sera remplacé par « ? ».
+                    }
                 }
             }
 
@@ -150,7 +158,8 @@ internal sealed class FontAtlas : IDisposable
             set.Add(c);
         }
 
-        set.AddRange("ŒœŸ‘’“”«»…–—•·€™×°±µ²³½¼¾←→↑↓▲▼●○✓".Distinct());
+        // Espace fine insécable : séparateur des milliers en français (« 10 000 »).
+        set.AddRange("  ŒœŸ‘’“”«»…–—•·€™×°±µ²³½¼¾←→↑↓▲▼●○✓".Distinct());
         return [.. set.Distinct()];
     }
 
@@ -158,7 +167,8 @@ internal sealed class FontAtlas : IDisposable
     private static (Bitmap Sdf, float Left, float Top) RenderGlyph(IDWriteFactory factory, IDWriteFontFace face, ushort index)
     {
         const int pad = (int)(Spread * Supersample) + 2;
-        using var run = new GlyphRun
+        // Pas de « using » : libérer le GlyphRun libérerait aussi la police partagée par tous les caractères.
+        var run = new GlyphRun
         {
             FontFace = face,
             FontEmSize = EmPixels * Supersample,
