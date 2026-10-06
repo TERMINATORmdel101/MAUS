@@ -35,6 +35,18 @@ public static class Ui
 
     public static string FpsTitle => T("Images par seconde");
 
+    public static string DriversToolsTitle => T("Outils des pilotes");
+
+    public static string LiveMeasuresTitle => T("Mesures en direct");
+
+    public static string DriversListLabel => T("Liste :");
+
+    public static string DriversBackupsLabel => T("Sauvegardes :");
+
+    public static string DriversUpdateLabel => T("Windows Update :");
+
+    public static string DriversDateWhy => T("Pourquoi certaines dates sont très anciennes ?");
+
     public static string LatencyTitle => T("Latence des pilotes (craquements audio, micro-saccades)");
 
     public static string LatencyIntro => T("MAUS écoute la trace du noyau de Windows quelques secondes, sans rien modifier, et nomme les pilotes qui ont gardé le processeur le plus longtemps d'affilée. Droits administrateur nécessaires.");
@@ -42,6 +54,8 @@ public static class Ui
     public static string OverlayShow => T("Afficher le compteur au-dessus du jeu pendant la mesure");
 
     public static string OverlayTip => T("Une petite fenêtre transparente aux clics, au premier plan, sans rien injecter dans le jeu (c'est l'injection que surveillent les anti-triche). Visible en fenêtré et en plein écran fenêtré ; en plein écran exclusif, Windows l'affiche dans la plupart des jeux récents, pas dans tous.");
+
+    public static string OverlaySettings => T("Taille, opacité et position du compteur");
 
     public static string OverlaySize => T("Taille");
 

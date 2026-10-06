@@ -11,7 +11,7 @@ Question du porteur (30/09/2026) : « qu'est-ce qui manque pour les experts du P
 
 ## Pistes, de la plus utile à la plus lourde
 
-### 1. Écrans bleus : nommer le pilote probablement en cause
+### 1. Écrans bleus : nommer le pilote probablement en cause — EN ATTENTE (aucun vidage sur le PC du porteur pour vérifier le décodage, 06/10/2026)
 
 - **Ce que font les experts** : WinDbg (`!analyze -v`, champs « Probably caused by » et « IMAGE_NAME ») ou BlueScreenView lisent les vidages de `C:\Windows\Minidump` et désignent le pilote le plus probable.
 - **Ce qui manque à MAUS** : il compte les vidages et traduit le code, mais ne nomme pas le pilote.

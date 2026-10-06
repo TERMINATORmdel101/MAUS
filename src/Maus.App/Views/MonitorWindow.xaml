@@ -68,7 +68,8 @@
                 <!-- Compteur au-dessus du jeu : affiché pendant la mesure, taille, opacité et coin au choix. -->
                 <Border Style="{StaticResource Divider}" Margin="0,10,0,8" Background="{DynamicResource PastelLilacStroke}" />
                 <CheckBox Content="{x:Static app:Ui.OverlayShow}" IsChecked="{Binding OverlayEnabled}" ToolTip="{x:Static app:Ui.OverlayTip}" />
-                <Grid Margin="0,6,0,0" IsEnabled="{Binding OverlayEnabled, Mode=OneWay}">
+                <Expander Style="{StaticResource QuietExpander}" Header="{x:Static app:Ui.OverlaySettings}" Margin="0,6,0,0">
+                <Grid Margin="0,4,0,0" IsEnabled="{Binding OverlayEnabled, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -91,6 +92,7 @@
                     <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,6,0,0" HorizontalAlignment="Left" MinWidth="180" ItemsSource="{Binding OverlayCorners, Mode=OneWay}"
                               SelectedItem="{Binding OverlayCornerChoice}" DisplayMemberPath="Label" AutomationProperties.Name="{x:Static app:Ui.OverlayPlace}" />
                 </Grid>
+                </Expander>
             </StackPanel>
         </Border>
 

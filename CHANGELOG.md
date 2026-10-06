@@ -13,7 +13,15 @@ Nouvelles fonctions pour les joueurs et les connaisseurs (améliorations : derni
 - **Relevé de partie** : il mesure maintenant les images par seconde du jeu (moyenne, 1 % et 0,1 % les plus lents), avec la même explication. La mesure se fait avec **PresentMon** d'Intel (gratuit, licence MIT), livré avec MAUS. PresentMon ne fait qu'écouter les événements d'affichage de Windows. MAUS ne le lance que si le fichier est exactement celui signé par Intel, et l'arrête avec la mesure.
 - **Santé des SSD NVMe** (module 11) : réserve de cellules et seuil du fabricant, alertes déclarées par le disque, usure estimée, heures d'utilisation, données écrites, erreurs. La lecture se fait sans droits administrateur et sans accès en écriture au disque. Les verdicts viennent uniquement de ce que déclare le disque.
 - **Idées reçues que MAUS ne suit pas** (onglet Corrections) : nettoyeurs de registre, suppression du fichier d'échange, nombre de processeurs dans msconfig, horloge HPET et « dynamic tick », défragmentation des SSD. Chacune a sa source chez Microsoft et un bouton « Voir la source ».
-- Recherche « ce qui manque pour les experts » : `docs/pistes-experts.md`. Deux pistes restent à faire (pilote en cause d'un écran bleu, latence des pilotes).
+- **Compteur au-dessus du jeu** (demande du porteur) : pendant la mesure, une petite fenêtre affiche les images par seconde par-dessus le jeu, avec le 1 % et le 0,1 % les plus lents et la part de travail de la carte graphique. Sa taille (60 à 250 %), son opacité (20 à 100 %) et son coin d'écran sont réglables et gardés en mémoire.
+  - Les clics la traversent, et MAUS n'injecte rien dans le jeu : c'est précisément l'injection que surveillent les anti-triche.
+  - Elle est visible en fenêtré et en plein écran fenêtré. En plein écran exclusif, Windows l'affiche grâce aux « optimisations du plein écran » (DirectX Developer Blog), dans la plupart des jeux récents mais pas dans tous.
+- **Latence des pilotes** (Atelier > Tests), pour les craquements audio et les micro-saccades. MAUS écoute la trace du noyau de Windows (DPC et interruptions, définitions de Microsoft) pendant 10 s à 1 min, sans rien modifier, puis nomme les pilotes qui ont gardé le processeur le plus longtemps d'affilée. Aucun seuil n'est inventé. Administrateur requis. La mesure a été vérifiée sur le PC du porteur (carte réseau, affichage NVIDIA, son).
+- **Pages plus découpées** (demande du porteur) :
+  - Atelier > Pilotes est organisé en trois zones numérotées et colorées : la carte graphique, tous les pilotes, puis les outils rangés par usage (liste, sauvegardes, Windows Update). La note sur les dates anciennes passe dans un dépliant.
+  - Atelier > En direct a trois zones séparées : les mesures, le relevé de partie et les capteurs avancés.
+  - Dans la fenêtre de surveillance, les réglages du compteur sont repliés.
+- Recherche « ce qui manque pour les experts » : `docs/pistes-experts.md`. Une seule piste reste en attente : nommer le pilote en cause d'un écran bleu. Elle ne peut pas être vérifiée sans un vrai vidage d'écran bleu, et il n'y en a aucun sur le PC du porteur.
 
 ## 0.6.1 — 05/10/2026
 

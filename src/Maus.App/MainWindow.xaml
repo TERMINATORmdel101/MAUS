@@ -761,7 +761,12 @@
                     <TabItem Header="{x:Static app:Ui.LiveTitle}" Style="{StaticResource PillTab}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <Button Content="{x:Static app:Ui.OpenMonitor}" Command="{Binding OpenMonitorCommand}" HorizontalAlignment="Left" Padding="12,5" Margin="0,0,0,10" />
+                                <!-- Zone 1 : les mesures en direct. -->
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenMonitor}" Command="{Binding OpenMonitorCommand}" VerticalAlignment="Center"
+                                            Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}" />
+                                    <TextBlock Text="{x:Static app:Ui.LiveMeasuresTitle}" Style="{StaticResource ZoneTitle}" Margin="0" VerticalAlignment="Center" />
+                                </DockPanel>
                                 <ItemsControl ItemsSource="{Binding Workshop.Live.Alarms}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -802,9 +807,12 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <TextBlock Text="{Binding Workshop.Live.ThermalNote}" FontSize="12" Style="{StaticResource Muted}" Margin="0,10,0,0" />
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                <Border Style="{StaticResource Divider}" />
+
+                                <!-- Zone 2 : relevé pendant une partie (images par seconde comprises). -->
+                                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}">
                                     <StackPanel>
-                                        <TextBlock Text="{x:Static app:Ui.SessionTitle}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{x:Static app:Ui.SessionTitle}" Style="{StaticResource CardTitle}" Foreground="{DynamicResource PastelMintInk}" />
                                         <TextBlock Text="{Binding Workshop.SessionStatus}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                         <WrapPanel Margin="0,10,0,0">
                                             <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -814,24 +822,27 @@
                                                     Command="{Binding Workshop.StartSessionCommand}" Visibility="{Binding Workshop.IsNotRecording, Converter={StaticResource BoolToVisibility}}" />
                                             <Button Style="{StaticResource DangerButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.Stop}"
                                                     Command="{Binding Workshop.StopSessionCommand}" Visibility="{Binding Workshop.IsRecording, Converter={StaticResource BoolToVisibility}}" />
-                                            <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.ExportCsv}" Command="{Binding Workshop.ExportSessionCommand}"
+                                            <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.ExportCsv}" Command="{Binding Workshop.ExportSessionCommand}"
                                                     Visibility="{Binding Workshop.HasSessionSummary, Converter={StaticResource BoolToVisibility}}" />
                                         </WrapPanel>
                                         <TextBox Text="{Binding Workshop.SessionSummary, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" TextWrapping="Wrap"
                                                  Margin="0,8,0,0" Visibility="{Binding Workshop.HasSessionSummary, Converter={StaticResource BoolToVisibility}}" />
                                     </StackPanel>
                                 </Border>
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                <Border Style="{StaticResource Divider}" />
+
+                                <!-- Zone 3 : capteurs avancés (pilote PawnIO, au choix de l'utilisateur). -->
+                                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
                                     <StackPanel>
-                                        <TextBlock Text="{x:Static app:Ui.PawnIoTitle}" Style="{StaticResource CardTitle}" />
+                                        <TextBlock Text="{x:Static app:Ui.PawnIoTitle}" Style="{StaticResource CardTitle}" Foreground="{DynamicResource PastelSandInk}" />
                                         <TextBlock Text="{Binding Workshop.PawnIoStatus}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                         <WrapPanel Margin="0,10,0,0">
                                             <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.InstallPawnIo}"
                                                     Command="{Binding Workshop.InstallPawnIoCommand}" Visibility="{Binding Workshop.IsPawnIoMissing, Converter={StaticResource BoolToVisibility}}" />
-                                            <Button Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.UninstallPawnIo}"
+                                            <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.UninstallPawnIo}"
                                                     Command="{Binding Workshop.UninstallPawnIoCommand}" Visibility="{Binding Workshop.IsPawnIoInstalled, Converter={StaticResource BoolToVisibility}}" />
                                         </WrapPanel>
-                                        <Expander Header="{x:Static app:Ui.AllSensors}" Margin="0,8,0,0"
+                                        <Expander Style="{StaticResource QuietExpander}" Header="{x:Static app:Ui.AllSensors}" Margin="0,10,0,0"
                                                   Visibility="{Binding Workshop.Live.HasReadings, Converter={StaticResource BoolToVisibility}}">
                                             <DataGrid ItemsSource="{Binding Workshop.Live.Readings}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
                                                       CanUserAddRows="False" GridLinesVisibility="None" MaxHeight="360" Margin="0,6,0,0">
@@ -1461,84 +1472,138 @@
                     <TabItem Header="{x:Static app:Ui.SectionDrivers}" Style="{StaticResource PillTab}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <WrapPanel Margin="0,0,0,6">
-                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.RefreshList}" Command="{Binding Workshop.RefreshDriversCommand}" />
-                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.CopyList}" ToolTip="{x:Static app:Ui.CopySheetTip}" Command="{Binding Workshop.CopyDriversCommand}" />
-                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverBackupsFolder}" Command="{Binding Workshop.OpenDriverBackupsCommand}" />
-                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.RestoreDriverBackup}" Command="{Binding Workshop.RestoreDriverBackupCommand}" />
-                                    <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverUpdates}" ToolTip="{x:Static app:Ui.DriverUpdatesTip}" Command="{Binding Workshop.OpenDriverUpdatesCommand}" />
-                                </WrapPanel>
                                 <TextBlock Text="{Binding Workshop.DriversStatus}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,6" />
                                 <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,10" Visibility="{Binding Workshop.IsReadingDrivers, Converter={StaticResource BoolToVisibility}}" />
 
-                                <TextBlock Text="{x:Static app:Ui.DriversGpuTitle}" Style="{StaticResource CardTitle}" Margin="0,4,0,4" />
-                                <TextBlock Text="{x:Static app:Ui.DriversIntro}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,8" />
-                                <ItemsControl ItemsSource="{Binding Workshop.GraphicsDrivers}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type ws:GraphicsDriverCardViewModel}">
-                                            <Border Style="{StaticResource Card}" Margin="0,0,0,12" appearance:Motion.EnterOnLoad="True">
-                                                <StackPanel>
-                                                    <DockPanel Margin="0,0,0,10">
-                                                        <controls:LetterTile DockPanel.Dock="Left" Width="40" Height="40" Margin="0,0,12,0" Text="G" Fill="{StaticResource MausRed}" />
-                                                        <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                                    </DockPanel>
-                                                    <ItemsControl ItemsSource="{Binding Lines}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate DataType="{x:Type ws:InfoLine}">
-                                                                <Grid Margin="0,1">
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="220" />
-                                                                        <ColumnDefinition Width="*" />
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <TextBlock Text="{Binding Label}" FontSize="12" Style="{StaticResource Muted}" Margin="0,0,8,0" />
-                                                                    <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                                                </Grid>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                    <TextBlock Text="{Binding PackageNote}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,8" />
-                                                    <WrapPanel>
-                                                        <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RestartDriver}"
-                                                                ToolTip="{x:Static app:Ui.RestartDriverTip}" Command="{Binding RestartCommand}" />
-                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.ReinstallDevice}" ToolTip="{x:Static app:Ui.ReinstallDeviceTip}" Command="{Binding ReinstallCommand}"
-                                                                IsEnabled="{Binding CanReinstall, Mode=OneWay}" ToolTipService.ShowOnDisabled="True" />
-                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.BackupDriver}" Command="{Binding BackupCommand}"
-                                                                IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
-                                                        <Button Style="{StaticResource DangerButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RemoveDriver}"
-                                                                ToolTip="{x:Static app:Ui.RemoveDriverTip}" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
-                                                        <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverPage}" Command="{Binding DownloadCommand}"
-                                                                Visibility="{Binding HasDownloadPage, Converter={StaticResource BoolToVisibility}}" />
-                                                    </WrapPanel>
-                                                </StackPanel>
+                                <!-- Zone 1 : la carte graphique et les actions sur son pilote. -->
+                                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,6">
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelRoseStroke}">
+                                                <TextBlock Text="1" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PastelRoseInk}" />
                                             </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                            <TextBlock Text="{x:Static app:Ui.DriversGpuTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelRoseInk}" />
+                                        </DockPanel>
+                                        <TextBlock Text="{x:Static app:Ui.DriversIntro}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" Margin="0,0,0,10" />
+                                        <ItemsControl ItemsSource="{Binding Workshop.GraphicsDrivers}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type ws:GraphicsDriverCardViewModel}">
+                                                    <Border Style="{StaticResource Card}" Margin="0,0,0,4" appearance:Motion.EnterOnLoad="True">
+                                                        <StackPanel>
+                                                            <DockPanel Margin="0,0,0,10">
+                                                                <controls:LetterTile DockPanel.Dock="Left" Width="40" Height="40" Margin="0,0,12,0" Text="G" Fill="{StaticResource MausRed}" />
+                                                                <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                            </DockPanel>
+                                                            <ItemsControl ItemsSource="{Binding Lines}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate DataType="{x:Type ws:InfoLine}">
+                                                                        <Grid Margin="0,1">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="220" />
+                                                                                <ColumnDefinition Width="*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Text="{Binding Label}" FontSize="12" Style="{StaticResource Muted}" Margin="0,0,8,0" />
+                                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                                        </Grid>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <TextBlock Text="{Binding PackageNote}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,8" />
+                                                            <WrapPanel>
+                                                                <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RestartDriver}"
+                                                                        ToolTip="{x:Static app:Ui.RestartDriverTip}" Command="{Binding RestartCommand}" />
+                                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.ReinstallDevice}" ToolTip="{x:Static app:Ui.ReinstallDeviceTip}" Command="{Binding ReinstallCommand}"
+                                                                        IsEnabled="{Binding CanReinstall, Mode=OneWay}" ToolTipService.ShowOnDisabled="True" />
+                                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.BackupDriver}" Command="{Binding BackupCommand}"
+                                                                        IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
+                                                                <Button Style="{StaticResource DangerButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RemoveDriver}"
+                                                                        ToolTip="{x:Static app:Ui.RemoveDriverTip}" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
+                                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverPage}" Command="{Binding DownloadCommand}"
+                                                                        Visibility="{Binding HasDownloadPage, Converter={StaticResource BoolToVisibility}}" />
+                                                            </WrapPanel>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
 
-                                <DockPanel Margin="0,8,0,6">
-                                    <TextBox DockPanel.Dock="Right" Width="260" Text="{Binding Workshop.DriverFilter, UpdateSourceTrigger=PropertyChanged}"
-                                             AutomationProperties.Name="{x:Static app:Ui.DriverFilterLabel}" ToolTip="{x:Static app:Ui.DriverFilterLabel}" />
-                                    <TextBlock DockPanel.Dock="Right" Text="{x:Static app:Ui.FilterLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                    <TextBlock Text="{x:Static app:Ui.DriversAllTitle}" Style="{StaticResource CardTitle}" VerticalAlignment="Center" />
-                                </DockPanel>
-                                <TextBlock Text="{Binding Workshop.DriversSummary}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,4" />
-                                <TextBlock Text="{x:Static app:Ui.DriversDateNote}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" Margin="0,0,0,6" />
-                                <Button Content="{x:Static app:Ui.ShowUnsignedDrivers}" Command="{Binding Workshop.ShowUnsignedDriversCommand}" HorizontalAlignment="Left" Padding="12,4" Margin="0,0,0,8"
-                                        Visibility="{Binding Workshop.HasUnsignedDrivers, Converter={StaticResource BoolToVisibility}}" />
-                                <DataGrid ItemsSource="{Binding Workshop.DriverRows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
-                                          CanUserAddRows="False" CanUserDeleteRows="False" GridLinesVisibility="None" Height="480" BorderThickness="0"
-                                          Background="Transparent" RowBackground="Transparent">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnFamily}" Binding="{Binding Group, Mode=OneWay}" Width="1.2*" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnDevice}" Binding="{Binding Device, Mode=OneWay}" Width="2.6*" FontWeight="SemiBold" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnVersion}" Binding="{Binding Version, Mode=OneWay}" Width="1.2*" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnDate}" Binding="{Binding Date, Mode=OneWay}" SortMemberPath="DateValue" Width="0.9*" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnAge}" Binding="{Binding Age, Mode=OneWay}" SortMemberPath="DateValue" Width="0.9*" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnProvider}" Binding="{Binding Provider, Mode=OneWay}" Width="1.4*" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnPackage}" Binding="{Binding Package, Mode=OneWay}" Width="0.9*" />
-                                        <DataGridTextColumn Header="{x:Static app:Ui.ColumnSignature}" Binding="{Binding Signature, Mode=OneWay}" Width="1.4*" />
-                                    </DataGrid.Columns>
-                                </DataGrid>
+                                <Border Style="{StaticResource Divider}" />
+
+                                <!-- Zone 2 : tous les pilotes installés. -->
+                                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,6">
+                                            <TextBox DockPanel.Dock="Right" Width="240" Text="{Binding Workshop.DriverFilter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                                                     AutomationProperties.Name="{x:Static app:Ui.DriverFilterLabel}" ToolTip="{x:Static app:Ui.DriverFilterLabel}" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{x:Static app:Ui.FilterLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelBlueStroke}">
+                                                <TextBlock Text="2" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PastelBlueInk}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Static app:Ui.DriversAllTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelBlueInk}" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Workshop.DriversSummary}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                        <Expander Style="{StaticResource QuietExpander}" Header="{x:Static app:Ui.DriversDateWhy}" Margin="0,0,0,8">
+                                            <TextBlock Text="{x:Static app:Ui.DriversDateNote}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource Muted}" />
+                                        </Expander>
+                                        <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ShowUnsignedDrivers}" Command="{Binding Workshop.ShowUnsignedDriversCommand}" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                                Visibility="{Binding Workshop.HasUnsignedDrivers, Converter={StaticResource BoolToVisibility}}" />
+                                        <DataGrid ItemsSource="{Binding Workshop.DriverRows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                                                  CanUserAddRows="False" CanUserDeleteRows="False" GridLinesVisibility="None" Height="440" BorderThickness="0"
+                                                  Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" RowBackground="Transparent">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnFamily}" Binding="{Binding Group, Mode=OneWay}" Width="1.2*" />
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnDevice}" Binding="{Binding Device, Mode=OneWay}" Width="2.6*" FontWeight="SemiBold" />
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnVersion}" Binding="{Binding Version, Mode=OneWay}" Width="1.2*" />
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnDate}" Binding="{Binding Date, Mode=OneWay}" SortMemberPath="DateValue" Width="0.9*" />
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnAge}" Binding="{Binding Age, Mode=OneWay}" SortMemberPath="DateValue" Width="0.9*" />
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnProvider}" Binding="{Binding Provider, Mode=OneWay}" Width="1.4*" />
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnPackage}" Binding="{Binding Package, Mode=OneWay}" Width="0.9*" />
+                                                <DataGridTextColumn Header="{x:Static app:Ui.ColumnSignature}" Binding="{Binding Signature, Mode=OneWay}" Width="1.4*" />
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Divider}" />
+
+                                <!-- Zone 3 : outils, rangés par usage. -->
+                                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelGrey}" BorderBrush="{DynamicResource PastelGreyStroke}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,10">
+                                            <Border DockPanel.Dock="Left" Style="{StaticResource TestBadge}" Background="{DynamicResource PastelGreyStroke}">
+                                                <TextBlock Text="3" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PastelGreyInk}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Static app:Ui.DriversToolsTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" />
+                                        </DockPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="{x:Static app:Ui.DriversListLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,14,6" />
+                                            <WrapPanel Grid.Column="1">
+                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.RefreshList}" Command="{Binding Workshop.RefreshDriversCommand}" />
+                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.CopyList}" ToolTip="{x:Static app:Ui.CopySheetTip}" Command="{Binding Workshop.CopyDriversCommand}" />
+                                            </WrapPanel>
+                                            <TextBlock Grid.Row="1" Text="{x:Static app:Ui.DriversBackupsLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,14,6" />
+                                            <WrapPanel Grid.Row="1" Grid.Column="1">
+                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.DriverBackupsFolder}" Command="{Binding Workshop.OpenDriverBackupsCommand}" />
+                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.RestoreDriverBackup}" Command="{Binding Workshop.RestoreDriverBackupCommand}" />
+                                            </WrapPanel>
+                                            <TextBlock Grid.Row="2" Text="{x:Static app:Ui.DriversUpdateLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,14,6" />
+                                            <WrapPanel Grid.Row="2" Grid.Column="1">
+                                                <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.DriverUpdates}" ToolTip="{x:Static app:Ui.DriverUpdatesTip}" Command="{Binding Workshop.OpenDriverUpdatesCommand}" />
+                                            </WrapPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
