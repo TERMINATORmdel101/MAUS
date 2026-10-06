@@ -641,12 +641,17 @@ ParticlePixel ParticleVS(uint vertex : SV_VertexID, uint instance : SV_InstanceI
 
 float4 SmokePS(ParticlePixel input) : SV_Target
 {
+    // Bouffée en volume : bord effiloché par un bruit, cœur plus épais et plus sombre, côté du soleil couchant plus clair,
+    // lueur du feu par-dessous.
     float r2 = dot(input.Corner, input.Corner);
-    float puff = saturate(1.0 - r2);
-    puff *= 0.6 + 0.4 * Fbm(float3(input.Corner * 2.0, input.Color.r * 40.0), 3);
-    float alpha = input.Color.a * puff;
-    // Fumée éclairée par le soleil couchant d'un côté et par le feu par-dessous.
-    float3 lit = input.Color.rgb * (SunColor * 1.2 + float3(0.5, 0.2, 0.05) * (1.0 - input.Corner.y) * 0.5);
+    float seed = input.Color.r * 97.0 + input.Color.a * 13.0;
+    float billow = Fbm(float3(input.Corner * 1.8, seed), 3);
+    float shape = saturate(1.0 - r2 + billow * 0.6);
+    float alpha = input.Color.a * shape * shape;
+    float thickness = saturate(1.0 - r2 * 0.8);
+    float2 toSun = normalize(float2(-SunDir.x, SunDir.y) + 1e-4);
+    float sunSide = saturate(dot(input.Corner, toSun) * 0.7 + 0.5);
+    float3 lit = input.Color.rgb * (SunColor * (0.6 + 1.1 * sunSide) * (1.0 - thickness * 0.45) + float3(0.6, 0.24, 0.06) * saturate(-input.Corner.y) * 0.7);
     return float4(lit * alpha, alpha);
 }
 

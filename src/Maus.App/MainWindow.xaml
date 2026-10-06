@@ -320,6 +320,13 @@
                         </Button>
                     </UniformGrid>
                     <WrapPanel Margin="0,8,0,0">
+                        <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Command="{Binding GoToCommand}" CommandParameter="5" ToolTip="{x:Static app:Ui.BenchmarkSubtitle}"
+                                Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource NavIcon}" Text="&#xE7FC;" Foreground="{DynamicResource PastelRoseInk}" Margin="0,0,8,0" />
+                                <TextBlock Text="{x:Static app:Ui.NavBenchmark}" />
+                            </StackPanel>
+                        </Button>
                         <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Command="{Binding GoToCommand}" CommandParameter="31" ToolTip="{x:Static app:Ui.LiveDetail}"
                                 Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
                             <StackPanel Orientation="Horizontal">
