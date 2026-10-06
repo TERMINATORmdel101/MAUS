@@ -110,3 +110,14 @@ Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@user
 - Traductions : `python3 tools/i18n.py missing en` (et `es`) liste les textes à traduire ; écrire un fichier JSON `{ "texte français": "traduction" }` puis `python3 tools/i18n.py merge en fichier.json` ; `prune en|es` retire les traductions devenues inutiles. Les `{0}` et les espaces en début / fin doivent être identiques.
 - Seuils de sécurité : `src/Maus.Core/Catalog/hw-safety-limits.json`. **Pas de source = pas de seuil.** Chaque ajout cite sa source dans le champ `source`.
 - Sources des emplacements SPD et des registres mémoire AMD : `THIRD-PARTY-NOTICES.md` et le commentaire en tête de `src/Maus.Core/Workshop/Memory/SpdDecoder.cs`.
+
+## Benchmark visuel (06/10/2026, en cours — demande du porteur)
+
+Demande : ~8 min de carte graphique + 2-3 min de processeur, « ultra lourd », DirectX 11 **et** 12, scores processeur / carte graphique / combiné, 10 000 points = PC du porteur (i7-8700K + RTX 2080 Ti), ressources libres, chaque test vise une capacité (géométrie, bande passante, calcul, textures) pour montrer les points faibles.
+
+Fait (projet `src/Maus.Bench`, bibliothèque ; essai : `maus --benchmark --api d3d11|d3d12 --capture DOSSIER --scene fractal --times 5,30 [--camera x,y,z,cx,cy,cz,champ]`) :
+- Moteurs Direct3D 11 et 12 complets derrière `IGpuDevice` / `ICommandList` (barrières automatiques, descripteurs, mémoire upload, horodatages, capture PNG hors écran) : les deux rendent la même image.
+- Post-traitement (anticrénelage temporel, halo, courbe filmique, grain), police à champ de distance (`Ui/FontAtlas.cs`, `UiRenderer`), bandes anti-TDR.
+- Scène 1 « Forge fractale » (Mandelbox, rayons de lumière volumétriques) : 47-75 ms par image sur la 2080 Ti ; trajet de caméra calculé pour ne jamais traverser la fractale.
+
+Reste : régler la brume de la fractale, scènes 2-5 (anneau d'astéroïdes = géométrie ; collision de galaxies = bande passante ; aube/nuages ; échecs glTF + HDRI CC0/CC-BY), tests processeur (lancer de rayons multi-cœurs / un cœur, physique), boucle de mesure plein écran + HUD + écran des résultats, étalonnage 10 000 points, intégration dans MAUS (Atelier > Tests, `MAUS.exe --benchmark`), traductions, tests, notices des ressources tierces, numéro de version (demander : 0.7.0 si majeur).

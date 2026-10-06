@@ -29,6 +29,12 @@ using static Maus.Core.Localization.Texts;
 //   maus --prefs                      affiche vos choix
 Console.OutputEncoding = Encoding.UTF8;
 
+// Benchmark visuel (essais) : même code que MAUS.exe --benchmark, sans l'interface WPF.
+if (args.Length > 0 && args[0].Equals("--benchmark", StringComparison.OrdinalIgnoreCase))
+{
+    return Maus.Bench.BenchmarkProgram.Run(args[1..]);
+}
+
 bool Has(string flag) => args.Contains(flag, StringComparer.OrdinalIgnoreCase);
 
 string? ValueOf(string flag)

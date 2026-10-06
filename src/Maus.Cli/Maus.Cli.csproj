@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Maus.Core\Maus.Core.csproj" />
+    <ProjectReference Include="..\Maus.Bench\Maus.Bench.csproj" />
   </ItemGroup>
 
 </Project>

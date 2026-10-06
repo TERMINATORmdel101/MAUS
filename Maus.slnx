@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Maus.App/Maus.App.csproj" />
+    <Project Path="src/Maus.Bench/Maus.Bench.csproj" />
     <Project Path="src/Maus.Cli/Maus.Cli.csproj" />
     <Project Path="src/Maus.Core/Maus.Core.csproj" />
   </Folder>

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Benchmark visuel de MAUS (demande du porteur, 06/10/2026) : environ 8 minutes de carte graphique (scènes calculées
+    image par image, DirectX 11 ou DirectX 12 au choix) puis 2 à 3 minutes de processeur (lancer de rayons sur tous les
+    cœurs, simulation physique, un seul cœur). Lancé par MAUS.exe avec l'option benchmark, dans un processus séparé :
+    un pilote graphique qui plante n'emporte pas MAUS. Vortice (Amer Koleci et contributeurs, licence MIT) donne accès
+    à Direct3D 11 et 12, DXGI, Direct2D, DirectWrite et WIC.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Maus.Bench</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Maus.Core\Maus.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct3D12" Version="3.8.3" />
+    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+  </ItemGroup>
+
+  <!-- Shaders HLSL, compilés au lancement par le compilateur de Windows (d3dcompiler_47.dll) puis gardés en cache. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Shaders\*.hlsl" LogicalName="Maus.Bench.Shaders.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Shaders\*.hlsli" LogicalName="Maus.Bench.Shaders.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Maus.Core.Tests" />
+  </ItemGroup>
+
+</Project>
