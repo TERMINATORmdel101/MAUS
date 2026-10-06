@@ -543,10 +543,10 @@ internal sealed class BenchmarkRunner : IDisposable
             y += 50 * s;
             // Passe partielle (carte graphique seule ou processeur seul) : le score du composant testé passe au premier plan.
             var (headline, caption) = report.OverallScore > 0
-                ? (report.OverallScore, T("score combiné en {0}  ·  10 000 = Core i7-8700K et RTX 2080 Ti", ResolutionName(_options.RenderSize)))
+                ? (report.OverallScore, T("score combiné en {0}", ResolutionName(_options.RenderSize)))
                 : report.GpuScore > 0
-                    ? (report.GpuScore, T("score de la carte graphique en {0}  ·  10 000 = RTX 2080 Ti", ResolutionName(_options.RenderSize)))
-                    : (report.CpuScore, T("score du processeur  ·  10 000 = Core i7-8700K"));
+                    ? (report.GpuScore, T("score de la carte graphique en {0}", ResolutionName(_options.RenderSize)))
+                    : (report.CpuScore, T("score du processeur"));
             _ui.Text(Points(headline * reveal), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
             y += 130 * s;
             _ui.Text(caption, cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
@@ -628,33 +628,28 @@ internal sealed class BenchmarkRunner : IDisposable
             return y;
         }
 
-        _ui.Rect(x, y, width, (108 * s) + (tests.Count * 74 * s), new Vector4(1, 1, 1, 0.05f), 18 * s);
+        // Bilan simple (demande du porteur) : le nom, les points et les images par seconde ; les capteurs et le détail des
+        // images lentes restent dans la page Benchmark de MAUS.
+        _ui.Rect(x, y, width, (86 * s) + (tests.Count * 74 * s), new Vector4(1, 1, 1, 0.05f), 18 * s);
         _ui.Text(title, x + (24 * s), y + (20 * s), 20 * s, accent, bold: true);
-        var device = tests[0].Device;
-        if (BenchmarkSensorText.Describe(BenchmarkSensorSummary.Merge(tests.Select(t => t.Sensors)), device) is { } sensors)
-        {
-            _ui.Text(sensors, x + (24 * s), y + (62 * s), 14 * s, UiColors.Grey(0.85f));
-        }
         _ui.Text(Points(score * reveal), x + width - (24 * s), y + (12 * s), 40 * s, UiColors.White(), bold: true, TextAlign.Right);
-        var rowY = y + (92 * s);
+        var rowY = y + (70 * s);
         var max = Math.Max(15000, tests.Count > 0 ? tests.Max(t => t.Score) * 1.1 : 1);
         foreach (var test in tests)
         {
             _ui.Text(TestName(test.Id), x + (24 * s), rowY, 17 * s, UiColors.White(0.92f));
             _ui.Text(Points(test.Score), x + width - (24 * s), rowY, 17 * s, UiColors.White(0.92f), bold: true, TextAlign.Right);
             var detail = test.Device != "cpu"
-                ? T("{0} images/s", test.Value.ToString("0.0", Culture)) + (test.Low1 is { } low ? "  ·  " + T("1 % les plus lentes : {0}", low.ToString("0.0", Culture)) : "")
+                ? T("{0} images/s", test.Value.ToString("0.0", Culture))
                 : test.Value.ToString("0.00", Culture) + " " + test.Unit;
             _ui.Text(detail, x + (24 * s), rowY + (40 * s), 14 * s, UiColors.Grey(0.85f));
             var barW = width - (48 * s);
             _ui.Rect(x + (24 * s), rowY + (26 * s), barW, 8 * s, UiColors.White(0.1f), 4 * s);
             _ui.Rect(x + (24 * s), rowY + (26 * s), (float)(barW * Math.Min(1, test.Score / max) * reveal), 8 * s, accent, 4 * s);
-            // Repère des 10 000 points de la machine de référence.
-            _ui.Rect(x + (24 * s) + (float)(barW * BenchmarkScoring.ReferencePoints / max), rowY + (22 * s), 2 * s, 16 * s, UiColors.White(0.6f));
             rowY += 74 * s;
         }
 
-        return y + (108 * s) + (tests.Count * 74 * s);
+        return y + (86 * s) + (tests.Count * 74 * s);
     }
 
     /// <summary>Capture de contrôle (option --screenshots) : une image par test, prise une seule fois.</summary>
@@ -746,44 +741,52 @@ internal sealed class BenchmarkRunner : IDisposable
 /// </summary>
 internal static class BenchReference
 {
-    // Mesures du 06/10/2026 sur la machine de référence (Direct3D 12, passes accélérées qui parcourent les mêmes trajets).
-    // Le test standard (1080p) tourne à plus de 24 images par seconde sur cette machine : une carte modeste le fait tourner
-    // correctement ; la 4K reste là pour mettre les très grosses cartes à genoux.
+    // Mesures du 06/10/2026 au soir sur la machine de référence (Direct3D 12), en passes à vitesse réelle et dans l'ordre
+    // du benchmark : la carte et le processeur y chauffent comme chez l'utilisateur. Une passe accélérée surestimait les
+    // tests de fin de passe (composants encore frais) et sous-estimait les galaxies (plus de pas de simulation par image).
     private static readonly Dictionary<string, double> At1080 = new(StringComparer.Ordinal)
     {
-        ["ring"] = 36.0,
-        ["battle"] = 37.6,
-        ["galaxy"] = 39.2,
-        ["fractal"] = 28.6,
+        ["ring"] = 35.42,
+        ["battle"] = 36.85,
+        ["galaxy"] = 39.63,
+        ["materials"] = 60.27,
+        ["fractal"] = 23.95,
+        ["raytracing"] = 49.99,
     };
 
     // Mode léger (720p, scènes allégées) : pour les cartes intégrées ; points comparables entre passes légères seulement.
     private static readonly Dictionary<string, double> At720 = new(StringComparer.Ordinal)
     {
-        ["ring"] = 164,
-        ["battle"] = 200,
-        ["galaxy"] = 179,
-        ["fractal"] = 141,
+        ["ring"] = 158.67,
+        ["battle"] = 199.06,
+        ["galaxy"] = 184.06,
+        ["materials"] = 327.6,
+        ["fractal"] = 138.94,
+        ["raytracing"] = 212.91,
     };
 
     private static readonly Dictionary<string, double> At2160 = new(StringComparer.Ordinal)
     {
-        ["ring"] = 30.8,
-        ["battle"] = 10.6,
-        ["galaxy"] = 13.8,
-        ["fractal"] = 6.36,
+        ["ring"] = 30.29,
+        ["battle"] = 11.88,
+        ["galaxy"] = 15.22,
+        ["materials"] = 16.49,
+        ["fractal"] = 6.31,
+        ["raytracing"] = 15.47,
     };
 
     /// <summary>1440p, et tests du processeur (indépendants de la résolution).</summary>
     private static readonly Dictionary<string, double> Values = new(StringComparer.Ordinal)
     {
-        ["ring"] = 34.2,
-        ["battle"] = 22.4,
-        ["galaxy"] = 26.0,
-        ["fractal"] = 16.9,
-        ["cpu-render"] = 6.79,
-        ["cpu-single"] = 0.693,
-        ["cpu-vector"] = 1.28,
+        ["ring"] = 34.08,
+        ["battle"] = 23.8,
+        ["galaxy"] = 28.05,
+        ["materials"] = 35.98,
+        ["fractal"] = 13.93,
+        ["raytracing"] = 31.21,
+        ["cpu-render"] = 6.703,
+        ["cpu-single"] = 0.695,
+        ["cpu-vector"] = 1.016,
     };
 
     public static double For(string id, BenchOptions options)

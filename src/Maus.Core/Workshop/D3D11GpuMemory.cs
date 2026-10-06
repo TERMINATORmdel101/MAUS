@@ -14,6 +14,7 @@ public sealed unsafe partial class D3D11GpuMemoryProvider : IGpuMemoryProvider
     private const uint SdkVersion = 7;
 
     private static readonly Guid FactoryInterface = new("770aae78-f26f-4dba-a829-253c83d1b387");
+    private static readonly Guid Adapter3Interface = new("645967a4-1392-4310-a798-8053ce3e93fd");
 
     /// <summary>Cartes matérielles (le rendu logiciel de Microsoft est écarté).</summary>
     public IReadOnlyList<GpuAdapterInfo> Adapters()
@@ -70,6 +71,45 @@ public sealed unsafe partial class D3D11GpuMemoryProvider : IGpuMemoryProvider
         }
     }
 
+    /// <summary>
+    /// Budget de mémoire vidéo locale que Windows accorde à MAUS sur cette carte, moins ce que MAUS y utilise déjà
+    /// (IDXGIAdapter3::QueryVideoMemoryInfo, index 14 de dxgi1_4.h) ; il tient compte de ce qu'occupent les autres
+    /// programmes. <c>null</c> si Windows ne répond pas.
+    /// </summary>
+    public long? AvailableBytes(GpuAdapterInfo adapter)
+    {
+        var factory = CreateFactory();
+        nint dxgiAdapter = 0;
+        nint adapter3 = 0;
+        try
+        {
+            if (Com.Call(factory, 12, (uint)adapter.Index, &dxgiAdapter) < 0)
+            {
+                return null;
+            }
+
+            var iid = Adapter3Interface;
+            if (((delegate* unmanaged[Stdcall]<nint, Guid*, nint*, int>)Com.Slot(dxgiAdapter, 0))(dxgiAdapter, &iid, &adapter3) < 0)
+            {
+                return null;
+            }
+
+            VideoMemoryInfo info;
+            if (((delegate* unmanaged[Stdcall]<nint, uint, int, VideoMemoryInfo*, int>)Com.Slot(adapter3, 14))(adapter3, 0, 0, &info) < 0)
+            {
+                return null;
+            }
+
+            return info.Budget > info.CurrentUsage ? (long)Math.Min(info.Budget - info.CurrentUsage, (ulong)long.MaxValue) : 0;
+        }
+        finally
+        {
+            Com.Release(adapter3);
+            Com.Release(dxgiAdapter);
+            Com.Release(factory);
+        }
+    }
+
     private static nint CreateFactory()
     {
         Com.Check(CreateDXGIFactory1(in FactoryInterface, out var factory));
@@ -81,6 +121,16 @@ public sealed unsafe partial class D3D11GpuMemoryProvider : IGpuMemoryProvider
 
     [LibraryImport("d3d11.dll")]
     private static partial int D3D11CreateDevice(nint adapter, int driverType, nint software, uint flags, nint featureLevels, uint featureLevelCount, uint sdkVersion, out nint device, out int featureLevel, out nint context);
+
+    /// <summary>DXGI_QUERY_VIDEO_MEMORY_INFO.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct VideoMemoryInfo
+    {
+        public ulong Budget;
+        public ulong CurrentUsage;
+        public ulong AvailableForReservation;
+        public ulong CurrentReservation;
+    }
 
     /// <summary>DXGI_ADAPTER_DESC1.</summary>
     [StructLayout(LayoutKind.Sequential)]

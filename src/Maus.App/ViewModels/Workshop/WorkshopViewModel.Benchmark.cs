@@ -13,7 +13,7 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels.Workshop;
 
-/// <summary>Une ligne de test dans le dernier résultat (barre remplie selon les points, repère des 10 000 points).</summary>
+/// <summary>Une ligne de test dans le dernier résultat (barre remplie selon les points).</summary>
 public sealed record BenchmarkRow(string Name, string Points, string Detail, double Fill, double Reference);
 
 /// <summary>Une passe de l'historique.</summary>
@@ -455,7 +455,7 @@ public sealed partial class WorkshopViewModel
             BenchmarkNames.Of(t.Id),
             Points(t.Score),
             t.Device != "cpu"
-                ? T("{0} images/s", t.Value.ToString("0.0", culture)) + (t.Low1 is { } low ? " · " + T("1 % les plus lentes : {0}", low.ToString("0.0", culture)) : "")
+                ? T("{0} images/s", t.Value.ToString("0.0", culture))
                 : t.Value.ToString("0.00", culture) + " " + t.Unit,
             Math.Min(1, t.Score / BarScale),
             BenchmarkScoring.ReferencePoints / BarScale))];
@@ -481,7 +481,7 @@ public sealed partial class WorkshopViewModel
             text.AppendLine("  • " + BenchmarkNames.Of(test.Id) + " : " + Points(test.Score) + " (" + value + ")");
         }
 
-        text.AppendLine(T("10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti). Deux fois plus de points = deux fois plus rapide."));
+        text.AppendLine(T("Deux fois plus de points = deux fois plus rapide (à résolution égale)."));
         text.Append(T("Code à coller dans MAUS (page Benchmark) pour comparer : {0}", BenchmarkShareCode.Encode(report)));
         return text.ToString();
     }

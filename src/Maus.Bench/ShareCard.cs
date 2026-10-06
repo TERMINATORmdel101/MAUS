@@ -133,7 +133,7 @@ internal static class ShareCard
             : report.GpuScore > 0 ? (T("Score de la carte graphique"), report.GpuScore) : (T("Score du processeur"), report.CpuScore);
         ui.Text(label.ToUpper(culture), 60, 178, 22, UiColors.Lilac(), bold: true);
         ui.Text(Points(score), 52, 204, 150, UiColors.White(), bold: true, glow: 0.4f);
-        ui.Text(T("10 000 points = Core i7-8700K et GeForce RTX 2080 Ti, à résolution égale"), 60, 384, 17, UiColors.Grey(0.9f));
+        ui.Text(T("Les points se comparent à résolution égale"), 60, 384, 17, UiColors.Grey(0.9f));
 
         var y = 446f;
         y = DrawDevice(ui, T("Carte graphique"), report.GpuScore, report.Gpu, "gpu", report, UiColors.Blue(), y);

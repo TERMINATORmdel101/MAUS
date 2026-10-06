@@ -37,8 +37,16 @@ public static unsafe class MemoryTest
     private const long ChunkBytes = 64L * 1024 * 1024;
     private const int MaxRecordedErrors = 16;
 
-    /// <summary>Quantité proposée : la moitié de la mémoire disponible, entre 256 Mo et 16 Go.</summary>
-    public static long SuggestedBytes(long availableBytes) => Math.Clamp(availableBytes / 2, 256L << 20, 16L << 30);
+    /// <summary>Test plus rapide : la moitié de la mémoire libre, au moins 256 Mo (sans plafond : 16, 24, 32, 64 Go…).</summary>
+    public static long SuggestedBytes(long availableBytes) => Math.Max(availableBytes / 2, 256L << 20);
+
+    /// <summary>
+    /// Le maximum (demande du porteur) : toute la mémoire libre, quelle que soit la quantité installée, moins une marge que
+    /// MAUS laisse à Windows (1 Go, ou un seizième de la mémoire si c'est plus) pour qu'il n'écrive pas sur le disque
+    /// pendant le test. Au moins 256 Mo.
+    /// </summary>
+    public static long MaximumBytes(long availableBytes, long totalBytes) =>
+        Math.Max(256L << 20, availableBytes - Math.Max(1L << 30, totalBytes / 16));
 
     public static Task<MemoryTestResult> RunAsync(
         MemoryTestOptions options,
@@ -62,7 +70,15 @@ public static unsafe class MemoryTest
             for (var remaining = options.Bytes & ~7L; remaining > 0; remaining -= ChunkBytes)
             {
                 var size = Math.Min(ChunkBytes, remaining);
-                chunks.Add(((nint)NativeMemory.AlignedAlloc((nuint)size, 64), size));
+                try
+                {
+                    chunks.Add(((nint)NativeMemory.AlignedAlloc((nuint)size, 64), size));
+                }
+                catch (OutOfMemoryException)
+                {
+                    // Windows n'a plus de place (un programme a pris de la mémoire entre-temps) : on teste ce qui a été réservé.
+                    break;
+                }
             }
 
             var patterns = new (string Name, Func<long, ulong, ulong> Value)[]
@@ -82,8 +98,15 @@ public static unsafe class MemoryTest
                     cancellationToken.ThrowIfCancellationRequested();
                     var (name, value) = patterns[p];
                     long baseIndex = 0;
+                    var chunkIndex = 0;
                     foreach (var (pointer, bytes) in chunks)
                     {
+                        // Avancement tous les 1 Go : avec 32 ou 64 Go, un motif dure plus d'une minute.
+                        if (++chunkIndex % 16 == 0)
+                        {
+                            progress?.Report(new MemoryTestProgress(100.0 * (step + ((double)chunkIndex / chunks.Count)) / steps, name, errors));
+                        }
+
                         var span = new Span<ulong>((void*)pointer, (int)(bytes / 8));
                         for (var i = 0; i < span.Length; i++)
                         {
@@ -131,9 +154,10 @@ public static unsafe class MemoryTest
             }
         }
 
-        var (bandwidth, latency) = aborted ? (null, null) : Measure(Math.Min(options.Bytes, 256L << 20));
+        var tested = chunks.Sum(c => c.Bytes);
+        var (bandwidth, latency) = aborted ? (null, null) : Measure(Math.Min(tested, 256L << 20));
         clock.Stop();
-        return new MemoryTestResult(options.Bytes & ~7L, errors, offsets, bandwidth, latency, clock.Elapsed, aborted, abortReason);
+        return new MemoryTestResult(tested, errors, offsets, bandwidth, latency, clock.Elapsed, aborted, abortReason);
     }
 
     /// <summary>Débit de copie (Go/s) et latence d'accès aléatoire (ns, parcours de pointeurs dans un grand tableau).</summary>

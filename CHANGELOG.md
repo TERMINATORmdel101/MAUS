@@ -2,6 +2,28 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.7.5 — 06/10/2026 — benchmark complété
+
+Numéro choisi par le porteur. Suggestions acceptées par le porteur (« 1 ok 3 ok 4 ok 5 ok 6 ok 7 ok ») et demandes sur le champ de bataille.
+
+- **Lancer de rayons : « Galerie des glaces »** (nouveau test, DirectX 12). Une galerie baroque de 40 m, inspirée de Versailles : dix fenêtres font face à dix arcades de miroirs, et deux grands miroirs aux extrémités se renvoient la salle à l'infini. Statues en or, en chrome, en verre et en marbre, six lustres de cristal, sol de marbre ciré, voûte peinte, jardins derrière les fenêtres.
+  - Tout est calculé rayon par rayon par la carte (DirectX Raytracing 1.1) : reflets nets en cascade, réfraction du verre et du cristal, ombres douces du soleil, lumière renvoyée par les murs, rayons de soleil dans la poussière.
+  - Il faut DirectX 12 et une carte qui gère le lancer de rayons matériel. MAUS le vérifie ; sinon il passe le test et dit pourquoi dans le bilan.
+  - Son score est **compté à part**, hors score combiné : les cartes sans lancer de rayons restent comparables. Une case de la page Benchmark permet de l'écarter.
+  - Ses shaders (modèle 6.5) sont compilés pendant la fabrication de MAUS par le compilateur DXC de Microsoft, qui n'est pas livré avec MAUS.
+- **« Cabinet de curiosités »** (nouvelle scène, textures) : des objets scannés de Poly Haven (licence CC0 : buste, cheval, vases, lanterne, appareil photo, réveil, éléphant, service à thé, katana) sur une table en bois de rose vernie, un parquet en point de Hongrie. Lumière d'un vrai ciel HDR, reflets dans la table et le parquet, relief par parallaxe, ombres douces et ombres de contact, rayons de lumière dans la poussière, flamme de bougie, profondeur de champ. Les auteurs sont cités dans `THIRD-PARTY-NOTICES.md`.
+- **Champ de bataille retravaillé** (demandes du porteur) : un vrai sol vallonné, calculé pixel par pixel avec l'ombre des collines, des dizaines de milliers de pierres et des traces de chenilles. Les chars sont plus beaux et posés sur le relief. Un obus perce un trou dans le blindage ; la tourelle arrachée retombe et se pose sur le sol sans le traverser ; le char brûlé ne noircit qu'autour des ouvertures. Fumée en volume.
+- **Capteurs pendant la mesure** : température, fréquence et puissance de la carte graphique et du processeur, et ralentissements signalés par la carte (chaleur, protection matérielle), avec un conseil dans la page Benchmark.
+- **Image du résultat à partager** : scores, vignettes des scènes prises pendant la mesure, matériel et capteurs, sans aucune donnée personnelle. Boutons Copier, Ouvrir et Afficher dans le dossier.
+- **Comparer** avec le résultat d'un ami (une ligne « MAUS-BENCH-1 » dans le texte copié, relue sans serveur) ou avec sa passe précédente : écart test par test, avertissement si les résolutions diffèrent.
+- **Mode 720p léger** pour les cartes intégrées et les petits portables : les mêmes scènes, allégées, avec leurs propres points.
+- **Durées** : cinq scènes de 1 min 36 (8 minutes de carte graphique), une minute de lancer de rayons, deux minutes de processeur : une douzaine de minutes en tout, annoncées dans la page et sur l'écran d'accueil du benchmark.
+- **Nouvel étalonnage** : toutes les références de la machine de référence (Core i7-8700K, GeForce RTX 2080 Ti) ont été remesurées en 720p, 1080p, 1440p et 4K, en passes à vitesse réelle.
+- **Bilan simplifié** (demande du porteur) : les points n'annoncent plus la machine de référence (« 10 000 = … »), les processeurs récents la dépassent de loin. Le bilan montre le nom, les points et les images par seconde de chaque test ; deux fois plus de points = deux fois plus rapide, à résolution égale. Le détail (capteurs, 1 % des images les plus lentes) reste dans la page Benchmark.
+- **Tests de la mémoire vive et de la mémoire vidéo au maximum** (Atelier > Tests, demande du porteur) : par défaut, toute la mémoire libre, quelle que soit la quantité installée (16, 24, 32, 64 Go…). MAUS laisse seulement une marge à Windows (1 Go, ou un seizième de la mémoire) et à l'affichage (256 Mo, d'après le budget de mémoire vidéo que Windows accorde à MAUS). Les tailles plus petites restent au choix, pour un test plus rapide.
+- Bilan d'une passe partielle : le score du composant testé passe au premier plan. Bouton Benchmark sur l'accueil.
+- **Pastel dans les dernières fenêtres annexes** : À propos, Demander de l'aide, mises à jour des logiciels, avertissement du premier lancement, choix du portable, notification.
+
 ## 0.7.1 — 06/10/2026 — benchmark visuel
 
 Modification majeure, numéro choisi par le porteur.

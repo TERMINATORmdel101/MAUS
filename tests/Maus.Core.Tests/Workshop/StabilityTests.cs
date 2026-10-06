@@ -137,10 +137,20 @@ public class StabilityTests
     [Theory]
     [InlineData(100L << 20, 256L << 20)]
     [InlineData(8L << 30, 4L << 30)]
-    [InlineData(64L << 30, 16L << 30)]
-    public void Suggested_size_is_half_the_free_memory_within_limits(long available, long expected)
+    [InlineData(64L << 30, 32L << 30)]
+    public void Quicker_size_is_half_the_free_memory_without_ceiling(long available, long expected)
     {
         Assert.Equal(expected, MemoryTest.SuggestedBytes(available));
+    }
+
+    [Theory]
+    [InlineData(10L << 30, 16L << 30, 9L << 30)]
+    [InlineData(20L << 30, 24L << 30, (20L << 30) - (3L << 29))]
+    [InlineData(58L << 30, 64L << 30, 54L << 30)]
+    [InlineData(1L << 30, 8L << 30, 256L << 20)]
+    public void Maximum_size_is_all_the_free_memory_minus_a_margin_for_windows(long available, long total, long expected)
+    {
+        Assert.Equal(expected, MemoryTest.MaximumBytes(available, total));
     }
 
     private sealed class SyncProgress<T>(Action<T> report) : IProgress<T>

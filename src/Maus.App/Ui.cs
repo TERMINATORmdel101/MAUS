@@ -49,7 +49,7 @@ public static class Ui
 
     public static string BenchmarkTitle => T("Benchmark visuel : carte graphique et processeur");
 
-    public static string BenchmarkIntro => T("Une douzaine de minutes en plein écran : cinq scènes calculées image par image (DirectX 11 ou 12), un test de lancer de rayons (DirectX 12, cartes compatibles, score à part), puis le processeur. Chaque test pousse une capacité à fond pour montrer les points forts et les points faibles. 10 000 points = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti) à la même résolution. La carte et le processeur chauffent comme dans un jeu très exigeant ; Échap arrête tout.");
+    public static string BenchmarkIntro => T("Une douzaine de minutes en plein écran : cinq scènes calculées image par image (DirectX 11 ou 12), un test de lancer de rayons (DirectX 12, score à part), puis le processeur. Deux fois plus de points = deux fois plus rapide. La carte et le processeur chauffent comme dans un jeu très exigeant ; Échap arrête tout.");
 
     public static string BenchmarkRayTracingOption => T("Lancer de rayons (DirectX 12, score à part)");
 
@@ -63,7 +63,7 @@ public static class Ui
 
     public static string NavBenchmark => T("Benchmark");
 
-    public static string BenchmarkSubtitle => T("Carte graphique et processeur poussés à fond, en plein écran. Les points se comparent à résolution égale : 10 000 = Core i7-8700K et GeForce RTX 2080 Ti.");
+    public static string BenchmarkSubtitle => T("Carte graphique et processeur poussés à fond, en plein écran. Les points se comparent à résolution égale.");
 
     public static string BenchmarkScopeLabel => T("Tests");
 

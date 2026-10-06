@@ -111,7 +111,11 @@ Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@user
 - Seuils de sécurité : `src/Maus.Core/Catalog/hw-safety-limits.json`. **Pas de source = pas de seuil.** Chaque ajout cite sa source dans le champ `source`.
 - Sources des emplacements SPD et des registres mémoire AMD : `THIRD-PARTY-NOTICES.md` et le commentaire en tête de `src/Maus.Core/Workshop/Memory/SpdDecoder.cs`.
 
-## Benchmark visuel (06/10/2026, en cours — demande du porteur)
+## Benchmark visuel (06/10/2026 : terminé en 0.7.5 — demande du porteur)
+
+État au soir du 06/10 : six tests de la carte graphique (anneau, champ de bataille, galaxies, cabinet de curiosités, fractale, et la « Galerie des glaces » en lancer de rayons DirectX 12, score à part), trois du processeur, mode 720p léger, capteurs, image à partager, comparaison avec un ami ; références remesurées à vitesse réelle en 720p, 1080p, 1440p et 4K (`BenchReference`). Les shaders du lancer de rayons (`src/Maus.Bench/Shaders/Dxil`) sont compilés à la fabrication par DXC (paquet NuGet `Microsoft.Direct3D.DXC`, cible MSBuild `CompileDxilShaders`, Windows seulement). Pièges notés : en HLSL 2018, `a ? b : c` calcule toujours b et c (un rebond coûteux doit passer par un vrai `if`) ; une division par zéro constante laisse le compilateur supprimer tout le calcul (mesures faussées) ; une passe d'essai accélérée (`--duration-scale` < 1) donne plus de pas de simulation par image à la scène des galaxies : l'étalonnage se fait à vitesse réelle. Reste : essayer sur d'autres cartes (AMD, Intel, cartes sans lancer de rayons), faire relire les traductions.
+
+### Notes du 06/10 au matin (historique)
 
 Demande : ~8 min de carte graphique + 2-3 min de processeur, « ultra lourd », DirectX 11 **et** 12, scores processeur / carte graphique / combiné, 10 000 points = PC du porteur (i7-8700K + RTX 2080 Ti), ressources libres, chaque test vise une capacité (géométrie, bande passante, calcul, textures) pour montrer les points faibles.
 

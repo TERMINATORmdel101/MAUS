@@ -13,6 +13,9 @@ public interface IGpuMemoryProvider
 
     /// <summary>Ouvre la carte ; à appeler depuis le fil qui fera tout le test (contexte Direct3D non partagé).</summary>
     IGpuMemory Open(GpuAdapterInfo adapter);
+
+    /// <summary>Mémoire vidéo que Windows laisse libre pour MAUS sur la carte (son budget) ; <c>null</c> si elle est inconnue.</summary>
+    long? AvailableBytes(GpuAdapterInfo adapter) => null;
 }
 
 /// <summary>Mémoire d'une carte graphique : des blocs alloués dans sa mémoire dédiée, remplis puis relus par copie.</summary>
@@ -61,9 +64,22 @@ public static class VramTest
     public const int BlockBytes = 64 * 1024 * 1024;
     private const int MaxRecordedErrors = 16;
 
-    /// <summary>Quantité proposée : 60 % de la mémoire dédiée, au moins 256 Mo, en laissant 512 Mo à l'affichage.</summary>
+    /// <summary>Test plus rapide : 60 % de la mémoire dédiée, au moins 256 Mo, en laissant 512 Mo à l'affichage.</summary>
     public static long SuggestedBytes(long dedicatedBytes) =>
         Math.Max(256L << 20, Math.Min(dedicatedBytes * 6 / 10, dedicatedBytes - (512L << 20)));
+
+    /// <summary>
+    /// Le maximum (demande du porteur), quelle que soit la carte : la mémoire que Windows laisse libre sur la carte, moins
+    /// 256 Mo que MAUS laisse à l'affichage ; si Windows ne donne pas cette information, la mémoire dédiée moins un dixième
+    /// (au moins 512 Mo). Au moins 256 Mo.
+    /// </summary>
+    public static long MaximumBytes(long dedicatedBytes, long? availableBytes)
+    {
+        var usable = availableBytes is > 0 and var free
+            ? Math.Min(free, dedicatedBytes) - (256L << 20)
+            : dedicatedBytes - Math.Max(512L << 20, dedicatedBytes / 10);
+        return Math.Max(256L << 20, usable);
+    }
 
     public static Task<VramTestResult> RunAsync(
         IGpuMemoryProvider provider,

@@ -92,15 +92,17 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _cpuDuration = CpuDurations[1];
         RamSizes =
         [
-            new(T("Automatique : la moitié de la mémoire libre"), 0L),
-            new(T("1 Go"), 1L << 30),
+            new(T("Maximum : toute la mémoire libre (recommandé)"), 0L),
+            new(T("La moitié de la mémoire libre (plus rapide)"), -1L),
             new(T("4 Go"), 4L << 30),
             new(T("8 Go"), 8L << 30),
+            new(T("16 Go"), 16L << 30),
         ];
         _ramSize = RamSizes[0];
         VramSizes =
         [
-            new(T("Automatique : 60 % de la mémoire de la carte"), 0L),
+            new(T("Maximum : toute la mémoire libre de la carte (recommandé)"), 0L),
+            new(T("60 % de la mémoire de la carte (plus rapide)"), -1L),
             new(T("1 Go"), 1L << 30),
             new(T("2 Go"), 2L << 30),
             new(T("4 Go"), 4L << 30),
@@ -969,8 +971,14 @@ public sealed partial class WorkshopViewModel : ObservableObject
             return;
         }
 
-        var available = Live.Samples.LastOrDefault() is { MemoryTotalBytes: { } total, MemoryUsedBytes: { } used } ? total - used : 4L << 30;
-        var bytes = RamSize.Value == 0 ? MemoryTest.SuggestedBytes(available) : Math.Min(RamSize.Value, Math.Max(256L << 20, available - (512L << 20)));
+        var (total, available) = Live.Samples.LastOrDefault() is { MemoryTotalBytes: { } installed, MemoryUsedBytes: { } used } ? (installed, installed - used) : (8L << 30, 4L << 30);
+        var maximum = MemoryTest.MaximumBytes(available, total);
+        var bytes = RamSize.Value switch
+        {
+            0 => maximum,
+            < 0 => Math.Min(MemoryTest.SuggestedBytes(available), maximum),
+            _ => Math.Min(RamSize.Value, maximum),
+        };
         if (!_confirm(T("Lancer le test de la mémoire vive ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de mémoire. Fermez vos jeux et programmes lourds pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;
@@ -1149,8 +1157,13 @@ public sealed partial class WorkshopViewModel : ObservableObject
             return;
         }
 
-        var ceiling = Math.Max(256L << 20, adapter.DedicatedBytes - (512L << 20));
-        var bytes = VramSize.Value == 0 ? VramTest.SuggestedBytes(adapter.DedicatedBytes) : Math.Min(VramSize.Value, ceiling);
+        var maximum = VramTest.MaximumBytes(adapter.DedicatedBytes, _gpuProvider.AvailableBytes(adapter));
+        var bytes = VramSize.Value switch
+        {
+            0 => maximum,
+            < 0 => Math.Min(VramTest.SuggestedBytes(adapter.DedicatedBytes), maximum),
+            _ => Math.Min(VramSize.Value, maximum),
+        };
         if (!_confirm(T("Lancer le test de la mémoire vidéo ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de la mémoire de « {1} ». Fermez vos jeux et applications 3D pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0, adapter.Name) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
         {
             return;

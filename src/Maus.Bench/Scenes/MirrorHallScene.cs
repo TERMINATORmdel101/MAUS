@@ -265,14 +265,14 @@ internal sealed class MirrorHallScene : BenchScene
                 Spandrels(stucco, x, inner, back, side);
                 if (windows)
                 {
-                    PaneBars(frames, x, side * (HalfWidth + (WallDepth / 2f)), 0.06f, 0.06f);
+                    PaneBars(frames, x, side * (HalfWidth + (WallDepth / 2f)), 0.06f);
                 }
                 else
                 {
                     var surface = side * (HalfWidth + MirrorRecess);
                     mirror.Quad(new Vector3(x - ArchRadius, Sill, surface), new Vector3(x + ArchRadius, Sill, surface), new Vector3(x + ArchRadius, Spring, surface), new Vector3(x - ArchRadius, Spring, surface), Vector3.UnitZ);
                     mirror.HalfDisk(new Vector3(x, Spring, surface), ArchRadius, Vector3.UnitZ, ArchSegments);
-                    PaneBars(gilt, x, surface + 0.03f, 0.035f, 0.04f);
+                    PaneBars(gilt, x, surface + 0.03f, 0.035f);
                 }
             }
 
@@ -406,9 +406,8 @@ internal sealed class MirrorHallScene : BenchScene
     }
 
     /// <summary>Croisillons d'une arcade (fenêtre ou miroir) : montants, traverses et rayons de l'arc, dans le plan z.</summary>
-    private static void PaneBars(HallMesh mesh, float x, float z, float width, float depth)
+    private static void PaneBars(HallMesh mesh, float x, float z, float width)
     {
-        _ = depth;
         var third = ArchRadius / 3f;
         foreach (var dx in new[] { -third, third })
         {

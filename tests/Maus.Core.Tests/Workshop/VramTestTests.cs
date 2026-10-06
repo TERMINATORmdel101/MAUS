@@ -136,4 +136,15 @@ public class VramTestTests
     {
         Assert.Equal(expected, VramTest.SuggestedBytes(dedicated));
     }
+
+    [Theory]
+    [InlineData(11L << 30, 10L << 30, (10L << 30) - (256L << 20))]
+    [InlineData(24L << 30, 30L << 30, (24L << 30) - (256L << 20))]
+    [InlineData(16L << 30, null, (16L << 30) - (16L << 30) / 10)]
+    [InlineData(4L << 30, null, (4L << 30) - (512L << 20))]
+    [InlineData(1L << 30, 100L << 20, 256L << 20)]
+    public void Maximum_size_uses_what_windows_leaves_free_on_the_card(long dedicated, long? available, long expected)
+    {
+        Assert.Equal(expected, VramTest.MaximumBytes(dedicated, available));
+    }
 }
