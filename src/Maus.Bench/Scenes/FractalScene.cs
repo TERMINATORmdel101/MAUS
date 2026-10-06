@@ -67,7 +67,7 @@ internal sealed class FractalScene : BenchScene
         })
         {
             // Soleil derrière la fractale : contre-jour, rayons de lumière vers la caméra à travers les ouvertures.
-            SunDirection = Vector3.Normalize(new Vector3(-0.55f, 0.3f, 0.62f)),
+            SunDirection = Vector3.Normalize(Vector3.Transform(new Vector3(-0.55f, 0.3f, 0.62f), Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.35f * MathF.Sin(t * 0.045f)))),
             SunColor = new Vector3(1f, 0.78f, 0.55f) * 1.4f,
             Params0 = new Vector4(-1.77f, 0.25f, 1f, 14f),
             Params1 = new Vector4(orb, 1.6f),

@@ -48,6 +48,27 @@ float3 RotateY(float3 v, float angle)
     return float3(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
 }
 
+// Les chars avancent en colonne sur une vingtaine de mètres, puis tiennent leur position en tirant ; la tourelle
+// balaie l'horizon jusqu'à l'explosion.
+static const float TankSpeed = 1.6;
+static const float TankTravel = 20.0;
+
+float3 TankForward(float heading)
+{
+    return float3(cos(heading), 0.0, -sin(heading));
+}
+
+float3 TankPosition(TankData d, float time)
+{
+    return d.PositionHeading.xyz + TankForward(d.PositionHeading.w) * min(TankSpeed * clamp(time, 0.0, d.Explosion.x), TankTravel);
+}
+
+float TurretYaw(TankData d, float time)
+{
+    float t = min(time, d.Explosion.x);
+    return 0.45 * sin(0.23 * t + d.Explosion.z * 1.7) + 0.15 * sin(0.61 * t + d.Explosion.z);
+}
+
 float3 RotateAxis(float3 v, float3 axis, float angle)
 {
     float c = cos(angle), s = sin(angle);
@@ -90,6 +111,17 @@ float3 Ballistic(float3 start, float3 velocity, float t, out float settled)
 
     settled = elapsed;
     return p;
+}
+
+float3 Sky(float3 d)
+{
+    float up = saturate(d.y);
+    float3 horizon = float3(1.0, 0.55, 0.3);
+    float3 zenith = float3(0.12, 0.2, 0.42);
+    float3 color = lerp(horizon, zenith, pow(up, 0.45)) * 0.9;
+    float sun = saturate(dot(d, SunDir));
+    color += SunColor * (pow(sun, 2000.0) * 80.0 + pow(sun, 60.0) * 0.8 + pow(sun, 6.0) * 0.25);
+    return color;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -137,7 +169,7 @@ float3 SolidWorld(MeshVertex v, uint instance, out float3 normal, out float4 inf
         float3 direction = RandomDirection(seed, 2);
         direction.y = abs(direction.y) * 1.4 + 0.2;
         float speed = 6.0 + 22.0 * Rand(seed, 4) * (1.0 - size);
-        float3 start = data.PositionHeading.xyz + float3(0, 1.4, 0) + RandomDirection(seed, 5) * 1.2;
+        float3 start = TankPosition(data, data.Explosion.x) + float3(0, 1.4, 0) + RandomDirection(seed, 5) * 1.2;
         float settled;
         float3 center = Ballistic(start, normalize(direction) * speed, t, settled);
         float3 axis = RandomDirection(seed, 7);
@@ -154,6 +186,14 @@ float3 SolidWorld(MeshVertex v, uint instance, out float3 normal, out float4 inf
     float3 local = v.Position;
     float3 n = v.Normal;
     float heading = data.PositionHeading.w;
+    if (kind == 1)
+    {
+        // Tourelle : pivote autour de son axe (x = -0,25 m).
+        float yaw = TurretYaw(data, time);
+        local = RotateY(local - float3(-0.25, 0, 0), yaw) + float3(-0.25, 0, 0);
+        n = RotateY(n, yaw);
+    }
+
     if (kind == 1 && t > 0.0)
     {
         // La tourelle est arrachée et projetée en tournoyant, puis retombe.
@@ -169,7 +209,7 @@ float3 SolidWorld(MeshVertex v, uint instance, out float3 normal, out float4 inf
 
     normal = RotateY(n, heading);
     info = float4(data.Explosion.y, burnt, t > 0.0 ? saturate(1.0 - t / 25.0) : 0.0, (float)kind);
-    return RotateY(local, heading) + data.PositionHeading.xyz;
+    return RotateY(local, heading) + TankPosition(data, time);
 }
 
 SolidPixel SolidVS(MeshVertex v, uint instance : SV_InstanceID)
@@ -320,6 +360,12 @@ SceneOut SolidPS(SolidPixel input)
     color += albedo * lerp(float3(0.10, 0.12, 0.18), float3(0.18, 0.12, 0.08), n.y * 0.5 + 0.5) * 0.6;
     color += ExplosionLight(input.World, n, albedo);
 
+    // Reflet du ciel du soir (Fresnel) : le métal et la peinture satinée renvoient la lumière de l'horizon.
+    float3 reflected = reflect(-v, n);
+    float3 f0 = lerp(0.04.xxx, albedo, metallic);
+    float3 fresnel = FresnelSchlick(saturate(dot(n, v)), f0);
+    color += fresnel * Sky(reflected) * (1.0 - roughness) * (reflected.y > 0.0 ? 0.7 : 0.15) * shadow;
+
     // Braises : lueur rouge dans les fissures du métal brûlé, qui s'éteint peu à peu.
     float crack = pow(saturate(Fbm(input.Local * 3.0 + 7.0, 3) * 2.0 + 0.2), 6.0);
     color += float3(1.6, 0.45, 0.1) * crack * ember * burnt;
@@ -339,17 +385,6 @@ struct GroundOut
     float2 Velocity : SV_Target1;
     float Depth : SV_Depth;
 };
-
-float3 Sky(float3 d)
-{
-    float up = saturate(d.y);
-    float3 horizon = float3(1.0, 0.55, 0.3);
-    float3 zenith = float3(0.12, 0.2, 0.42);
-    float3 color = lerp(horizon, zenith, pow(up, 0.45)) * 0.9;
-    float sun = saturate(dot(d, SunDir));
-    color += SunColor * (pow(sun, 2000.0) * 80.0 + pow(sun, 60.0) * 0.8 + pow(sun, 6.0) * 0.25);
-    return color;
-}
 
 GroundOut GroundPS(FullscreenOut input)
 {
@@ -396,7 +431,7 @@ GroundOut GroundPS(FullscreenOut input)
             continue;
         }
 
-        float r = length(p.xz - data.PositionHeading.xz);
+        float r = length(p.xz - TankPosition(data, data.Explosion.x).xz);
         float wave = since * 45.0;
         if (r > 12.0 && abs(r - wave) > 8.0)
         {
@@ -419,6 +454,12 @@ GroundOut GroundPS(FullscreenOut input)
     // Brume au loin : le sable se fond dans la lumière du soir.
     float haze = 1.0 - exp(-t * 0.0045);
     color = lerp(color, Sky(normalize(float3(d.x, 0.02, d.z))), haze);
+
+    // Mirage : au ras de l'horizon, l'air brûlant au-dessus du sable renvoie le ciel comme un miroir qui tremble.
+    float grazing = smoothstep(-0.07, -0.004, d.y);
+    float shimmer = Fbm(float3(p.xz * 0.05, Time * 1.5), 3) * 0.025;
+    float3 mirrored = Sky(normalize(float3(d.x, -d.y + shimmer, d.z)));
+    color = lerp(color, mirrored, grazing * 0.75);
 
     float4 clip = mul(float4(p, 1.0), ViewProjNoJitter);
     o.Color = float4(color, 1.0);
@@ -447,16 +488,82 @@ float3 Dragged(float3 velocity, float k, float t, float lift)
     return velocity * (1.0 - exp(-k * t)) / k + float3(0, lift * t * t * 0.5, 0);
 }
 
+static const uint MuzzlePerTank = 48;
+
+// Tirs : chaque char tire toutes les 5 à 8 secondes jusqu'à sa destruction (flamme de bouche, fumée, traceur).
+bool Shot(uint tank, float time, out float shotTime, out float3 muzzle, out float3 direction)
+{
+    TankData data = TankList[tank];
+    float period = 5.5 + 3.0 * Rand(tank, 31);
+    float phase = 1.0 + 4.0 * Rand(tank, 32);
+    float since = time - phase;
+    shotTime = since - floor(since / period) * period;
+    float shotStart = time - shotTime;
+    float yaw = TurretYaw(data, shotStart);
+    float heading = data.PositionHeading.w;
+    float3 tip = RotateY(float3(5.65, 2.06, 0) - float3(-0.25, 0, 0), yaw) + float3(-0.25, 0, 0);
+    muzzle = RotateY(tip, heading) + TankPosition(data, shotStart);
+    direction = RotateY(RotateY(float3(1, 0.012, 0), yaw), heading);
+    return since >= 0.0 && shotStart < data.Explosion.x;
+}
+
 ParticlePixel ParticleVS(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 {
     ParticlePixel o;
-    uint kind = (uint)Battle.z;          // 0 fumée, 1 feu, 2 étincelles
+    uint kind = (uint)Battle.z;          // 0 fumée, 1 feu, 2 étincelles, 3 tirs
+    if (kind == 3)
+    {
+        uint shooter = instance / MuzzlePerTank;
+        uint k = instance % MuzzlePerTank;
+        uint shotSeed = instance * 5u + 11u;
+        float shotTime;
+        float3 muzzle, direction;
+        bool firing = Shot(shooter, Battle.x, shotTime, muzzle, direction);
+        float muzzleLife = k == 0 ? 0.9 : 0.25 + 0.45 * Rand(shotSeed, 1);
+        if (!firing || shotTime > muzzleLife)
+        {
+            o.Position = float4(0, 0, -1, 1);
+            o.Corner = 0;
+            o.Color = 0;
+            o.Kind = 0;
+            return o;
+        }
+
+        float3 position;
+        float size;
+        float4 color;
+        if (k == 0)
+        {
+            // Traceur de l'obus : file à 380 m/s.
+            position = muzzle + direction * 380.0 * shotTime;
+            size = 0.22;
+            color = float4(3.2, 1.9, 0.7, 1.0);
+        }
+        else
+        {
+            float a = saturate(shotTime / muzzleLife);
+            float3 spread = normalize(direction * (2.0 + 2.0 * Rand(shotSeed, 2)) + RandomDirection(shotSeed, 3) * 0.9);
+            position = muzzle + Dragged(spread * (6.0 + 14.0 * Rand(shotSeed, 4)), 6.0, shotTime, 0.6);
+            size = 0.2 + 1.2 * sqrt(a);
+            color = float4(lerp(float3(1.4, 0.9, 0.35), float3(0.02, 0.018, 0.015), saturate(a * 3.0)), 1.0 - a);
+        }
+
+        float4 muzzleView = mul(float4(position, 1.0), View);
+        float2 muzzleCorner = QuadCorners[vertex];
+        muzzleView.xy += muzzleCorner * size;
+        o.Position = mul(muzzleView, Proj);
+        o.Corner = muzzleCorner;
+        o.Color = color;
+        o.Kind = 1.0;
+        return o;
+    }
+
     uint perTank = kind == 0 ? SmokePerTank : (kind == 1 ? FirePerTank : SparksPerTank);
     uint tank = instance / perTank;
     uint seed = instance * 3u + kind * 0x51ED27u;
     TankData data = TankList[tank];
     float t = Battle.x - data.Explosion.x;
-    float3 origin = data.PositionHeading.xyz + float3(0, 1.5, 0);
+    float3 origin = TankPosition(data, data.Explosion.x) + float3(0, 1.5, 0);
     float3 position;
     float size;
     float4 color;

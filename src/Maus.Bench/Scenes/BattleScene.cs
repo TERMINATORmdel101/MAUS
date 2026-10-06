@@ -19,6 +19,9 @@ internal sealed class BattleScene : BenchScene
     private const int FirePerTank = 6000;
     private const int SmokePerTank = 2200;
     private const int SparksPerTank = 5000;
+    private const int MuzzlePerTank = 48;
+    private const float TankSpeed = 1.6f;
+    private const float TankTravel = 20f;
     private const int ShadowSize = 4096;
 
     private static readonly Vector3 Sun = Vector3.Normalize(new Vector3(-0.75f, 0.2f, 0.45f));
@@ -152,6 +155,8 @@ internal sealed class BattleScene : BenchScene
         cmd.Draw(6, Tanks * FirePerTank);
         cmd.SetConstants(1, Constants(time, 0, 2));
         cmd.Draw(6, Tanks * SparksPerTank);
+        cmd.SetConstants(1, Constants(time, 0, 3));
+        cmd.Draw(6, Tanks * MuzzlePerTank);
         cmd.SetBuffer(0, null);
     }
 
@@ -187,22 +192,48 @@ internal sealed class BattleScene : BenchScene
         cmd.DrawIndexed(_debris.IndexCount, Tanks * DebrisPerTank);
     }
 
-    /// <summary>Les huit explosions les plus lumineuses éclairent la scène : éclair bref, puis lueur du feu qui décroît.</summary>
+    /// <summary>
+    /// Les huit sources les plus lumineuses éclairent la scène : explosions (éclair bref, puis lueur du feu qui décroît)
+    /// et tirs (flamme de bouche). Mêmes formules que battle.hlsl (position du char qui avance, rotation de la tourelle).
+    /// </summary>
     private void UpdateLights(float time)
     {
-        var lights = _tanks
-            .Select(tank => (Tank: tank, Since: time - tank.Explosion.X))
-            .Where(x => x.Since >= 0)
-            .Select(x => (x.Tank, Intensity: (60f * MathF.Exp(-x.Since * 5f)) + (22f * MathF.Exp(-x.Since / 7f)) + (5f * MathF.Exp(-x.Since / 40f))))
-            .OrderByDescending(x => x.Intensity)
-            .Take(8)
-            .ToArray();
+        var sources = new List<(Vector3 Position, float Intensity)>();
+        for (var i = 0; i < Tanks; i++)
+        {
+            var tank = _tanks[i];
+            var since = time - tank.Explosion.X;
+            if (since >= 0)
+            {
+                var at = TankPosition(tank, tank.Explosion.X);
+                sources.Add((at + new Vector3(0, 3f, 0), (60f * MathF.Exp(-since * 5f)) + (22f * MathF.Exp(-since / 7f)) + (5f * MathF.Exp(-since / 40f))));
+                continue;
+            }
+
+            var period = 5.5f + (3f * Rand((uint)i, 31));
+            var phase = 1f + (4f * Rand((uint)i, 32));
+            var sinceFirst = time - phase;
+            if (sinceFirst < 0)
+            {
+                continue;
+            }
+
+            var shot = sinceFirst - (MathF.Floor(sinceFirst / period) * period);
+            if (shot < 0.12f)
+            {
+                var start = time - shot;
+                var yaw = TurretYaw(tank, start);
+                var tip = RotateY(RotateY(new Vector3(5.9f, 2.06f, 0f) - new Vector3(-0.25f, 0, 0), yaw) + new Vector3(-0.25f, 0, 0), tank.PositionHeading.W);
+                sources.Add((tip + TankPosition(tank, start), 35f * (1f - (shot / 0.12f))));
+            }
+        }
+
+        var lights = sources.OrderByDescending(x => x.Intensity).Take(8).ToArray();
         for (var i = 0; i < 8; i++)
         {
             if (i < lights.Length)
             {
-                var p = lights[i].Tank.PositionHeading;
-                _lightPosition[i] = new Vector4(p.X, 3f, p.Z, lights[i].Intensity);
+                _lightPosition[i] = new Vector4(lights[i].Position, lights[i].Intensity);
                 _lightColor[i] = new Vector4(1f, 0.55f, 0.22f, 0f);
             }
             else
@@ -227,6 +258,36 @@ internal sealed class BattleScene : BenchScene
         return constants;
     }
 
+    private static Vector3 TankPosition(TankData tank, float time)
+    {
+        var heading = tank.PositionHeading.W;
+        var forward = new Vector3(MathF.Cos(heading), 0f, -MathF.Sin(heading));
+        return new Vector3(tank.PositionHeading.X, tank.PositionHeading.Y, tank.PositionHeading.Z) + (forward * MathF.Min(TankSpeed * Math.Clamp(time, 0f, tank.Explosion.X), TankTravel));
+    }
+
+    private static float TurretYaw(TankData tank, float time)
+    {
+        var t = MathF.Min(time, tank.Explosion.X);
+        return (0.45f * MathF.Sin((0.23f * t) + (tank.Explosion.Z * 1.7f))) + (0.15f * MathF.Sin((0.61f * t) + tank.Explosion.Z));
+    }
+
+    private static Vector3 RotateY(Vector3 v, float angle)
+    {
+        var c = MathF.Cos(angle);
+        var s = MathF.Sin(angle);
+        return new Vector3((v.X * c) + (v.Z * s), v.Y, (-v.X * s) + (v.Z * c));
+    }
+
+    /// <summary>Même hasard que Rand() de battle.hlsl (mélange de type PCG), pour retrouver les instants de tir.</summary>
+    private static float Rand(uint seed, uint salt) => Hash((seed * 0x9E3779B9u) ^ Hash(salt + 0x632BE5ABu)) * (1f / 4294967296f);
+
+    private static uint Hash(uint x)
+    {
+        x = (x * 747796405u) + 2891336453u;
+        var w = ((x >> (int)((x >> 28) + 4u)) ^ x) * 277803737u;
+        return (w >> 22) ^ w;
+    }
+
     private static TankData[] CreateTanks()
     {
         var random = new Random(1944);
@@ -235,8 +296,9 @@ internal sealed class BattleScene : BenchScene
         {
             var row = i / 6;
             var column = i % 6;
-            var position = new Vector3(-42f + (column * 16.5f) + (random.NextSingle() * 5f), 0f, -27f + (row * 17f) + (random.NextSingle() * 6f));
             var heading = 0.35f + ((random.NextSingle() - 0.5f) * 0.9f);
+            var arrival = new Vector3(-42f + (column * 16.5f) + (random.NextSingle() * 5f), 0f, -27f + (row * 17f) + (random.NextSingle() * 6f));
+            var position = arrival - (new Vector3(MathF.Cos(heading), 0f, -MathF.Sin(heading)) * TankTravel);
             // Explosions en cascade : d'abord la colonne de gauche, toutes les 4,5 secondes environ.
             var order = (column * 4) + row;
             tanks[i] = new TankData(new Vector4(position, heading), new Vector4(5f + (order * 4.5f) + (random.NextSingle() * 1.5f), random.NextSingle(), i, 0));

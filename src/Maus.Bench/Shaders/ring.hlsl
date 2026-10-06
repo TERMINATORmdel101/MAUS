@@ -95,6 +95,29 @@ float SunShadow(float3 world, float3 normal)
     return sum / 16.0;
 }
 
+float3 PlanetBands(float3 p)
+{
+    float latitude = p.y;
+    // Les bandes glissent les unes sur les autres (cisaillement selon la latitude) et se déchirent en tourbillons.
+    float shear = sin(latitude * 23.0) * 0.35;
+    float3 q = float3(p.x * cos(shear) - p.z * sin(shear), p.y, p.x * sin(shear) + p.z * cos(shear));
+    float turbulence = Fbm(float3(q.x * 2.5, q.y * 11.0, q.z * 2.5) + Time * 0.008, 7);
+    float fine = Fbm(float3(q.x * 9.0, q.y * 40.0, q.z * 9.0), 4);
+    float band = latitude * 7.5 + turbulence * 1.4 + fine * 0.25;
+    float3 cream = float3(0.96, 0.88, 0.72);
+    float3 rust = float3(0.76, 0.44, 0.24);
+    float3 brown = float3(0.40, 0.25, 0.16);
+    float3 color = lerp(cream, rust, 0.5 + 0.5 * sin(band * 2.1));
+    color = lerp(color, brown, saturate(sin(band * 0.7 + 1.0) * 0.8));
+    color *= 0.9 + 0.2 * fine;
+    // Pôles plus sombres et bleutés.
+    color = lerp(color, float3(0.35, 0.38, 0.45), smoothstep(0.75, 0.98, abs(latitude)) * 0.7);
+    // Une tempête ovale.
+    float2 storm = float2(atan2(p.z, p.x) - 0.9, (latitude + 0.32) * 3.5);
+    color = lerp(color, float3(0.85, 0.35, 0.2), smoothstep(0.35, 0.1, length(storm)) * 0.8);
+    return color;
+}
+
 struct SceneOut
 {
     float4 Color : SV_Target0;
@@ -123,7 +146,29 @@ SceneOut RockPS(RockPixel input)
     float metallic = 0.0;
 
     float shadow = SunShadow(input.World, n);
+
+    // Ombre de la géante : les rochers qui passent derrière elle, côté nuit, sont dans le noir.
+    float3 toCenter = PlanetCenter.xyz - input.World;
+    float along = dot(toCenter, SunDir);
+    float closest2 = dot(toCenter, toCenter) - along * along;
+    float radius2 = RingParams.z * RingParams.z;
+    shadow *= along > 0.0 ? smoothstep(radius2 * 0.97, radius2 * 1.03, closest2) : 1.0;
+
     float3 color = ShadeDirect(albedo, metallic, roughness, n, v, SunDir, SunColor * 5.0 * shadow);
+
+    // Miroir de glace : la planète géante et le ciel étoilé se reflètent sur les rochers gelés.
+    float3 r = reflect(-v, n);
+    float3 mirror = float3(0.002, 0.003, 0.006);
+    float hitAlong = dot(toCenter, r);
+    float hitClosest2 = dot(toCenter, toCenter) - hitAlong * hitAlong;
+    if (hitAlong > 0.0 && hitClosest2 < radius2)
+    {
+        float3 hit = input.World + r * (hitAlong - sqrt(radius2 - hitClosest2));
+        float3 pn = normalize(hit - PlanetCenter.xyz);
+        mirror = PlanetBands(pn) * SunColor * 1.6 * smoothstep(-0.08, 0.35, dot(pn, SunDir));
+    }
+    float3 fresnel = FresnelSchlick(saturate(dot(n, v)), 0.04.xxx);
+    color += mirror * fresnel * ice * (1.0 - roughness) * 2.5;
 
     // Lumière renvoyée par la planète (orange) et ciel étoilé très faible.
     float3 toPlanet = normalize(PlanetCenter.xyz - input.World);
@@ -146,29 +191,6 @@ struct BackgroundOut
     float2 Velocity : SV_Target1;
     float Depth : SV_Depth;
 };
-
-float3 PlanetBands(float3 p)
-{
-    float latitude = p.y;
-    // Les bandes glissent les unes sur les autres (cisaillement selon la latitude) et se déchirent en tourbillons.
-    float shear = sin(latitude * 23.0) * 0.35;
-    float3 q = float3(p.x * cos(shear) - p.z * sin(shear), p.y, p.x * sin(shear) + p.z * cos(shear));
-    float turbulence = Fbm(float3(q.x * 2.5, q.y * 11.0, q.z * 2.5) + Time * 0.008, 7);
-    float fine = Fbm(float3(q.x * 9.0, q.y * 40.0, q.z * 9.0), 4);
-    float band = latitude * 7.5 + turbulence * 1.4 + fine * 0.25;
-    float3 cream = float3(0.96, 0.88, 0.72);
-    float3 rust = float3(0.76, 0.44, 0.24);
-    float3 brown = float3(0.40, 0.25, 0.16);
-    float3 color = lerp(cream, rust, 0.5 + 0.5 * sin(band * 2.1));
-    color = lerp(color, brown, saturate(sin(band * 0.7 + 1.0) * 0.8));
-    color *= 0.9 + 0.2 * fine;
-    // Pôles plus sombres et bleutés.
-    color = lerp(color, float3(0.35, 0.38, 0.45), smoothstep(0.75, 0.98, abs(latitude)) * 0.7);
-    // Une tempête ovale.
-    float2 storm = float2(atan2(p.z, p.x) - 0.9, (latitude + 0.32) * 3.5);
-    color = lerp(color, float3(0.85, 0.35, 0.2), smoothstep(0.35, 0.1, length(storm)) * 0.8);
-    return color;
-}
 
 BackgroundOut BackgroundPS(FullscreenOut input)
 {

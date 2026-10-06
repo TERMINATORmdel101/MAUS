@@ -519,29 +519,29 @@ internal static class BenchReference
     private static readonly Dictionary<string, double> At1080 = new(StringComparer.Ordinal)
     {
         ["ring"] = 36.0,
-        ["battle"] = 39.6,
-        ["galaxy"] = 39.0,
-        ["fractal"] = 24.3,
+        ["battle"] = 37.6,
+        ["galaxy"] = 39.2,
+        ["fractal"] = 28.6,
     };
 
     private static readonly Dictionary<string, double> At2160 = new(StringComparer.Ordinal)
     {
-        ["ring"] = 32.3,
-        ["battle"] = 11.3,
+        ["ring"] = 30.8,
+        ["battle"] = 10.6,
         ["galaxy"] = 13.8,
-        ["fractal"] = 6.41,
+        ["fractal"] = 6.36,
     };
 
     /// <summary>1440p, et tests du processeur (indépendants de la résolution).</summary>
     private static readonly Dictionary<string, double> Values = new(StringComparer.Ordinal)
     {
-        ["ring"] = 34.8,
-        ["battle"] = 23.8,
-        ["galaxy"] = 25.9,
-        ["fractal"] = 14.0,
+        ["ring"] = 34.2,
+        ["battle"] = 22.4,
+        ["galaxy"] = 26.0,
+        ["fractal"] = 16.9,
         ["cpu-render"] = 6.79,
-        ["cpu-single"] = 0.692,
-        ["cpu-vector"] = 1.31,
+        ["cpu-single"] = 0.693,
+        ["cpu-vector"] = 1.28,
     };
 
     public static double For(string id, BenchOptions options)
