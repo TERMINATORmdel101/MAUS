@@ -14,6 +14,9 @@ public enum PixelFormat
 {
     Unknown,
     Rgba8Unorm,
+
+    /// <summary>Couleurs d'images (sRVB) : la carte les convertit en lumière linéaire à la lecture.</summary>
+    Rgba8UnormSrgb,
     Bgra8Unorm,
     Rgba16Float,
     Rgba32Float,

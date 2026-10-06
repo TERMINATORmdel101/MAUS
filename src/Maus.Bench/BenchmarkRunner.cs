@@ -659,6 +659,7 @@ internal sealed class BenchmarkRunner : IDisposable
     internal static string TestName(string id) => id switch
     {
         "fractal" => T("Forge fractale (calcul)"),
+        "materials" => T("Cabinet de curiosités (textures)"),
         "galaxy" => T("Collision galactique (bande passante)"),
         "ring" => T("Anneau de la géante (géométrie)"),
         "battle" => T("Champ de bataille (effets)"),

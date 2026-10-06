@@ -64,7 +64,7 @@ public static partial class BenchmarkProgram
 
     internal static IReadOnlyList<BenchScene> CreateScenes(IReadOnlyCollection<string> only)
     {
-        BenchScene[] all = [new RingScene(), new BattleScene(), new GalaxyScene(), new FractalScene()];
+        BenchScene[] all = [new RingScene(), new BattleScene(), new GalaxyScene(), new MaterialsScene(), new FractalScene()];
         return only.Count == 0 ? all : all.Where(s => only.Contains(s.Id)).ToArray();
     }
 

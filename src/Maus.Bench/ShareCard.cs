@@ -226,6 +226,7 @@ internal static class ShareCard
         "battle" => T("Champ de bataille"),
         "galaxy" => T("Collision galactique"),
         "fractal" => T("Forge fractale"),
+        "materials" => T("Cabinet de curiosités"),
         _ => BenchmarkRunner.TestName(id),
     };
 
@@ -236,6 +237,7 @@ internal static class ShareCard
         "battle" => T("Effets"),
         "galaxy" => T("Bande passante"),
         "fractal" => T("Calcul"),
+        "materials" => T("Textures"),
         _ => T("Processeur"),
     };
 

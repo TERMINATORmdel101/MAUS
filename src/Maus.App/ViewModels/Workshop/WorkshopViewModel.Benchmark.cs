@@ -469,6 +469,7 @@ internal static class BenchmarkNames
     public static string Of(string id) => id switch
     {
         "fractal" => T("Forge fractale (calcul)"),
+        "materials" => T("Cabinet de curiosités (textures)"),
         "galaxy" => T("Collision galactique (bande passante)"),
         "ring" => T("Anneau de la géante (géométrie)"),
         "battle" => T("Champ de bataille (effets)"),

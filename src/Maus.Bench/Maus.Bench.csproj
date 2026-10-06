@@ -34,6 +34,14 @@
     <EmbeddedResource Include="..\Maus.App\Assets\maus-logo-512.png" LogicalName="Maus.Bench.logo.png" />
   </ItemGroup>
 
+  <!--
+    Scène « Matériaux » : modèles, textures et ciel HDR de Poly Haven (polyhaven.com, licence CC0 : utilisation et
+    redistribution libres), livrés à côté de MAUS.exe. Liste et auteurs : THIRD-PARTY-NOTICES.md.
+  -->
+  <ItemGroup>
+    <None Include="Assets\PolyHaven\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Assets\PolyHaven" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Maus.Core.Tests" />
   </ItemGroup>
