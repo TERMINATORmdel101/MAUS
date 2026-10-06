@@ -13,8 +13,8 @@
         <TextBlock Text="{x:Static app:Ui.NotificationTitle}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
         <TextBlock x:Name="Message" Margin="0,8,0,14" TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="{x:Static app:Ui.Later}" Padding="14,5" Margin="0,0,8,0" Click="OnLater" />
-            <Button Content="{x:Static app:Ui.OpenMaus}" Padding="14,5" IsDefault="True" Click="OnOpen" />
+            <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Later}" Margin="0,0,8,0" Click="OnLater" />
+            <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.OpenMaus}" Padding="14,5" IsDefault="True" Click="OnOpen" />
         </StackPanel>
     </StackPanel>
 </Window>

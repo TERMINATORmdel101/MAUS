@@ -9,11 +9,6 @@
     <Window.Resources>
         <!-- Tous les textes de la fenêtre prennent la couleur de texte du thème (blanc en thème sombre), sauf couleur voulue. -->
         <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
-        <Style x:Key="AboutSection" TargetType="TextBlock" BasedOn="{StaticResource MausText}">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Margin" Value="0,22,0,6" />
-        </Style>
         <DataTemplate x:Key="Paragraph">
             <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,8" />
         </DataTemplate>
@@ -27,15 +22,18 @@
     <DockPanel>
         <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
             <WrapPanel HorizontalAlignment="Right">
-                <Button Content="{x:Static app:Ui.ReportProblem}" Padding="14,6" Margin="0,0,8,4" Click="OnReport" />
-                <Button Content="{x:Static app:Ui.ProjectPage}" Padding="14,6" Margin="0,0,8,4" Click="OnProject" />
-                <Button Content="{x:Static app:Ui.LicensesFolder}" Padding="14,6" Margin="0,0,8,4" Click="OnLicenses" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ReportProblem}" Margin="0,0,8,4" Click="OnReport"
+                        Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ProjectPage}" Margin="0,0,8,4" Click="OnProject"
+                        Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.LicensesFolder}" Margin="0,0,8,4" Click="OnLicenses" />
                 <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.CloseWindow}" Padding="20,6" Margin="0,0,0,4" IsCancel="True" IsDefault="True" Click="OnClose" />
             </WrapPanel>
         </Border>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="Page" Margin="28,24,28,24">
+            <StackPanel x:Name="Page" Margin="24,20,24,20">
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -64,18 +62,35 @@
                         <TextBlock Text="{x:Static app:Ui.AboutMadeBy}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Grid>
+                </Border>
 
-                <TextBlock Text="{x:Static app:Ui.AboutLicenseTitle}" Style="{StaticResource AboutSection}" />
-                <TextBlock Text="{x:Static app:Ui.AboutLicense}" TextWrapping="Wrap" />
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static app:Ui.AboutLicenseTitle}" Style="{StaticResource CardTitle}" Foreground="{DynamicResource PastelBlueInk}" />
+                        <TextBlock Text="{x:Static app:Ui.AboutLicense}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="{x:Static app:Ui.AboutPrivacyTitle}" Style="{StaticResource AboutSection}" />
-                <TextBlock Text="{x:Static app:Ui.AboutPrivacy}" TextWrapping="Wrap" />
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static app:Ui.AboutPrivacyTitle}" Style="{StaticResource CardTitle}" Foreground="{DynamicResource PastelMintInk}" />
+                        <TextBlock Text="{x:Static app:Ui.AboutPrivacy}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="{x:Static app:Ui.ShowDisclaimer}" Style="{StaticResource AboutSection}" />
-                <ItemsControl ItemsSource="{x:Static app:Ui.DisclaimerParagraphs}" ItemTemplate="{StaticResource Paragraph}" />
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static app:Ui.ShowDisclaimer}" Style="{StaticResource CardTitle}" Foreground="{DynamicResource PastelSandInk}" Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{x:Static app:Ui.DisclaimerParagraphs}" ItemTemplate="{StaticResource Paragraph}" />
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Text="{x:Static app:Ui.AboutComponentsTitle}" Style="{StaticResource AboutSection}" />
-                <ItemsControl ItemsSource="{x:Static app:Ui.AboutComponents}" ItemTemplate="{StaticResource Bullet}" />
+                <Border Style="{StaticResource SoftCard}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static app:Ui.AboutComponentsTitle}" Style="{StaticResource CardTitle}" Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{x:Static app:Ui.AboutComponents}" ItemTemplate="{StaticResource Bullet}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

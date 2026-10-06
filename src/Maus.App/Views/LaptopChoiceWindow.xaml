@@ -15,28 +15,34 @@
         <TextBlock Margin="0,8,0,16" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap"
                    Text="{x:Static app:Ui.LaptopIntro}" />
 
-        <RadioButton x:Name="Performance" GroupName="Choice" IsChecked="True" Margin="0,0,0,12">
-            <StackPanel>
-                <TextBlock Text="{x:Static app:Ui.LaptopPerformance}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock Text="{x:Static app:Ui.LaptopPerformanceDetail}" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
-            </StackPanel>
-        </RadioButton>
-        <RadioButton x:Name="Everywhere" GroupName="Choice" Margin="0,0,0,12">
-            <StackPanel>
-                <TextBlock Text="{x:Static app:Ui.LaptopEverywhere}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock Text="{x:Static app:Ui.LaptopEverywhereDetail}" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
-            </StackPanel>
-        </RadioButton>
-        <RadioButton x:Name="Battery" GroupName="Choice" Margin="0,0,0,12">
-            <StackPanel>
-                <TextBlock Text="{x:Static app:Ui.LaptopBattery}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock Text="{x:Static app:Ui.LaptopBatteryDetail}" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
-            </StackPanel>
-        </RadioButton>
+        <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" Padding="14,12" Margin="0,0,0,10">
+            <RadioButton x:Name="Performance" GroupName="Choice" IsChecked="True">
+                <StackPanel>
+                    <TextBlock Text="{x:Static app:Ui.LaptopPerformance}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{x:Static app:Ui.LaptopPerformanceDetail}" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
+                </StackPanel>
+            </RadioButton>
+        </Border>
+        <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}" Padding="14,12" Margin="0,0,0,10">
+            <RadioButton x:Name="Everywhere" GroupName="Choice">
+                <StackPanel>
+                    <TextBlock Text="{x:Static app:Ui.LaptopEverywhere}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{x:Static app:Ui.LaptopEverywhereDetail}" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
+                </StackPanel>
+            </RadioButton>
+        </Border>
+        <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}" Padding="14,12" Margin="0,0,0,10">
+            <RadioButton x:Name="Battery" GroupName="Choice">
+                <StackPanel>
+                    <TextBlock Text="{x:Static app:Ui.LaptopBattery}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{x:Static app:Ui.LaptopBatteryDetail}" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
+                </StackPanel>
+            </RadioButton>
+        </Border>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button Content="{x:Static app:Ui.Later}" Padding="16,6" Margin="0,0,8,0" IsCancel="True" />
-            <Button Content="{x:Static app:Ui.Validate}" Padding="16,6" IsDefault="True" Click="OnValidate" />
+            <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Later}" Margin="0,0,8,0" IsCancel="True" />
+            <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.Validate}" Padding="16,6" IsDefault="True" Click="OnValidate" />
         </StackPanel>
     </StackPanel>
 </Window>

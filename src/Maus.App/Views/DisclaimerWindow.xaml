@@ -17,13 +17,13 @@
             <CheckBox x:Name="Accept" Content="{x:Static app:Ui.DisclaimerAcceptance}" Checked="OnAcceptChanged" Unchecked="OnAcceptChanged"
                       AutomationProperties.Name="{x:Static app:Ui.DisclaimerAcceptance}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                <Button x:Name="QuitButton" Content="{x:Static app:Ui.Quit}" Padding="16,6" Margin="0,0,8,0" IsCancel="True" />
+                <Button x:Name="QuitButton" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Quit}" Margin="0,0,8,0" IsCancel="True" />
                 <Button x:Name="Continue" Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.Continue}" Padding="16,6" IsDefault="True"
                         IsEnabled="False" Click="OnContinue" />
             </StackPanel>
         </StackPanel>
 
-        <Border Margin="0,12,0,0" Padding="16" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource MausGold}">
+        <Border Style="{StaticResource SoftCard}" Margin="0,12,0,0" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="480">
                 <ItemsControl ItemsSource="{x:Static app:Ui.DisclaimerParagraphs}">
                     <ItemsControl.ItemTemplate>
