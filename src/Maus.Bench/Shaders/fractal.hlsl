@@ -129,6 +129,9 @@ void SurfaceMaterial(float4 trap, float3 p, out float3 albedo, out float metalli
     float3 stone = float3(0.07, 0.065, 0.07);
     float3 teal = float3(0.03, 0.16, 0.19);
     albedo = lerp(lerp(stone, teal, axis), lerp(gold, copper, axis), band);
+    float jewel = smoothstep(0.7, 0.9, frac(sqrt(trap.z) * 3.1 + Params3.x * 0.5));
+    float3 gem = lerp(float3(0.05, 0.42, 0.25), float3(0.08, 0.18, 0.55), saturate(trap.y * 2.0));
+    albedo = lerp(albedo, gem, jewel * (1.0 - band) * 0.85);
     metallic = band;
     roughness = lerp(0.6, 0.25, band);
 
@@ -182,7 +185,7 @@ float SunVisibility(float3 p, int steps)
 // Le point de départ change à chaque pixel et à chaque image, l'anticrénelage temporel lisse le résultat.
 float4 VolumetricLight(float3 origin, float3 direction, float distance, float2 pixel)
 {
-    const int samples = 48;
+    const int samples = 28;
     float stepSize = min(distance, 10.0) / samples;
     float offset = InterleavedNoise(pixel);
     float phase = PhaseHG(dot(direction, SunDir), 0.6) * 4.0 * PI;
@@ -196,7 +199,7 @@ float4 VolumetricLight(float3 origin, float3 direction, float distance, float2 p
         // Brume concentrée autour de la fractale : le ciel lointain reste sombre et contrasté.
         float aura = exp(-max(length(p) - 1.6, 0.0) * 2.2);
         float density = Params2.x * aura * (0.45 + 1.1 * ValueNoise(p * 2.5 + float3(0.0, Time * 0.03, Time * 0.02)));
-        float visibility = SunVisibility(p, 24);
+        float visibility = SunVisibility(p, 18);
         light += transmittance * density * stepSize * SunColor * (visibility * phase * 0.9 + 0.003);
         transmittance *= exp(-density * stepSize);
     }

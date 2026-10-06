@@ -39,6 +39,7 @@ internal static class DxgiFormats
 
     public static Format ToDxgi(VertexFormat format) => format switch
     {
+        VertexFormat.Float1 => Format.R32_Float,
         VertexFormat.Float2 => Format.R32G32_Float,
         VertexFormat.Float3 => Format.R32G32B32_Float,
         VertexFormat.Float4 => Format.R32G32B32A32_Float,

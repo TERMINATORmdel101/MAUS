@@ -514,32 +514,34 @@ internal sealed class BenchmarkRunner : IDisposable
 internal static class BenchReference
 {
     // Mesures du 06/10/2026 sur la machine de référence (Direct3D 12, passes accélérées qui parcourent les mêmes trajets).
+    // Le test standard (1080p) tourne à plus de 24 images par seconde sur cette machine : une carte modeste le fait tourner
+    // correctement ; la 4K reste là pour mettre les très grosses cartes à genoux.
     private static readonly Dictionary<string, double> At1080 = new(StringComparer.Ordinal)
     {
-        ["ring"] = 26.3,
-        ["battle"] = 46.9,
-        ["galaxy"] = 12.0,
-        ["fractal"] = 18.6,
+        ["ring"] = 36.0,
+        ["battle"] = 39.6,
+        ["galaxy"] = 39.0,
+        ["fractal"] = 24.3,
     };
 
     private static readonly Dictionary<string, double> At2160 = new(StringComparer.Ordinal)
     {
-        ["ring"] = 24.3,
-        ["battle"] = 13.9,
-        ["galaxy"] = 3.70,
-        ["fractal"] = 4.64,
+        ["ring"] = 32.3,
+        ["battle"] = 11.3,
+        ["galaxy"] = 13.8,
+        ["fractal"] = 6.41,
     };
 
     /// <summary>1440p, et tests du processeur (indépendants de la résolution).</summary>
     private static readonly Dictionary<string, double> Values = new(StringComparer.Ordinal)
     {
-        ["ring"] = 25.5,
-        ["battle"] = 29.0,
-        ["galaxy"] = 6.68,
-        ["fractal"] = 11.0,
+        ["ring"] = 34.8,
+        ["battle"] = 23.8,
+        ["galaxy"] = 25.9,
+        ["fractal"] = 14.0,
         ["cpu-render"] = 6.79,
-        ["cpu-single"] = 0.693,
-        ["cpu-vector"] = 1.32,
+        ["cpu-single"] = 0.692,
+        ["cpu-vector"] = 1.31,
     };
 
     public static double For(string id, BenchOptions options)

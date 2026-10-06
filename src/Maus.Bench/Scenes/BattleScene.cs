@@ -50,7 +50,7 @@ internal sealed class BattleScene : BenchScene
 
     public override string Title => T("Champ de bataille");
 
-    public override string Subtitle => T("Effets : 24 chars explosent, 320 000 particules de feu, de fumée et d'étincelles");
+    public override string Subtitle => T("Effets : 24 chars explosent, des centaines de milliers de particules de feu, de fumée et d'étincelles");
 
     public override GpuCapability Capability => GpuCapability.Effects;
 
@@ -66,7 +66,7 @@ internal sealed class BattleScene : BenchScene
         _debris = Mesh.Create(device, "Éclat", TankMeshes.Shard());
         _shadowMap = device.CreateTexture(TextureDesc.DepthTarget(ShadowSize, ShadowSize, "Ombres du soleil couchant"));
 
-        VertexElement[] layout = [new("POSITION", 0, VertexFormat.Float3, 0), new("NORMAL", 0, VertexFormat.Float3, 12)];
+        VertexElement[] layout = [new("POSITION", 0, VertexFormat.Float3, 0), new("NORMAL", 0, VertexFormat.Float3, 12), new("TEXCOORD", 0, VertexFormat.Float1, 24)];
         PixelFormat[] targets = [PixelFormat.Rgba16Float, PixelFormat.Rg16Float];
         _ground = device.CreatePipeline(new GraphicsPipelineDesc(
             "Bataille : sol", shaders.Get("common.hlsli", "FullscreenVS", "vs_5_0"), shaders.Get("battle.hlsl", "GroundPS", "ps_5_0"), [],
@@ -261,140 +261,5 @@ internal sealed class BattleScene : BenchScene
     private struct LightArray
     {
         private Vector4 _element;
-    }
-}
-
-/// <summary>Maillage simple (sommets : position, normale) prêt à dessiner.</summary>
-internal sealed class Mesh(IBuffer vertices, IBuffer indices, int indexCount) : IDisposable
-{
-    public int IndexCount { get; } = indexCount;
-
-    public static Mesh Create(IGpuDevice device, string name, (float[] Vertices, uint[] Indices) data) => new(
-        device.CreateBuffer(new BufferDesc(data.Vertices.Length * 4, BufferUsage.Vertex, 24, name), MemoryMarshal.AsBytes(data.Vertices.AsSpan())),
-        device.CreateBuffer(new BufferDesc(data.Indices.Length * 4, BufferUsage.Index, 4, name + " : indices"), MemoryMarshal.AsBytes(data.Indices.AsSpan())),
-        data.Indices.Length);
-
-    public void Bind(ICommandList cmd)
-    {
-        cmd.SetVertexBuffer(0, vertices, 24);
-        cmd.SetIndexBuffer(indices);
-    }
-
-    public void Dispose()
-    {
-        vertices.Dispose();
-        indices.Dispose();
-    }
-}
-
-/// <summary>Char d'assaut construit avec des pavés et des cylindres (faces planes, comme un modèle simplifié).</summary>
-internal static class TankMeshes
-{
-    public static (float[] Vertices, uint[] Indices) Hull()
-    {
-        var builder = new MeshBuilder();
-        // Caisse avec glacis incliné à l'avant, chenilles, roues et garde-boue.
-        builder.Box(new Vector3(0f, 1.15f, 0f), new Vector3(3.1f, 0.55f, 1.55f), frontSlope: 0.6f);
-        builder.Box(new Vector3(0f, 0.55f, 1.55f), new Vector3(3.35f, 0.5f, 0.38f));
-        builder.Box(new Vector3(0f, 0.55f, -1.55f), new Vector3(3.35f, 0.5f, 0.38f));
-        builder.Box(new Vector3(0f, 1.1f, 1.62f), new Vector3(3.4f, 0.05f, 0.42f));
-        builder.Box(new Vector3(0f, 1.1f, -1.62f), new Vector3(3.4f, 0.05f, 0.42f));
-        for (var w = 0; w < 6; w++)
-        {
-            var x = -2.6f + (w * 1.04f);
-            builder.Cylinder(new Vector3(x, 0.45f, 1.95f), 0.4f, 0.1f, Vector3.UnitZ, 14);
-            builder.Cylinder(new Vector3(x, 0.45f, -1.95f), 0.4f, 0.1f, Vector3.UnitZ, 14);
-        }
-
-        builder.Box(new Vector3(-3.0f, 1.45f, 0f), new Vector3(0.12f, 0.25f, 1.2f));
-        return builder.Build();
-    }
-
-    public static (float[] Vertices, uint[] Indices) Turret()
-    {
-        var builder = new MeshBuilder();
-        builder.Box(new Vector3(-0.2f, 2.05f, 0f), new Vector3(1.55f, 0.38f, 1.25f), frontSlope: 0.5f);
-        builder.Cylinder(new Vector3(-0.4f, 2.5f, 0.45f), 0.32f, 0.08f, Vector3.UnitY, 12);
-        builder.Cylinder(new Vector3(3.15f, 2.12f, 0f), 0.13f, 1.9f, Vector3.UnitX, 12);
-        builder.Cylinder(new Vector3(5.0f, 2.12f, 0f), 0.18f, 0.18f, Vector3.UnitX, 12);
-        builder.Box(new Vector3(-1.85f, 2.0f, 0f), new Vector3(0.3f, 0.28f, 1.05f));
-        return builder.Build();
-    }
-
-    public static (float[] Vertices, uint[] Indices) Shard()
-    {
-        var builder = new MeshBuilder();
-        builder.Box(Vector3.Zero, new Vector3(0.5f, 0.35f, 0.45f), frontSlope: 0.35f);
-        return builder.Build();
-    }
-}
-
-/// <summary>Assemble des pavés et des cylindres en un seul maillage à normales par face.</summary>
-internal sealed class MeshBuilder
-{
-    private readonly List<float> _vertices = [];
-    private readonly List<uint> _indices = [];
-
-    public void Box(Vector3 center, Vector3 half, float frontSlope = 0f)
-    {
-        var c = new Vector3[8];
-        for (var i = 0; i < 8; i++)
-        {
-            var sx = (i & 1) == 0 ? -1f : 1f;
-            var sy = (i & 2) == 0 ? -1f : 1f;
-            var sz = (i & 4) == 0 ? -1f : 1f;
-            var p = new Vector3(sx * half.X, sy * half.Y, sz * half.Z);
-            if (sx > 0 && sy > 0)
-            {
-                // Arête avant-haute reculée : glacis incliné.
-                p.X -= half.X * frontSlope * 0.5f;
-            }
-
-            c[i] = center + p;
-        }
-
-        Quad(c[0], c[2], c[3], c[1]);
-        Quad(c[4], c[5], c[7], c[6]);
-        Quad(c[0], c[4], c[6], c[2]);
-        Quad(c[1], c[3], c[7], c[5]);
-        Quad(c[0], c[1], c[5], c[4]);
-        Quad(c[2], c[6], c[7], c[3]);
-    }
-
-    public void Cylinder(Vector3 center, float radius, float halfLength, Vector3 axis, int segments)
-    {
-        var a = Vector3.Normalize(axis);
-        var u = Vector3.Normalize(Vector3.Cross(MathF.Abs(a.Y) > 0.9f ? Vector3.UnitX : Vector3.UnitY, a));
-        var v = Vector3.Cross(a, u);
-        for (var s = 0; s < segments; s++)
-        {
-            var a0 = s * MathF.Tau / segments;
-            var a1 = (s + 1) * MathF.Tau / segments;
-            var r0 = ((u * MathF.Cos(a0)) + (v * MathF.Sin(a0))) * radius;
-            var r1 = ((u * MathF.Cos(a1)) + (v * MathF.Sin(a1))) * radius;
-            var top = center + (a * halfLength);
-            var bottom = center - (a * halfLength);
-            Quad(bottom + r0, top + r0, top + r1, bottom + r1);
-            Triangle(top, top + r1, top + r0);
-            Triangle(bottom, bottom + r0, bottom + r1);
-        }
-    }
-
-    public (float[] Vertices, uint[] Indices) Build() => ([.. _vertices], [.. _indices]);
-
-    private void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
-    {
-        Triangle(a, b, c);
-        Triangle(a, c, d);
-    }
-
-    private void Triangle(Vector3 a, Vector3 b, Vector3 c)
-    {
-        var n = Vector3.Normalize(Vector3.Cross(b - a, c - a) + new Vector3(1e-9f));
-        foreach (var p in new[] { a, b, c })
-        {
-            _indices.Add((uint)(_vertices.Count / 6));
-            _vertices.AddRange([p.X, p.Y, p.Z, n.X, n.Y, n.Z]);
-        }
     }
 }

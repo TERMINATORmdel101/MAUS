@@ -180,6 +180,40 @@ float Fbm(float3 p, int octaves)
     return sum;
 }
 
+// Bruit cellulaire (principe de S. Worley, 1996) : distance au point caractéristique le plus proche (x) et au deuxième
+// (y). y − x est petit le long des frontières entre cellules : fissures, joints, cailloux.
+float2 Cellular(float3 p)
+{
+    float3 cell = floor(p);
+    float3 f = frac(p);
+    float d1 = 8.0, d2 = 8.0;
+    [unroll]
+    for (int z = -1; z <= 1; z++)
+    {
+        [unroll]
+        for (int y = -1; y <= 1; y++)
+        {
+            [unroll]
+            for (int x = -1; x <= 1; x++)
+            {
+                float3 o = float3(x, y, z);
+                float3 r = o + Hash33(cell + o) - f;
+                float d = dot(r, r);
+                if (d < d1)
+                {
+                    d2 = d1;
+                    d1 = d;
+                }
+                else if (d < d2)
+                {
+                    d2 = d;
+                }
+            }
+        }
+    }
+    return sqrt(float2(d1, d2));
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Lumière physique : GGX (Walter et al. 2007), Smith-Schlick, Fresnel de Schlick.
 // ---------------------------------------------------------------------------------------------------------------

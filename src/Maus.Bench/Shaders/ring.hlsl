@@ -111,8 +111,15 @@ SceneOut RockPS(RockPixel input)
     // Détail de surface : bruit en trois dimensions sur la position du rocher (cratères, veines claires).
     float detail = Fbm(input.Local * 2.0, 4);
     float3 albedo = input.Color.rgb * (0.75 + 0.5 * detail);
-    albedo = lerp(albedo, float3(0.85, 0.9, 0.95), ice * saturate(detail * 2.0 + 0.5));
-    float roughness = lerp(0.85, 0.25, ice);
+    // Fissures (frontières de cellules), veines minérales colorées, glace bleutée qui scintille.
+    float2 cells = Cellular(input.Local * 4.0);
+    float crack = 1.0 - smoothstep(0.0, 0.07, cells.y - cells.x);
+    float vein = smoothstep(0.82, 0.97, abs(sin(dot(input.Local, float3(3.1, 5.7, 2.3)) * 2.0 + detail * 5.0)));
+    float3 mineral = lerp(float3(1.25, 1.0, 0.7), float3(0.75, 0.95, 1.2), frac(input.Color.r * 37.0));
+    albedo = lerp(albedo, albedo * mineral * 1.4, vein * 0.6);
+    albedo *= 1.0 - crack * 0.55;
+    albedo = lerp(albedo, float3(0.78, 0.86, 0.95), ice * saturate(detail * 2.0 + 0.5));
+    float roughness = lerp(0.85, 0.18, ice) + crack * 0.1;
     float metallic = 0.0;
 
     float shadow = SunShadow(input.World, n);

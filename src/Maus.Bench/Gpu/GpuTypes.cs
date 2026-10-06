@@ -128,6 +128,7 @@ public enum CullMode
 
 public enum VertexFormat
 {
+    Float1,
     Float2,
     Float3,
     Float4,

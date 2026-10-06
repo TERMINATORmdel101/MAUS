@@ -11,6 +11,9 @@ Les versions sont testées avec des simulations (faux registre, faux WMI, faux r
     - « Collision galactique » (bande passante) : 8 millions d'étoiles et de nuages de gaz simulés par la carte et superposés à chaque image ;
     - « Forge fractale » (calcul pur) : une Mandelbox éclairée par un orbe, avec des rayons de lumière volumétriques.
   - **Résolution de calcul au choix** : 1080p natif (recommandé, demande du porteur), 1440p ou 4K (très exigeant). Chaque résolution a ses propres points de référence : les scores ne se comparent qu'à résolution égale.
+  - **Test standard pour comparer toutes les cartes** (demande du porteur) : en 1080p, chaque scène tourne à plus de 24 images par seconde sur la machine de référence, pour qu'une carte modeste puisse le faire tourner correctement. La 4K reste là pour mettre les très grosses cartes à genoux.
+  - **Chars détaillés** : vraies chenilles (92 maillons avec crampons de chaque côté), barbotin denté, galets, rouleaux, jupes, tourelleau, lance-pots fumigènes, antenne. Trois camouflages (désert, forêt, gris), panneaux de blindage, poussière et usure.
+  - **Textures plus riches** : rochers fissurés avec veines minérales et glace, désert avec cailloux et traînées de vent, fractale aux reflets d'émeraude et de saphir.
   - **Processeur** : rendu par lancer de rayons sur tous les cœurs (image en 1080p natif) puis sur un seul, et calcul vectoriel en double précision (ensemble de Mandelbrot, 2, 4 ou 8 calculs à la fois selon le processeur).
   - **Points** : 10 000 = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti, mesurée par le projet). Deux fois plus rapide = deux fois plus de points. Scores de la carte graphique, du processeur et combiné (moyenne qui pénalise le déséquilibre). Le bilan donne aussi le point fort et le point faible, et le 1 % des images les plus lentes.
   - Le bilan est gardé dans l'historique (`%LOCALAPPDATA%\MAUSenchmark-history.json`) et affiché dans l'Atelier.

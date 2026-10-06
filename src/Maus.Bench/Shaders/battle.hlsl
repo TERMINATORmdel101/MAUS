@@ -100,6 +100,7 @@ struct MeshVertex
 {
     float3 Position : POSITION;
     float3 Normal : NORMAL;
+    float Material : TEXCOORD0;     // 0 peinture, 1 chenille, 2 galet, 3 acier, 4 caoutchouc
 };
 
 struct SolidPixel
@@ -109,6 +110,7 @@ struct SolidPixel
     float3 Normal : TEXCOORD1;
     float3 Local : TEXCOORD2;
     nointerpolation float4 Info : TEXCOORD3;   // teinte, brûlé (0-1), braise (0-1), genre
+    nointerpolation float Material : TEXCOORD4;
 };
 
 float3 SolidWorld(MeshVertex v, uint instance, out float3 normal, out float4 info)
@@ -181,6 +183,7 @@ SolidPixel SolidVS(MeshVertex v, uint instance : SV_InstanceID)
     o.Normal = normal;
     o.Local = v.Position;
     o.Info = info;
+    o.Material = v.Material;
     return o;
 }
 
@@ -249,15 +252,68 @@ SceneOut SolidPS(SolidPixel input)
     float burnt = input.Info.y;
     float ember = input.Info.z;
 
-    // Camouflage : taches de trois teintes, découpées dans un bruit (sur les coordonnées propres au char).
+    // Camouflage : trois schémas selon le char (désert, forêt, gris urbain), taches nettes découpées dans un bruit.
     float pattern = Fbm(input.Local * 0.55 + hue * 13.0, 3);
-    float3 olive = lerp(float3(0.20, 0.22, 0.12), float3(0.30, 0.27, 0.16), hue);
-    float3 sand = float3(0.45, 0.38, 0.24);
-    float3 dark = float3(0.08, 0.08, 0.06);
-    float3 camo = pattern > 0.12 ? sand : (pattern < -0.12 ? dark : olive);
-    float3 albedo = lerp(camo, float3(0.05, 0.045, 0.04) * (0.7 + 0.6 * saturate(pattern + 0.5)), burnt);
-    float metallic = 0.25 * (1.0 - burnt);
-    float roughness = lerp(0.55, 0.95, burnt);
+    float scheme = floor(hue * 3.0);
+    float3 c1, c2, c3;
+    if (scheme < 0.5)
+    {
+        c1 = float3(0.46, 0.38, 0.24); c2 = float3(0.33, 0.27, 0.16); c3 = float3(0.18, 0.15, 0.10);
+    }
+    else if (scheme < 1.5)
+    {
+        c1 = float3(0.19, 0.22, 0.12); c2 = float3(0.27, 0.22, 0.14); c3 = float3(0.06, 0.06, 0.05);
+    }
+    else
+    {
+        c1 = float3(0.36, 0.37, 0.36); c2 = float3(0.24, 0.25, 0.26); c3 = float3(0.12, 0.12, 0.13);
+    }
+    float3 paint = pattern > 0.1 ? c1 : (pattern < -0.12 ? c3 : c2);
+
+    // Panneaux de blindage (joints fins), poussière qui monte depuis le sol, arêtes usées plus claires.
+    float2 panel = abs(frac(input.Local.xz * float2(0.9, 1.4)) - 0.5);
+    float seam = smoothstep(0.49, 0.5, max(panel.x, panel.y));
+    float dust = saturate(1.2 - input.Local.y * 0.75) * (0.55 + 0.45 * ValueNoise(input.Local * 4.0));
+    float wear = smoothstep(0.55, 0.8, ValueNoise(input.Local * 9.0)) * saturate(n.y + 0.3);
+    float3 dustColor = float3(0.55, 0.45, 0.32);
+
+    float material = input.Material;
+    float3 albedo;
+    float metallic;
+    float roughness;
+    if (material < 0.5 || (material > 1.5 && material < 2.5))
+    {
+        albedo = paint * (1.0 - seam * 0.45);
+        albedo = lerp(albedo, dustColor, dust * 0.45);
+        albedo = lerp(albedo, albedo * 1.6 + 0.05, wear * 0.5);
+        metallic = 0.1;
+        roughness = 0.6;
+        if (material > 1.5)
+        {
+            // Galets : bandage de caoutchouc sur le pourtour (faces dont la normale est dans le plan de la roue).
+            float rim = 1.0 - abs(normalize(input.Normal).z);
+            albedo = lerp(albedo, float3(0.03, 0.03, 0.03), step(0.6, rim));
+        }
+    }
+    else if (material < 1.5)
+    {
+        // Chenilles : acier sombre, crampons polis par le sol, rouille et terre dans les creux.
+        float shine = saturate(n.y * -1.0 + 0.2);
+        albedo = lerp(float3(0.07, 0.065, 0.06), float3(0.2, 0.12, 0.07), ValueNoise(input.World * 6.0) * 0.6);
+        albedo = lerp(albedo, dustColor * 0.7, dust * 0.6);
+        metallic = 0.6 * (1.0 - dust);
+        roughness = lerp(0.35, 0.8, dust) - shine * 0.1;
+    }
+    else
+    {
+        albedo = material < 3.5 ? float3(0.09, 0.09, 0.085) : float3(0.03, 0.03, 0.03);
+        metallic = material < 3.5 ? 0.7 : 0.0;
+        roughness = material < 3.5 ? 0.4 : 0.9;
+    }
+
+    albedo = lerp(albedo, float3(0.05, 0.045, 0.04) * (0.7 + 0.6 * saturate(pattern + 0.5)), burnt);
+    metallic *= 1.0 - burnt;
+    roughness = lerp(roughness, 0.95, burnt);
 
     float shadow = SunShadow(input.World, n);
     float3 color = ShadeDirect(albedo, metallic, roughness, n, v, SunDir, SunColor * 4.0 * shadow);
@@ -320,6 +376,13 @@ GroundOut GroundPS(FullscreenOut input)
     n = normalize(n + float3(ripples * 0.06, 0, 0));
 
     float3 albedo = lerp(float3(0.5, 0.36, 0.23), float3(0.64, 0.48, 0.31), saturate(h0 * 2.0 + 0.5)) * (0.9 + 0.1 * ripples);
+    // Graviers et cailloux (bruit cellulaire), plaques de terre plus sombre, traînées laissées par le vent.
+    float2 pebbles = Cellular(float3(p.xz * 1.6, 0.5));
+    float stone = smoothstep(0.32, 0.18, pebbles.x) * step(0.55, Hash31(floor(float3(p.xz * 1.6, 0.5))));
+    albedo = lerp(albedo, float3(0.32, 0.27, 0.22) * (0.7 + 0.6 * Hash31(floor(float3(p.xz * 1.6, 3.0)))), stone * 0.8);
+    albedo *= 0.85 + 0.15 * smoothstep(-0.3, 0.3, Fbm(float3(p.xz * 0.06, 9.0), 3));
+    albedo *= 0.94 + 0.06 * sin(p.z * 0.9 + Fbm(float3(p.xz * 0.15, 4.0), 2) * 5.0);
+    n = normalize(n + float3(0, 0, 0) + stone * normalize(float3(p.x - floor(p.x * 1.6) / 1.6, 3.0, p.z - floor(p.z * 1.6) / 1.6)) * 0.3);
 
     // Cratères et traces de brûlure autour de chaque char qui a explosé, onde de choc dans le sable.
     float3 glow = 0.0;

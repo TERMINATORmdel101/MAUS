@@ -13,8 +13,8 @@ namespace Maus.Bench.Scenes;
 /// </summary>
 internal sealed class RingScene : BenchScene
 {
-    private const int Detailed = 250_000;
-    private const int Coarse = 500_000;
+    private const int Detailed = 180_000;
+    private const int Coarse = 360_000;
     private const float PlanetRadius = 40f;
     private const int ShadowSize = 4096;
 
@@ -48,7 +48,7 @@ internal sealed class RingScene : BenchScene
 
     public override string Title => T("Anneau de la géante");
 
-    public override string Subtitle => T("Géométrie : 750 000 rochers, environ 200 millions de triangles par image avec les ombres");
+    public override string Subtitle => T("Géométrie : des centaines de milliers de rochers, plus de 100 millions de triangles par image");
 
     public override GpuCapability Capability => GpuCapability.Geometry;
 

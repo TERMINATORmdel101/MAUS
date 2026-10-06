@@ -13,8 +13,8 @@ namespace Maus.Bench.Scenes;
 /// </summary>
 internal sealed class GalaxyScene : BenchScene
 {
-    private const int Stars = 6 * 1024 * 1024;
-    private const int Gas = 2 * 1024 * 1024;
+    private const int Stars = 4 * 1024 * 1024;
+    private const int Gas = 3 * 512 * 1024;
     private const int Total = Stars + Gas;
     private const float Step = 0.02f;
     private const float SimulationSpeed = 0.7f;
@@ -43,7 +43,7 @@ internal sealed class GalaxyScene : BenchScene
 
     public override string Title => T("Collision galactique");
 
-    public override string Subtitle => T("Bande passante : 8 millions de particules simulées et superposées à chaque image");
+    public override string Subtitle => T("Bande passante : des millions de particules simulées et superposées à chaque image");
 
     public override GpuCapability Capability => GpuCapability.Bandwidth;
 
@@ -181,7 +181,7 @@ internal sealed class GalaxyScene : BenchScene
         CoreA = new Vector4(_a.Position, _a.Mass),
         CoreB = new Vector4(_b.Position, _b.Mass),
         Simulation = new Vector4(Step, Softening, Stars, Total),
-        Look = new Vector4(1.3f, 0.3f, 0.0011f, 0.035f),
+        Look = new Vector4(1.4f, 0.17f, 0.0019f, 0.045f),
         InitA = new Vector4(_a.Velocity, _a.Tilt),
         InitB = new Vector4(_b.Velocity, _b.Tilt),
     };
