@@ -2,13 +2,17 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
-## Prochaine version (numéro à choisir par le porteur) — benchmark visuel
+## 0.7.1 — 06/10/2026 — benchmark visuel
 
-- **Benchmark visuel** (Atelier > Tests, demande du porteur) : environ dix minutes en plein écran, dans un processus séparé (un plantage du pilote graphique n'emporte pas MAUS). Interface graphique au choix : **DirectX 12** (recommandé) ou **DirectX 11**. Le même moteur sert aux deux, et les deux donnent la même image.
+Modification majeure, numéro choisi par le porteur.
+
+- **Benchmark visuel** (demande du porteur), avec sa **page dans le menu de gauche** : environ dix minutes en plein écran, dans un processus séparé (un plantage du pilote graphique n'emporte pas MAUS). Interface graphique au choix : **DirectX 12** (recommandé) ou **DirectX 11**. Le même moteur sert aux deux, et les deux donnent la même image.
+  - **Page Benchmark** : choix des tests (complet, carte graphique seule, processeur seul), de l'interface graphique et de la résolution, durée annoncée. Elle affiche le dernier résultat : score combiné, une carte par composant avec une barre par test, point fort et point faible. On y trouve aussi l'historique des passes avec sa courbe, et un bouton « Copier le résultat » pour un forum : seulement le matériel, aucune donnée personnelle. Le bilan est gardé dans `%LOCALAPPDATA%\MAUS\benchmark-history.json` ; les passes d'essai accélérées n'y vont pas.
+  - **Mise en scène** : chaque scène s'ouvre sur un générique (sortie du noir, titre en grand pendant la mise en route non mesurée) et se ferme en fondu. Une courbe montre les temps des dernières images pendant la mesure. Le bilan est animé : le score défile, les barres se remplissent.
   - **Carte graphique**, quatre scènes de 2 minutes, chacune pousse une capacité à fond :
-    - « Anneau de la géante » (géométrie) : 750 000 petits rochers taillés qui ne se touchent pas, environ 200 millions de triangles par image avec les ombres du soleil, la planète géante presque toujours à l'image ;
-    - « Champ de bataille » (effets, idée du porteur) : 24 chars explosent l'un après l'autre : boule de feu, tourelle projetée, éclats qui rebondissent, colonnes de fumée, 320 000 particules ;
-    - « Collision galactique » (bande passante) : 8 millions d'étoiles et de nuages de gaz simulés par la carte et superposés à chaque image ;
+    - « Anneau de la géante » (géométrie) : 540 000 petits rochers taillés qui ne se touchent pas, plus de 100 millions de triangles par image avec les ombres du soleil, la planète géante presque toujours à l'image ;
+    - « Champ de bataille » (effets, idée du porteur) : 24 chars explosent l'un après l'autre : boule de feu, tourelle projetée, éclats qui rebondissent, colonnes de fumée, des centaines de milliers de particules ;
+    - « Collision galactique » (bande passante) : 5,5 millions d'étoiles et de nuages de gaz simulés par la carte et superposés à chaque image ;
     - « Forge fractale » (calcul pur) : une Mandelbox éclairée par un orbe, avec des rayons de lumière volumétriques.
   - **Résolution de calcul au choix** : 1080p natif (recommandé, demande du porteur), 1440p ou 4K (très exigeant). Chaque résolution a ses propres points de référence : les scores ne se comparent qu'à résolution égale.
   - **Test standard pour comparer toutes les cartes** (demande du porteur) : en 1080p, chaque scène tourne à plus de 24 images par seconde sur la machine de référence, pour qu'une carte modeste puisse le faire tourner correctement. La 4K reste là pour mettre les très grosses cartes à genoux.
@@ -17,7 +21,6 @@ Les versions sont testées avec des simulations (faux registre, faux WMI, faux r
   - **Animations, ombres et reflets** (demande du porteur) : les chars avancent en colonne, tiennent leur position, pivotent leur tourelle et tirent (flamme de bouche qui éclaire, traceur de l'obus) avant d'exploser ; la planète géante projette son ombre sur les rochers ; la glace reflète la planète et le ciel ; le métal des chars reflète le ciel du soir ; mirage tremblant au ras de l'horizon du désert ; le soleil tourne lentement autour de la fractale et ses ombres balaient la structure.
   - **Processeur** : rendu par lancer de rayons sur tous les cœurs (image en 1080p natif) puis sur un seul, et calcul vectoriel en double précision (ensemble de Mandelbrot, 2, 4 ou 8 calculs à la fois selon le processeur).
   - **Points** : 10 000 = la machine de référence (Core i7-8700K et GeForce RTX 2080 Ti, mesurée par le projet). Deux fois plus rapide = deux fois plus de points. Scores de la carte graphique, du processeur et combiné (moyenne qui pénalise le déséquilibre). Le bilan donne aussi le point fort et le point faible, et le 1 % des images les plus lentes.
-  - Le bilan est gardé dans l'historique (`%LOCALAPPDATA%\MAUSenchmark-history.json`) et affiché dans l'Atelier.
   - Toutes les scènes sont calculées par formules, écrites pour MAUS. La bibliothèque Vortice (licence MIT) donne accès à DirectX (voir `THIRD-PARTY-NOTICES.md`).
 
 ## 0.6.2 — 06/10/2026
