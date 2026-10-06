@@ -65,6 +65,32 @@
                     <TextBlock Text="{Binding FpsAdvice}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
                                Visibility="{Binding HasFpsAdvice, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
+                <!-- Compteur au-dessus du jeu : affiché pendant la mesure, taille, opacité et coin au choix. -->
+                <Border Style="{StaticResource Divider}" Margin="0,10,0,8" Background="{DynamicResource PastelLilacStroke}" />
+                <CheckBox Content="{x:Static app:Ui.OverlayShow}" IsChecked="{Binding OverlayEnabled}" ToolTip="{x:Static app:Ui.OverlayTip}" />
+                <Grid Margin="0,6,0,0" IsEnabled="{Binding OverlayEnabled, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="52" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="{x:Static app:Ui.OverlaySize}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <Slider Grid.Column="1" Minimum="0.6" Maximum="2.5" SmallChange="0.1" LargeChange="0.25" Value="{Binding OverlayScale}" VerticalAlignment="Center"
+                            AutomationProperties.Name="{x:Static app:Ui.OverlaySize}" />
+                    <TextBlock Grid.Column="2" Text="{Binding OverlayScaleText}" Style="{StaticResource ValueCell}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="1" Text="{x:Static app:Ui.OverlayOpacity}" VerticalAlignment="Center" Margin="0,4,10,0" />
+                    <Slider Grid.Row="1" Grid.Column="1" Minimum="0.2" Maximum="1" SmallChange="0.05" LargeChange="0.1" Value="{Binding OverlayOpacity}" VerticalAlignment="Center" Margin="0,4,0,0"
+                            AutomationProperties.Name="{x:Static app:Ui.OverlayOpacity}" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding OverlayOpacityText}" Style="{StaticResource ValueCell}" VerticalAlignment="Center" Margin="12,4,0,0" />
+                    <TextBlock Grid.Row="2" Text="{x:Static app:Ui.OverlayPlace}" VerticalAlignment="Center" Margin="0,6,10,0" />
+                    <ComboBox Grid.Row="2" Grid.Column="1" Margin="0,6,0,0" HorizontalAlignment="Left" MinWidth="180" ItemsSource="{Binding OverlayCorners, Mode=OneWay}"
+                              SelectedItem="{Binding OverlayCornerChoice}" DisplayMemberPath="Label" AutomationProperties.Name="{x:Static app:Ui.OverlayPlace}" />
+                </Grid>
             </StackPanel>
         </Border>
 

@@ -205,6 +205,7 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
         options.Converters.Add(new TolerantEnumConverter<ThemeChoice>());
         options.Converters.Add(new TolerantEnumConverter<AccentChoice>());
         options.Converters.Add(new TolerantEnumConverter<AnimationChoice>());
+        options.Converters.Add(new TolerantEnumConverter<OverlayCorner>());
         // Une énumération ajoutée plus tard sans être listée ici reste lue strictement : fichier traité comme abîmé, copie gardée.
         options.Converters.Add(new JsonStringEnumConverter());
         return options;

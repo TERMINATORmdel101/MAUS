@@ -111,6 +111,7 @@ public sealed partial class MonitorViewModel
 
         _fpsTimer.Start();
         OnFpsStateChanged();
+        SyncOverlay();
         FpsStatus = _refreshHz is { } hz
             ? T("Mesure en cours. Écran principal : {0} Hz.", hz)
             : T("Mesure en cours. Fréquence de l'écran inconnue.");
@@ -120,7 +121,9 @@ public sealed partial class MonitorViewModel
 
     private void RefreshFps()
     {
-        if (_fps?.Log.Summarize(FpsWindow) is not { } frames)
+        var summary = _fps?.Log.Summarize(FpsWindow);
+        _overlay?.Display(summary);
+        if (summary is not { } frames)
         {
             FpsGame = T("en attente d'un jeu…");
             FpsAverage = FpsLow1 = FpsLow01 = FpsGpu = "—";
@@ -140,6 +143,7 @@ public sealed partial class MonitorViewModel
     private void StopFps()
     {
         _fpsTimer.Dispatcher.Invoke(_fpsTimer.Stop);
+        CloseOverlay();
         if (_fps is { } capture)
         {
             _fps = null;

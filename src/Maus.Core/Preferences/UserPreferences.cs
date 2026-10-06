@@ -16,6 +16,15 @@ public enum LaptopPowerChoice
     Battery,
 }
 
+/// <summary>Coin de l'écran principal où s'affiche le compteur d'images par seconde au-dessus du jeu.</summary>
+public enum OverlayCorner
+{
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
 /// <summary>
 /// Constat marqué « voulu » par l'utilisateur. Il est lié à la valeur constatée ce jour-là, écrite dans la langue
 /// de MAUS à ce moment-là : si la situation change, MAUS le signale de nouveau.
@@ -56,6 +65,24 @@ public sealed record UserPreferences
 
     /// <summary>La fenêtre de surveillance reste au premier plan.</summary>
     public bool MonitorOnTop { get; init; }
+
+    /// <summary>Compteur d'images par seconde affiché au-dessus du jeu pendant la mesure.</summary>
+    public bool OverlayEnabled { get; init; } = true;
+
+    /// <summary>Taille du compteur au-dessus du jeu (1 = normale) ; bornée entre 0,6 et 2,5.</summary>
+    public double OverlayScale { get; init; } = 1;
+
+    /// <summary>Opacité du compteur au-dessus du jeu (1 = opaque) ; bornée entre 0,2 et 1.</summary>
+    public double OverlayOpacity { get; init; } = 0.85;
+
+    public OverlayCorner OverlayCorner { get; init; }
+
+    /// <summary>Taille réellement utilisée (un fichier modifié à la main ne peut pas rendre le compteur invisible ou géant).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double OverlayScaleUsed => double.IsFinite(OverlayScale) ? Math.Clamp(OverlayScale, 0.6, 2.5) : 1;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double OverlayOpacityUsed => double.IsFinite(OverlayOpacity) ? Math.Clamp(OverlayOpacity, 0.2, 1) : 0.85;
 
     /// <summary>Entrée de la carte mère choisie par l'utilisateur comme tension de la mémoire (étalonnage), ou <c>null</c>.</summary>
     public Workshop.Memory.DramVoltageCalibration? DramVoltage { get; init; }

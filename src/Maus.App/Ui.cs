@@ -35,6 +35,16 @@ public static class Ui
 
     public static string FpsTitle => T("Images par seconde");
 
+    public static string OverlayShow => T("Afficher le compteur au-dessus du jeu pendant la mesure");
+
+    public static string OverlayTip => T("Une petite fenêtre transparente aux clics, au premier plan, sans rien injecter dans le jeu (c'est l'injection que surveillent les anti-triche). Visible en fenêtré et en plein écran fenêtré ; en plein écran exclusif, Windows l'affiche dans la plupart des jeux récents, pas dans tous.");
+
+    public static string OverlaySize => T("Taille");
+
+    public static string OverlayOpacity => T("Opacité");
+
+    public static string OverlayPlace => T("Position");
+
     public static string FpsAverage => T("MOYENNE");
 
     public static string FpsLow1 => T("1 % LE PLUS LENT");
