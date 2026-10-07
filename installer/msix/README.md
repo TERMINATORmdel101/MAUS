@@ -83,3 +83,15 @@ Différences avec l'installateur classique :
 > • No data collected, no ads. Free and open source (GPL-3.0). In English, French and Spanish.
 >
 > MAUS is designed and coded with Claude, an AI by Anthropic, under the direction of its author. Alpha version: back up your data before applying fixes.
+
+### Description (español)
+
+> MAUS (Maintenance · Audit · Updates · Security) revisa tu PC con Windows 11 sin modificar nada y luego te propone correcciones que eliges tú mismo.
+>
+> • Auditoría de solo lectura: actualizaciones, privacidad, inicio, energía, controladores, estado del hardware, copias de seguridad. Cada resultado se explica con claridad: qué hace, la ganancia real, el riesgo.
+> • Correcciones reversibles: punto de restauración verificado antes de cualquier cambio, valores originales anotados, botón «Deshacer».
+> • Taller: ficha del hardware, temperaturas y frecuencias en directo, pruebas de estabilidad del procesador, de la memoria RAM y de la memoria de vídeo con parada automática en caso de sobrecalentamiento.
+> • Benchmark visual: tarjeta gráfica (DirectX 11 y 12, trazado de rayos) y procesador.
+> • No recopila ningún dato, sin publicidad. Gratuito y libre (GPL-3.0). En español, francés e inglés.
+>
+> MAUS está diseñado y programado con Claude, una IA de Anthropic, bajo la dirección de su autor. Versión alfa: haz una copia de seguridad de tus datos antes de aplicar correcciones.
