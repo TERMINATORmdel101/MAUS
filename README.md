@@ -22,6 +22,21 @@ Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATO
 
 *In English:* MAUS is a free, open-source Windows 11 utility. It first runs a **read-only audit** (updates, privacy, startup, drivers, hardware health…) and explains every finding in plain language, then lets you choose **reversible fixes** (verified restore point, original values logged, one-click undo). No telemetry, no exaggerated performance claims. Available in English, French and Spanish. Alpha version, built with Claude (an AI by Anthropic) under the author's direction.
 
+## Captures d'écran
+
+**Accueil** : le score de santé du PC, les quatre familles M·A·U·S et les outils.
+
+![Accueil de MAUS : bouton « Lancer l'audit », familles Maintenance, Audit, Mises à jour et Sécurité, outils de l'Atelier](docs/captures/accueil.png)
+
+| Atelier > Tests | Benchmark |
+|---|---|
+| ![Tests du processeur, de la mémoire vive et de la mémoire de la carte graphique, test cœur par cœur](docs/captures/atelier-tests.png) | ![Page Benchmark : tests, DirectX 11 ou 12, résolution, lancer de rayons](docs/captures/benchmark.png) |
+| Processeur, mémoire vive et mémoire vidéo testés à fond, avec arrêt automatique en cas de surchauffe. | Benchmark visuel en plein écran : cinq scènes, un test de lancer de rayons, le processeur. |
+
+<p align="center"><img src="docs/captures/surveillance.png" alt="Fenêtre de surveillance : images par seconde, erreurs matérielles et de Windows, températures, consommation et fréquences en direct" width="360"></p>
+
+**Fenêtre de surveillance** : images par seconde au-dessus du jeu, erreurs matérielles, températures et fréquences en direct.
+
 ## Principes
 
 - **Audit d'abord, action ensuite.** Un scan en lecture seule produit un rapport (vert, bleu, orange, rouge) avant toute modification.
