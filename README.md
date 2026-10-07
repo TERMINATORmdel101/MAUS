@@ -6,6 +6,22 @@
 
 > MAUS est conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur.
 
+**Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha**
+
+```powershell
+winget install TERMINATORmdel101.MAUS
+```
+
+Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATORmdel101/MAUS/releases) (voir [Installer](#installer)). Windows 11 23H2 ou plus récent.
+
+## En bref
+
+1. **Lancez l'audit** : MAUS lit votre PC sans rien modifier et vous dit, en français clair, ce qui va, ce qui peut être amélioré et ce qui pose problème.
+2. **Choisissez vos corrections** : chacune explique son gain réel et son risque. Point de restauration vérifié, et bouton « Annuler » pour tout remettre comme avant.
+3. **Allez plus loin dans l'Atelier** : fiche du matériel, températures en direct, tests du processeur, de la mémoire et de la carte graphique, benchmark visuel.
+
+*In English:* MAUS is a free, open-source Windows 11 utility. It first runs a **read-only audit** (updates, privacy, startup, drivers, hardware health…) and explains every finding in plain language, then lets you choose **reversible fixes** (verified restore point, original values logged, one-click undo). No telemetry, no exaggerated performance claims. Available in English, French and Spanish. Alpha version, built with Claude (an AI by Anthropic) under the author's direction.
+
 ## Principes
 
 - **Audit d'abord, action ensuite.** Un scan en lecture seule produit un rapport (vert, bleu, orange, rouge) avant toute modification.
@@ -32,7 +48,7 @@
 
 ## État du projet
 
-Version actuelle : **0.7.1** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
+Version actuelle : **0.7.5** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
 
 | Version | Contenu | État |
 |---|---|---|
@@ -58,7 +74,15 @@ Configuration requise : Windows 11 23H2 (build 22631) ou plus récent, processeu
 
 ## Installer
 
-Téléchargez `MAUS-<version>-installation.exe` dans les *Releases* du dépôt et lancez-le. MAUS s'installe dans `Program Files` (dossier protégé, nécessaire à l'audit automatique de la semaine), avec un raccourci dans le menu Démarrer ; .NET est inclus, rien d'autre à installer. Un fichier `.sha256` permet de vérifier que le téléchargement est intact.
+**Le plus simple : winget**, le gestionnaire de logiciels intégré à Windows 11. Dans PowerShell ou le Terminal :
+
+```powershell
+winget install TERMINATORmdel101.MAUS
+```
+
+Le paquet a été vérifié par Microsoft avant sa publication dans le catalogue winget : analyse antivirus et installation d'essai. Mise à jour plus tard : `winget upgrade TERMINATORmdel101.MAUS`.
+
+**Ou à la main :** téléchargez `MAUS-<version>-installation.exe` dans les *Releases* du dépôt et lancez-le. MAUS s'installe dans `Program Files` (dossier protégé, nécessaire à l'audit automatique de la semaine), avec un raccourci dans le menu Démarrer ; .NET est inclus, rien d'autre à installer. Un fichier `.sha256` permet de vérifier que le téléchargement est intact.
 
 Tant que l'installateur n'est pas signé (voir *Code signing policy* ci-dessous), Windows SmartScreen affiche « Windows a protégé votre ordinateur » : « Informations complémentaires », puis « Exécuter quand même ».
 
