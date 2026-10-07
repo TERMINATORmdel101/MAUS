@@ -1,4 +1,4 @@
-# Images du paquet MSIX (Microsoft Store), tirées du logo du porteur : rien n'est redessiné, seulement recadré et
+﻿# Images du paquet MSIX (Microsoft Store), tirées du logo du porteur : rien n'est redessiné, seulement recadré et
 # redimensionné. Le « M » seul (src/Maus.App/Assets/maus-letter-256.png) pour les petites icônes, le logo entier
 # (assets/logo/maus-logo.jpg) pour les tuiles. Résultat dans installer/msix/Images, avec les échelles de Windows.
 #

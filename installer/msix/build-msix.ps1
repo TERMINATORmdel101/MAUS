@@ -1,4 +1,4 @@
-# Fabrique le paquet MSIX de MAUS pour le Microsoft Store : application autonome (win-x64, .NET inclus), manifeste
+﻿# Fabrique le paquet MSIX de MAUS pour le Microsoft Store : application autonome (win-x64, .NET inclus), manifeste
 # (installer/msix/AppxManifest.xml), images (installer/msix/Images, voir make-store-images.ps1), index des ressources
 # (makepri) puis paquet (makeappx). Le paquet n'est pas signé : le Store le signe lui-même après la certification.
 #
