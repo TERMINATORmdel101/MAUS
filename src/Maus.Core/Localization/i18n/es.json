@@ -1141,6 +1141,7 @@
   "L'application NVIDIA : pilotes, réglages de jeux et superposition.": "La aplicación NVIDIA: controladores, ajustes de juegos y superposición.",
   "L'application Paramètres peut afficher des suggestions et des offres de Microsoft (applications, services, abonnements).": "La aplicación Configuración puede mostrar sugerencias y ofertas de Microsoft (aplicaciones, servicios, suscripciones).",
   "L'audit a échoué : {0}": "La auditoría falló: {0}",
+  "L'audit automatique n'a pas pu suivre la mise à jour de MAUS : {0}": "La auditoría automática no pudo seguir la actualización de MAUS: {0}",
   "L'audit automatique n'a pas pu être modifié : {0}": "No se pudo modificar la auditoría automática: {0}",
   "L'audit automatique n'est proposé que si MAUS est installé dans un dossier protégé (Program Files, ou par le Microsoft Store). Depuis {0}, un autre programme pourrait remplacer MAUS.exe et profiter des droits administrateur de la tâche.": "La auditoría automática solo se ofrece si MAUS está instalado en una carpeta protegida (Program Files, o mediante Microsoft Store). Desde {0}, otro programa podría reemplazar MAUS.exe y aprovechar los derechos de administrador de la tarea.",
   "L'audit de la semaine a trouvé {0} problème(s) : {1}{2}": "La auditoría de la semana encontró {0} problema(s): {1}{2}",

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifeste du paquet MSIX de MAUS pour le Microsoft Store (identité réservée par le porteur dans le Partner Center).
+  La version (@VERSION@) est remplacée par build-msix.ps1 à partir de Directory.Build.props (format x.y.z.0 : le Store
+  exige 0 en dernier chiffre).
+
+  Capacités restreintes, justifiées à la soumission (texte dans installer/msix/README.md) :
+  - runFullTrust : application de bureau WPF ;
+  - allowElevation : MAUS demande l'administrateur à l'ouverture (audit et corrections) ;
+  - unvirtualizedResources + écriture du registre et des fichiers non virtualisée : les corrections modifient les vrais
+    réglages de Windows (HKCU), et non une copie privée au paquet.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 desktop6 rescap">
+
+  <Identity
+    Name="TERMINATEURmdel101.MAUS-MaintenanceAuditUpdatesSec"
+    Publisher="CN=6B0C0F7F-C76C-4C86-B80A-B15B69E93EBB"
+    Version="@VERSION@"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>MAUS - Maintenance Audit Updates Security</DisplayName>
+    <PublisherDisplayName>TERMINATEURmdel101</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+    <Description>Audit, réparation et optimisation de Windows 11, en toute transparence.</Description>
+    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22631.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="fr-FR" />
+    <Resource Language="en-US" />
+    <Resource Language="es-ES" />
+  </Resources>
+
+  <Applications>
+    <Application Id="MAUS" Executable="MAUS.exe" EntryPoint="Windows.FullTrustApplication"
+                 uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL">
+      <uap:VisualElements
+        DisplayName="MAUS"
+        Description="Audit, réparation et optimisation de Windows 11, en toute transparence."
+        BackgroundColor="transparent"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Images\Wide310x150Logo.png" Square71x71Logo="Images\Square71x71Logo.png" ShortName="MAUS">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="allowElevation" />
+    <rescap:Capability Name="unvirtualizedResources" />
+  </Capabilities>
+</Package>

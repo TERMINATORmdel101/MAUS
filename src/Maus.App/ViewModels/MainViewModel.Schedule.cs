@@ -1,3 +1,4 @@
+using Maus.Core.Engine;
 using Maus.Core.Diagnostics;
 using static Maus.Core.Localization.Texts;
 
@@ -40,6 +41,22 @@ public sealed partial class MainViewModel
     private async Task LoadScheduleAsync()
     {
         var (day, command) = await TaskSchedulerClient.GetAsync();
+        if (day is { } existing && command is not null && ScheduledAudit.IsOlderStoreFolder(command, TaskSchedulerClient.Executable)
+            && TaskSchedulerClient.Refusal() is null)
+        {
+            // Version du Microsoft Store : chaque mise à jour change le dossier de MAUS ; la tâche suit le nouveau dossier.
+            var error = await TaskSchedulerClient.CreateAsync(existing);
+            Breadcrumbs.Add("audit hebdomadaire : tâche remise sur le nouveau dossier du Store" + (error is null ? "" : " (échec)"));
+            if (error is null)
+            {
+                command = TaskSchedulerClient.Executable;
+            }
+            else
+            {
+                StatusText = T("L'audit automatique n'a pas pu suivre la mise à jour de MAUS : {0}", error);
+            }
+        }
+
         if (day is not null && command is not null && TaskSchedulerClient.Refusal(command) is not null)
         {
             // Tâche créée par une version précédente depuis un dossier non protégé : à retirer.

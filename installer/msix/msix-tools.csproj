@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Outils d'empaquetage MSIX (makeappx.exe, makepri.exe) de Microsoft, tirés du paquet NuGet officiel
+    Microsoft.Windows.SDK.BuildTools : utilisés seulement par build-msix.ps1 pour fabriquer le paquet du Store, jamais
+    livrés avec MAUS. Ce projet ne compile rien : il sert à télécharger (restaurer) le paquet.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" ExcludeAssets="all" PrivateAssets="all" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <Target Name="ShowToolsPath">
+    <Message Importance="high" Text="MSIXTOOLS=$(PkgMicrosoft_Windows_SDK_BuildTools)" />
+  </Target>
+
+</Project>

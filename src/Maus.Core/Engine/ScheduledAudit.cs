@@ -95,6 +95,40 @@ public static class ScheduledAudit
                 Path.GetDirectoryName(executable) ?? executable);
     }
 
+    /// <summary>
+    /// Vrai si la tâche lance une version précédente du même paquet du Microsoft Store que <paramref name="currentExecutable"/> :
+    /// le dossier d'une application du Store contient son numéro de version (« Nom_0.7.5.0_x64__éditeur », sous
+    /// Program Files\WindowsApps) et change à chaque mise à jour. MAUS remet alors la tâche sur son nouveau dossier.
+    /// </summary>
+    public static bool IsOlderStoreFolder(string taskCommand, string currentExecutable)
+    {
+        if (StoreFolder(taskCommand) is not { } previous || StoreFolder(currentExecutable) is not { } current)
+        {
+            return false;
+        }
+
+        return string.Equals(previous.Family, current.Family, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(previous.File, current.File, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(previous.Version, current.Version, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Famille du paquet (nom, architecture, éditeur), version et fichier d'un exécutable rangé sous WindowsApps.</summary>
+    private static (string Family, string Version, string File)? StoreFolder(string path)
+    {
+        // Découpé sur « \ » explicitement : les tests tournent aussi sous Linux.
+        var parts = path.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3 || !string.Equals(parts[^3], "WindowsApps", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        // Nom_Version_Architecture_IdentifiantDeRessource_Éditeur (le nom d'un paquet ne contient jamais « _ »).
+        var fields = parts[^2].Split('_');
+        return fields.Length == 5 && fields[0].Length > 0 && fields[4].Length > 0
+            ? (fields[0] + "_" + fields[2] + "_" + fields[4], fields[1], parts[^1])
+            : null;
+    }
+
     /// <summary>Program Files (64 et 32 bits) : modifiables par les seuls administrateurs, WindowsApps compris.</summary>
     public static IReadOnlyList<string> ProtectedRoots() =>
     [

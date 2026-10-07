@@ -55,6 +55,18 @@ public class ScheduledAuditTests
         Assert.Equal("2026-10-01T12:00:00", xml.Descendants(Ns + "StartBoundary").Single().Value);
     }
 
+    [Theory]
+    [InlineData(@"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.5.0_x64__6c0b8wp3bzq1y\MAUS.exe", @"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.6.0_x64__6c0b8wp3bzq1y\MAUS.exe", true)]
+    [InlineData(@"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.6.0_x64__6c0b8wp3bzq1y\MAUS.exe", @"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.6.0_x64__6c0b8wp3bzq1y\MAUS.exe", false)]
+    [InlineData(@"C:\Program Files\WindowsApps\Autre.Appli_1.0.0.0_x64__6c0b8wp3bzq1y\MAUS.exe", @"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.6.0_x64__6c0b8wp3bzq1y\MAUS.exe", false)]
+    [InlineData(@"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.5.0_x64__autreediteur\MAUS.exe", @"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.6.0_x64__6c0b8wp3bzq1y\MAUS.exe", false)]
+    [InlineData(@"C:\Program Files\MAUS\MAUS.exe", @"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.6.0_x64__6c0b8wp3bzq1y\MAUS.exe", false)]
+    [InlineData(@"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.5.0_x64__6c0b8wp3bzq1y\MAUS.exe", @"C:\Program Files\MAUS\MAUS.exe", false)]
+    public void A_task_left_on_an_older_store_folder_is_recognised(string taskCommand, string current, bool expected)
+    {
+        Assert.Equal(expected, ScheduledAudit.IsOlderStoreFolder(taskCommand, current));
+    }
+
     [Fact]
     public void Only_red_problems_trigger_a_notification()
     {
