@@ -63,7 +63,7 @@ Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATO
 
 ## État du projet
 
-Version actuelle : **0.7.5** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
+Version actuelle : **0.7.6** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a choisi de revenir à des numéros en 0.x tant que MAUS est une alpha). Tout est testé avec des simulations et, depuis la 0.3.3-alpha, sur le PC Windows du porteur ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application. Projet encore jeune : à essayer d'abord sur un PC dont les données sont sauvegardées.
 
 | Version | Contenu | État |
 |---|---|---|
@@ -81,6 +81,7 @@ Version actuelle : **0.7.5** (voir [CHANGELOG.md](CHANGELOG.md) ; le porteur a c
 | 0.6.2 | Compteur d'images par seconde en direct et au-dessus du jeu (moyenne, 1 % et 0,1 % les plus lents, ce qui limite, fréquence de l'écran), latence des pilotes, pages Pilotes et En direct découpées, images par seconde dans le relevé de partie (PresentMon d'Intel), santé des SSD NVMe, idées reçues sur l'optimisation avec leurs sources | Vérifiée sur le PC du porteur (SSD NVMe, compteur sans jeu) ; mesure en jeu à essayer |
 | 0.7.1 | **Benchmark visuel** (nouvelle page du menu) : quatre scènes calculées image par image en DirectX 11 ou 12 (anneau de planète, champ de bataille, collision de galaxies, fractale), trois tests du processeur, points comparables à résolution égale (10 000 = Core i7-8700K et RTX 2080 Ti), historique des passes | Étalonné et vérifié sur le PC du porteur ; à essayer sur d'autres cartes |
 | 0.7.5 | **Benchmark complété** : test de lancer de rayons « Galerie des glaces » (DirectX 12, score à part), scène « Cabinet de curiosités » (objets scannés, vrai ciel HDR), champ de bataille retravaillé (sol vallonné, chars qui perdent leur tourelle), capteurs pendant la mesure, image du résultat à partager, comparaison avec un ami, mode 720p léger, nouvel étalonnage | Étalonné et vérifié sur le PC du porteur ; à essayer sur d'autres cartes |
+| 0.7.6 | **Compteur d'images par seconde réactif** : chiffre de la dernière seconde (changement suivi en 1 à 2 s au lieu d'une dizaine), reprise juste après une pause, plus de gel en fermant la fenêtre de surveillance ; plantage du pilote graphique expliqué pendant le benchmark ; erreur d'un bouton qui ne ferme plus MAUS ; deux constats plus justes (disques NVMe, démarrage) | Mesuré sur le PC du porteur avec une fenêtre d'essai à rythme imposé |
 | Suite | Écran et HDR, signature du code, publication sur le Microsoft Store | À venir |
 
 **Aucune donnée inventée.** Chaque seuil (température, tension) cite sa source publiée dans `src/Maus.Core/Catalog/hw-safety-limits.json`. Sans source, MAUS n'affiche pas de seuil et ne déclenche pas d'alarme.

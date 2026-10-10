@@ -2,6 +2,23 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.7.6 — 10/10/2026 — compteur d'images par seconde réactif, stabilité
+
+Corrections (dernier chiffre, règle du porteur). Demande du porteur : « la fenêtre de surveillance par-dessus les jeux […] les FPS mettent 50 ans à calculer correctement », puis recherche de défauts et d'améliorations de stabilité.
+
+- **Compteur d'images par seconde** (fenêtre de surveillance et compteur au-dessus du jeu), mesuré sur le PC du porteur avec une fenêtre d'essai à rythme imposé (60, puis 200, puis 90 images par seconde, une pause, puis 60) :
+  - le chiffre en grand est celui de la **dernière seconde** (« En ce moment ») ; la moyenne des dix dernières secondes est écrite à côté. Un changement de rythme est suivi en 1 à 2 secondes, contre une dizaine avant (la moyenne de dix secondes traînait) ;
+  - affichage rafraîchi deux fois par seconde ; chiffre affiché dès 20 images (1,3 s après le lancement du jeu au lieu de 3 s), le 1 % le plus lent à partir de 100 images seulement ;
+  - **après une pause** du jeu (menu, fenêtre réduite, chargement), l'image qui contient la pause ne fausse plus le résultat : à la reprise, MAUS affichait 7 images par seconde au lieu de 60, et la moyenne restait faussée dix secondes ;
+  - un jeu fermé ou en pause n'est plus affiché avec son dernier chiffre : retour à « en attente d'un jeu » après 3 secondes sans image ;
+  - Windows livre les images à PresentMon par lots d'environ une seconde : c'est le retard minimal, mesuré ;
+  - PresentMon ne suit plus le compositeur de Windows ni MAUS (moins de travail) ; s'il s'arrête de lui-même, MAUS le dit au lieu d'attendre indéfiniment.
+- **Fermer la fenêtre de surveillance pendant la mesure figeait MAUS jusqu'à 8 secondes** (arrêt de PresentMon sur le fil de l'interface ; probablement le gel de 7 s noté le 07/10 sur le PC du porteur). PresentMon est maintenant arrêté tout de suite et sa session d'écoute refermée en arrière-plan ; à la fermeture de MAUS, cet arrêt est attendu pour ne jamais laisser de session ouverte. Vérifié dans l'interface : fermeture en 4 ms, aucun PresentMon ni session restants.
+- **Benchmark** : un plantage du pilote graphique signalé par un appel ordinaire de Direct3D (carte retirée, bloquée, réinitialisée) est reconnu comme tel : les résultats déjà mesurés sont gardés et la page Benchmark l'explique, au lieu d'un arrêt sans message. Les autres refus de Direct3D ou de Windows sont expliqués aussi.
+- **Stabilité** : une erreur imprévue dans l'action d'un bouton est notée dans le journal et expliquée, mais ne ferme plus tout MAUS.
+- **M11** : un SSD NVMe dont le journal de santé est lu n'est plus signalé « ne transmet pas ses compteurs de fiabilité » (faux sur le PC du porteur) ; le texte des tests actifs dit que la température du processeur se lit dans l'Atelier avec PawnIO, à la demande.
+- **M12** : une entrée de démarrage dont le programme a été effacé affiche « programme introuvable » au lieu de « éditeur inconnu ».
+
 ## 0.7.5 — 06/10/2026 — benchmark complété
 
 Numéro choisi par le porteur. Suggestions acceptées par le porteur (« 1 ok 3 ok 4 ok 5 ok 6 ok 7 ok ») et demandes sur le champ de bataille.
