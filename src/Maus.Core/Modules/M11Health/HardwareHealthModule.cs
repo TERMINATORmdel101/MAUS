@@ -65,8 +65,12 @@ public sealed class HardwareHealthModule : IAuditModule
         {
             findings.Add(DetectSystemDisk(context.Cim, disks, systemLetter));
             findings.AddRange(disks.Select(DetectDiskHealth));
-            findings.AddRange(DetectReliability(context.Cim, disks));
-            findings.AddRange(disks.Where(d => d.BusType == NvmeBus).Select(DetectNvmeHealth).OfType<Finding>());
+            // Un SSD NVMe dont le journal de santé a été lu : ses compteurs Windows absents ne sont pas une inconnue à signaler
+            // (« ce disque ne transmet pas ses compteurs » était faux, le journal NVMe donne l'usure, les erreurs et les heures).
+            var nvme = disks.Where(d => d.BusType == NvmeBus).Select(d => (Disk: d, Finding: DetectNvmeHealth(d))).Where(x => x.Finding is not null).ToList();
+            var covered = nvme.Select(x => ReliabilityId(x.Disk)).ToHashSet(StringComparer.Ordinal);
+            findings.AddRange(DetectReliability(context.Cim, disks).Where(f => f.Status != FindingStatus.Unknown || !covered.Contains(f.Id)));
+            findings.AddRange(nvme.Select(x => x.Finding!));
         }
 
         findings.Add(await DetectTrimAsync(context.Commands, disks, cancellationToken).ConfigureAwait(false));
@@ -319,9 +323,11 @@ public sealed class HardwareHealthModule : IAuditModule
         return disks.Select(disk => DetectDiskReliability(disk, rows.FirstOrDefault(r => r.GetString("DeviceId") == disk.DeviceId))).ToList();
     }
 
+    private static string ReliabilityId(PhysicalDiskInfo disk) => $"M11.disk-{Slug(disk.DeviceId)}-reliability";
+
     private static Finding DetectDiskReliability(PhysicalDiskInfo disk, CimRow? row)
     {
-        var id = $"M11.disk-{Slug(disk.DeviceId)}-reliability";
+        var id = ReliabilityId(disk);
         var title = T("Usure, erreurs et température du disque {0}", disk.Name);
         if (row is null)
         {
@@ -586,7 +592,7 @@ public sealed class HardwareHealthModule : IAuditModule
         Explanation = T("« Ce test ne rend pas votre PC plus rapide : il vérifie qu'il fonctionne comme prévu. » "
             + "Les tests du processeur, de la mémoire vive et de la mémoire vidéo se lancent depuis l'Atelier (onglet Tests), avec arrêt automatique en cas de surchauffe, "
             + "et leurs résultats sont gardés pour comparer avant et après optimisation. L'audit se limite aux indicateurs passifs ci-dessus. "
-            + "La température interne du processeur n'est pas lue : elle exige un pilote noyau, que MAUS n'installe pas."),
+            + "La température interne du processeur n'est pas lue par l'audit : l'Atelier peut la lire avec le pilote PawnIO, installé seulement si vous le demandez."),
         Advice = T("En attendant, les causes de lenteur les plus fréquentes sont vérifiées par les Modules 5 (alimentation), 10 (mémoire) et 12 (démarrage)."),
     };
 

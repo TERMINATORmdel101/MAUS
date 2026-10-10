@@ -144,6 +144,16 @@ public class HardwareHealthModuleTests
     }
 
     [Fact]
+    public async Task Nvme_log_replaces_missing_windows_counters()
+    {
+        // Constaté le 10/10/2026 sur le PC du porteur : pas de compteurs Windows, mais le journal NVMe du disque est lisible.
+        var findings = await Detect(Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "7"))), Healthy);
+
+        Assert.DoesNotContain(findings, f => f.Id == "M11.disk-0-reliability");
+        Assert.Equal(FindingStatus.Ok, Status(findings, "M11.disk-0-nvme"));
+    }
+
+    [Fact]
     public async Task Missing_sources_give_unknown_never_problem()
     {
         var cim = new FakeCim()
