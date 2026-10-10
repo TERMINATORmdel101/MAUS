@@ -24,7 +24,11 @@ public abstract class ObservableObject : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
-/// <summary>Commande asynchrone qui se désactive pendant son exécution.</summary>
+/// <summary>
+/// Commande asynchrone qui se désactive pendant son exécution. Une erreur imprévue dans l'action d'un bouton est notée dans
+/// le journal et expliquée, mais ne ferme plus tout MAUS : seule cette action a échoué (avant le 10/10/2026, elle remontait
+/// jusqu'au filet de sécurité de l'application, qui arrête MAUS).
+/// </summary>
 public sealed class AsyncCommand(Func<Task> execute) : ICommand
 {
     private bool _running;
@@ -40,6 +44,18 @@ public sealed class AsyncCommand(Func<Task> execute) : ICommand
         try
         {
             await execute();
+        }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or InsufficientExecutionStackException or AccessViolationException))
+        {
+            Maus.Core.Diagnostics.Breadcrumbs.Add("action d'un bouton en erreur (" + ex.GetType().Name + ")");
+            var log = Maus.Core.Diagnostics.CrashLog.Write(ex, "Erreur dans l'action d'un bouton : MAUS continue");
+            System.Windows.MessageBox.Show(
+                Maus.Core.Localization.Texts.T("Cette action n'a pas pu se terminer à cause d'une erreur inattendue. MAUS continue de fonctionner.") +
+                "\n\n" + ex.Message +
+                (log is null ? string.Empty : "\n\n" + Maus.Core.Localization.Texts.T("Détails enregistrés dans :") + "\n" + log),
+                Maus.Core.Localization.Texts.T("MAUS — erreur"),
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
         }
         finally
         {
