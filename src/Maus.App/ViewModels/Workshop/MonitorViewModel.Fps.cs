@@ -16,6 +16,13 @@ public sealed partial class MonitorViewModel
 {
     private static readonly TimeSpan FpsWindow = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// Sans image depuis ce temps, le jeu est fermé, en pause ou réduit : le compteur repasse sur « en attente ». Windows livre
+    /// les images par lots d'environ une seconde (mesuré le 07/10/2026 sur le PC du porteur) : moins de trois secondes ferait
+    /// clignoter le compteur.
+    /// </summary>
+    private static readonly TimeSpan FpsSilence = TimeSpan.FromSeconds(3);
+
     // Deux fois par seconde : le chiffre en direct suit le jeu sans à-coups.
     private readonly DispatcherTimer _fpsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private PresentMonCapture? _fps;
@@ -122,7 +129,7 @@ public sealed partial class MonitorViewModel
 
     private void RefreshFps()
     {
-        var summary = _fps?.Log.Summarize(FpsWindow);
+        var summary = _fps?.Log.Summarize(FpsWindow, FpsSilence);
         _overlay?.Display(summary);
         if (summary is not { } frames)
         {
@@ -140,7 +147,7 @@ public sealed partial class MonitorViewModel
         FpsAdvice = string.Join(Environment.NewLine + Environment.NewLine, FrameAdvice.Explain(frames, _refreshHz));
     }
 
-    /// <summary>Arrête PresentMon (fermeture de la fenêtre ou bouton) ; quelques secondes au plus.</summary>
+    /// <summary>Arrête PresentMon (bouton) ; quelques secondes au plus, hors du fil de l'interface.</summary>
     private void StopFps()
     {
         _fpsTimer.Dispatcher.Invoke(_fpsTimer.Stop);
@@ -154,6 +161,30 @@ public sealed partial class MonitorViewModel
             }
 
             Breadcrumbs.Add("compteur d'images par seconde arrêté");
+        }
+    }
+
+    /// <summary>
+    /// Fermeture de la fenêtre pendant la mesure : PresentMon est arrêté tout de suite, et sa session d'écoute refermée en
+    /// arrière-plan. Attendre ici (jusqu'à huit secondes) figeait toute l'interface de MAUS.
+    /// </summary>
+    private void StopFpsWithoutWaiting()
+    {
+        _fpsTimer.Stop();
+        CloseOverlay();
+        if (_fps is { } capture)
+        {
+            _fps = null;
+            capture.Halt();
+            Task.Run(() =>
+            {
+                using (capture)
+                {
+                    capture.Stop();
+                }
+
+                Breadcrumbs.Add("compteur d'images par seconde arrêté (fenêtre fermée)");
+            }).Forget("compteur d'images par seconde : arrêt");
         }
     }
 

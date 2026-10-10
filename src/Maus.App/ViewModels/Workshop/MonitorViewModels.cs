@@ -198,7 +198,7 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        StopFps();
+        StopFpsWithoutWaiting();
         _errorTimer.Stop();
         _workshop.Sampled -= OnSampled;
         _workshop.PropertyChanged -= OnWorkshopChanged;

@@ -77,7 +77,23 @@ public sealed class PresentMonCapture : IDisposable
         }
     }
 
-    /// <summary>Arrête la mesure et referme la session d'écoute de Windows ; renvoie le bilan (ou <c>null</c>).</summary>
+    /// <summary>Arrête PresentMon tout de suite, sans attendre (fermeture d'une fenêtre) ; <see cref="Stop"/> finit le travail.</summary>
+    public void Halt()
+    {
+        try
+        {
+            if (!_process.HasExited)
+            {
+                _process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // Déjà terminé.
+        }
+    }
+
+    /// <summary>Arrête la mesure et referme la session d'écoute de Windows ; renvoie le bilan (ou <c>null</c>). Quelques secondes au plus.</summary>
     public FrameSummary? Stop()
     {
         try

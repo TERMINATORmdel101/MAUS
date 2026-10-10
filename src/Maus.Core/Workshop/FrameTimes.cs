@@ -39,7 +39,8 @@ public sealed record FrameSummary(string Application, int Frames, double Average
 /// vérifiées le 05/10/2026 avec la version 2.6.0). Les lignes arrivent d'un autre fil : l'ajout et le bilan sont protégés.
 /// </summary>
 /// <param name="keep">Durée gardée en mémoire (compteur en direct) ; <c>null</c> = tout garder (relevé de partie).</param>
-public sealed class FrameTimeLog(TimeSpan? keep = null)
+/// <param name="clock">Horloge en millisecondes (tests) ; par défaut <see cref="Environment.TickCount64"/>.</param>
+public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null)
 {
     /// <summary>Moins d'images que cela : pas de bilan (une poignée d'images ne dit rien d'une partie).</summary>
     public const int MinimumFrames = 100;
@@ -55,6 +56,10 @@ public sealed class FrameTimeLog(TimeSpan? keep = null)
 
     private readonly Lock _gate = new();
     private readonly Dictionary<string, List<Frame>> _frames = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Heure (horloge du PC) de la dernière image reçue de chaque programme : un jeu fermé ou en pause n'envoie plus rien.</summary>
+    private readonly Dictionary<string, long> _lastSeen = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<long> _clock = clock ?? (() => Environment.TickCount64);
     private Dictionary<string, int>? _columns;
     private double _latest;
 
@@ -96,7 +101,11 @@ public sealed class FrameTimeLog(TimeSpan? keep = null)
 
             var gpu = Number("msGPUActive") is { } g && g >= 0 ? Math.Min(g, ms) : (double?)null;
             list.Add(new Frame(time, ms, gpu, Number("SyncInterval") >= 1));
-            if (keep is { } window && list.Count > 4096 && list[0].Time < _latest - window.TotalSeconds)
+            _lastSeen[application] = _clock();
+
+            // Les images trop anciennes partent par paquets (deux secondes de marge), pas une par une à chaque image :
+            // à plusieurs centaines d'images par seconde, retirer à chaque ligne recopierait toute la liste à chaque fois.
+            if (keep is { } window && list.Count > 4096 && list[0].Time < _latest - window.TotalSeconds - 2)
             {
                 list.RemoveAll(f => f.Time < _latest - window.TotalSeconds);
             }
@@ -105,13 +114,19 @@ public sealed class FrameTimeLog(TimeSpan? keep = null)
 
     /// <summary>Bilan du programme qui a affiché le plus d'images, ou <c>null</c> s'il n'y en a pas assez.</summary>
     /// <param name="last">Seulement les dernières secondes (compteur en direct) ; <c>null</c> = toute la mesure.</param>
-    public FrameSummary? Summarize(TimeSpan? last = null)
+    /// <param name="silentAfter">
+    /// Compteur en direct : un programme qui n'a envoyé aucune image depuis cette durée (jeu fermé, en pause, réduit) n'est plus
+    /// affiché, au lieu de garder son dernier chiffre comme s'il était encore vrai ; <c>null</c> = pas de limite (relevé).
+    /// </param>
+    public FrameSummary? Summarize(TimeSpan? last = null, TimeSpan? silentAfter = null)
     {
         lock (_gate)
         {
             var since = last is { } window ? _latest - window.TotalSeconds : double.MinValue;
+            var now = _clock();
             var game = _frames
                 .Where(f => !NotGames.Contains(f.Key))
+                .Where(f => silentAfter is not { } silence || (_lastSeen.TryGetValue(f.Key, out var seen) && now - seen <= silence.TotalMilliseconds))
                 .Select(f => (Application: f.Key, Frames: f.Value.Where(x => x.Time >= since).ToList()))
                 .OrderByDescending(f => f.Frames.Count)
                 .FirstOrDefault();

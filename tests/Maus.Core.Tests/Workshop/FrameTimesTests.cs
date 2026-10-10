@@ -76,6 +76,26 @@ public class FrameTimesTests
     }
 
     [Fact]
+    public void A_game_that_stopped_sending_frames_is_no_longer_shown_live()
+    {
+        var now = 0L;
+        var log = new FrameTimeLog(TimeSpan.FromSeconds(20), () => now);
+        log.AddCsvLine(Header);
+        for (var i = 0; i < 300; i++)
+        {
+            log.AddCsvLine(Line("jeu.exe", i * 0.01, 10, 5));
+        }
+
+        now = 2_000;
+        Assert.NotNull(log.Summarize(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(3)));
+
+        // Jeu fermé ou en pause : plus aucune image depuis quatre secondes.
+        now = 4_000;
+        Assert.Null(log.Summarize(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(3)));
+        Assert.NotNull(log.Summarize());
+    }
+
+    [Fact]
     public void Live_figure_follows_the_last_second_without_waiting_for_the_ten_second_average()
     {
         // 9 s à 50 images/s (20 ms), puis 1 s à 200 images/s (5 ms) : la moyenne sur 10 s traîne, pas le chiffre en direct.
