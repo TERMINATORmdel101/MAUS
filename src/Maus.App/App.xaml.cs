@@ -175,6 +175,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         base.OnExit(e);
+        PresentMonCapture.WaitForBackgroundStops(TimeSpan.FromSeconds(8));
         Environment.Exit(e.ApplicationExitCode);
     }
 

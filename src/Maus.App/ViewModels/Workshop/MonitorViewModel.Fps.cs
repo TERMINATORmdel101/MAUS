@@ -183,16 +183,7 @@ public sealed partial class MonitorViewModel
         if (_fps is { } capture)
         {
             _fps = null;
-            capture.Halt();
-            Task.Run(() =>
-            {
-                using (capture)
-                {
-                    capture.Stop();
-                }
-
-                Breadcrumbs.Add("compteur d'images par seconde arrêté (fenêtre fermée)");
-            }).Forget("compteur d'images par seconde : arrêt");
+            capture.StopInBackground("compteur d'images par seconde arrêté (fenêtre fermée)");
         }
     }
 

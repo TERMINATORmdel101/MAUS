@@ -19,6 +19,9 @@ public sealed class PresentMonCapture : IDisposable
 
     private const string SessionName = "MAUS_Releve";
 
+    /// <summary>Arrêts en arrière-plan pas encore finis (attendus à la fermeture de MAUS, voir <see cref="WaitForBackgroundStops"/>).</summary>
+    private static readonly List<Task> s_stopping = [];
+
     private readonly Process _process;
 
     private readonly string _sessionName;
@@ -90,6 +93,56 @@ public sealed class PresentMonCapture : IDisposable
         {
             Breadcrumbs.Add("PresentMon n'a pas démarré (" + ex.GetType().Name + ")");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Fermeture d'une fenêtre : PresentMon est arrêté tout de suite, sa session d'écoute refermée en arrière-plan (quelques
+    /// secondes), puis la mesure libérée.
+    /// </summary>
+    public void StopInBackground(string what)
+    {
+        Halt();
+        var task = Task.Run(() =>
+        {
+            using (this)
+            {
+                Stop();
+            }
+
+            Breadcrumbs.Add(what);
+        });
+        lock (s_stopping)
+        {
+            s_stopping.RemoveAll(t => t.IsCompleted);
+            s_stopping.Add(task);
+        }
+
+        task.Forget("PresentMon : arrêt en arrière-plan");
+    }
+
+    /// <summary>
+    /// Fermeture de MAUS : laisse finir les arrêts en arrière-plan (sinon la fin du processus pourrait laisser une session
+    /// d'écoute de Windows ouverte jusqu'au redémarrage).
+    /// </summary>
+    public static void WaitForBackgroundStops(TimeSpan timeout)
+    {
+        Task[] pending;
+        lock (s_stopping)
+        {
+            pending = [.. s_stopping.Where(t => !t.IsCompleted)];
+        }
+
+        if (pending.Length > 0)
+        {
+            try
+            {
+                Task.WaitAll(pending, timeout);
+            }
+            catch (AggregateException)
+            {
+                // Déjà noté par Forget.
+            }
         }
     }
 
