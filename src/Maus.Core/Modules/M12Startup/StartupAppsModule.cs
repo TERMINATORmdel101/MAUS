@@ -288,7 +288,10 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 : entry.Approval.DisabledOnUtc is { } date
                     ? T("désactivé le {0}", date.ToLocalTime().ToString("d", Culture))
                     : T("désactivé");
-        var publisher = company ?? (isStore ? T("application du Store") : executable is null ? null : T("éditeur inconnu"));
+        // Programme effacé : son éditeur ne peut plus être lu, et c'est le fait utile à montrer (l'entrée ne lance plus rien).
+        var publisher = orphan
+            ? T("programme introuvable")
+            : company ?? (isStore ? T("application du Store") : executable is null ? null : T("éditeur inconnu"));
 
         var explanation = T("Source : {0}. Commande : {1}.", entry.SourceLabel, entry.Command);
         if (match is { } known)

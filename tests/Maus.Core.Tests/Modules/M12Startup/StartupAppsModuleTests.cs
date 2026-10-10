@@ -140,7 +140,7 @@ public class StartupAppsModuleTests
         var entry = findings.Single(f => f.Id == "M12.hkcu-run-oldtool");
         Assert.Equal(FindingStatus.Improvable, entry.Status);
         Assert.Contains("n'existe plus", entry.Explanation, StringComparison.Ordinal);
-        Assert.Equal("activé · éditeur inconnu", entry.Current);
+        Assert.Equal("activé · programme introuvable", entry.Current);
         Assert.Equal("ms-settings:startupapps", entry.SettingsPage);
     }
 

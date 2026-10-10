@@ -3145,6 +3145,7 @@
   "processus Windows": "Windows process",
   "processus {0}": "process {0}",
   "profil {0} (choisi par vous)": "profile {0} (chosen by you)",
+  "programme introuvable": "program not found",
   "programmes signés par leur éditeur": "programs signed by their publisher",
   "protection active": "protection on",
   "protection de la pile du noyau (audit)": "kernel stack protection (audit)",
