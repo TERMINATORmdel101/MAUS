@@ -24,6 +24,12 @@ public sealed record FrameSummary(string Application, int Frames, double Average
     /// <summary>Le chiffre à afficher en grand : celui de la dernière seconde, sinon la moyenne.</summary>
     public double LiveFps => CurrentFps ?? AverageFps;
 
+    /// <summary>
+    /// Assez d'images pour le 1 % le plus lent (<see cref="FrameTimeLog.MinimumFrames"/>) : le compteur en direct s'affiche
+    /// plus tôt (<see cref="FrameTimeLog.MinimumLiveFrames"/>), mais sur une poignée d'images ce ne serait que la pire.
+    /// </summary>
+    public bool HasLows => Frames >= FrameTimeLog.MinimumFrames;
+
     public double Low1Fps => Low1Ms > 0 ? 1000 / Low1Ms : 0;
 
     public double? Low01Fps => Low01Ms is > 0 ? 1000 / Low01Ms : null;
@@ -47,6 +53,12 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
 
     /// <summary>Le 0,1 % le plus lent n'a de sens qu'à partir de 1 000 images (en dessous, ce serait la seule pire image).</summary>
     public const int MinimumFramesFor01 = 1000;
+
+    /// <summary>
+    /// Compteur en direct : chiffre affiché dès ce nombre d'images (au démarrage du jeu ou après une pause), sans attendre
+    /// les <see cref="MinimumFrames"/> du bilan, soit plus de trois secondes dans un jeu à 30 images par seconde.
+    /// </summary>
+    public const int MinimumLiveFrames = 20;
 
     /// <summary>Durée du chiffre en direct (<see cref="FrameSummary.CurrentFps"/>).</summary>
     public static readonly TimeSpan CurrentWindow = TimeSpan.FromSeconds(1);
@@ -112,13 +124,30 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
         }
     }
 
+    /// <summary>
+    /// Compteur en direct : seulement les images depuis la dernière pause (jeu en pause, réduit, chargement). L'image qui suit
+    /// une pause « dure » toute la pause : comptée, elle ferait croire à quelques images par seconde pendant dix secondes
+    /// (constaté le 10/10/2026 avec une fenêtre d'essai : 7 au lieu de 60 à la reprise).
+    /// </summary>
+    private static List<Frame> SincePause(List<Frame> frames, TimeSpan? silentAfter)
+    {
+        if (silentAfter is not { } silence)
+        {
+            return frames;
+        }
+
+        var pause = frames.FindLastIndex(f => f.Ms >= silence.TotalMilliseconds);
+        return pause < 0 ? frames : frames[(pause + 1)..];
+    }
+
     /// <summary>Bilan du programme qui a affiché le plus d'images, ou <c>null</c> s'il n'y en a pas assez.</summary>
     /// <param name="last">Seulement les dernières secondes (compteur en direct) ; <c>null</c> = toute la mesure.</param>
     /// <param name="silentAfter">
     /// Compteur en direct : un programme qui n'a envoyé aucune image depuis cette durée (jeu fermé, en pause, réduit) n'est plus
     /// affiché, au lieu de garder son dernier chiffre comme s'il était encore vrai ; <c>null</c> = pas de limite (relevé).
     /// </param>
-    public FrameSummary? Summarize(TimeSpan? last = null, TimeSpan? silentAfter = null)
+    /// <param name="minimumFrames">Moins d'images que cela : pas de bilan (<see cref="MinimumLiveFrames"/> pour le compteur en direct).</param>
+    public FrameSummary? Summarize(TimeSpan? last = null, TimeSpan? silentAfter = null, int minimumFrames = MinimumFrames)
     {
         lock (_gate)
         {
@@ -127,10 +156,10 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
             var game = _frames
                 .Where(f => !NotGames.Contains(f.Key))
                 .Where(f => silentAfter is not { } silence || (_lastSeen.TryGetValue(f.Key, out var seen) && now - seen <= silence.TotalMilliseconds))
-                .Select(f => (Application: f.Key, Frames: f.Value.Where(x => x.Time >= since).ToList()))
+                .Select(f => (Application: f.Key, Frames: SincePause(f.Value.Where(x => x.Time >= since).ToList(), silentAfter)))
                 .OrderByDescending(f => f.Frames.Count)
                 .FirstOrDefault();
-            if (game.Frames is not { Count: >= MinimumFrames } frames)
+            if (game.Frames is not { } frames || frames.Count < Math.Max(2, minimumFrames))
             {
                 return null;
             }
@@ -140,8 +169,11 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
             double Slowest(double share) => sorted[^(int)Math.Ceiling(sorted.Count * share)];
             var total = frames.Sum(f => f.Ms);
             var withGpu = frames.Where(f => f.GpuMs is not null).ToList();
-            var recent = frames.Where(f => f.Time >= _latest - CurrentWindow.TotalSeconds).ToList();
-            var recentMs = recent.Sum(f => f.Ms);
+            // Chiffre en direct : images de la dernière seconde du jeu, comptées d'après leurs heures (la durée de la première
+            // d'entre elles, qui peut contenir une attente, n'entre pas dans le calcul).
+            var gameLatest = frames.Max(f => f.Time);
+            var recent = frames.Where(f => f.Time >= gameLatest - CurrentWindow.TotalSeconds).ToList();
+            var recentSpan = recent.Count >= 2 ? recent.Max(f => f.Time) - recent.Min(f => f.Time) : 0;
             return new FrameSummary(
                 game.Application,
                 frames.Count,
@@ -151,7 +183,7 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
                 withGpu.Count == frames.Count && total > 0 ? withGpu.Sum(f => f.GpuMs!.Value) / total : null,
                 frames.Count(f => f.Synced) / (double)frames.Count)
             {
-                CurrentFps = recent.Count >= 2 && recentMs > 0 ? recent.Count * 1000 / recentMs : null,
+                CurrentFps = recentSpan > 0 ? (recent.Count - 1) / recentSpan : null,
             };
         }
     }

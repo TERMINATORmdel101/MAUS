@@ -137,7 +137,7 @@ public sealed partial class MonitorViewModel
             return;
         }
 
-        var summary = _fps?.Log.Summarize(FpsWindow, FpsSilence);
+        var summary = _fps?.Log.Summarize(FpsWindow, FpsSilence, FrameTimeLog.MinimumLiveFrames);
         _overlay?.Display(summary);
         if (summary is not { } frames)
         {
@@ -149,7 +149,7 @@ public sealed partial class MonitorViewModel
 
         FpsGame = T("{0} · moyenne sur 10 s : {1:0} images par seconde", frames.Application, frames.AverageFps);
         FpsAverage = frames.LiveFps.ToString("0", Culture);
-        FpsLow1 = frames.Low1Fps.ToString("0", Culture);
+        FpsLow1 = frames.HasLows ? frames.Low1Fps.ToString("0", Culture) : "—";
         FpsLow01 = frames.Low01Fps is { } low01 ? low01.ToString("0", Culture) : "—";
         FpsGpu = frames.GpuBusyShare is { } busy ? (busy * 100).ToString("0", Culture) + " %" : "—";
         FpsAdvice = string.Join(Environment.NewLine + Environment.NewLine, FrameAdvice.Explain(frames, _refreshHz));

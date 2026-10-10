@@ -94,7 +94,12 @@ public sealed class FpsOverlayWindow : Window
         }
 
         _fps.Text = frames.LiveFps.ToString("0", Culture);
-        var parts = new List<string> { T("moy. 10 s : {0:0}", frames.AverageFps), T("1 % : {0:0}", frames.Low1Fps) };
+        var parts = new List<string> { T("moy. 10 s : {0:0}", frames.AverageFps) };
+        if (frames.HasLows)
+        {
+            parts.Add(T("1 % : {0:0}", frames.Low1Fps));
+        }
+
         if (frames.Low01Fps is { } low01)
         {
             parts.Add(T("0,1 % : {0:0}", low01));

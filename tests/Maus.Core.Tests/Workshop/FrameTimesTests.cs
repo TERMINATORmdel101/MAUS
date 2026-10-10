@@ -96,6 +96,47 @@ public class FrameTimesTests
     }
 
     [Fact]
+    public void Live_counter_shows_a_figure_from_a_few_frames_but_no_lows()
+    {
+        var log = Log(30, _ => 33.3);
+
+        Assert.Null(log.Summarize());
+        var live = log.Summarize(TimeSpan.FromSeconds(10), minimumFrames: FrameTimeLog.MinimumLiveFrames)!;
+        Assert.Equal(30, live.LiveFps, 0);
+        Assert.False(live.HasLows);
+    }
+
+    [Fact]
+    public void After_a_pause_the_live_counter_starts_again_from_the_resumed_frames()
+    {
+        // 5 s à 90 images/s, pause de 6 s (une image de 6 000 ms à la reprise), puis 3 s à 60 images/s.
+        var log = new FrameTimeLog(TimeSpan.FromSeconds(20), () => 0);
+        log.AddCsvLine(Header);
+        var time = 0.0;
+        void Frames(int count, double ms)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                time += ms / 1000;
+                log.AddCsvLine(Line("jeu.exe", time, ms, ms / 2));
+            }
+        }
+
+        Frames(450, 1000 / 90.0);
+        Frames(1, 6000);
+        Frames(180, 1000 / 60.0);
+
+        var live = log.Summarize(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(3))!;
+
+        Assert.Equal(180, live.Frames);
+        Assert.Equal(60, live.AverageFps, 0);
+        Assert.Equal(60, live.CurrentFps!.Value, 0);
+
+        // Le relevé de toute la partie, lui, garde tout.
+        Assert.Equal(631, log.Summarize()!.Frames);
+    }
+
+    [Fact]
     public void Live_figure_follows_the_last_second_without_waiting_for_the_ten_second_average()
     {
         // 9 s à 50 images/s (20 ms), puis 1 s à 200 images/s (5 ms) : la moyenne sur 10 s traîne, pas le chiffre en direct.
