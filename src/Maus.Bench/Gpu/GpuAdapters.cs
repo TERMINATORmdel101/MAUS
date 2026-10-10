@@ -51,6 +51,18 @@ public sealed class DeviceLostException(string message, Exception? inner = null)
 
 internal static class DeviceLost
 {
+    /// <summary>
+    /// Codes de DXGI qui signalent la perte de la carte (learn.microsoft.com, « DXGI_ERROR ») : DEVICE_REMOVED (0x887A0005),
+    /// DEVICE_HUNG (0x887A0006), DEVICE_RESET (0x887A0007), DRIVER_INTERNAL_ERROR (0x887A0020). Un plantage du pilote arrive
+    /// sous l'une de ces formes, à n'importe quel appel (fermeture d'une liste de commandes, présentation, attente).
+    /// </summary>
+    private static readonly HashSet<uint> LossCodes = [0x887A0005, 0x887A0006, 0x887A0007, 0x887A0020];
+
+    public static bool IsLoss(SharpGen.Runtime.SharpGenException ex) => LossCodes.Contains(unchecked((uint)ex.ResultCode.Code));
+
+    public static DeviceLostException From(SharpGen.Runtime.SharpGenException ex) =>
+        new($"La carte graphique a cessé de répondre (code 0x{unchecked((uint)ex.ResultCode.Code):X8}).", ex);
+
     public static void ThrowIfRemoved(Result reason)
     {
         if (reason.Failure)

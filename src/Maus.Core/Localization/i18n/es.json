@@ -1320,6 +1320,8 @@
   "Le barème de MAUS": "El baremo de MAUS",
   "Le benchmark n'a pas pu démarrer : {0}": "No se pudo iniciar el benchmark: {0}",
   "Le benchmark n'a pas pu démarrer.": "No se pudo iniciar el benchmark.",
+  "Le benchmark s'est arrêté : Direct3D ou Windows a refusé une opération. Mettez à jour le pilote de la carte graphique, ou essayez l'autre interface (DirectX 11 / DirectX 12).": "El benchmark se ha detenido: Direct3D o Windows ha rechazado una operación. Actualiza el controlador de la tarjeta gráfica o prueba la otra interfaz (DirectX 11 / DirectX 12).",
+  "Le benchmark s'est arrêté sur une erreur (code {0}). Le détail est dans l'Observateur d'événements de Windows, journal Application, source « .NET Runtime ».": "El benchmark se ha detenido por un error (código {0}). El detalle está en el Visor de eventos de Windows, registro Aplicación, origen «.NET Runtime».",
   "Le benchmark visuel a sa propre page dans le menu de gauche : lancement, dernier résultat et historique.": "El benchmark visual tiene su propia página en el menú de la izquierda: inicio, último resultado e historial.",
   "Le bilan du relevé n'a pas pu être établi : {0}": "No se pudo elaborar el balance del registro: {0}",
   "Le bleu du logo.": "El azul del logotipo.",

@@ -401,9 +401,13 @@ public sealed partial class WorkshopViewModel
             }
 
             await process.WaitForExitAsync().ConfigureAwait(true);
-            BenchmarkStatus = process.ExitCode == 3
-                ? T("La carte graphique a cessé de répondre pendant le benchmark (pilote réinitialisé par Windows). Une carte stable ne devrait jamais le faire : vérifiez sa température, son alimentation et ses réglages d'overclocking.")
-                : "";
+            BenchmarkStatus = process.ExitCode switch
+            {
+                0 => "",
+                3 => T("La carte graphique a cessé de répondre pendant le benchmark (pilote réinitialisé par Windows). Une carte stable ne devrait jamais le faire : vérifiez sa température, son alimentation et ses réglages d'overclocking."),
+                4 => T("Le benchmark s'est arrêté : Direct3D ou Windows a refusé une opération. Mettez à jour le pilote de la carte graphique, ou essayez l'autre interface (DirectX 11 / DirectX 12)."),
+                var code => T("Le benchmark s'est arrêté sur une erreur (code {0}). Le détail est dans l'Observateur d'événements de Windows, journal Application, source « .NET Runtime ».", code),
+            };
         }
         catch (System.ComponentModel.Win32Exception ex)
         {

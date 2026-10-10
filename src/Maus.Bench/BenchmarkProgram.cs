@@ -63,6 +63,17 @@ public static partial class BenchmarkProgram
             Console.Error.WriteLine(ex.Message);
             return 3;
         }
+        catch (SharpGen.Runtime.SharpGenException ex) when (DeviceLost.IsLoss(ex))
+        {
+            Console.Error.WriteLine(DeviceLost.From(ex).Message);
+            return 3;
+        }
+        catch (Exception ex) when (ex is SharpGen.Runtime.SharpGenException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            // Autre refus de Direct3D ou de Windows : un code de sortie à part, que l'Atelier explique, au lieu d'un plantage muet.
+            Console.Error.WriteLine(ex.Message);
+            return 4;
+        }
     }
 
     internal static IReadOnlyList<BenchScene> CreateScenes(IReadOnlyCollection<string> only)

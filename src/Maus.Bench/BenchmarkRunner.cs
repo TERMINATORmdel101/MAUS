@@ -92,6 +92,11 @@ internal sealed class BenchmarkRunner : IDisposable
         {
             error = ex.Message;
         }
+        catch (SharpGen.Runtime.SharpGenException ex) when (DeviceLost.IsLoss(ex))
+        {
+            // Plantage du pilote signalé par un appel ordinaire : les résultats déjà mesurés sont gardés.
+            error = DeviceLost.From(ex).Message;
+        }
 
         return Finish(completed, error);
     }
