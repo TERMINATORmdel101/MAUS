@@ -16,7 +16,8 @@ public sealed partial class MonitorViewModel
 {
     private static readonly TimeSpan FpsWindow = TimeSpan.FromSeconds(10);
 
-    private readonly DispatcherTimer _fpsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    // Deux fois par seconde : le chiffre en direct suit le jeu sans à-coups.
+    private readonly DispatcherTimer _fpsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private PresentMonCapture? _fps;
     private int? _refreshHz;
     private string _fpsGame = string.Empty;
@@ -131,8 +132,8 @@ public sealed partial class MonitorViewModel
             return;
         }
 
-        FpsGame = frames.Application;
-        FpsAverage = frames.AverageFps.ToString("0", Culture);
+        FpsGame = T("{0} · moyenne sur 10 s : {1:0} images par seconde", frames.Application, frames.AverageFps);
+        FpsAverage = frames.LiveFps.ToString("0", Culture);
         FpsLow1 = frames.Low1Fps.ToString("0", Culture);
         FpsLow01 = frames.Low01Fps is { } low01 ? low01.ToString("0", Culture) : "—";
         FpsGpu = frames.GpuBusyShare is { } busy ? (busy * 100).ToString("0", Culture) + " %" : "—";

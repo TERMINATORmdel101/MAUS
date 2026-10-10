@@ -15,6 +15,15 @@ namespace Maus.Core.Workshop;
 /// <param name="VSyncShare">Part des images envoyées avec la synchronisation verticale (colonne SyncInterval ≥ 1).</param>
 public sealed record FrameSummary(string Application, int Frames, double AverageFps, double Low1Ms, double? Low01Ms, double? GpuBusyShare, double VSyncShare)
 {
+    /// <summary>
+    /// Images par seconde de la dernière seconde seulement (<see cref="FrameTimeLog.CurrentWindow"/>) : le chiffre en direct,
+    /// qui suit le jeu sans attendre la moyenne longue ; <c>null</c> s'il n'y a pas eu au moins deux images dans cette seconde.
+    /// </summary>
+    public double? CurrentFps { get; init; }
+
+    /// <summary>Le chiffre à afficher en grand : celui de la dernière seconde, sinon la moyenne.</summary>
+    public double LiveFps => CurrentFps ?? AverageFps;
+
     public double Low1Fps => Low1Ms > 0 ? 1000 / Low1Ms : 0;
 
     public double? Low01Fps => Low01Ms is > 0 ? 1000 / Low01Ms : null;
@@ -37,6 +46,9 @@ public sealed class FrameTimeLog(TimeSpan? keep = null)
 
     /// <summary>Le 0,1 % le plus lent n'a de sens qu'à partir de 1 000 images (en dessous, ce serait la seule pire image).</summary>
     public const int MinimumFramesFor01 = 1000;
+
+    /// <summary>Durée du chiffre en direct (<see cref="FrameSummary.CurrentFps"/>).</summary>
+    public static readonly TimeSpan CurrentWindow = TimeSpan.FromSeconds(1);
 
     /// <summary>Le compositeur de Windows et MAUS affichent aussi des images : jamais pris pour le jeu.</summary>
     private static readonly HashSet<string> NotGames = new(StringComparer.OrdinalIgnoreCase) { "dwm.exe", "MAUS.exe", "<error>", "<unknown>" };
@@ -113,6 +125,8 @@ public sealed class FrameTimeLog(TimeSpan? keep = null)
             double Slowest(double share) => sorted[^(int)Math.Ceiling(sorted.Count * share)];
             var total = frames.Sum(f => f.Ms);
             var withGpu = frames.Where(f => f.GpuMs is not null).ToList();
+            var recent = frames.Where(f => f.Time >= _latest - CurrentWindow.TotalSeconds).ToList();
+            var recentMs = recent.Sum(f => f.Ms);
             return new FrameSummary(
                 game.Application,
                 frames.Count,
@@ -120,7 +134,10 @@ public sealed class FrameTimeLog(TimeSpan? keep = null)
                 Slowest(0.01),
                 frames.Count >= MinimumFramesFor01 ? Slowest(0.001) : null,
                 withGpu.Count == frames.Count && total > 0 ? withGpu.Sum(f => f.GpuMs!.Value) / total : null,
-                frames.Count(f => f.Synced) / (double)frames.Count);
+                frames.Count(f => f.Synced) / (double)frames.Count)
+            {
+                CurrentFps = recent.Count >= 2 && recentMs > 0 ? recent.Count * 1000 / recentMs : null,
+            };
         }
     }
 }

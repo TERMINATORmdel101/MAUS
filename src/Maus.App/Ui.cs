@@ -129,7 +129,7 @@ public static class Ui
 
     public static string OverlayPlace => T("Position");
 
-    public static string FpsAverage => T("MOYENNE");
+    public static string FpsAverage => T("EN CE MOMENT");
 
     public static string FpsLow1 => T("1 % LE PLUS LENT");
 
@@ -137,7 +137,7 @@ public static class Ui
 
     public static string FpsGpu => T("CARTE GRAPHIQUE");
 
-    public static string FpsAverageTip => T("Images par seconde sur les dix dernières secondes : nombre d'images divisé par le temps.");
+    public static string FpsAverageTip => T("Images par seconde de la dernière seconde. La moyenne des dix dernières secondes est écrite au-dessus, à côté du nom du jeu.");
 
     public static string FpsLowTip => T("Images par seconde des images les plus lentes : 1 % (ou 0,1 %) des images ont duré au moins aussi longtemps. Un chiffre bas par rapport à la moyenne se ressent comme des saccades.");
 

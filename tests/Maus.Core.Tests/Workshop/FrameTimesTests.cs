@@ -76,6 +76,19 @@ public class FrameTimesTests
     }
 
     [Fact]
+    public void Live_figure_follows_the_last_second_without_waiting_for_the_ten_second_average()
+    {
+        // 9 s à 50 images/s (20 ms), puis 1 s à 200 images/s (5 ms) : la moyenne sur 10 s traîne, pas le chiffre en direct.
+        var log = Log(650, i => i < 450 ? 20 : 5);
+
+        var summary = log.Summarize(TimeSpan.FromSeconds(10))!;
+
+        Assert.True(summary.AverageFps < 70);
+        Assert.InRange(summary.CurrentFps!.Value, 190, 205);
+        Assert.Equal(summary.CurrentFps, summary.LiveFps);
+    }
+
+    [Fact]
     public void Dropped_frames_bad_lines_and_short_captures_are_ignored()
     {
         var log = new FrameTimeLog();

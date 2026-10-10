@@ -83,7 +83,7 @@ public sealed class FpsOverlayWindow : Window
         Place();
     }
 
-    /// <summary>Dernier bilan des dix dernières secondes ; <c>null</c> = pas encore de jeu.</summary>
+    /// <summary>Dernier bilan : chiffre de la dernière seconde en grand, puis les dix dernières secondes ; <c>null</c> = pas encore de jeu.</summary>
     public void Display(FrameSummary? frames)
     {
         if (frames is null)
@@ -93,8 +93,8 @@ public sealed class FpsOverlayWindow : Window
             return;
         }
 
-        _fps.Text = frames.AverageFps.ToString("0", Culture);
-        var parts = new List<string> { T("1 % : {0:0}", frames.Low1Fps) };
+        _fps.Text = frames.LiveFps.ToString("0", Culture);
+        var parts = new List<string> { T("moy. 10 s : {0:0}", frames.AverageFps), T("1 % : {0:0}", frames.Low1Fps) };
         if (frames.Low01Fps is { } low01)
         {
             parts.Add(T("0,1 % : {0:0}", low01));

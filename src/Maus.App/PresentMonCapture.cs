@@ -54,7 +54,8 @@ public sealed class PresentMonCapture : IDisposable
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
-        foreach (var argument in new[] { "--output_stdout", "--v1_metrics", "--no_console_stats", "--stop_existing_session", "--session_name", sessionName })
+        // Le compositeur de Windows et MAUS ne sont jamais le jeu : PresentMon ne les suit pas (moins de lignes à écrire et à lire).
+        foreach (var argument in new[] { "--output_stdout", "--v1_metrics", "--no_console_stats", "--stop_existing_session", "--session_name", sessionName, "--exclude", "dwm.exe", "--exclude", "MAUS.exe" })
         {
             start.ArgumentList.Add(argument);
         }
