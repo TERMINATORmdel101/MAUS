@@ -129,6 +129,14 @@ public sealed partial class MonitorViewModel
 
     private void RefreshFps()
     {
+        if (_fps is { HasExited: true })
+        {
+            StopFpsWithoutWaiting();
+            OnFpsStateChanged();
+            FpsStatus = T("La mesure s'est arrêtée toute seule : un autre programme a peut-être repris l'écoute des images de Windows. Relancez la mesure.");
+            return;
+        }
+
         var summary = _fps?.Log.Summarize(FpsWindow, FpsSilence);
         _overlay?.Display(summary);
         if (summary is not { } frames)

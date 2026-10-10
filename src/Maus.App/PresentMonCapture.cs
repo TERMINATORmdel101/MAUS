@@ -32,6 +32,22 @@ public sealed class PresentMonCapture : IDisposable
 
     public FrameTimeLog Log { get; }
 
+    /// <summary>PresentMon s'est arrêté de lui-même (session d'écoute reprise par un autre programme, refus de Windows).</summary>
+    public bool HasExited
+    {
+        get
+        {
+            try
+            {
+                return _process.HasExited;
+            }
+            catch (InvalidOperationException)
+            {
+                return true;
+            }
+        }
+    }
+
     public static string ExecutablePath => Path.Combine(AppContext.BaseDirectory, "PresentMon", "PresentMon.exe");
 
     /// <summary>Démarre la mesure ; <c>null</c> si PresentMon est absent, modifié ou refuse de démarrer.</summary>
