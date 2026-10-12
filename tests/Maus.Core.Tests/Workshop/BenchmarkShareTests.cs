@@ -24,6 +24,32 @@ public sealed class BenchmarkShareTests
         ],
     };
 
+    [Theory]
+    [InlineData("0.7.1", 1)]
+    [InlineData("0.7.4", 1)]
+    [InlineData("0.7.5", 2)]
+    [InlineData("0.8.0", 2)]
+    [InlineData("0.6.2", 0)]
+    public void Benchmark_edition_follows_the_version_that_measured_it(string version, int edition) =>
+        Assert.Equal(edition, BenchmarkScoring.EditionOf(Sample() with { Version = version }));
+
+    [Fact]
+    public void Results_of_different_editions_or_test_sets_are_flagged_and_the_overall_score_is_not_compared()
+    {
+        var mine = Sample();
+        var older = Sample() with { Version = "0.7.1" };
+        var gpuOnly = Sample() with { Tests = [Sample().Tests[0]] };
+
+        Assert.True(BenchmarkComparison.Comparable(mine, Sample(gpu: 8000)));
+        Assert.Empty(BenchmarkComparison.Differences(mine, Sample(gpu: 8000)));
+        Assert.False(BenchmarkComparison.Comparable(mine, older));
+        Assert.Contains(BenchmarkComparison.Differences(mine, older), n => n.Contains("Versions du benchmark", StringComparison.Ordinal));
+        Assert.Contains(BenchmarkComparison.Differences(mine, gpuOnly), n => n.Contains("mêmes tests", StringComparison.Ordinal));
+        Assert.DoesNotContain(BenchmarkComparison.Compare(mine, gpuOnly), r => r.Id == "overall");
+        Assert.Contains(BenchmarkComparison.Differences(mine, Sample() with { Api = "Direct3D 11" }), n => n.Contains("Interfaces", StringComparison.Ordinal));
+        Assert.Contains(BenchmarkComparison.Differences(mine, Sample() with { Completed = false }), n => n.Contains("interrompue", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void A_result_survives_the_share_code_even_inside_a_forum_message()
     {

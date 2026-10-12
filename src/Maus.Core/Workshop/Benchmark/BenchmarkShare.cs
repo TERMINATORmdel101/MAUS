@@ -183,12 +183,15 @@ public static class BenchmarkComparison
         ArgumentNullException.ThrowIfNull(mine);
         ArgumentNullException.ThrowIfNull(theirs);
 
-        var rows = new List<BenchmarkComparisonRow>
+        // Score combiné seulement entre passes des mêmes tests (une passe « carte graphique seule » n'a pas le même mélange).
+        var rows = new List<BenchmarkComparisonRow>();
+        if (SameTests(mine, theirs))
         {
-            Row("overall", mine.OverallScore, theirs.OverallScore),
-            Row("gpu", mine.GpuScore, theirs.GpuScore),
-            Row("cpu", mine.CpuScore, theirs.CpuScore),
-        };
+            rows.Add(Row("overall", mine.OverallScore, theirs.OverallScore));
+        }
+
+        rows.Add(Row("gpu", mine.GpuScore, theirs.GpuScore));
+        rows.Add(Row("cpu", mine.CpuScore, theirs.CpuScore));
         if (mine.RayTracingScore > 0 || theirs.RayTracingScore > 0)
         {
             rows.Add(Row("rt", mine.RayTracingScore, theirs.RayTracingScore));
@@ -203,13 +206,54 @@ public static class BenchmarkComparison
         return rows;
     }
 
-    /// <summary>Les points ne se comparent qu'à résolution de calcul égale (et en mode léger avec le mode léger).</summary>
+    /// <summary>
+    /// Les points ne se comparent qu'entre passes de la même édition du benchmark (mêmes scènes, même étalonnage) et à
+    /// résolution de calcul égale ; le reste (interface, passe interrompue, tests différents) appelle une précaution.
+    /// </summary>
     public static bool Comparable(BenchmarkReport a, BenchmarkReport b)
     {
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(b);
-        return string.Equals(a.RenderResolution, b.RenderResolution, StringComparison.Ordinal);
+        return BenchmarkScoring.EditionOf(a) == BenchmarkScoring.EditionOf(b)
+            && string.Equals(a.RenderResolution, b.RenderResolution, StringComparison.Ordinal);
     }
+
+    /// <summary>Ce qui empêche ou limite la comparaison, en phrases à afficher ; vide si les deux passes se comparent.</summary>
+    public static IReadOnlyList<string> Differences(BenchmarkReport mine, BenchmarkReport theirs)
+    {
+        ArgumentNullException.ThrowIfNull(mine);
+        ArgumentNullException.ThrowIfNull(theirs);
+        var notes = new List<string>();
+        if (BenchmarkScoring.EditionOf(mine) != BenchmarkScoring.EditionOf(theirs))
+        {
+            notes.Add(Localization.Texts.T("Versions du benchmark différentes (MAUS {0} contre {1}) : les scènes ou l'étalonnage ont changé entre-temps, les points ne se comparent pas.", mine.Version, theirs.Version));
+        }
+
+        if (!string.Equals(mine.RenderResolution, theirs.RenderResolution, StringComparison.Ordinal))
+        {
+            notes.Add(Localization.Texts.T("Résolutions différentes ({0} contre {1}) : les points ne se comparent pas vraiment.", mine.RenderResolution, theirs.RenderResolution));
+        }
+
+        if (!mine.Completed || !theirs.Completed)
+        {
+            notes.Add(Localization.Texts.T("Une des passes a été interrompue : ses scores sont partiels."));
+        }
+
+        if (!string.Equals(mine.Api, theirs.Api, StringComparison.Ordinal))
+        {
+            notes.Add(Localization.Texts.T("Interfaces différentes ({0} contre {1}) : la même carte peut aller plus ou moins vite selon l'interface.", mine.Api, theirs.Api));
+        }
+
+        if (!SameTests(mine, theirs))
+        {
+            notes.Add(Localization.Texts.T("Les deux passes n'ont pas fait les mêmes tests : le score combiné n'est pas comparé, seulement les tests communs."));
+        }
+
+        return notes;
+    }
+
+    private static bool SameTests(BenchmarkReport a, BenchmarkReport b) =>
+        a.Tests.Select(t => t.Id).Order(StringComparer.Ordinal).SequenceEqual(b.Tests.Select(t => t.Id).Order(StringComparer.Ordinal), StringComparer.Ordinal);
 
     private static BenchmarkComparisonRow Row(string id, double mine, double theirs) =>
         new(id, mine, theirs, mine > 0 && theirs > 0 ? Math.Round(((theirs / mine) - 1) * 100, 1) : null);

@@ -236,7 +236,10 @@ public sealed partial class WorkshopViewModel
     public IReadOnlyList<BenchmarkRow> BenchmarkCpuTests => Rows("cpu");
 
     /// <summary>Scores combinés des passes complètes, pour la courbe de l'historique.</summary>
-    public IReadOnlyList<double> BenchmarkTrend => [.. VisualRuns.Where(r => r.OverallScore > 0).TakeLast(20).Select(r => r.OverallScore)];
+    /// <summary>Évolution du score combiné : seulement les passes complètes comparables à la dernière (même édition, même résolution).</summary>
+    public IReadOnlyList<double> BenchmarkTrend => LastBenchmark is not { } latest
+        ? []
+        : [.. VisualRuns.Where(r => r.OverallScore > 0 && r.Completed && BenchmarkComparison.Comparable(latest, r)).TakeLast(20).Select(r => r.OverallScore)];
 
     public IReadOnlyList<BenchmarkRunRow> BenchmarkRuns => [.. VisualRuns.Reverse().Take(12).Select(r => new BenchmarkRunRow(
         r.Date.ToLocalTime().ToString("g", Texts.Culture),
@@ -263,9 +266,9 @@ public sealed partial class WorkshopViewModel
         ? T("Comparé à : {0} · {1} ({2}, {3}, {4})", other.Gpu, other.Cpu, other.RenderResolution, other.Api, other.Date.ToLocalTime().ToString("d", Texts.Culture))
         : "";
 
-    /// <summary>Les points ne se comparent qu'à résolution égale : avertissement sinon.</summary>
-    public string BenchmarkCompareWarning => _compared is { } other && LastBenchmark is { } mine && !BenchmarkComparison.Comparable(mine, other)
-        ? T("Attention : résolutions différentes ({0} contre {1}), les points ne se comparent pas vraiment.", mine.RenderResolution, other.RenderResolution)
+    /// <summary>Tout ce qui empêche ou limite la comparaison (édition, résolution, interface, passe interrompue, tests).</summary>
+    public string BenchmarkCompareWarning => _compared is { } other && LastBenchmark is { } mine
+        ? string.Join(" ", BenchmarkComparison.Differences(mine, other).Select(n => T("Attention :") + " " + n))
         : "";
 
     public bool HasBenchmarkCompareWarning => BenchmarkCompareWarning.Length > 0;
@@ -303,7 +306,11 @@ public sealed partial class WorkshopViewModel
     {
         if (VisualRuns.Count >= 2)
         {
-            ShowComparison(VisualRuns[^2], "");
+            // La passe précédente la plus récente qui se compare vraiment (même édition, même résolution, passe complète) ;
+            // à défaut, l'avant-dernière, avec les précautions affichées.
+            var latest = VisualRuns[^1];
+            var comparable = VisualRuns.Take(VisualRuns.Count - 1).LastOrDefault(r => r.Completed && BenchmarkComparison.Comparable(latest, r));
+            ShowComparison(comparable ?? VisualRuns[^2], "");
         }
         else
         {

@@ -73,6 +73,34 @@ public sealed record BenchmarkReport
 /// </summary>
 public static class BenchmarkScoring
 {
+    /// <summary>
+    /// Éditions du benchmark : une nouvelle édition commence chaque fois que les scènes ou les valeurs de référence changent,
+    /// et les points de deux éditions ne se comparent pas. Déduite de la version de MAUS du résultat (aussi pour l'historique
+    /// et les codes partagés des versions précédentes) : 1 = de la 0.7.1 à la 0.7.4, 2 = depuis la 0.7.5 (nouvelles scènes,
+    /// étalonnage à vitesse réelle). À compléter à chaque changement de scène ou de référence.
+    /// </summary>
+    private static readonly (Version From, int Edition)[] Editions = [(new(0, 7, 5), 2), (new(0, 7, 1), 1)];
+
+    public static int EditionOf(BenchmarkReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        var text = report.Version.Split('+', '-', ' ')[0];
+        if (!Version.TryParse(text, out var version))
+        {
+            return 0;
+        }
+
+        foreach (var (from, edition) in Editions)
+        {
+            if (version >= from)
+            {
+                return edition;
+            }
+        }
+
+        return 0;
+    }
+
     public const double ReferencePoints = 10000;
     public const double GpuWeight = 0.75;
     public const double CpuWeight = 0.25;
