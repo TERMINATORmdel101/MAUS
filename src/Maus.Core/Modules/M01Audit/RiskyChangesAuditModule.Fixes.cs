@@ -39,82 +39,69 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
     public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(findings);
 
-        var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
-        var registry = context.Registry;
         var policyFileNote = HasLocalPolicyFile(context)
             ? T("Une stratégie locale (Registry.pol) existe sur ce PC : si elle contient ce réglage, Windows peut le réécrire. MAUS le verra au prochain audit.")
             : null;
-        var changes = new List<PlannedChange>();
-
-        bool Deviates(string id, out Finding finding) =>
-            byId.TryGetValue(id, out finding!) && finding.Fixable && finding.Status is FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem;
-
-        void Add(Finding finding, string title, string description, IEnumerable<SettingWrite> writes, string? id = null, ChangeEffect effect = ChangeEffect.Immediate, string? risk = null, string? warning = null)
-        {
-            var list = writes.ToList();
-            if (list.Count == 0)
-            {
-                return;
-            }
-
-            var isPolicy = list.Any(w => w.Value is null && (w.Key.Path ?? string.Empty).Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase));
-            changes.Add(new PlannedChange
-            {
-                Id = id ?? finding.Id,
-                FindingId = id is null ? null : finding.Id,
-                ModuleId = Id,
-                Title = title,
-                Description = description,
-                Category = finding.Category,
-                Gain = T("Retour au réglage d'origine de Windows : sécurité et mises à jour rétablies."),
-                Risk = risk ?? (isPolicy ? policyFileNote : null),
-                Warning = warning,
-                Effect = effect,
-                Recommended = finding.Severity == Severity.Critical,
-                Writes = list,
-            });
-        }
+        var plan = new PlanBuilder(Id, findings, policyFileNote);
+        var registry = context.Registry;
 
         // Règles du catalogue (stratégies Defender, SmartScreen, mises à jour automatiques, UAC).
         foreach (var change in RegistryRulePlanner.Plan(Id, Rules.Value, findings))
         {
-            var finding = byId[change.Id];
-            changes.Add(change with
+            var finding = plan.Finding(change.Id);
+            plan.Changes.Add(change with
             {
                 Recommended = finding.Severity == Severity.Critical,
                 Risk = change.Risk ?? (change.Writes.All(w => w.Value is null) ? policyFileNote : null),
             });
         }
 
-        if (Deviates("M01.defender-realtime", out var realtime) && Read(registry, RealtimePolicyKey, "DisableRealtimeMonitoring") is not null)
+        PlanProtections(plan, registry);
+        PlanUpdates(plan);
+        PlanServices(plan, registry);
+        PlanWinlogon(plan, registry);
+        PlanAppInit(plan, registry);
+        PlanDebuggers(plan, registry);
+        return plan.Changes;
+    }
+
+    /// <summary>Protection en temps réel, confirmation de l'UAC, pare-feu.</summary>
+    private static void PlanProtections(PlanBuilder plan, IRegistryReader registry)
+    {
+        if (plan.Deviates("M01.defender-realtime", out var realtime) && Read(registry, RealtimePolicyKey, "DisableRealtimeMonitoring") is not null)
         {
-            Add(realtime, T("Supprimer la stratégie qui coupe la protection en temps réel"),
+            plan.Add(realtime, T("Supprimer la stratégie qui coupe la protection en temps réel"),
                 T("Rend la main à Sécurité Windows. Si la protection reste coupée ensuite, réactivez-la dans Sécurité Windows > Protection contre les virus et menaces."),
                 [Delete(RealtimePolicyKey, "DisableRealtimeMonitoring")],
                 risk: T("La protection contre les falsifications peut refuser l'écriture : MAUS le signalera sans rien casser."));
         }
 
-        if (Deviates("M01.uac-prompt", out var uacPrompt))
+        if (plan.Deviates("M01.uac-prompt", out var uacPrompt))
         {
-            Add(uacPrompt, T("Remettre la demande de confirmation de l'UAC par défaut"),
+            plan.Add(uacPrompt, T("Remettre la demande de confirmation de l'UAC par défaut"),
                 T("Curseur de l'UAC sur le niveau par défaut : confirmation sur le bureau sécurisé."),
                 [Set(UacKey, "ConsentPromptBehaviorAdmin", 5), Set(UacKey, "PromptOnSecureDesktop", 1)]);
         }
 
-        if (Deviates("M01.firewall", out var firewall))
+        if (plan.Deviates("M01.firewall", out var firewall))
         {
-            Add(firewall, T("Supprimer les stratégies qui coupent le pare-feu"),
+            plan.Add(firewall, T("Supprimer les stratégies qui coupent le pare-feu"),
                 T("Rend la main à Sécurité Windows. Si un profil reste coupé ensuite, réactivez-le dans Sécurité Windows > Pare-feu et protection du réseau."),
                 FirewallPolicyProfiles.Select(p => p.Key).Distinct(StringComparer.Ordinal)
                     .Where(key => registry.GetDword(Microsoft.Win32.RegistryHive.LocalMachine, FirewallPolicyKey + key, "EnableFirewall") == 0)
                     .Select(key => Delete(FirewallPolicyKey + key, "EnableFirewall")),
                 effect: ChangeEffect.Restart);
         }
+    }
 
-        if (Deviates("M01.wu-server", out var wsus))
+    /// <summary>Serveur de mises à jour imposé, version figée, pause.</summary>
+    private static void PlanUpdates(PlanBuilder plan)
+    {
+        if (plan.Deviates("M01.wu-server", out var wsus))
         {
-            Add(wsus, T("Revenir aux serveurs de mises à jour de Microsoft"),
+            plan.Add(wsus, T("Revenir aux serveurs de mises à jour de Microsoft"),
                 T("Supprime le serveur de mises à jour imposé et les valeurs qui l'accompagnent."),
                 [
                     Delete(WuPolicyKey, "WUServer"), Delete(WuPolicyKey, "WUStatusServer"),
@@ -122,23 +109,27 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 ]);
         }
 
-        if (Deviates("M01.wu-target-version", out var target))
+        if (plan.Deviates("M01.wu-target-version", out var target))
         {
-            Add(target, T("Ne plus figer la version de Windows"),
+            plan.Add(target, T("Ne plus figer la version de Windows"),
                 T("Windows suit de nouveau les versions prises en charge."),
                 [Delete(WuPolicyKey, "TargetReleaseVersion"), Delete(WuPolicyKey, "TargetReleaseVersionInfo"), Delete(WuPolicyKey, "ProductVersion")]);
         }
 
-        if (Deviates("M01.wu-pause", out var pause))
+        if (plan.Deviates("M01.wu-pause", out var pause))
         {
-            Add(pause, T("Reprendre les mises à jour"),
+            plan.Add(pause, T("Reprendre les mises à jour"),
                 T("Supprime la pause en cours et la durée de pause allongée (valeurs de la clé WindowsUpdate\\UX\\Settings lues par Paramètres)."),
                 PauseValues.Select(name => Delete(WuUxSettingsKey, name)));
         }
+    }
 
+    /// <summary>Services de mise à jour et services essentiels désactivés.</summary>
+    private static void PlanServices(PlanBuilder plan, IRegistryReader registry)
+    {
         foreach (var (check, names) in new[] { ("M01.wu-services", UpdateServices), ("M01.core-services", CoreServices) })
         {
-            if (!Deviates(check, out var services))
+            if (!plan.Deviates(check, out var services))
             {
                 continue;
             }
@@ -148,7 +139,7 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 var state = ServiceStart.Read(registry, name);
                 if (state.IsDisabled && DefaultServiceStart.TryGetValue(name, out var start))
                 {
-                    Add(services, T("Réactiver le service {0} ({1})", name, ServiceStart.Label(start)),
+                    plan.Add(services, T("Réactiver le service {0} ({1})", name, ServiceStart.Label(start)),
                         T("Remet le type de démarrage d'origine du service {0}.", name),
                         [Set(@"SYSTEM\CurrentControlSet\Services\" + name, "Start", start)],
                         id: $"{check}.{name}",
@@ -159,8 +150,12 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 }
             }
         }
+    }
 
-        if (Deviates("M01.winlogon", out var winlogon))
+    /// <summary>Shell et Userinit détournés à l'ouverture de session.</summary>
+    private void PlanWinlogon(PlanBuilder plan, IRegistryReader registry)
+    {
+        if (plan.Deviates("M01.winlogon", out var winlogon))
         {
             var writes = new List<SettingWrite>();
             var shell = registry.GetString(Microsoft.Win32.RegistryHive.LocalMachine, WinlogonKey, "Shell");
@@ -181,13 +176,17 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 writes.Add(new SettingWrite(SettingKey.Registry("HKLM", WinlogonKey, "Userinit"), SettingValue.Text(_windowsDirectory + @"\system32\userinit.exe,")));
             }
 
-            Add(winlogon, T("Remettre Shell et Userinit par défaut"),
+            plan.Add(winlogon, T("Remettre Shell et Userinit par défaut"),
                 T("Seuls le Bureau (explorer.exe) et userinit.exe démarrent de nouveau à l'ouverture de session."),
                 writes, effect: ChangeEffect.SignOut,
                 warning: T("Lancez aussi une analyse antivirus complète : un programme ajouté à ces valeurs est souvent malveillant."));
         }
+    }
 
-        if (Deviates("M01.appinit", out var appInit))
+    /// <summary>Bibliothèques injectées dans tous les programmes (AppInit_DLLs).</summary>
+    private static void PlanAppInit(PlanBuilder plan, IRegistryReader registry)
+    {
+        if (plan.Deviates("M01.appinit", out var appInit))
         {
             var writes = new List<SettingWrite>();
             foreach (var key in AppInitKeys.Where(key => IsSet(registry.GetString(Microsoft.Win32.RegistryHive.LocalMachine, key, "AppInit_DLLs"))))
@@ -196,12 +195,16 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 writes.Add(Set(key, "LoadAppInit_DLLs", 0));
             }
 
-            Add(appInit, "Vider AppInit_DLLs", T("Plus aucune bibliothèque n'est injectée dans tous les programmes."), writes,
+            plan.Add(appInit, "Vider AppInit_DLLs", T("Plus aucune bibliothèque n'est injectée dans tous les programmes."), writes,
                 effect: ChangeEffect.Restart,
                 warning: T("Lancez aussi une analyse antivirus complète."));
         }
+    }
 
-        if (Deviates("M01.ifeo-debugger", out var ifeo))
+    /// <summary>Programmes détournés par un « débogueur » (Image File Execution Options).</summary>
+    private static void PlanDebuggers(PlanBuilder plan, IRegistryReader registry)
+    {
+        if (plan.Deviates("M01.ifeo-debugger", out var ifeo))
         {
             foreach (var root in IfeoKeys)
             {
@@ -220,18 +223,56 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
 
                     if (IsSet(debugger))
                     {
-                        Add(ifeo, T("Supprimer le détournement de {0}", program),
+                        plan.Add(ifeo, T("Supprimer le détournement de {0}", program),
                             T("{0} est actuellement remplacé par : {1}.", program, debugger),
                             [Delete(path, "Debugger")],
                             id: $"M01.ifeo-debugger.{program.ToLowerInvariant()}",
                             warning: T("Vérifiez d'abord : certains outils légitimes (Process Explorer qui remplace le Gestionnaire des tâches) utilisent ce mécanisme."));
-                        changes[^1] = changes[^1] with { Recommended = false };
+                        plan.Changes[^1] = plan.Changes[^1] with { Recommended = false };
                     }
                 }
             }
         }
+    }
 
-        return changes;
+    /// <summary>Constats du dernier audit et corrections déjà prévues, partagés par les étapes de <see cref="Plan"/>.</summary>
+    private sealed class PlanBuilder(string moduleId, IReadOnlyList<Finding> findings, string? policyFileNote)
+    {
+        private readonly Dictionary<string, Finding> _byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
+
+        public List<PlannedChange> Changes { get; } = [];
+
+        public Finding Finding(string id) => _byId[id];
+
+        /// <summary>Le constat existe, s'écarte de la valeur attendue et peut être corrigé.</summary>
+        public bool Deviates(string id, out Finding finding) =>
+            _byId.TryGetValue(id, out finding!) && finding.Fixable && finding.Status is FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem;
+
+        public void Add(Finding finding, string title, string description, IEnumerable<SettingWrite> writes, string? id = null, ChangeEffect effect = ChangeEffect.Immediate, string? risk = null, string? warning = null)
+        {
+            var list = writes.ToList();
+            if (list.Count == 0)
+            {
+                return;
+            }
+
+            var isPolicy = list.Any(w => w.Value is null && (w.Key.Path ?? string.Empty).Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase));
+            Changes.Add(new PlannedChange
+            {
+                Id = id ?? finding.Id,
+                FindingId = id is null ? null : finding.Id,
+                ModuleId = moduleId,
+                Title = title,
+                Description = description,
+                Category = finding.Category,
+                Gain = T("Retour au réglage d'origine de Windows : sécurité et mises à jour rétablies."),
+                Risk = risk ?? (isPolicy ? policyFileNote : null),
+                Warning = warning,
+                Effect = effect,
+                Recommended = finding.Severity == Severity.Critical,
+                Writes = list,
+            });
+        }
     }
 
     private bool HasLocalPolicyFile(AuditContext context) => context.Files.FileExists(_windowsDirectory + @"\" + LocalPolicyFile);
