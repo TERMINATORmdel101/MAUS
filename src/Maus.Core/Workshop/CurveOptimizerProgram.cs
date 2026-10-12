@@ -61,7 +61,11 @@ public sealed record CurveProgramResult(
 {
     public bool TransientsStable => TransientErrors == 0 && !TransientFroze;
 
-    public bool Stable => Cores.All(c => c.Stable) && TransientsStable && WheaEvents is null or 0;
+    /// <summary>Stable seulement si tout a vraiment été vérifié (voir <see cref="CoreCycleResult.Stable"/>), rafales comprises.</summary>
+    public bool Stable => !Aborted && Cores.Count > 0 && Cores.All(c => c.Tested && c.Stable) && Bursts > 0 && TransientsStable && WheaEvents == 0;
+
+    /// <summary>Cœurs jamais testés en phase 1.</summary>
+    public IReadOnlyList<int> Untested => [.. Cores.Where(c => !c.Tested).Select(c => c.Core)];
 }
 
 /// <summary>

@@ -46,7 +46,7 @@ public class CoreCycleTestTests
         var topology = new FakeTopology(3);
         var checkpoint = new FakeCheckpoint();
 
-        var result = await CoreCycleTest.RunAsync(topology, checkpoint, Quick);
+        var result = await CoreCycleTest.RunAsync(topology, checkpoint, Quick, wheaSince: _ => 0);
 
         Assert.True(result.Stable);
         Assert.Equal([0, 1, 2], result.Cores.Select(c => c.Core));
@@ -54,6 +54,18 @@ public class CoreCycleTestTests
         Assert.Equal([0, 1, 2], topology.Pinned.Order());
         Assert.Equal([0, 1, 2], checkpoint.Saved.Select(s => s.Core));
         Assert.Null(checkpoint.Current);
+    }
+
+    [Fact]
+    public async Task Unreadable_hardware_error_log_or_untested_cores_are_never_called_stable()
+    {
+        var unreadable = await CoreCycleTest.RunAsync(new FakeTopology(3), null, Quick);
+        Assert.Null(unreadable.WheaEvents);
+        Assert.False(unreadable.Stable);
+
+        var partial = new CoreCycleResult([new CoreVerdict(0, 5, 0, false, true), new CoreVerdict(1, 0, 0, false, true)], TimeSpan.FromSeconds(1), false, null, 0);
+        Assert.False(partial.Stable);
+        Assert.Equal([1], partial.Untested);
     }
 
     [Fact]

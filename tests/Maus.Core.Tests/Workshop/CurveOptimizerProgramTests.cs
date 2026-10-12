@@ -62,7 +62,7 @@ public class CurveOptimizerProgramTests
         var reports = new List<CurveProgramProgress>();
 
         var result = await CurveOptimizerProgram.RunAsync(topology, checkpoint, Quick(TimeSpan.FromMilliseconds(900), TimeSpan.FromMilliseconds(900)),
-            new SyncProgress<CurveProgramProgress>(reports.Add));
+            new SyncProgress<CurveProgramProgress>(reports.Add), wheaSince: _ => 0);
 
         Assert.True(result.Stable);
         Assert.False(result.Aborted);

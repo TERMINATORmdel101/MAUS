@@ -234,6 +234,8 @@ public sealed partial class WorkshopViewModel
                 ? string.Join(" ", advice) + whea + " " + T("Puis refaites le programme.")
                 : result.WheaEvents is > 0
                     ? T("Aucune erreur de calcul, mais le processeur a signalé des erreurs matérielles.") + whea + " " + T("Remontez légèrement le Curve Optimizer ou l'undervolt, puis refaites le programme.")
+                    : result.Untested.Count > 0 || result.Bursts == 0
+                        ? T("Aucune erreur sur ce qui a été testé, mais le programme n'a pas tout couvert ({0} cœur(s) non testé(s), {1} rafale(s)) : il était trop court. Allongez-le avant de conclure.", result.Untested.Count, result.Bursts)
                     : T("Programme complet réussi : {0} cœur(s) stables en phase 1, {1} rafales sans erreur en phase 2.", result.Cores.Count, result.Bursts) + " "
                       + (result.WheaEvents is null
                           ? T("Le journal des erreurs matérielles (WHEA) n'a pas pu être lu : regardez-le dans l'Observateur d'événements avant de conclure.")

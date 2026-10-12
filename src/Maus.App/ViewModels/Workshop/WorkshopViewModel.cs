@@ -967,7 +967,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             var previous = history.Load();
             // Un score par type de charge : ils ne se comparent pas entre eux.
             var entry = new BenchmarkEntry(ScoreTrends.CpuKind(mode), result.Score, result.Stable, DateTimeOffset.Now);
-            if (!result.Aborted)
+            if (!result.Aborted && result.Verified)
             {
                 SaveScore(history, entry);
             }
@@ -977,6 +977,8 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                 : string.Empty;
             CpuStatus = result.Aborted
                 ? T("Test interrompu : {0}", result.AbortReason)
+                : !result.Verified
+                    ? T("Le test n'a rien vérifié (durée trop courte, ou arrêt dès le début) : pas de verdict.")
                 : result.Stable
                     ? T("Stable : aucune erreur de calcul en {0:0} s. Score : {1:0.0} tours par seconde.", result.Duration.TotalSeconds, result.Score) + comparison
                       + " " + T("Instructions : {0}", CpuStress.Instructions(result.Mode)) + "."
@@ -1024,7 +1026,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             });
             var result = await MemoryTest.RunAsync(new MemoryTestOptions(bytes), progress, _watchdog.AbortReason, cancellation.Token);
             RamProgress = 100;
-            if (!result.Aborted)
+            if (!result.Aborted && result.Verified)
             {
                 SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("ram", result.CopyGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now,
                     result.LatencyNanoseconds?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)));
@@ -1032,6 +1034,8 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 
             RamStatus = result.Aborted
                 ? result.AbortReason is { } reason ? T("Test interrompu : {0}", reason) : T("Test interrompu.")
+                : !result.Verified
+                    ? T("Le test n'a rien vérifié (durée trop courte, ou arrêt dès le début) : pas de verdict.")
                 : result.Stable
                     ? T("Aucune erreur sur {0:0.0} Go. Débit de copie : {1:0.0} Go/s · latence : {2:0.0} ns. (Un test sous Windows ne couvre pas la mémoire déjà utilisée : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)", result.TestedBytes / 1073741824.0, result.CopyGigabytesPerSecond, result.LatencyNanoseconds)
                     : T("ERREURS : {0} valeur(s) relue(s) différente(s). Revenez au profil mémoire d'origine dans le BIOS (voir Module 10), puis refaites le test ; si les erreurs restent, une barrette est probablement défaillante.", result.Errors);
@@ -1142,8 +1146,12 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                     ? T("Cœur(s) instable(s) : {0}. Remontez le Curve Optimizer de ce(s) cœur(s) de 2 ou 3 points (par exemple de −15 à −12) ou réduisez l'undervolt, puis refaites le test. Si rien ne change, revenez aux réglages d'origine du BIOS.", string.Join(", ", failing)) + whea + pinning
                     : result.WheaEvents is > 0
                         ? T("Aucune erreur de calcul, mais le processeur a signalé des erreurs matérielles.") + whea + " " + T("Remontez légèrement le Curve Optimizer ou l'undervolt, puis refaites le test.")
-                        : T("Tous les cœurs ont tenu : {0} cœur(s), aucune erreur de calcul, aucun gel, aucune erreur matérielle WHEA.", result.Cores.Count) + pinning + " "
-                            + T("Pour valider un réglage, laissez tourner au moins 20 minutes (idéalement une nuit), puis utilisez le PC normalement quelques jours : certains gels n'arrivent qu'au repos.");
+                        : result.Untested.Count > 0
+                            ? T("Aucune erreur sur les cœurs testés, mais {0} cœur(s) n'ont pas été testés ({1}) : le test était trop court pour faire le tour. Allongez-le avant de conclure.", result.Untested.Count, string.Join(", ", result.Untested.Select(Name))) + pinning
+                            : result.WheaEvents is null
+                                ? T("Aucune erreur de calcul ni gel sur {0} cœur(s).", result.Cores.Count) + " " + T("Le journal des erreurs matérielles (WHEA) n'a pas pu être lu : regardez-le dans l'Observateur d'événements avant de conclure.") + pinning
+                                : T("Tous les cœurs ont tenu : {0} cœur(s), aucune erreur de calcul, aucun gel, aucune erreur matérielle WHEA.", result.Cores.Count) + pinning + " "
+                                    + T("Pour valider un réglage, laissez tourner au moins 20 minutes (idéalement une nuit), puis utilisez le PC normalement quelques jours : certains gels n'arrivent qu'au repos.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -1209,13 +1217,15 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             });
             var result = await VramTest.RunAsync(_gpuProvider, adapter, new VramTestOptions(bytes), progress, _watchdog.AbortReason, cancellation.Token);
             VramProgress = 100;
-            if (!result.Aborted)
+            if (!result.Aborted && result.Verified)
             {
                 SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("vram", result.ReadbackGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now, adapter.Name));
             }
 
             VramStatus = result.Aborted
                 ? T("Test interrompu : {0}", result.AbortReason)
+                : !result.Verified
+                    ? T("Le test n'a rien vérifié (durée trop courte, ou arrêt dès le début) : pas de verdict.")
                 : result.Stable
                     ? T("Aucune erreur sur {0:0.0} Go de mémoire vidéo. Débit de relecture vers le processeur : {1:0.0} Go/s.", result.TestedBytes / 1073741824.0, result.ReadbackGigabytesPerSecond)
                         + (result.CardWasFull ? " " + T("La carte n'avait plus de place libre : seule la mémoire disponible a été testée.") : string.Empty)

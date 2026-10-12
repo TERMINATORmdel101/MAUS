@@ -18,8 +18,11 @@ public sealed record CpuTestResult(int Threads, TimeSpan Duration, long Rounds, 
     /// <summary>Score : tours vérifiés par seconde, arrondi (comparable d'un passage à l'autre sur le même PC).</summary>
     public double Score => Duration.TotalSeconds > 0 ? Math.Round(Rounds / Duration.TotalSeconds, 1) : 0;
 
-    /// <summary>Une seule erreur de calcul suffit à signaler un PC instable.</summary>
-    public bool Stable => Errors == 0;
+    /// <summary>Au moins un tour de calcul vérifié : sans cela, il n'y a pas de verdict.</summary>
+    public bool Verified => Rounds > 0;
+
+    /// <summary>Une seule erreur de calcul suffit à signaler un PC instable ; « stable » demande un test allé au bout.</summary>
+    public bool Stable => Verified && !Aborted && Errors == 0;
 }
 
 /// <summary>

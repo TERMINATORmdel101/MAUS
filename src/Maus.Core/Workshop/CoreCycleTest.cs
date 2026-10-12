@@ -49,12 +49,23 @@ public sealed record CoreCycleProgress(int Core, int Position, int CoreCount, st
 /// <summary>Bilan d'un cœur : tours de calcul vérifiés, erreurs, cœur figé, épinglage accepté par Windows.</summary>
 public sealed record CoreVerdict(int Core, long Rounds, int Errors, bool Froze, bool Pinned)
 {
+    /// <summary>Aucune erreur ni gel constatés (vrai aussi pour un cœur jamais testé : voir <see cref="Tested"/>).</summary>
     public bool Stable => Errors == 0 && !Froze;
+
+    /// <summary>Le cœur a fait au moins un tour vérifié : sans cela, « stable » ne veut rien dire.</summary>
+    public bool Tested => Rounds > 0;
 }
 
 public sealed record CoreCycleResult(IReadOnlyList<CoreVerdict> Cores, TimeSpan Duration, bool Aborted, string? AbortReason, int? WheaEvents)
 {
-    public bool Stable => Cores.All(c => c.Stable) && WheaEvents is null or 0;
+    /// <summary>
+    /// Stable seulement si tout a vraiment été vérifié : test allé au bout, chaque cœur testé sans erreur ni gel, et journal
+    /// des erreurs matérielles lu à zéro (illisible = pas de conclusion, jamais « aucune erreur »).
+    /// </summary>
+    public bool Stable => !Aborted && Cores.Count > 0 && Cores.All(c => c.Tested && c.Stable) && WheaEvents == 0;
+
+    /// <summary>Cœurs jamais testés (durée trop courte pour faire le tour, ou arrêt).</summary>
+    public IReadOnlyList<int> Untested => [.. Cores.Where(c => !c.Tested).Select(c => c.Core)];
 }
 
 /// <summary>

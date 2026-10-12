@@ -51,7 +51,10 @@ public sealed record VramTestResult(
     string? AbortReason,
     bool CardWasFull)
 {
-    public bool Stable => Errors == 0;
+    /// <summary>Au moins un octet écrit puis relu : sans cela, il n'y a pas de verdict.</summary>
+    public bool Verified => TestedBytes > 0;
+
+    public bool Stable => Verified && !Aborted && Errors == 0;
 }
 
 /// <summary>
