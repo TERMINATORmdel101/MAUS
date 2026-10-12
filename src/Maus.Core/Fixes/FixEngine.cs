@@ -153,7 +153,7 @@ public sealed class FixEngine
 
         var outcomes = new List<RevertOutcome>();
         var targets = Enumerable.Reverse(session.Entries)
-            .Where(e => e.State is EntryState.Applied or EntryState.Pending && (changeId is null || e.ChangeId == changeId))
+            .Where(e => e.State.IsOutstanding() && (changeId is null || e.ChangeId == changeId))
             .ToList();
         if (changeId is not null && targets.Count == 0)
         {
@@ -244,7 +244,9 @@ public sealed class FixEngine
                 entry.Error = ex.Message;
                 RollBack(entries);
                 _context.Journal.Save(session);
-                return Outcome(ChangeStatus.Failed, T("Écriture refusée ({0}) : valeurs d'origine remises.", entry.Key));
+                return Outcome(ChangeStatus.Failed, RolledBack(entries)
+                    ? T("Écriture refusée ({0}) : valeurs d'origine remises.", entry.Key)
+                    : T("Écriture refusée ({0}), et le retour arrière a échoué : la valeur modifiée est peut-être encore en place. La séance garde son bouton « Annuler » pour réessayer.", entry.Key));
             }
         }
 
@@ -257,7 +259,9 @@ public sealed class FixEngine
                 entry.Error = T("Relu : {0}, attendu : {1}", SettingValue.Display(actual), SettingValue.Display(entry.After));
                 RollBack(entries);
                 _context.Journal.Save(session);
-                return Outcome(ChangeStatus.Failed, T("Windows n'a pas gardé la valeur ({0}) : valeurs d'origine remises.", entry.Key));
+                return Outcome(ChangeStatus.Failed, RolledBack(entries)
+                    ? T("Windows n'a pas gardé la valeur ({0}) : valeurs d'origine remises.", entry.Key)
+                    : T("Windows n'a pas gardé la valeur ({0}), et le retour arrière a échoué : la séance garde son bouton « Annuler » pour réessayer.", entry.Key));
             }
         }
 
@@ -294,7 +298,14 @@ public sealed class FixEngine
             return Outcome(RevertStatus.Skipped, T("Correction interrompue avant l'écriture : rien à annuler."));
         }
 
-        if (!force && !SettingValue.AreEquivalent(current, entry.After))
+        if (entry.State == EntryState.RollbackFailed && SettingValue.AreEquivalent(current, entry.Before))
+        {
+            entry.State = EntryState.Failed;
+            return Outcome(RevertStatus.Skipped, T("La valeur d'origine est déjà en place."));
+        }
+
+        // Après un retour arrière raté, la valeur peut être l'ancienne, la nouvelle ou entre les deux : on remet l'origine.
+        if (!force && entry.State != EntryState.RollbackFailed && !SettingValue.AreEquivalent(current, entry.After))
         {
             entry.State = EntryState.RevertSkipped;
             return Outcome(RevertStatus.ChangedSince,
@@ -326,26 +337,55 @@ public sealed class FixEngine
     /// <summary>Heure réelle de l'opération (horloge du contexte), sinon celle de l'audit (tests).</summary>
     private DateTimeOffset Now => _context.Clock?.Invoke() ?? _context.Audit.Now;
 
-    /// <summary>Défait les écritures d'une correction, dans l'ordre inverse.</summary>
+    /// <summary>
+    /// Défait les écritures d'une correction, dans l'ordre inverse, et relit chaque valeur remise. Une écriture dont le
+    /// retour arrière échoue (ou ne se relit pas) passe en <see cref="EntryState.RollbackFailed"/> : elle reste visible et
+    /// « Annuler » la reprendra, au lieu de devenir une modification invisible.
+    /// </summary>
     private void RollBack(IEnumerable<JournalEntry> entries)
     {
         foreach (var entry in entries.Reverse())
         {
-            if (entry.State == EntryState.Applied || entry.Error is not null)
+            if (entry.State != EntryState.Applied && entry.Error is null)
             {
-                try
-                {
-                    Restore(entry);
-                }
-                catch (Exception ex) when (IsSettingFailure(ex))
-                {
-                    entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + T("retour arrière refusé : ") + ex.Message;
-                }
+                // Jamais écrite : la valeur d'origine n'a pas bougé.
+                entry.State = EntryState.Failed;
+                continue;
+            }
+
+            var current = TryRead(entry.Key, out var readable);
+            if (entry.State != EntryState.Applied && readable && SettingValue.AreEquivalent(current, entry.Before))
+            {
+                // Écriture refusée d'emblée : la valeur d'origine est encore là, rien à remettre.
+                entry.State = EntryState.Failed;
+                continue;
+            }
+
+            try
+            {
+                Restore(entry);
+            }
+            catch (Exception ex) when (IsSettingFailure(ex))
+            {
+                entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + T("retour arrière refusé : ") + ex.Message;
+                entry.State = EntryState.RollbackFailed;
+                continue;
+            }
+
+            var restored = TryRead(entry.Key, out readable);
+            if (!readable || !SettingValue.AreEquivalent(restored, entry.Before))
+            {
+                entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + T("retour arrière non vérifié (relu : {0})", SettingValue.Display(restored));
+                entry.State = EntryState.RollbackFailed;
+                continue;
             }
 
             entry.State = EntryState.Failed;
         }
     }
+
+    /// <summary>Toutes les valeurs d'origine sont revenues (aucun retour arrière raté).</summary>
+    private static bool RolledBack(IEnumerable<JournalEntry> entries) => entries.All(e => e.State != EntryState.RollbackFailed);
 
     private void RollBackSession(JournalSession session) =>
         RollBack(session.Entries.Where(e => e.State == EntryState.Applied).ToList());

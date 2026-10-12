@@ -17,6 +17,18 @@ public enum EntryState
 
     /// <summary>Retour arrière non fait : la valeur a changé depuis (par l'utilisateur ou Windows).</summary>
     RevertSkipped,
+
+    /// <summary>
+    /// Correction en échec dont le retour arrière a lui aussi échoué (ou n'a pas pu être relu) : la valeur modifiée est
+    /// peut-être encore en place. Jamais rangée avec les échecs ordinaires : « Annuler » reste proposé et réessaie.
+    /// </summary>
+    RollbackFailed,
+}
+
+public static class EntryStateExtensions
+{
+    /// <summary>Une valeur que « Annuler » doit encore traiter : appliquée, écriture interrompue, ou retour arrière raté.</summary>
+    public static bool IsOutstanding(this EntryState state) => state is EntryState.Applied or EntryState.Pending or EntryState.RollbackFailed;
 }
 
 /// <summary>Une valeur modifiée : avant, après, et ce qui lui est arrivé.</summary>
@@ -75,11 +87,16 @@ public sealed class JournalSession
     public DateTimeOffset? RevertedAt { get; set; }
 
     /// <summary>
-    /// Au moins une valeur est encore appliquée, ou une écriture a été interrompue (MAUS fermé pendant la correction) :
-    /// « Annuler » a peut-être quelque chose à faire.
+    /// Au moins une valeur est encore appliquée, une écriture a été interrompue (MAUS fermé pendant la correction), ou un
+    /// retour arrière a échoué : « Annuler » a peut-être quelque chose à faire.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool CanRevert => Entries.Any(e => e.State is EntryState.Applied or EntryState.Pending);
+    public bool HasFailedRollback => Entries.Any(e => e.State == EntryState.RollbackFailed);
+
+    /// <summary>Voir <see cref="EntryStateExtensions.IsOutstanding"/>.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool CanRevert => Entries.Any(e => e.State.IsOutstanding());
 
     /// <summary>Identifiant lisible et triable : date, heure, puis suffixe aléatoire.</summary>
     public static string NewId(DateTimeOffset now) =>

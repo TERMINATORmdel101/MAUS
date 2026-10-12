@@ -181,6 +181,7 @@ public static class HtmlReport
                     EntryState.Failed => T("Échec : valeur d'origine remise"),
                     EntryState.RevertSkipped => T("Modifiée depuis, laissée telle quelle"),
                     EntryState.Pending => T("Interrompue : peut-être appliquée"),
+                    EntryState.RollbackFailed => T("Retour arrière raté : peut-être encore en place"),
                     _ => first.State.ToString(),
                 };
             var values = string.Join("<br>", change.Select(e => $"<code>{E(e.Key.Describe())}</code> : {E(SettingValue.Display(e.Before))} → {E(SettingValue.Display(e.After))}"));

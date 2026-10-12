@@ -109,7 +109,7 @@ public sealed class SessionViewModel
 
     public string Header =>
         $"{Session.CreatedAt.ToLocalTime().ToString("f", Culture)}  ·  " +
-        (Session.RevertedAt is not null ? T("annulée") : Session.CanRevert ? T("active") : T("rien à annuler"));
+        (Session.HasFailedRollback ? T("à reprendre : un retour arrière a échoué") : Session.RevertedAt is not null ? T("annulée") : Session.CanRevert ? T("active") : T("rien à annuler"));
 
     public string Summary
     {
@@ -140,7 +140,7 @@ public sealed class SessionChangeViewModel
 
     public string Title => _entries[0].ChangeTitle;
 
-    public bool CanRevert => _entries.Any(e => e.State is EntryState.Applied or EntryState.Pending);
+    public bool CanRevert => _entries.Any(e => e.State.IsOutstanding());
 
     public string State => _entries.Select(e => e.State).Distinct().ToList() switch
     {
@@ -149,6 +149,7 @@ public sealed class SessionChangeViewModel
         [EntryState.RevertSkipped] => T("modifiée depuis"),
         [EntryState.Failed] => T("échec, origine remise"),
         [EntryState.Pending] => T("interrompue : peut-être appliquée, « Annuler » vérifie"),
+        _ when _entries.Any(e => e.State == EntryState.RollbackFailed) => T("retour arrière raté : peut-être encore en place, « Annuler » réessaie"),
         _ => T("en partie annulée"),
     };
 

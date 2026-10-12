@@ -153,7 +153,7 @@ internal static class FixCommands
 
         foreach (var session in sessions)
         {
-            var state = session.RevertedAt is not null ? T("annulée") : session.CanRevert ? T("active") : T("sans modification en cours");
+            var state = session.HasFailedRollback ? T("à reprendre : un retour arrière a échoué") : session.RevertedAt is not null ? T("annulée") : session.CanRevert ? T("active") : T("sans modification en cours");
             var values = session.Entries.Count(e => e.State is EntryState.Applied or EntryState.Reverted or EntryState.RevertSkipped);
             output.WriteLine(T("{0}  {1:g}  {2}  ({3} valeur(s))", session.Id, session.CreatedAt.ToLocalTime(), state, values));
             foreach (var entry in session.Entries)

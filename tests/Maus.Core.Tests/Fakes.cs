@@ -33,6 +33,16 @@ public sealed class FakeRegistry : IRegistryReader, IRegistryWriter
         return this;
     }
 
+    /// <summary>Lève un refus d'écriture posé par <see cref="DenyWrite"/>.</summary>
+    public FakeRegistry AllowWrite(RegistryHive hive, string path)
+    {
+        _writeDenied.Remove(KeyOf(hive, path));
+        return this;
+    }
+
+    /// <summary>Appelé après chaque écriture réussie (pour changer les refus en cours de route).</summary>
+    public Action<RegistryHive, string>? AfterWrite { get; set; }
+
     /// <summary>Accepte l'écriture sans la garder, comme une valeur aussitôt réécrite par Windows.</summary>
     public FakeRegistry IgnoreWrites(RegistryHive hive, string path)
     {
@@ -73,6 +83,8 @@ public sealed class FakeRegistry : IRegistryReader, IRegistryWriter
         {
             SetTyped(hive, path, name, value, kind);
         }
+
+        AfterWrite?.Invoke(hive, path);
     }
 
     public void DeleteValue(RegistryHive hive, string path, string name)

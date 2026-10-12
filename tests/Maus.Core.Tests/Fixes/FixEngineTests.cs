@@ -192,6 +192,44 @@ public class FixEngineTests
     }
 
     [Fact]
+    public void Failed_rollback_stays_visible_and_undo_retries_it()
+    {
+        var (engine, registry, _, journal, _, _) = Setup();
+        // La première écriture passe, puis Windows refuse tout sous cette clé : le retour arrière échouera aussi.
+        registry.AfterWrite = (hive, path) =>
+        {
+            if (hive == RegistryHive.CurrentUser && path == Advanced)
+            {
+                registry.DenyWrite(RegistryHive.CurrentUser, Advanced);
+            }
+        };
+        registry.FailWrite(RegistryHive.LocalMachine, Policy, new IOException("clé marquée pour suppression"));
+
+        var result = engine.Apply(
+            [Change("M06.pair", new SettingWrite(TaskView, SettingValue.Dword(0)), new SettingWrite(Widgets, SettingValue.Dword(0)))],
+            new ApplyOptions());
+
+        // Jamais rangée avec les échecs ordinaires : la modification est encore en place et la séance garde « Annuler ».
+        Assert.Equal(ChangeStatus.Failed, result.Changes.Single().Status);
+        Assert.True(result.Changes.Single().Message.Contains("retour arrière a échoué", StringComparison.Ordinal), result.Changes.Single().Message);
+        Assert.Equal(0, registry.GetDword(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton"));
+        var session = journal.Load(result.Session!.Id)!;
+        Assert.True(session.CanRevert);
+        Assert.True(session.HasFailedRollback);
+        Assert.Equal(EntryState.RollbackFailed, session.Entries.Single(e => e.Key.Identity == TaskView.Identity).State);
+        Assert.Equal(EntryState.Failed, session.Entries.Single(e => e.Key.Identity == Widgets.Identity).State);
+
+        // Windows accepte de nouveau : « Annuler » remet la valeur d'origine.
+        registry.AfterWrite = null;
+        registry.AllowWrite(RegistryHive.CurrentUser, Advanced);
+        var revert = engine.Revert(result.Session.Id);
+
+        Assert.Contains(revert.Entries, o => o.Status == RevertStatus.Reverted);
+        Assert.Equal(1, registry.GetDword(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton"));
+        Assert.False(journal.Load(result.Session.Id)!.CanRevert);
+    }
+
+    [Fact]
     public void Value_not_kept_by_windows_is_rolled_back()
     {
         var (engine, registry, _, _, _, _) = Setup();
