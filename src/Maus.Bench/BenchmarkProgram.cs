@@ -79,7 +79,18 @@ public static partial class BenchmarkProgram
     internal static IReadOnlyList<BenchScene> CreateScenes(IReadOnlyCollection<string> only)
     {
         BenchScene[] all = [new RingScene(), new BattleScene(), new GalaxyScene(), new MaterialsScene(), new FractalScene(), new MirrorHallScene()];
-        return only.Count == 0 ? all : all.Where(s => only.Contains(s.Id)).ToArray();
+        if (only.Count == 0)
+        {
+            return all;
+        }
+
+        // Les scènes écartées sont libérées tout de suite.
+        foreach (var scene in all.Where(s => !only.Contains(s.Id)))
+        {
+            scene.Dispose();
+        }
+
+        return all.Where(s => only.Contains(s.Id)).ToArray();
     }
 
     internal static IReadOnlyList<CpuBenchTest> CreateCpuTests(IReadOnlyCollection<string> only)

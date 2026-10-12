@@ -15,7 +15,7 @@ namespace Maus.App.ViewModels.Workshop;
 /// Atelier matériel : « Mon PC », « En direct », « Processus », « Tests ». Les mesures ne tournent que lorsque
 /// l'atelier est affiché (ou qu'un test est en cours), pour ne rien consommer le reste du temps.
 /// </summary>
-public sealed partial class WorkshopViewModel : ObservableObject
+public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 {
     public const int SectionPc = 0;
     public const int SectionLive = 1;
@@ -34,6 +34,9 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private readonly ProcessCatalog _catalog = ProcessCatalog.Default;
     private ISensorSource? _sensors;
     private ProcessMonitor? _processes;
+
+    /// <summary>Source des processus (requête PDH de Windows) : rendue à la fermeture de l'Atelier.</summary>
+    private WindowsProcessSource? _processSource;
     private bool _isActive;
     private bool _monitorOpen;
     private int _section;
@@ -515,6 +518,9 @@ public sealed partial class WorkshopViewModel : ObservableObject
         private set => SetProperty(ref _vramStatus, value);
     }
 
+    /// <summary>Fermeture : comme <see cref="Stop"/>, qui rend aussi les ressources de Windows (pilote, requêtes PDH).</summary>
+    public void Dispose() => Stop();
+
     /// <summary>Arrête les mesures et un test en cours (fermeture de la fenêtre, changement de langue).</summary>
     public void Stop()
     {
@@ -549,6 +555,23 @@ public sealed partial class WorkshopViewModel : ObservableObject
 
                 sensors.Dispose();
             }).Forget("atelier : fermeture des capteurs");
+        }
+
+        // Rend la requête PDH des processus une fois la dernière lecture terminée.
+        var processSource = _processSource;
+        _processSource = null;
+        _processes = null;
+        if (processSource is not null)
+        {
+            Task.Run(async () =>
+            {
+                while (_processSampling)
+                {
+                    await Task.Delay(50);
+                }
+
+                processSource.Dispose();
+            }).Forget("atelier : fermeture de la liste des processus");
         }
     }
 
@@ -811,7 +834,12 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _processSampling = true;
         try
         {
-            _processes ??= new ProcessMonitor(new WindowsProcessSource(), Environment.ProcessorCount);
+            if (_processes is null)
+            {
+                _processSource = new WindowsProcessSource();
+                _processes = new ProcessMonitor(_processSource, Environment.ProcessorCount);
+            }
+
             var monitor = _processes;
             _lastProcesses = await Task.Run(monitor.Sample);
             ShowProcesses();
