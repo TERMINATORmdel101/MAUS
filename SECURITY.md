@@ -28,6 +28,6 @@ Only the **latest released version** receives security fixes.
 
 - L'audit est en lecture seule ; les corrections ne sont écrites qu'après un choix de l'utilisateur, avec un point de restauration et un journal qui permet de tout annuler.
 - Les outils externes (PresentMon, winget) ne sont lancés que depuis des dossiers protégés, et PresentMon seulement si son empreinte SHA-256 est exactement celle de la copie d'Intel.
-- Le journal des corrections et les choix de l'utilisateur sont rangés dans un dossier réservé aux administrateurs (`%ProgramData%MAUS`).
+- Le journal des corrections et les choix de l'utilisateur sont rangés dans un dossier réservé aux administrateurs (`%ProgramData%\MAUS`).
 - Aucune donnée n'est envoyée (voir [PRIVACY](PRIVACY)).
 - L'installateur est fabriqué par GitHub Actions à partir du code public, et son empreinte SHA-256 est publiée avec chaque version.
