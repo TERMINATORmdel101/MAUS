@@ -13,7 +13,7 @@ namespace Maus.Core.Engine.Broker;
 /// </summary>
 /// <param name="pipeName">Nom aléatoire du canal, choisi par l'interface au lancement du moteur.</param>
 /// <param name="serverProcessId">Processus du moteur lancé par l'interface.</param>
-public sealed class RemoteMausEngine(string pipeName, int serverProcessId) : IMausEngine
+public sealed partial class RemoteMausEngine(string pipeName, int serverProcessId) : IMausEngine
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
 

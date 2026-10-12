@@ -20,7 +20,7 @@ namespace Maus.Core.Engine.Broker;
 /// <item>le moteur s'arrête avec l'interface.</item>
 /// </list>
 /// </summary>
-public sealed class EngineServer(IMausEngine engine, string pipeName, int clientProcessId)
+public sealed partial class EngineServer(IMausEngine engine, string pipeName, int clientProcessId)
 {
     private const int MaxIdLength = 200;
     private const int MaxIds = 500;
@@ -153,7 +153,7 @@ public sealed class EngineServer(IMausEngine engine, string pipeName, int client
             case "prefs.save":
                 return EngineProtocol.ToElement(await engine.SavePreferencesAsync(Arg<UserPreferences>(args, "preferences"), cancellationToken).ConfigureAwait(false));
             default:
-                throw new EngineException("Opération inconnue : " + request.Op);
+                return await DispatchWorkshopAsync(request, pipe, cancellationToken).ConfigureAwait(false);
         }
     }
 

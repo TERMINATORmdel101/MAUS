@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using System.Diagnostics;
 using static Maus.Core.Localization.Texts;
 
@@ -13,22 +14,31 @@ public sealed class SpaceNode
 
     public required string Name { get; init; }
 
-    public SpaceNode? Parent { get; init; }
+    /// <summary>Dossier parent (pas transmis par le canal du moteur : rétabli par <see cref="SpaceAnalyzer.RestoreParents"/>).</summary>
+    [JsonIgnore]
+    public SpaceNode? Parent { get; internal set; }
 
+    [JsonInclude]
     public long Bytes { get; internal set; }
 
+    [JsonInclude]
     public long Files { get; internal set; }
 
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public List<SpaceNode> Folders { get; } = [];
 
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public List<SpaceFile> BigFiles { get; } = [];
 
     /// <summary>Petits fichiers (moins de 1 Mo) placés directement dans ce dossier, regroupés.</summary>
+    [JsonInclude]
     public long OtherBytes { get; internal set; }
 
+    [JsonInclude]
     public long OtherFiles { get; internal set; }
 
     /// <summary>Dossier illisible (droits) : sa taille réelle est inconnue.</summary>
+    [JsonInclude]
     public bool Inaccessible { get; internal set; }
 }
 
@@ -72,6 +82,23 @@ public static class SpaceAnalyzer
     /// dossier imbriqué des milliers de fois (même créé exprès) épuiserait la pile et fermerait MAUS sans message.
     /// </summary>
     internal const int MaxDepth = 256;
+
+    /// <summary>Rétablit les liens vers les dossiers parents (arbre reçu du moteur, où ils ne sont pas transmis).</summary>
+    public static void RestoreParents(SpaceNode root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        var pending = new Stack<SpaceNode>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            var node = pending.Pop();
+            foreach (var child in node.Folders)
+            {
+                child.Parent = node;
+                pending.Push(child);
+            }
+        }
+    }
 
     private static void Walk(SpaceNode node, ScanState state, int depth = 0)
     {

@@ -9,7 +9,7 @@ namespace Maus.Core.Engine.Broker;
 /// (qui sert ces opérations à l'interface par <see cref="EngineServer"/>). Il garde son propre audit : les corrections sont
 /// toujours préparées d'après lui, jamais d'après des constats venus de l'extérieur.
 /// </summary>
-public sealed class LocalMausEngine : IMausEngine
+public sealed partial class LocalMausEngine : IMausEngine
 {
     private readonly AuditEngine _audit;
     private readonly Func<AuditContext> _createContext;
@@ -147,7 +147,11 @@ public sealed class LocalMausEngine : IMausEngine
             }
         }, cancellationToken);
 
-    public void Dispose() => _gate.Dispose();
+    public void Dispose()
+    {
+        DisposeWorkshop();
+        _gate.Dispose();
+    }
 
     private PreferencesState State(UserPreferences preferences) =>
         new(preferences, _preferences is FilePreferencesStore files ? files.State : PreferencesFileState.Read, _preferences.Notice);

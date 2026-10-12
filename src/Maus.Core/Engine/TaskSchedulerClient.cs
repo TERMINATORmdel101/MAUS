@@ -5,7 +5,7 @@ using System.Text;
 using System.Xml.Linq;
 using Maus.Core.Engine;
 
-namespace Maus.App;
+namespace Maus.Core.Engine;
 
 /// <summary>
 /// Tâche « audit hebdomadaire » dans le Planificateur de tâches de Windows, par <c>schtasks.exe</c> (System32).

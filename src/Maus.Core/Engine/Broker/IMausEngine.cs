@@ -27,7 +27,7 @@ public sealed record AuditRun(EngineSnapshot Snapshot, IReadOnlyList<ModuleResul
 /// l'interface ne lui envoie jamais d'écriture ni de commande toute faite, seulement des identifiants (corrections, séances)
 /// qu'il vérifie lui-même d'après son propre audit.
 /// </summary>
-public interface IMausEngine : IDisposable
+public partial interface IMausEngine : IDisposable
 {
     /// <summary>Audit complet ; le moteur garde ses résultats, qui servent seuls à préparer les corrections.</summary>
     Task<AuditRun> RunAuditAsync(IProgress<ModuleResult>? progress, CancellationToken cancellationToken);

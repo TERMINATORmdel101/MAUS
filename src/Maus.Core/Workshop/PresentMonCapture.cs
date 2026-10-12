@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using Maus.Core.Diagnostics;
 using Maus.Core.Workshop;
 
-namespace Maus.App;
+namespace Maus.Core.Workshop;
 
 /// <summary>
 /// Mesure des images par seconde pendant le relevé de partie, par PresentMon (Intel, licence MIT, copie dans
