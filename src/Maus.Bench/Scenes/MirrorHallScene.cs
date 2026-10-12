@@ -248,6 +248,26 @@ internal sealed class MirrorHallScene : BenchScene
         var gilt = new HallMesh();
         var mirror = new HallMesh();
         var frames = new HallMesh();
+        AddSideWalls(stucco, marble, gilt, mirror, frames);
+        AddEndWalls(stucco, gilt, mirror);
+        var vault = BuildVault(gilt);
+        var pedestals = BuildPedestals();
+
+        hall.Place(hall.Add(
+            "Galerie",
+            (floor, Material.Floor),
+            (stucco, Material.Stucco),
+            (marble, Material.Pilaster),
+            (gilt, Material.Gilt),
+            (mirror, Material.Mirror),
+            (frames, Material.Frame),
+            (vault, Material.Vault),
+            (pedestals, Material.Pedestal)));
+    }
+
+    /// <summary>Murs latéraux : arcades (fenêtres d'un côté, miroirs de l'autre), pilastres, corniches.</summary>
+    private static void AddSideWalls(HallMesh stucco, HallMesh marble, HallMesh gilt, HallMesh mirror, HallMesh frames)
+    {
         foreach (var side in new[] { 1f, -1f })
         {
             // Côté fenêtres (z > 0) : mur de 60 cm percé de part en part. Côté miroirs (z < 0) : arcades creusées de 25 cm.
@@ -292,8 +312,11 @@ internal sealed class MirrorHallScene : BenchScene
             // Corniche dorée au pied de la voûte.
             gilt.Box(Corner(-HalfLength, 7.0f, inner, inner - (side * 0.32f)), Corner(HalfLength, VaultBase, inner, inner - (side * 0.32f), upper: true));
         }
+    }
 
-        // Extrémités : mur, lunette sous la voûte, grand miroir encadré (les deux miroirs se font face).
+    /// <summary>Extrémités : mur, lunette sous la voûte, grand miroir encadré (les deux miroirs se font face).</summary>
+    private static void AddEndWalls(HallMesh stucco, HallMesh gilt, HallMesh mirror)
+    {
         foreach (var end in new[] { 1f, -1f })
         {
             var x = end * HalfLength;
@@ -314,8 +337,11 @@ internal sealed class MirrorHallScene : BenchScene
                 gilt.Bar(new Vector3(bars, y, -3f), new Vector3(bars, y, 3f), y is < 0.7f or > 6.2f ? 0.09f : 0.035f);
             }
         }
+    }
 
-        // Voûte en berceau, travées soulignées d'arcs dorés tous les 5 m.
+    /// <summary>Voûte en berceau ; ses travées sont soulignées d'arcs dorés tous les 5 m (ajoutés aux dorures).</summary>
+    private static HallMesh BuildVault(HallMesh gilt)
+    {
         var vault = new HallMesh();
         const int around = 48;
         for (var i = 0; i < around; i++)
@@ -346,7 +372,12 @@ internal sealed class MirrorHallScene : BenchScene
             }
         }
 
-        // Socles des statues (marbre vert).
+        return vault;
+    }
+
+    /// <summary>Socles des statues (marbre vert).</summary>
+    private static HallMesh BuildPedestals()
+    {
         var pedestals = new HallMesh();
         foreach (var statue in Statues)
         {
@@ -355,16 +386,7 @@ internal sealed class MirrorHallScene : BenchScene
             pedestals.Box(new Vector3(statue.X - 0.42f, 0.95f, -0.42f), new Vector3(statue.X + 0.42f, PedestalTop, 0.42f));
         }
 
-        hall.Place(hall.Add(
-            "Galerie",
-            (floor, Material.Floor),
-            (stucco, Material.Stucco),
-            (marble, Material.Pilaster),
-            (gilt, Material.Gilt),
-            (mirror, Material.Mirror),
-            (frames, Material.Frame),
-            (vault, Material.Vault),
-            (pedestals, Material.Pedestal)));
+        return pedestals;
     }
 
     /// <summary>Coin d'une boîte de mur : x, y, et l'épaisseur entre les plans <paramref name="a"/> et <paramref name="b"/>.</summary>
