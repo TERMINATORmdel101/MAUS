@@ -289,6 +289,7 @@
   "Attention : plus de 50 faux sites MSI Afterburner ont diffusé un voleur de mots de passe et un mineur de cryptomonnaie en 2022 (BleepingComputer, 23/11/2022).": "Atención: más de 50 sitios falsos de MSI Afterburner difundieron un ladrón de contraseñas y un minero de criptomonedas en 2022 (BleepingComputer, 23/11/2022).",
   "Attention : résolutions différentes ({0} contre {1}), les points ne se comparent pas vraiment.": "Atención: resoluciones diferentes ({0} frente a {1}), los puntos no son realmente comparables.",
   "Attention : un redémarrage est en attente. Redémarrez d'abord le PC, sinon la réparation risque d'échouer ou de donner un faux résultat.": "Atención: hay un reinicio pendiente. Reinicie primero el PC; si no, la reparación puede fallar o dar un resultado falso.",
+  "Attention : une correction a échoué et son retour arrière aussi. La valeur modifiée est peut-être encore en place : ouvrez l'Historique et cliquez sur « Annuler » pour réessayer.": "Atención: una corrección falló y su reversión también. Puede que el valor modificado siga aplicado: abre el Historial y pulsa «Deshacer» para volver a intentarlo.",
   "Attention : {0}": "Atención: {0}",
   "Attention : {0} correction(s) écrite(s) mais sans effet d'après le nouvel audit (détails ci-dessous).": "Atención: {0} corrección(es) escrita(s) pero sin efecto según la nueva auditoría (detalles abajo).",
   "Atténuations Spectre et Meltdown actives": "Mitigaciones de Spectre y Meltdown activas",

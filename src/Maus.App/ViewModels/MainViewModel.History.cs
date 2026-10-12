@@ -49,6 +49,12 @@ public sealed partial class MainViewModel
             Sessions.Add(new SessionViewModel(session, RevertAsync));
         }
 
+        // Un retour arrière raté ne doit jamais passer inaperçu : la modification est peut-être encore en place.
+        if (sessions.Any(s => s.HasFailedRollback))
+        {
+            StatusText = T("Attention : une correction a échoué et son retour arrière aussi. La valeur modifiée est peut-être encore en place : ouvrez l'Historique et cliquez sur « Annuler » pour réessayer.");
+        }
+
         OnPropertyChanged(nameof(JournalSummary));
     }
 
