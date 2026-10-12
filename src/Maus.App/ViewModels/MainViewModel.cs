@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Maus.App.Views;
 using Maus.Core;
 using Maus.Core.Engine;
+using Maus.Core.Engine.Broker;
 using Maus.Core.Fixes;
 using Maus.Core.Preferences;
 using Maus.Core.Reporting;
@@ -15,6 +16,7 @@ namespace Maus.App.ViewModels;
 /// <summary>Fenêtre principale : audit (ce fichier), corrections, historique et choix de l'utilisateur (fichiers partiels).</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    /// <summary>Liste des modules (titres, ordre) : l'audit lui-même est fait par le moteur.</summary>
     private readonly AuditEngine _engine = AuditEngine.CreateWithBuiltInModules();
     private List<ModuleResult> _results = [];
     private ModuleViewModel? _selectedModule;
@@ -22,7 +24,8 @@ public sealed partial class MainViewModel : ObservableObject
     private string _statusText = T("Prêt. Lancez l'audit : MAUS lit votre configuration sans rien modifier.");
     private string _systemSummary = string.Empty;
     private int _completed;
-    private AuditContext? _lastContext;
+    /// <summary>Ce que le moteur a dit du PC au dernier audit ; <c>null</c> avant le premier.</summary>
+    private EngineSnapshot? _lastContext;
     private bool _laptopQuestionAsked;
 
     public MainViewModel()
@@ -40,7 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
         LoadHealthTrend();
 
         // Fichier des choix illisible ou abîmé au démarrage : l'utilisateur le sait dès l'ouverture.
-        if (FilePreferencesStore.CreateDefault().Notice is { } notice)
+        if (PreferencesStore.Notice is { } notice)
         {
             _statusText = notice;
         }
@@ -51,7 +54,10 @@ public sealed partial class MainViewModel : ObservableObject
         MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     /// <summary>Préférences enregistrées (profil Game Bar, alimentation, constats « voulus ») ; remplaçable pour les tests.</summary>
-    public IPreferencesStore PreferencesStore { get; init; } = FilePreferencesStore.CreateDefault();
+    public IPreferencesStore PreferencesStore { get; init; } = new EnginePreferencesStore(EngineHost.Current);
+
+    /// <summary>Le moteur (audit, corrections, journal) ; remplaçable pour les tests.</summary>
+    public IMausEngine Engine { get; init; } = EngineHost.Current;
 
     /// <summary>Choix de l'emplacement du rapport HTML (nom proposé) ; <c>null</c> si l'utilisateur renonce.</summary>
     public Func<string, string?> PickReportPath { get; init; } = suggested =>
@@ -138,9 +144,6 @@ public sealed partial class MainViewModel : ObservableObject
         StatusText = T("Lecture de la configuration…");
         try
         {
-            var context = await Task.Run(AuditContext.CreateDefault);
-            SystemSummary = $"{context.Windows.ProductName} {context.Windows.DisplayVersion} (build {context.Windows.FullBuild}) · " +
-                            $"{Labels.Of(context.Hardware.FormFactor)} · {context.Hardware.Cpu.Name}";
 
             var byId = Modules.ToDictionary(m => m.Id);
             var progress = new Progress<ModuleResult>(result =>
@@ -154,7 +157,11 @@ public sealed partial class MainViewModel : ObservableObject
                 StatusText = T("Audit en cours… {0}/{1}", Completed, ModuleCount);
             });
 
-            _results = [.. await _engine.RunAsync(context, progress)];
+            var run = await Engine.RunAuditAsync(progress, CancellationToken.None);
+            var context = run.Snapshot;
+            SystemSummary = $"{context.Windows.ProductName} {context.Windows.DisplayVersion} (build {context.Windows.FullBuild}) · " +
+                            $"{Labels.Of(context.Hardware.FormFactor)} · {context.Hardware.Cpu.Name}";
+            _results = [.. run.Results];
             var findings = _results.SelectMany(r => r.Findings).ToList();
             // Les comptes sont déjà sous le score et dans « À traiter d'abord » : ici, seulement l'heure de l'audit.
             StatusText = T("Audit terminé à {0:t}.", DateTime.Now);
@@ -167,12 +174,11 @@ public sealed partial class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(IsFirstAudit));
             OnPropertyChanged(nameof(ShowWelcome));
             LoadChoices(context);
-            var fixContext = await Task.Run(() => FixContext.CreateDefault(context));
-            BlockingReason = new FixEngine(fixContext).GetBlockingReason()
-                ?? (fixContext.ElevatedAsAnotherUser
+            BlockingReason = context.BlockingReason
+                ?? (context.ElevatedAsAnotherUser
                     ? T("MAUS a été lancé avec un autre compte administrateur : les réglages de votre profil (effets visuels, confidentialité, Game Bar) seront ignorés. Relancez MAUS depuis votre propre session.")
                     : null);
-            Replan();
+            await ReplanAsync();
             RefreshDashboard();
             await RecordHealthAsync();
             await RefreshJournalAsync();
@@ -198,15 +204,19 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        foreach (var module in _engine.Modules.Where(m => moduleIds.Contains(m.Id)))
+        foreach (var id in moduleIds)
         {
-            var result = await AuditEngine.RunModuleAsync(module, _lastContext, CancellationToken.None);
-            _results = [.. _results.Where(r => r.ModuleId != module.Id), result];
-            Modules.FirstOrDefault(m => m.Id == module.Id)?.SetResult(result);
+            if (await Engine.RunModuleAsync(id, CancellationToken.None) is not { } result)
+            {
+                continue;
+            }
+
+            _results = [.. _results.Where(r => r.ModuleId != id), result];
+            Modules.FirstOrDefault(m => m.Id == id)?.SetResult(result);
         }
 
         OnPropertyChanged(nameof(SelectedModule));
-        Replan();
+        await ReplanAsync();
         RefreshDashboard();
     }
 
@@ -231,7 +241,7 @@ public sealed partial class MainViewModel : ObservableObject
                 {
                     Before = applied.Before,
                     After = after,
-                    Session = applied.SessionId is null ? null : await Task.Run(() => FileJournalStore.CreateDefault().Load(applied.SessionId)),
+                    Session = applied.SessionId is null ? null : await Engine.LoadSessionAsync(applied.SessionId, CancellationToken.None),
                     Outcomes = applied.Verified,
                 }
                 : new HtmlReportInput { After = after };
@@ -246,6 +256,6 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Dernier audit, modules dans l'ordre de l'interface.</summary>
-    private AuditReport CurrentReport(AuditContext context) =>
+    private AuditReport CurrentReport(EngineSnapshot context) =>
         AuditReport.Create(context, _results.OrderBy(r => Modules.IndexOf(Modules.First(m => m.Id == r.ModuleId))).ToList());
 }

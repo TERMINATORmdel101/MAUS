@@ -298,6 +298,7 @@
   "Au niveau 0, les informations d'échec des mises à jour ne partent plus vers Microsoft (voir Module 3).": "At level 0, update failure information is no longer sent to Microsoft (see Module 3).",
   "Au premier lancement, vous choisirez vos préférences : MAUS propose « Meilleures performances » sur secteur et « Équilibré » sur batterie.": "At first launch, you will choose your preferences: MAUS suggests \"Best performance\" on mains power and \"Balanced\" on battery.",
   "Au repos, la carte est déjà proche de son seuil de ralentissement : dépoussiérez-la, vérifiez que ses ventilateurs tournent et que le boîtier est bien aéré.": "At idle, the card is already close to its slowdown threshold: dust it, check that its fans spin and that the case is well ventilated.",
+  "Aucun audit : lancez d'abord l'audit.": "No audit: run the audit first.",
   "Aucun benchmark lancé pour l'instant. Le résultat s'affichera ici, avec l'historique de vos passes.": "No benchmark run yet. The result will appear here, with the history of your runs.",
   "Aucun code MAUS-BENCH-1 valable dans ce texte : demandez à votre ami le texte de son bouton « Copier le résultat ».": "No valid MAUS-BENCH-1 code in this text: ask your friend for the text from their “Copy result” button.",
   "Aucun constat ne retire de points : tout est conforme, indéterminé ou marqué « voulu ».": "No finding takes points away: everything is compliant, undetermined or marked \"intended\".",

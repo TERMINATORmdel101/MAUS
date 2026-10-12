@@ -106,7 +106,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Affiche les choix enregistrés, sans déclencher de mise à jour.</summary>
-    private void LoadChoices(AuditContext context)
+    private void LoadChoices(Maus.Core.Engine.Broker.EngineSnapshot context)
     {
         _loadingChoices = true;
         try
@@ -144,7 +144,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Première ouverture sur un portable : la question du choix d'alimentation (décision du projet).</summary>
-    private async Task AskLaptopChoiceOnceAsync(AuditContext context)
+    private async Task AskLaptopChoiceOnceAsync(Maus.Core.Engine.Broker.EngineSnapshot context)
     {
         if (_laptopQuestionAsked || !context.Hardware.IsLaptop || context.Preferences.LaptopPower != LaptopPowerChoice.NotChosen)
         {
@@ -191,7 +191,7 @@ public sealed partial class MainViewModel
         try
         {
             var saved = await Task.Run(() => PreferencesStore.Update(p => p.RebindLanguage(findings)));
-            _lastContext = context.WithPreferences(saved);
+            _lastContext = context with { Preferences = saved };
         }
         catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
         {
@@ -214,7 +214,7 @@ public sealed partial class MainViewModel
 
         if (_lastContext is not null)
         {
-            _lastContext = _lastContext.WithPreferences(updated);
+            _lastContext = _lastContext with { Preferences = updated };
             await RefreshModulesAsync(moduleIds);
             StatusText = T("Choix enregistré : les constats et les corrections sont mis à jour.");
         }

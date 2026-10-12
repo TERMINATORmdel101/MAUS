@@ -25,6 +25,13 @@ public sealed record AuditReport(
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
+    /// <summary>Rapport d'après ce que le moteur a dit du PC (interface sans accès direct au système).</summary>
+    public static AuditReport Create(Engine.Broker.EngineSnapshot snapshot, IReadOnlyList<ModuleResult> modules)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        return new(snapshot.Now, AppVersion.Display, snapshot.Windows, snapshot.Hardware, snapshot.IsElevated, modules);
+    }
+
     public static AuditReport Create(AuditContext context, IReadOnlyList<ModuleResult> modules)
     {
         ArgumentNullException.ThrowIfNull(context);

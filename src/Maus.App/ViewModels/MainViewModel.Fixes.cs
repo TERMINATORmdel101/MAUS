@@ -110,13 +110,15 @@ public sealed partial class MainViewModel
         private set => SetProperty(ref _needsExplorerRestart, value);
     }
 
-    /// <summary>Recalcule les corrections en gardant les cases que l'utilisateur a déjà cochées ou décochées.</summary>
-    private void Replan()
+    /// <summary>Recalcule les corrections (par le moteur) en gardant les cases que l'utilisateur a déjà cochées ou décochées.</summary>
+    private async Task ReplanAsync()
     {
         if (_lastContext is null)
         {
             return;
         }
+
+        var plan = await Engine.PlanAsync(CancellationToken.None);
 
         var previous = Changes.ToDictionary(c => c.Change.Id, c => c.IsSelected, StringComparer.Ordinal);
         foreach (var change in Changes)
@@ -125,7 +127,7 @@ public sealed partial class MainViewModel
         }
 
         Changes.Clear();
-        foreach (var change in FixEngine.Plan(_engine, _results, _lastContext))
+        foreach (var change in plan)
         {
             var item = new ChangeViewModel(change, Modules.FirstOrDefault(m => m.Id == change.ModuleId)?.Header);
             if (previous.TryGetValue(change.Id, out var selected))
@@ -215,15 +217,15 @@ public sealed partial class MainViewModel
             var context = _lastContext;
             var before = AuditReport.Create(context, _results);
             var scoreBefore = Score;
-            var engine = new FixEngine(await Task.Run(() => FixContext.CreateDefault(context)));
+            var ids = selected.Select(c => c.Id).ToList();
             var options = new ApplyOptions { CreateRestorePoint = CreateRestorePoint, EnableProtectionIfNeeded = EnableProtection };
-            var result = await Task.Run(() => engine.Apply(selected, options));
+            var result = await Engine.ApplyAsync(ids, options, CancellationToken.None);
 
             if (result.Blocked && result.RestorePoint is { Succeeded: false } point &&
                 Confirm(T("Point de restauration impossible"), point.Message + Environment.NewLine + Environment.NewLine +
                     T("Continuer sans point de restauration ? Le journal de MAUS permettra quand même d'annuler chaque correction.")))
             {
-                result = await Task.Run(() => engine.Apply(selected, options with { ProceedWithoutRestorePoint = true }));
+                result = await Engine.ApplyAsync(ids, options with { ProceedWithoutRestorePoint = true }, CancellationToken.None);
             }
 
             if (result.Blocked)
@@ -243,7 +245,7 @@ public sealed partial class MainViewModel
                 : FixVerification.AuditFailed(result);
             if (result.Session is { } session)
             {
-                await Task.Run(() => engine.RecordVerification(session.Id, verified));
+                await Engine.RecordVerificationAsync(session.Id, verified, CancellationToken.None);
             }
 
             _lastApplied = new AppliedSession(before, result.Session?.Id, verified);
@@ -344,7 +346,7 @@ public sealed partial class MainViewModel
         IsCheckingSoftware = true;
         try
         {
-            var context = _lastContext ?? await Task.Run(AuditContext.CreateDefault);
+            var context = await Task.Run(AuditContext.CreateDefault);
             winget = await Task.Run(() => Winget.Locate(context.Packages, context.Files));
             if (winget is null)
             {

@@ -33,7 +33,7 @@ public sealed partial class MainViewModel
         IReadOnlyList<JournalSession> sessions;
         try
         {
-            var listing = await Task.Run(() => FileJournalStore.CreateDefault().Browse());
+            var listing = await EngineHost.Current.BrowseJournalAsync(CancellationToken.None);
             sessions = listing.Sessions;
             _journalNotice = listing.UnreadableNotice;
         }
@@ -76,9 +76,7 @@ public sealed partial class MainViewModel
 
         try
         {
-            var context = _lastContext ?? await Task.Run(AuditContext.CreateDefault);
-            var engine = new FixEngine(await Task.Run(() => FixContext.CreateDefault(context)));
-            var result = await Task.Run(() => engine.Revert(session.Session.Id, changeId: changeId));
+            var result = await Engine.RevertAsync(session.Session.Id, changeId, force: false, CancellationToken.None);
             FixReport = result.Error ?? T("Annulation :") + Environment.NewLine + string.Join(Environment.NewLine,
                 result.Entries.Select(e => $"• [{Labels.Of(e.Status)}] {e.Title} : {e.Message}"));
 
