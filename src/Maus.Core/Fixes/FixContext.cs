@@ -29,6 +29,8 @@ public sealed class FixContext
 
     public static FixContext CreateDefault(AuditContext audit)
     {
+        ArgumentNullException.ThrowIfNull(audit);
+
         var settings = new SettingsAccessor(audit.Registry, new WindowsRegistryWriter(), audit.SystemParameters, new Win32SystemParametersWriter());
         return new FixContext
         {

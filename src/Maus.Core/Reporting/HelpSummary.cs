@@ -71,6 +71,9 @@ public static class HelpSummary
 
     public static string Build(AuditReport report, PrivacyFilter privacy)
     {
+        ArgumentNullException.ThrowIfNull(privacy);
+        ArgumentNullException.ThrowIfNull(report);
+
         var text = new StringBuilder();
         void Line(string value = "") => text.AppendLine(privacy.Mask(value));
 

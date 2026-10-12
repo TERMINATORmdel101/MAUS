@@ -80,6 +80,9 @@ public static class CoreCycleTest
         Func<DateTimeOffset, int?>? wheaSince = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(topology);
+
         var started = DateTimeOffset.Now;
         var clock = Stopwatch.StartNew();
         var cores = topology.Cores();

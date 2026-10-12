@@ -34,6 +34,8 @@ public sealed class SettingsAccessor(
 
     public SettingValue? Read(SettingKey key)
     {
+        ArgumentNullException.ThrowIfNull(key);
+
         switch (key.Kind)
         {
             case SettingKind.Registry:
@@ -52,11 +54,17 @@ public sealed class SettingsAccessor(
         }
     }
 
-    public bool ContainerExists(SettingKey key) =>
-        key.Kind != SettingKind.Registry || registryReader.KeyExists(key.RegistryHive, key.Path!);
+    public bool ContainerExists(SettingKey key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        return key.Kind != SettingKind.Registry || registryReader.KeyExists(key.RegistryHive, key.Path!);
+    }
 
     public void Write(SettingKey key, SettingValue? value)
     {
+
+        ArgumentNullException.ThrowIfNull(key);
+
         switch (key.Kind)
         {
             case SettingKind.Registry when value is null:
@@ -93,12 +101,16 @@ public sealed class SettingsAccessor(
 
     public void RemoveContainerIfEmpty(SettingKey key)
     {
+        ArgumentNullException.ThrowIfNull(key);
+
         if (key.Kind == SettingKind.Registry)
         {
             registryWriter.DeleteKeyIfEmpty(key.RegistryHive, key.Path!);
         }
     }
 
-    private static SettingValue RequireValue(SettingKey key, SettingValue? value) =>
-        value ?? throw new InvalidOperationException(T("Un paramètre système ne peut pas être supprimé : {0}", key));
+    private static SettingValue RequireValue(SettingKey key, SettingValue? value)
+    {
+        return value ?? throw new InvalidOperationException(T("Un paramètre système ne peut pas être supprimé : {0}", key));
+    }
 }

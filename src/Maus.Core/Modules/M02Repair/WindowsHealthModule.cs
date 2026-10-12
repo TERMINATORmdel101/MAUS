@@ -103,6 +103,8 @@ public sealed class WindowsHealthModule : IAuditModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var now = context.Now.LocalDateTime;
         var since = now.AddDays(-LookbackDays);
         var logs = context.EventLogs;

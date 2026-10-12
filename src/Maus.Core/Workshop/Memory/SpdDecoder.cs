@@ -17,7 +17,10 @@ public static class SpdDecoder
     public const byte Ddr5Type = 0x12;
 
     /// <summary>Décode une image SPD ; <c>null</c> si ce n'est ni de la DDR4 ni de la DDR5.</summary>
-    public static SpdModule? Decode(SpdImage image) => image.Bytes.Length > 2
+    public static SpdModule? Decode(SpdImage image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        return image.Bytes.Length > 2
         ? image.Bytes[2] switch
         {
             Ddr4Type when image.Bytes.Length >= 256 => DecodeDdr4(image),
@@ -25,6 +28,7 @@ public static class SpdDecoder
             _ => null,
         }
         : null;
+    }
 
     /// <summary>CRC-16 des SPD JEDEC (polynôme 0x1021, valeur initiale 0).</summary>
     public static int Crc16(ReadOnlySpan<byte> data)

@@ -14,8 +14,11 @@ public interface IPackageInventory
 public static class PackageInventoryExtensions
 {
     /// <summary>Premier paquet dont le nom commence par <paramref name="namePrefix"/>, par exemple « Microsoft.XboxGamingOverlay ».</summary>
-    public static InstalledPackage? Find(this IPackageInventory inventory, string namePrefix) =>
-        inventory.GetUserPackages().FirstOrDefault(p => p.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase));
+    public static InstalledPackage? Find(this IPackageInventory inventory, string namePrefix)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);
+        return inventory.GetUserPackages().FirstOrDefault(p => p.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 /// <summary>Lecture par <c>PackageManager.FindPackagesForUser</c>, mise en cache pour la durée de l'audit.</summary>

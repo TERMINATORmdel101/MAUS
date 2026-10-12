@@ -87,13 +87,18 @@ public static class HardwareInventoryReader
         ["04EF"] = "TeamGroup",
     };
 
-    public static HardwareInventory Read(AuditContext context, ICpuIdSource cpuId, INvmlSource nvml) => new(
+    public static HardwareInventory Read(AuditContext context, ICpuIdSource cpuId, INvmlSource nvml)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(nvml);
+        return new(
         ReadCpu(context.Cim, cpuId),
         ReadBoard(context.Cim),
         ReadMemory(context.Cim),
         ReadGpus(context, nvml),
         ReadDisks(context.Cim),
         ReadBatteries(context.Cim));
+    }
 
     internal static CpuIdentity ReadCpu(ICimReader cim, ICpuIdSource cpuId)
     {

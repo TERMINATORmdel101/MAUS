@@ -57,6 +57,8 @@ public sealed class HardwareHealthModule : IAuditModule
 
     public async Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var findings = new List<Finding>();
         var systemLetter = SystemDriveLetter(context.Registry);
 

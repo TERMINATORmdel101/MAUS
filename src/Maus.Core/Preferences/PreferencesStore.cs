@@ -255,6 +255,9 @@ public static class PreferencesStoreExtensions
     /// <exception cref="PreferencesNotSavedException">Fichier illisible : le choix vaut pour cette séance seulement.</exception>
     public static UserPreferences Update(this IPreferencesStore store, Func<UserPreferences, UserPreferences> change)
     {
+        ArgumentNullException.ThrowIfNull(change);
+        ArgumentNullException.ThrowIfNull(store);
+
         lock (Gate)
         {
             var updated = change(store.Load());
@@ -269,6 +272,9 @@ public static class Acknowledgements
 {
     public static ModuleResult Apply(ModuleResult result, UserPreferences preferences)
     {
+        ArgumentNullException.ThrowIfNull(preferences);
+        ArgumentNullException.ThrowIfNull(result);
+
         if (preferences.Acknowledged.Count == 0)
         {
             return result;

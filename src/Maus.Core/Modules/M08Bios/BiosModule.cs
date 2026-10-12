@@ -60,6 +60,8 @@ public sealed class BiosModule : IAuditModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var bios = QueryAll(context.Cim, BiosQuery, CimScopes.Default);
         var board = QueryAll(context.Cim, BoardQuery, CimScopes.Default);
         var boardRow = board.Rows.Count > 0 ? board.Rows[0] : null;

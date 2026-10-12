@@ -57,6 +57,8 @@ public sealed unsafe partial class WindowsCoreTopology : ICoreTopology
 
     public bool PinCurrentThread(CpuCore core)
     {
+        ArgumentNullException.ThrowIfNull(core);
+
         var affinity = stackalloc ulong[2];
         affinity[0] = core.Mask;
         affinity[1] = core.Group;

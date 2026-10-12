@@ -68,6 +68,8 @@ public sealed class WindowsEventLogReader : IEventLogReader
     /// <summary>Filtre XPath par niveau de gravité et fenêtre de temps.</summary>
     public static string BuildLevelXPath(IReadOnlyCollection<int> levels, DateTime since)
     {
+        ArgumentNullException.ThrowIfNull(levels);
+
         var milliseconds = (long)Math.Max(0, (DateTime.UtcNow - since.ToUniversalTime()).TotalMilliseconds);
         var levelFilter = levels.Count > 0 ? "(" + string.Join(" or ", levels.Select(l => $"Level={l.ToString(CultureInfo.InvariantCulture)}")) + ") and " : string.Empty;
         return $"*[System[{levelFilter}TimeCreated[timediff(@SystemTime) <= {milliseconds.ToString(CultureInfo.InvariantCulture)}]]]";
@@ -108,6 +110,8 @@ public sealed class WindowsEventLogReader : IEventLogReader
     /// <summary>Filtre XPath : fournisseur, identifiants et fenêtre de temps (<c>timediff</c> en millisecondes).</summary>
     public static string BuildXPath(string? provider, IReadOnlyCollection<int> eventIds, DateTime since)
     {
+        ArgumentNullException.ThrowIfNull(eventIds);
+
         var conditions = new List<string>();
         if (!string.IsNullOrEmpty(provider))
         {

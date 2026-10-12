@@ -37,6 +37,8 @@ public sealed class Sparkline : FrameworkElement
 
     protected override void OnRender(DrawingContext drawingContext)
     {
+        ArgumentNullException.ThrowIfNull(drawingContext);
+
         var values = Values?.Cast<object>().Select(v => Convert.ToDouble(v, System.Globalization.CultureInfo.InvariantCulture)).ToList() ?? [];
         if (values.Count < 2 || ActualWidth <= 0 || ActualHeight <= 0)
         {

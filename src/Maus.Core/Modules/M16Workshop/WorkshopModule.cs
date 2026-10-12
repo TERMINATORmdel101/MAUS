@@ -38,6 +38,8 @@ public sealed class WorkshopModule : IAuditModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var inventory = HardwareInventoryReader.Read(context, _cpuId, _nvml);
         var limits = Limits.Value;
         var findings = new List<Finding> { DescribeCpu(inventory.Cpu, limits) };

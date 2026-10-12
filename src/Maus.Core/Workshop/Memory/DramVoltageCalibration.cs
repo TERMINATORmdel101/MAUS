@@ -48,16 +48,21 @@ public static class DramVoltageCalibrations
     }
 
     /// <summary>Tension de la mémoire d'après l'étalonnage, si la carte mère et l'entrée sont les mêmes.</summary>
-    public static double? Apply(IReadOnlyList<HardwareReading> readings, DramVoltageCalibration calibration, string? board) =>
-        board is not null && string.Equals(board, calibration.Board, StringComparison.OrdinalIgnoreCase)
+    public static double? Apply(IReadOnlyList<HardwareReading> readings, DramVoltageCalibration calibration, string? board)
+    {
+        ArgumentNullException.ThrowIfNull(calibration);
+        return board is not null && string.Equals(board, calibration.Board, StringComparison.OrdinalIgnoreCase)
         && readings.FirstOrDefault(r => r.Group == ReadingGroup.Motherboard && r.Kind == ReadingKind.Voltage
             && r.Hardware == calibration.Hardware && r.Name == calibration.Sensor) is { } reading
             ? reading.Value * calibration.Factor
             : null;
+    }
 
     /// <summary>Carte mère (fabricant et modèle, d'après le BIOS), pour lier l'étalonnage à cette carte.</summary>
     public static string? Board(IRegistryReader registry)
     {
+        ArgumentNullException.ThrowIfNull(registry);
+
         const string key = @"HARDWARE\DESCRIPTION\System\BIOS";
         try
         {

@@ -49,6 +49,8 @@ public sealed class RingGauge : FrameworkElement
 
     protected override void OnRender(DrawingContext drawingContext)
     {
+        ArgumentNullException.ThrowIfNull(drawingContext);
+
         var size = Math.Min(ActualWidth, ActualHeight);
         if (size <= Thickness * 2)
         {

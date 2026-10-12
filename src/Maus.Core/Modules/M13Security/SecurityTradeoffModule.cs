@@ -63,6 +63,8 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var registry = context.Registry;
         var (deviceGuard, deviceGuardDenied) = ReadDeviceGuard(context.Cim);
         var configuration = ReadConfiguration(registry);

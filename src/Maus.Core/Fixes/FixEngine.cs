@@ -21,6 +21,8 @@ public sealed class FixEngine
     /// <summary>Étape Plan de tous les modules corrigeables, à partir des résultats d'un audit.</summary>
     public static IReadOnlyList<PlannedChange> Plan(AuditEngine engine, IReadOnlyList<ModuleResult> results, AuditContext context)
     {
+        ArgumentNullException.ThrowIfNull(engine);
+
         var changes = new List<PlannedChange>();
         foreach (var module in engine.Modules.OfType<IFixableModule>())
         {
@@ -51,6 +53,9 @@ public sealed class FixEngine
 
     public ApplyResult Apply(IReadOnlyList<PlannedChange> changes, ApplyOptions options)
     {
+        ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(options);
+
         if (GetBlockingReason() is { } blocked)
         {
             return ApplyResult.Block(blocked);

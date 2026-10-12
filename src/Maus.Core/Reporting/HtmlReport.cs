@@ -53,6 +53,8 @@ public static class HtmlReport
 
     public static string Build(HtmlReportInput input)
     {
+        ArgumentNullException.ThrowIfNull(input);
+
         t_privacy = input.Privacy;
         try
         {

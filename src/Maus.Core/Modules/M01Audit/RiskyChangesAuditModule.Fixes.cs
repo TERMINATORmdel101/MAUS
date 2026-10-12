@@ -38,6 +38,8 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
 
     public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
         var registry = context.Registry;
         var policyFileNote = HasLocalPolicyFile(context)

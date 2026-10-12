@@ -207,6 +207,8 @@ public static class FrameAdvice
     /// <param name="refreshHz">Fréquence de l'écran principal, si connue.</param>
     public static IReadOnlyList<string> Explain(FrameSummary frames, int? refreshHz)
     {
+        ArgumentNullException.ThrowIfNull(frames);
+
         var lines = new List<string>();
         if (refreshHz is > 0 and var hz)
         {

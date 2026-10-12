@@ -49,6 +49,8 @@ public static class CpuIdParser
 {
     public static CpuIdInfo? Read(ICpuIdSource source)
     {
+        ArgumentNullException.ThrowIfNull(source);
+
         if (!source.IsSupported)
         {
             return null;

@@ -110,6 +110,8 @@ public static class SensorAlarms
     /// <param name="cpuMaxC">Température maximale du processeur selon son fabricant (catalogue des seuils), si connue.</param>
     public static IReadOnlyList<SensorAlarm> Check(SensorSnapshot snapshot, int? cpuMaxC = null)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
         var alarms = new List<SensorAlarm>();
         // Limite : celle que donne le processeur, sinon celle du catalogue (modèles vérifiés) ; inconnue = pas d'alarme inventée
         // (le processeur se protège de toute façon en ralentissant).

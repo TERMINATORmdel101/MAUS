@@ -46,6 +46,8 @@ public sealed class SafetyGauge : FrameworkElement
 
     protected override void OnRender(DrawingContext drawingContext)
     {
+        ArgumentNullException.ThrowIfNull(drawingContext);
+
         var range = Maximum - Minimum;
         if (range <= 0 || ActualWidth <= 0)
         {

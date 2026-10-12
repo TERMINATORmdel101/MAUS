@@ -8,6 +8,8 @@ public static class RegistryRulePlanner
 {
     public static IReadOnlyList<PlannedChange> Plan(string moduleId, IEnumerable<RegistryRule> rules, IReadOnlyList<Finding> findings)
     {
+        ArgumentNullException.ThrowIfNull(rules);
+
         var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
         var changes = new List<PlannedChange>();
         foreach (var rule in rules)

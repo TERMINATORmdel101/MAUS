@@ -129,6 +129,8 @@ public sealed class LiveViewModel : ObservableObject
 
     public void Add(SensorSnapshot snapshot)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
         _history.Add(snapshot);
         Cpu.Update(Percent(snapshot.CpuPercent), snapshot.CpuMhz is { } mhz ? (mhz / 1000).ToString("0.00 ", Culture) + "GHz" : string.Empty, _history.Series(s => s.CpuPercent));
         var cpuMax = snapshot.CpuTjMaxC ?? CpuMaxC;

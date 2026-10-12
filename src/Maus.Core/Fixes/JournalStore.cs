@@ -87,6 +87,8 @@ public sealed class FileJournalStore(string directory, IDirectoryProtector prote
 
     public void Save(JournalSession session)
     {
+        ArgumentNullException.ThrowIfNull(session);
+
         protector.EnsureProtected(Directory);
         var path = PathOf(session.Id);
         if (!_known.ContainsKey(session.Id))
@@ -100,6 +102,8 @@ public sealed class FileJournalStore(string directory, IDirectoryProtector prote
 
     public JournalSession? Load(string id)
     {
+        ArgumentNullException.ThrowIfNull(id);
+
         if (!IsValidId(id))
         {
             return null;

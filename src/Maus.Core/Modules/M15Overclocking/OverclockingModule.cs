@@ -47,6 +47,8 @@ public sealed class OverclockingModule : IAuditModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var tools = ReadInstalledTools(context.Registry, out var toolsReadable);
         cancellationToken.ThrowIfCancellationRequested();
 

@@ -11,6 +11,8 @@ public static class ShellLauncher
 {
     public static void OpenUrl(Uri url)
     {
+        ArgumentNullException.ThrowIfNull(url);
+
         if (url.Scheme is not ("https" or "http"))
         {
             return;
@@ -22,6 +24,8 @@ public static class ShellLauncher
     /// <summary>Ouvre une page des Paramètres de Windows (adresse « ms-settings: »).</summary>
     public static void OpenSettings(string page)
     {
+        ArgumentNullException.ThrowIfNull(page);
+
         if (page.StartsWith("ms-settings:", StringComparison.Ordinal))
         {
             Start(page);

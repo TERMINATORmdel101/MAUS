@@ -47,6 +47,8 @@ public sealed partial class PawnIoModule : IDisposable
 
     public static unsafe PawnIoModule Load(byte[] binary)
     {
+        ArgumentNullException.ThrowIfNull(binary);
+
         var handle = CreateFileW(@"\\?\GLOBALROOT\Device\PawnIO", GenericRead | GenericWrite, FileShareReadWrite, 0, OpenExisting, 0, 0);
         if (handle.IsInvalid)
         {
@@ -71,6 +73,8 @@ public sealed partial class PawnIoModule : IDisposable
     /// <summary>Appelle la fonction <paramref name="function"/> du module et renvoie ses <paramref name="outputLength"/> valeurs de sortie.</summary>
     public unsafe long[] Execute(string function, ReadOnlySpan<long> input, int outputLength)
     {
+        ArgumentNullException.ThrowIfNull(function);
+
         var request = new byte[FunctionNameLength + (input.Length * sizeof(long))];
         Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
         MemoryMarshal.AsBytes(input).CopyTo(request.AsSpan(FunctionNameLength));
@@ -100,6 +104,9 @@ public sealed partial class PawnIoModule : IDisposable
     /// </summary>
     public unsafe int ExecuteHr(string function, long[] input, uint inputCount, long[] output, uint outputCount, out uint returned)
     {
+        ArgumentNullException.ThrowIfNull(function);
+        ArgumentNullException.ThrowIfNull(output);
+
         var request = new byte[FunctionNameLength + (inputCount * sizeof(long))];
         Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
         MemoryMarshal.AsBytes(input.AsSpan(0, (int)inputCount)).CopyTo(request.AsSpan(FunctionNameLength));

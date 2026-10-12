@@ -81,6 +81,8 @@ public sealed class VisualEffectsModule : IFixableModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var findings = new List<Finding>(RegistryRuleEvaluator.EvaluateAll(Rules.Value, context.Registry))
         {
             DetectWidgets(context.Registry, context.Windows),
@@ -115,6 +117,8 @@ public sealed class VisualEffectsModule : IFixableModule
     /// </summary>
     public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
         bool Deviates(string id) => byId.TryGetValue(id, out var f) && f.Status == FindingStatus.Improvable;
 

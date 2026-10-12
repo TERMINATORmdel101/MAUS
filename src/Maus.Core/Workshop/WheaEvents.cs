@@ -10,6 +10,8 @@ public static class WheaEvents
     /// <summary>Nombre d'erreurs WHEA (corrigées ou non) dans le journal Système ; <c>null</c> si le journal est illisible.</summary>
     public static int? CountSince(IEventLogReader logs, DateTimeOffset since)
     {
+        ArgumentNullException.ThrowIfNull(logs);
+
         try
         {
             return logs.Query("System", WindowsHealthModule.WheaProvider, [.. WindowsHealthModule.WheaFatalIds, .. WindowsHealthModule.WheaCorrectedIds], since.LocalDateTime, 500).Count;

@@ -7,6 +7,9 @@ public static class TextReport
 {
     public static void Write(AuditReport report, TextWriter writer, bool useColor)
     {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(writer);
+
         writer.WriteLine(T("MAUS {0} — audit en lecture seule, aucune modification", report.MausVersion));
         writer.WriteLine(T("{0} {1} (build {2}), édition {3}", report.Windows.ProductName, report.Windows.DisplayVersion, report.Windows.FullBuild, report.Windows.EditionId));
         writer.WriteLine($"{Labels.Of(report.Hardware.FormFactor)} · {report.Hardware.Cpu.Name} · {string.Join(", ", report.Hardware.Gpus.Select(g => g.Name))}");

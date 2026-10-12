@@ -26,6 +26,9 @@ public sealed record MemorySnapshot
     /// <summary>Fiche tirée d'une lecture : contrôleur (Intel ou AMD), barrettes, vitesse vue par Windows, tension mesurée.</summary>
     public static MemorySnapshot From(MemoryDetailReport report, IReadOnlyList<MemorySlotConfiguration> slots, string? measuredVoltage, DateTimeOffset at)
     {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(slots);
+
         var values = new List<MemoryValue>();
         void Add(string key, string? value)
         {
@@ -117,6 +120,9 @@ public sealed record MemorySnapshot
     /// <summary>Valeurs qui diffèrent entre <paramref name="before"/> et <paramref name="after"/>, dans l'ordre de la fiche la plus récente.</summary>
     public static IReadOnlyList<MemoryDifference> Compare(MemorySnapshot before, MemorySnapshot after)
     {
+        ArgumentNullException.ThrowIfNull(after);
+        ArgumentNullException.ThrowIfNull(before);
+
         var previous = before.Values.ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
         var differences = new List<MemoryDifference>();
         foreach (var value in after.Values)
@@ -135,9 +141,13 @@ public sealed record MemorySnapshot
     }
 
     /// <summary>Texte des écarts, une ligne par valeur : « tCL : 16 → 15 ».</summary>
-    public static string Describe(IReadOnlyList<MemoryDifference> differences) => differences.Count == 0
+    public static string Describe(IReadOnlyList<MemoryDifference> differences)
+    {
+        ArgumentNullException.ThrowIfNull(differences);
+        return differences.Count == 0
         ? T("Aucune différence : même vitesse, mêmes réglages et mêmes timings.")
         : string.Join(Environment.NewLine, differences.Select(d => $"{d.Key} : {d.Before ?? "—"} → {d.After ?? "—"}"));
+    }
 
     private static string ClockName(string key) => key switch
     {
@@ -160,6 +170,8 @@ public sealed class MemorySnapshotStore(string directory)
 
     public void Save(MemorySnapshot snapshot)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
         Directory.CreateDirectory(directory);
         var name = "fiche-" + snapshot.At.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".json";
         // « Tout ou rien » : un plantage pendant l'écriture ne laisse pas une fiche à moitié écrite.

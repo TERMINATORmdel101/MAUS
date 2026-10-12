@@ -29,6 +29,8 @@ public sealed partial class ShaderLibrary
     /// <param name="defines">Définitions de préprocesseur (variantes d'un même shader).</param>
     public ShaderCode Get(string file, string entry, string profile, params (string Name, string Value)[] defines)
     {
+        ArgumentNullException.ThrowIfNull(defines);
+
         var source = Resolve(file, 0);
         var key = Key(source, entry, profile, defines);
         if (_compiled.TryGetValue(key, out var cached))

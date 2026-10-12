@@ -64,6 +64,8 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var findings = new List<Finding>();
         var entries = CollectEntries(context, findings);
         cancellationToken.ThrowIfCancellationRequested();
@@ -88,6 +90,8 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     /// </summary>
     public IReadOnlyList<Fixes.PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
         var entries = CollectEntries(context, []);
         var windowsDirectory = _environment.Expand("%SystemRoot%").TrimEnd('\\');

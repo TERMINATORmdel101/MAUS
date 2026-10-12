@@ -89,6 +89,8 @@ public sealed class SessionViewModel
 {
     public SessionViewModel(JournalSession session, Func<SessionViewModel, string?, Task> revert)
     {
+        ArgumentNullException.ThrowIfNull(session);
+
         Session = session;
         RevertCommand = new AsyncCommand(() => revert(this, null));
         Changes = session.Entries

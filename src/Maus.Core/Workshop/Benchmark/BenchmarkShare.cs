@@ -29,6 +29,8 @@ public static partial class BenchmarkShareCode
 
     public static string Encode(BenchmarkReport report)
     {
+        ArgumentNullException.ThrowIfNull(report);
+
         var payload = new Payload(
             report.Version,
             report.Date,
@@ -178,6 +180,9 @@ public static class BenchmarkComparison
 {
     public static IReadOnlyList<BenchmarkComparisonRow> Compare(BenchmarkReport mine, BenchmarkReport theirs)
     {
+        ArgumentNullException.ThrowIfNull(mine);
+        ArgumentNullException.ThrowIfNull(theirs);
+
         var rows = new List<BenchmarkComparisonRow>
         {
             Row("overall", mine.OverallScore, theirs.OverallScore),
@@ -199,8 +204,12 @@ public static class BenchmarkComparison
     }
 
     /// <summary>Les points ne se comparent qu'à résolution de calcul égale (et en mode léger avec le mode léger).</summary>
-    public static bool Comparable(BenchmarkReport a, BenchmarkReport b) =>
-        string.Equals(a.RenderResolution, b.RenderResolution, StringComparison.Ordinal);
+    public static bool Comparable(BenchmarkReport a, BenchmarkReport b)
+    {
+        ArgumentNullException.ThrowIfNull(a);
+        ArgumentNullException.ThrowIfNull(b);
+        return string.Equals(a.RenderResolution, b.RenderResolution, StringComparison.Ordinal);
+    }
 
     private static BenchmarkComparisonRow Row(string id, double mine, double theirs) =>
         new(id, mine, theirs, mine > 0 && theirs > 0 ? Math.Round(((theirs / mine) - 1) * 100, 1) : null);

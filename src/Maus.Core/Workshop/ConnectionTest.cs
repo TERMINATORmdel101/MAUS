@@ -38,6 +38,8 @@ public sealed record PingStats(string Label, IPAddress Address, int Sent, int Lo
 
     public static PingStats From(string label, IPAddress address, IReadOnlyList<double?> replies)
     {
+        ArgumentNullException.ThrowIfNull(replies);
+
         var times = replies.Where(r => r is not null).Select(r => r!.Value).ToList();
         if (times.Count == 0)
         {
@@ -166,12 +168,19 @@ public static class ConnectionTest
     }
 
     /// <summary>Une ligne de mesures, par exemple « Google (8.8.8.8) : 14 ms (pire 31 ms), gigue 2,1 ms, pertes 0 % ».</summary>
-    public static string Describe(PingStats stats) => stats.Answered
+    public static string Describe(PingStats stats)
+    {
+        ArgumentNullException.ThrowIfNull(stats);
+        return stats.Answered
         ? T("{0} : {1:0} ms (pire {2:0} ms), gigue {3:0.#} ms, pertes {4:0.#} %", stats.Label, stats.Median, stats.Worst, stats.Jitter ?? 0, stats.LossPercent)
         : T("{0} : aucune réponse", stats.Label);
+    }
 
     /// <summary>Ce qu'il faut en retenir et quoi faire, sans promettre de miracle.</summary>
-    public static string Advice(ConnectionResult result) => result.Verdict switch
+    public static string Advice(ConnectionResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Verdict switch
     {
         ConnectionVerdict.Good => T("Connexion stable. Pour jouer ou appeler en vidéo, c'est la régularité qui compte : peu de gigue et aucune perte."),
         ConnectionVerdict.LocalNetwork => T("Le souci est entre le PC et la box : en Wi-Fi, rapprochez-vous de la box ou passez en 5 GHz ; "
@@ -183,6 +192,7 @@ public static class ConnectionTest
         _ => T("Aucune réponse d'Internet : le PC semble hors ligne, ou un pare-feu bloque le ping. "
             + "Vérifiez la connexion dans Paramètres > Réseau et Internet."),
     };
+    }
 
     public static string References => T("Repères (latence) : fibre souvent 5 à 20 ms, ADSL 20 à 50 ms, 4G/5G 30 à 60 ms, Starlink 25 à 60 ms. "
         + "Ce test mesure la stabilité, pas le débit.");

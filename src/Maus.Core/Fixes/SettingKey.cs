@@ -55,8 +55,12 @@ public sealed record SettingKey
     public bool IsUserScoped => Kind is SettingKind.SystemParameter or SettingKind.MinimizeAnimation
         || Kind == SettingKind.Registry && string.Equals(Hive, "HKCU", StringComparison.OrdinalIgnoreCase);
 
-    public static SettingKey Registry(string hive, string path, string name) =>
-        new() { Kind = SettingKind.Registry, Hive = hive.ToUpperInvariant(), Path = path.Trim('\\'), Name = name };
+    public static SettingKey Registry(string hive, string path, string name)
+    {
+        ArgumentNullException.ThrowIfNull(hive);
+        ArgumentNullException.ThrowIfNull(path);
+        return new() { Kind = SettingKind.Registry, Hive = hive.ToUpperInvariant(), Path = path.Trim('\\'), Name = name };
+    }
 
     public static SettingKey Spi(uint getAction, uint setAction, bool useUiParam = false) =>
         new() { Kind = SettingKind.SystemParameter, SpiGet = getAction, SpiSet = setAction, SpiUseUiParam = useUiParam };

@@ -97,6 +97,8 @@ public static class HealthScore
     /// </summary>
     public static Severity GravityOf(Finding finding)
     {
+        ArgumentNullException.ThrowIfNull(finding);
+
         if (finding.Status is not (FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable))
         {
             return Severity.Info;
@@ -133,13 +135,17 @@ public static class HealthScore
         results.Where(r => r.Error is not null).Select(r => new UncheckedModule(r.ModuleId, r.Title, r.Error!)).ToList();
 
     /// <summary>Phrase qui signale un score partiel, ou <c>null</c> quand tous les modules ont été vérifiés.</summary>
-    public static string? PartialNote(ScoreBreakdown breakdown) => breakdown.Unchecked.Count switch
+    public static string? PartialNote(ScoreBreakdown breakdown)
+    {
+        ArgumentNullException.ThrowIfNull(breakdown);
+        return breakdown.Unchecked.Count switch
     {
         0 => null,
         1 => T("Score partiel : 1 module n'a pas pu être vérifié ({0}). Le score ne tient compte que du reste.", breakdown.Unchecked[0].Title),
         var count => T("Score partiel : {0} modules n'ont pas pu être vérifiés ({1}). Le score ne tient compte que du reste.", count,
             string.Join(", ", breakdown.Unchecked.Select(u => u.Title))),
     };
+    }
 
     /// <summary>
     /// Détail d'un score partiel pour « Pourquoi ce score ? » : la phrase de <see cref="PartialNote"/>, chaque module non
@@ -147,6 +153,8 @@ public static class HealthScore
     /// </summary>
     public static string? PartialDetail(ScoreBreakdown breakdown)
     {
+        ArgumentNullException.ThrowIfNull(breakdown);
+
         if (PartialNote(breakdown) is not { } note)
         {
             return null;

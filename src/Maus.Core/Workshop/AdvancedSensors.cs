@@ -47,6 +47,8 @@ public static class PawnIo
     /// <summary>Installé ? et version (lu dans la liste des programmes installés, sans charger le pilote).</summary>
     public static (bool Installed, string? Version) State(IRegistryReader registry)
     {
+        ArgumentNullException.ThrowIfNull(registry);
+
         try
         {
             return registry.KeyExists(RegistryHive.LocalMachine, UninstallKey)
@@ -59,9 +61,17 @@ public static class PawnIo
         }
     }
 
-    public static string InstallConsoleArguments(string wingetPath) => ConsoleArguments(wingetPath, "install", InstallIntro);
+    public static string InstallConsoleArguments(string wingetPath)
+    {
+        ArgumentNullException.ThrowIfNull(wingetPath);
+        return ConsoleArguments(wingetPath, "install", InstallIntro);
+    }
 
-    public static string UninstallConsoleArguments(string wingetPath) => ConsoleArguments(wingetPath, "uninstall", UninstallIntro);
+    public static string UninstallConsoleArguments(string wingetPath)
+    {
+        ArgumentNullException.ThrowIfNull(wingetPath);
+        return ConsoleArguments(wingetPath, "uninstall", UninstallIntro);
+    }
 
     public static string InstallIntro => T("Installation du pilote PawnIO par winget. Répondez à ses questions dans cette fenêtre, puis relancez MAUS pour voir les nouveaux capteurs.");
 

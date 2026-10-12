@@ -31,6 +31,8 @@ public static class MemoryDetails
     /// </summary>
     public static MemoryDetailReport Read(ISpdSource spd, ISmnReader? smn, IPmTableReader? pm, bool? ddr5Hint, IntelControllerAccess? intel = null)
     {
+        ArgumentNullException.ThrowIfNull(spd);
+
         var notes = new List<string>();
         var modules = new List<SpdModule>();
         try
@@ -254,6 +256,8 @@ public static class MemoryDetails
     /// <summary>Rapport texte complet, à copier dans un forum ou à comparer avant/après un réglage.</summary>
     public static string ToText(MemoryDetailReport report)
     {
+        ArgumentNullException.ThrowIfNull(report);
+
         var text = new StringBuilder();
         void Line(string value = "") => text.AppendLine(value);
         string Timings(IEnumerable<MemoryTiming> timings) => string.Join("  ", timings.Select(t =>
@@ -330,6 +334,8 @@ public static class MemoryDetails
     /// <summary>Horloges du contrôleur Intel sur une ligne : « Horloge mémoire 1733 MHz (3467 MT/s) · ring 4300 MHz (800 à 4300) ».</summary>
     public static string IntelClocks(IntelMemoryReport report)
     {
+        ArgumentNullException.ThrowIfNull(report);
+
         var parts = new List<string>();
         foreach (var clock in report.Clocks)
         {
@@ -353,6 +359,8 @@ public static class MemoryDetails
     /// <summary>Réglages du contrôleur Intel sur une ligne : « DDR4 · canaux A, B · commande 2N ».</summary>
     public static string IntelSettings(IntelMemoryReport report)
     {
+        ArgumentNullException.ThrowIfNull(report);
+
         var parts = new List<string>();
         if (report.MemoryType is { } type)
         {
@@ -374,9 +382,12 @@ public static class MemoryDetails
     }
 
     /// <summary>Résumé d'un profil sur une ligne : « 3200 MT/s · 16-18-18-36 · 1.35 V ».</summary>
-    public static string ProfileSummary(SpdProfile profile) =>
-        string.Create(CultureInfo.InvariantCulture, $"{profile.SpeedMts} MT/s · {profile.Summary}")
+    public static string ProfileSummary(SpdProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        return string.Create(CultureInfo.InvariantCulture, $"{profile.SpeedMts} MT/s · {profile.Summary}")
         + (profile.Vdd is { } vdd ? string.Create(CultureInfo.InvariantCulture, $" · {vdd:0.00} V") : string.Empty);
+    }
 
     /// <summary>
     /// Puce SPD d'une barrette décrite par Windows : même référence d'abord (le BIOS recopie celle de la puce),
@@ -384,6 +395,8 @@ public static class MemoryDetails
     /// </summary>
     public static SpdModule? MatchModule(IReadOnlyList<SpdModule> modules, string? partNumber, int index)
     {
+        ArgumentNullException.ThrowIfNull(modules);
+
         var part = partNumber?.Trim();
         if (!string.IsNullOrEmpty(part))
         {
@@ -404,12 +417,16 @@ public static class MemoryDetails
         _ => T("Tertiaires"),
     };
 
-    public static string ProfileName(SpdProfile profile) => profile.Kind switch
+    public static string ProfileName(SpdProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        return profile.Kind switch
     {
         ProfileKind.Jedec => T("JEDEC (standard)"),
         ProfileKind.Xmp => T("XMP {0} n° {1}", profile.Version ?? string.Empty, profile.Number) + (profile.Name is { } name ? $" « {name} »" : string.Empty),
         _ => T("EXPO n° {0}", profile.Number),
     };
+    }
 
     private static string OnOff(bool value) => value ? T("activé") : T("désactivé");
 

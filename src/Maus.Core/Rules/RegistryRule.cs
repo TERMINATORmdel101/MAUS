@@ -98,10 +98,13 @@ public sealed record RuleFix
     public IReadOnlyList<string> AlsoDelete { get; init; } = [];
 
     /// <summary>Écritures à faire, ou liste vide si la règle ne permet pas d'en déduire.</summary>
-    public IReadOnlyList<SettingWrite> ToWrites(RegistryRule rule) =>
-        ToWrite(rule) is { } main
+    public IReadOnlyList<SettingWrite> ToWrites(RegistryRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        return ToWrite(rule) is { } main
             ? [main, .. AlsoDelete.Select(name => new SettingWrite(SettingKey.Registry(rule.Hive, rule.Path, name), null))]
             : [];
+    }
 
     private SettingWrite? ToWrite(RegistryRule rule)
     {

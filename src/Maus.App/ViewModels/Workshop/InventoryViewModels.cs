@@ -53,6 +53,9 @@ public sealed class ComponentCardViewModel
     /// <param name="details">Windows, écrans, réseau, son et emplacements mémoire, ou <c>null</c> s'ils n'ont pas été lus.</param>
     public static IReadOnlyList<ComponentCardViewModel> From(HardwareInventory inventory, SafetyLimits limits, Action<string> search, IReadOnlyList<SpdModule>? spd = null, MachineDetails? details = null, DateTime? now = null)
     {
+        ArgumentNullException.ThrowIfNull(inventory);
+        ArgumentNullException.ThrowIfNull(limits);
+
         var cards = new List<ComponentCardViewModel>();
         if (details is not null)
         {
@@ -305,6 +308,8 @@ public sealed class ComponentCardViewModel
     /// <summary>La fiche entière en texte, pour la coller dans un message d'aide ou un signalement.</summary>
     public static string ToText(IEnumerable<ComponentCardViewModel> cards)
     {
+        ArgumentNullException.ThrowIfNull(cards);
+
         var text = new System.Text.StringBuilder();
         foreach (var card in cards)
         {

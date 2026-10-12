@@ -45,6 +45,8 @@ public sealed class MonitorTracker
     /// <summary>Mesures utiles d'un échantillon, par composant ; les capteurs lus par le pilote remplacent les résumés sans pilote.</summary>
     public static IEnumerable<(string Component, string Name, MonitorKind Kind, double Value)> Extract(SensorSnapshot snapshot)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
         var cpuReadings = snapshot.Readings.Where(r => r.Group == ReadingGroup.Cpu).ToList();
         var cpuName = cpuReadings.FirstOrDefault()?.Hardware ?? T("Processeur");
         if (snapshot.CpuPercent is { } load)
@@ -139,6 +141,8 @@ public static class ErrorWatch
 
     public static ErrorWatchResult Read(IEventLogReader logs, DateTime since)
     {
+        ArgumentNullException.ThrowIfNull(logs);
+
         var events = new List<WatchedEvent>();
         var incomplete = false;
 
@@ -182,7 +186,10 @@ public static class ErrorWatch
     }
 
     /// <summary>Erreur WHEA venant du bus PCI Express : le message (ou les données) de l'événement nomme le composant.</summary>
-    public static bool IsPciExpress(EventRecordInfo e) =>
-        (e.Message?.Contains("PCI Express", StringComparison.OrdinalIgnoreCase) ?? false)
+    public static bool IsPciExpress(EventRecordInfo e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        return (e.Message?.Contains("PCI Express", StringComparison.OrdinalIgnoreCase) ?? false)
         || e.Data.Values.Any(v => v.Contains("PCI Express", StringComparison.OrdinalIgnoreCase));
+    }
 }

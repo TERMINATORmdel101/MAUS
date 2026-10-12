@@ -44,7 +44,11 @@ public static partial class GraphicsDriverActions
         instanceId is { Length: > 0 and < 400 } && SafeInstanceId().IsMatch(instanceId);
 
     /// <summary>Seuls les paquets ajoutés au magasin (<c>oem#.inf</c>) se sauvegardent et se suppriment ; jamais un pilote de Windows.</summary>
-    public static bool CanBackupOrRemove(DriverEntry driver) => driver.IsThirdPartyPackage;
+    public static bool CanBackupOrRemove(DriverEntry driver)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        return driver.IsThirdPartyPackage;
+    }
 
     /// <summary>Sous-dossier daté pour une sauvegarde, par exemple <c>20260929-101500-oem12</c>.</summary>
     public static string BackupFolder(string infName, DateTimeOffset now) =>
@@ -56,6 +60,9 @@ public static partial class GraphicsDriverActions
     /// </summary>
     public static string? ConsoleArguments(GraphicsDriverAction action, DriverEntry gpu, string backupFolder, string? pnputil = null)
     {
+        ArgumentNullException.ThrowIfNull(backupFolder);
+        ArgumentNullException.ThrowIfNull(gpu);
+
         if (gpu.Group != DriverGroup.Graphics || !IsSafeInstanceId(gpu.InstanceId) || !SafePath(backupFolder))
         {
             return null;
@@ -109,6 +116,8 @@ public static partial class GraphicsDriverActions
     /// <summary>Réinstallation d'une sauvegarde : tous les .inf du dossier, installés sur les cartes correspondantes.</summary>
     public static string? RestoreArguments(string backupFolder, string? pnputil = null)
     {
+        ArgumentNullException.ThrowIfNull(backupFolder);
+
         if (!SafePath(backupFolder))
         {
             return null;
@@ -143,7 +152,11 @@ public static partial class GraphicsDriverActions
     /// Retirer puis redétecter n'a de sens que pour une carte du bus PCI : un adaptateur virtuel (ROOT, SWD : Parsec,
     /// écran virtuel…) retiré par <c>/remove-device</c> n'est pas recréé par <c>/scan-devices</c>.
     /// </summary>
-    public static bool CanReinstall(DriverEntry driver) => driver.InstanceId.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase);
+    public static bool CanReinstall(DriverEntry driver)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        return driver.InstanceId.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Message selon le code de sortie de pnputil, lu au moment de l'exécution (<c>if errorlevel N</c> = code supérieur ou égal

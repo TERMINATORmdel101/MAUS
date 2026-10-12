@@ -57,6 +57,8 @@ public sealed unsafe partial class D3D11GpuMemoryProvider : IGpuMemoryProvider
 
     public IGpuMemory Open(GpuAdapterInfo adapter)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
+
         var factory = CreateFactory();
         nint dxgiAdapter = 0;
         try
@@ -79,6 +81,8 @@ public sealed unsafe partial class D3D11GpuMemoryProvider : IGpuMemoryProvider
     /// </summary>
     public long? AvailableBytes(GpuAdapterInfo adapter)
     {
+        ArgumentNullException.ThrowIfNull(adapter);
+
         var factory = CreateFactory();
         nint dxgiAdapter = 0;
         nint adapter3 = 0;

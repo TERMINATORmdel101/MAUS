@@ -18,6 +18,8 @@ public partial class MainWindow : Window
     /// </summary>
     protected override void OnClosing(CancelEventArgs e)
     {
+        ArgumentNullException.ThrowIfNull(e);
+
         if (DataContext is ViewModels.MainViewModel { IsApplying: true }
             && MessageBox.Show(
                 this,

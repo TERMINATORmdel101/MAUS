@@ -96,7 +96,11 @@ public static class MachineDetailsReader
     private const long Ethernet = 14;
     private const long Wireless = 9;
 
-    public static MachineDetails Read(AuditContext context) => Read(context, new Win32DisplayConfigReader(), new Win32FirmwareTypeSource());
+    public static MachineDetails Read(AuditContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return Read(context, new Win32DisplayConfigReader(), new Win32FirmwareTypeSource());
+    }
 
     internal static MachineDetails Read(AuditContext context, IDisplayConfigReader displays, IFirmwareTypeSource firmware) => new(
         ReadSystem(context, firmware),

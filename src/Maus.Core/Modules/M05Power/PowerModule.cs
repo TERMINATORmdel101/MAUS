@@ -64,6 +64,8 @@ public sealed class PowerModule : Fixes.IFixableModule
 
     public async Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var registry = context.Registry;
         var listed = await ReadSchemeListAsync(context.Commands, cancellationToken).ConfigureAwait(false);
         var capabilities = CallPlatform(_platform.GetCapabilities);
@@ -114,6 +116,8 @@ public sealed class PowerModule : Fixes.IFixableModule
     /// </summary>
     public IReadOnlyList<Fixes.PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var byId = findings.ToDictionary(f => f.Id, StringComparer.Ordinal);
         var changes = new List<Fixes.PlannedChange>();
 

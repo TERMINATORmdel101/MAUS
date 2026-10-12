@@ -36,25 +36,34 @@ public interface IRegistryReader
 
 public static class RegistryReaderExtensions
 {
-    public static int? GetDword(this IRegistryReader registry, RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64) =>
-        registry.GetValue(hive, path, name, view) switch
+    public static int? GetDword(this IRegistryReader registry, RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        return registry.GetValue(hive, path, name, view) switch
         {
             int value => value,
             long value => unchecked((int)value),
             _ => null,
         };
+    }
 
-    public static string? GetString(this IRegistryReader registry, RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64) =>
-        registry.GetValue(hive, path, name, view) switch
+    public static string? GetString(this IRegistryReader registry, RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        return registry.GetValue(hive, path, name, view) switch
         {
             string value => value,
             string[] values => string.Join('|', values),
             null => null,
             var other => other.ToString(),
         };
+    }
 
-    public static byte[]? GetBinary(this IRegistryReader registry, RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64) =>
-        registry.GetValue(hive, path, name, view) as byte[];
+    public static byte[]? GetBinary(this IRegistryReader registry, RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        return registry.GetValue(hive, path, name, view) as byte[];
+    }
 
     /// <summary>Représentation texte stable d'une valeur de registre, pour comparer et afficher.</summary>
     public static string? Normalize(object? value) => value switch

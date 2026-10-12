@@ -96,6 +96,8 @@ public static class FormFactorClassifier
     /// <summary>Portable si au moins deux indices sur trois concordent : châssis, <c>PCSystemTypeEx</c>, batterie.</summary>
     public static FormFactor Classify(IReadOnlyList<long> chassisTypes, long? pcSystemTypeEx, bool hasBattery)
     {
+        ArgumentNullException.ThrowIfNull(chassisTypes);
+
         var chassisPortable = chassisTypes.Any(PortableChassis.Contains);
         var systemTypePortable = pcSystemTypeEx is 2 or 8;
         var votes = (chassisPortable ? 1 : 0) + (systemTypePortable ? 1 : 0) + (hasBattery ? 1 : 0);

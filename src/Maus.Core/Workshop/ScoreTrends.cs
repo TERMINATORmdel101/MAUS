@@ -83,6 +83,8 @@ public static class ScoreTrends
     /// </summary>
     public static string DescribeHealth(IReadOnlyList<BenchmarkEntry> series)
     {
+        ArgumentNullException.ThrowIfNull(series);
+
         if (series.Count == 0)
         {
             return T("Pas encore de résultat.");
@@ -108,6 +110,8 @@ public static class ScoreTrends
 
     public static string Describe(IReadOnlyList<BenchmarkEntry> series)
     {
+        ArgumentNullException.ThrowIfNull(series);
+
         if (series.Count == 0)
         {
             return T("Pas encore de résultat.");

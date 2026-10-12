@@ -160,6 +160,8 @@ public static class AppearanceManager
     /// <summary>Applique les choix à toute l'application (à chaud).</summary>
     public static void Apply(UserPreferences preferences)
     {
+        ArgumentNullException.ThrowIfNull(preferences);
+
         Current = preferences;
         var application = Application.Current;
         if (application is null)

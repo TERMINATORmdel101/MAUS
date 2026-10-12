@@ -86,6 +86,8 @@ public static class ScheduledAudit
     /// <param name="protectedRoots">Dossiers réservés aux administrateurs (voir <see cref="ProtectedRoots"/>).</param>
     public static string? Refusal(string executable, IReadOnlyList<string> protectedRoots)
     {
+        ArgumentNullException.ThrowIfNull(executable);
+
         var isProtected = Path.IsPathFullyQualified(executable)
             && !executable.Contains("..", StringComparison.Ordinal)
             && protectedRoots.Any(root => root.Length > 0 && executable.StartsWith(root.TrimEnd('\\') + @"\", StringComparison.OrdinalIgnoreCase));
@@ -102,6 +104,9 @@ public static class ScheduledAudit
     /// </summary>
     public static bool IsOlderStoreFolder(string taskCommand, string currentExecutable)
     {
+        ArgumentNullException.ThrowIfNull(currentExecutable);
+        ArgumentNullException.ThrowIfNull(taskCommand);
+
         if (StoreFolder(taskCommand) is not { } previous || StoreFolder(currentExecutable) is not { } current)
         {
             return false;
@@ -155,6 +160,8 @@ public static class ScheduledAudit
     /// <param name="results">Résultats de l'audit, pour citer les modules non vérifiés ; <c>null</c> = ne pas les citer.</param>
     public static string NotificationText(IReadOnlyList<Finding> problems, IEnumerable<ModuleResult>? results = null)
     {
+        ArgumentNullException.ThrowIfNull(problems);
+
         var text = T("L'audit de la semaine a trouvé {0} problème(s) : {1}{2}", problems.Count,
             string.Join(" ; ", problems.Take(3).Select(p => p.Title)), problems.Count > 3 ? "…" : string.Empty);
         var failed = results is null ? [] : Reporting.HealthScore.UncheckedModules(results);

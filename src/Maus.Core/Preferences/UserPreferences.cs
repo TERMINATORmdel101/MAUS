@@ -94,10 +94,14 @@ public sealed record UserPreferences
     public IReadOnlyList<Acknowledgement> Acknowledged { get; init; } = [];
 
     /// <summary>Marque « voulu » la valeur actuelle du constat (remplace une marque précédente).</summary>
-    public UserPreferences Acknowledge(Finding finding, DateTimeOffset now) => this with
+    public UserPreferences Acknowledge(Finding finding, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(finding);
+        return this with
     {
         Acknowledged = [.. Acknowledged.Where(a => a.FindingId != finding.Id), new Acknowledgement(finding.Id, finding.Current, now, Localization.Texts.Language)],
     };
+    }
 
     public UserPreferences Unacknowledge(string findingId) => this with
     {

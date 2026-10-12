@@ -32,8 +32,11 @@ public static partial class Winget
     public static readonly IReadOnlyList<string> ListArguments = ["upgrade", "--source", "winget", "--disable-interactivity"];
 
     /// <summary>Chemin de winget.exe dans le dossier protégé du paquet, ou <c>null</c>.</summary>
-    public static string? Locate(IPackageInventory packages, IFileSystemReader files) =>
-        Locate(packages, files, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
+    public static string? Locate(IPackageInventory packages, IFileSystemReader files)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        return Locate(packages, files, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
+    }
 
     internal static string? Locate(IPackageInventory packages, IFileSystemReader files, string programFiles)
     {
@@ -48,6 +51,8 @@ public static partial class Winget
 
     public static async Task<IReadOnlyList<SoftwareUpdate>> ListUpgradesAsync(ICommandRunner commands, string wingetPath, TimeSpan timeout, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(commands);
+
         var result = await commands.RunAsync(wingetPath, ListArguments, timeout, cancellationToken).ConfigureAwait(false);
         if (result.TimedOut)
         {
@@ -70,6 +75,8 @@ public static partial class Winget
     /// </summary>
     public static IReadOnlyList<SoftwareUpdate> Parse(string output)
     {
+        ArgumentNullException.ThrowIfNull(output);
+
         var lines = output.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(Clean).ToList();
         var separator = lines.FindIndex(IsSeparator);
         if (separator < 1)
@@ -130,6 +137,8 @@ public static partial class Winget
     /// </summary>
     public static string UpgradeConsoleArguments(string wingetPath, IEnumerable<SoftwareUpdate> selection)
     {
+        ArgumentNullException.ThrowIfNull(wingetPath);
+
         if (wingetPath.Contains('"', StringComparison.Ordinal))
         {
             throw new ArgumentException(T("Chemin de winget invalide."), nameof(wingetPath));

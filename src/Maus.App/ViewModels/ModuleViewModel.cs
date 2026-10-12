@@ -24,6 +24,8 @@ public sealed class FindingViewModel
     /// <param name="module">Module d'origine (« M01 · … »), affiché dans la liste par importance de l'onglet Constats.</param>
     public FindingViewModel(Finding finding, string moduleId, IFindingActions actions, string? module = null)
     {
+        ArgumentNullException.ThrowIfNull(actions);
+
         this.finding = finding;
         Module = module;
         CanFix = actions.CanFix(finding);
@@ -133,6 +135,8 @@ public sealed class ModuleViewModel : ObservableObject
 
     public ModuleViewModel(IAuditModule module, IFindingActions actions)
     {
+        ArgumentNullException.ThrowIfNull(module);
+
         Id = module.Id;
         Title = module.Title;
         _actions = actions;

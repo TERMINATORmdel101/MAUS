@@ -56,6 +56,8 @@ public static class DriverInventoryReader
     /// celle de <c>Win32_PnPSignedDriver</c> inverse parfois le jour et le mois.</param>
     public static IReadOnlyList<DriverEntry> Read(ICimReader cim, IDriverDateSource? dates = null)
     {
+        ArgumentNullException.ThrowIfNull(cim);
+
         IReadOnlyList<CimRow> rows;
         try
         {
@@ -151,11 +153,17 @@ public static class DriverAge
     public static DateTime IntelConventionalDate { get; } = new(1968, 7, 18);
 
     /// <summary>Date de convention (Microsoft 2006 ou Intel 1968) : elle ne dit rien de l'âge réel du pilote.</summary>
-    public static bool HasConventionalDate(DriverEntry driver) => ConventionOf(driver) is not null;
+    public static bool HasConventionalDate(DriverEntry driver)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        return ConventionOf(driver) is not null;
+    }
 
     /// <summary>Âge lisible (« 3 ans », « 8 mois », « 1 mois », « moins d'un mois »), ou la mention d'une date de convention.</summary>
     public static string Describe(DriverEntry driver, DateTime today)
     {
+        ArgumentNullException.ThrowIfNull(driver);
+
         if (driver.Date is not { } date)
         {
             return "—";

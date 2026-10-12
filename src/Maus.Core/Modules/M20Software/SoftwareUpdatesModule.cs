@@ -50,6 +50,8 @@ public sealed class SoftwareUpdatesModule : IAuditModule
 
     public async Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         const string id = "M20.software-updates";
         var title = T("Logiciels à mettre à jour");
         string? winget;

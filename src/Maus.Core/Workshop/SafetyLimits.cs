@@ -37,8 +37,11 @@ public enum SafetyLevel
 
 public static class SafetyRules
 {
-    public static SafetyLevel MemoryVoltage(int millivolts, MemoryVoltageLimit limit) =>
-        millivolts > limit.DangerAboveMv ? SafetyLevel.Dangerous
+    public static SafetyLevel MemoryVoltage(int millivolts, MemoryVoltageLimit limit)
+    {
+        ArgumentNullException.ThrowIfNull(limit);
+        return millivolts > limit.DangerAboveMv ? SafetyLevel.Dangerous
         : millivolts > limit.ElevatedAboveMv ? SafetyLevel.Elevated
         : SafetyLevel.Normal;
+    }
 }

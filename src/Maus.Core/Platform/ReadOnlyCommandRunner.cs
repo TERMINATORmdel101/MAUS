@@ -43,6 +43,9 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
 
     public static bool IsAllowed(string executable, IReadOnlyList<string> arguments)
     {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(executable);
+
         var name = FileName(executable);
         if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
         {
@@ -70,6 +73,8 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
     /// <summary>Vrai si le chemin est dans <c>Program Files\WindowsApps</c>, dossier des paquets que seul Windows peut modifier.</summary>
     public static bool IsInProtectedAppsFolder(string path, string programFiles)
     {
+        ArgumentNullException.ThrowIfNull(path);
+
         if (string.IsNullOrEmpty(programFiles) || path.Contains("..", StringComparison.Ordinal))
         {
             return false;
@@ -80,6 +85,9 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
 
     public async Task<CommandResult> RunAsync(string executable, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(executable);
+
         if (!IsAllowed(executable, arguments))
         {
             throw new InvalidOperationException(T("Commande refusée en mode lecture seule : {0} {1}", executable, string.Join(' ', arguments)));

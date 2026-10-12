@@ -25,11 +25,15 @@ public sealed record AuditReport(
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
-    public static AuditReport Create(AuditContext context, IReadOnlyList<ModuleResult> modules) => new(
+    public static AuditReport Create(AuditContext context, IReadOnlyList<ModuleResult> modules)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return new(
         context.Now,
         AppVersion.Display,
         context.Windows,
         context.Hardware,
         context.IsElevated,
         modules);
+    }
 }

@@ -104,6 +104,8 @@ public static class ZenMemoryController
     /// <summary>Canaux mémoire actifs (numéro et décalage de leur bloc de registres).</summary>
     public static IReadOnlyList<(int Index, uint Offset)> Channels(ISmnReader smn)
     {
+        ArgumentNullException.ThrowIfNull(smn);
+
         var channels = new List<(int, uint)>();
         for (var i = 0; i < MaxChannels; i++)
         {
@@ -123,6 +125,8 @@ public static class ZenMemoryController
     /// <summary>Timings du premier canal actif ; <c>null</c> si aucun canal n'est lisible (pilote absent, processeur non géré).</summary>
     public static LiveMemoryTimings? ReadTimings(ISmnReader smn, bool ddr5)
     {
+        ArgumentNullException.ThrowIfNull(smn);
+
         var channels = Channels(smn);
         if (channels.Count == 0)
         {
@@ -320,6 +324,8 @@ public static class ZenMemoryController
     /// <summary>FCLK, UCLK, MCLK et tensions SoC / VDDP / VDDG ; <c>null</c> si la version de table est inconnue ou illisible.</summary>
     public static MemoryClocks? ReadClocks(IPmTableReader pm)
     {
+        ArgumentNullException.ThrowIfNull(pm);
+
         if (pm.Version() is not { } version || LayoutFor(version) is not { } found)
         {
             return null;

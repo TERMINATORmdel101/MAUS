@@ -17,7 +17,11 @@ public static class CrashLog
     /// <param name="exception">L'erreur imprévue.</param>
     /// <param name="what">Ce qui était en cours (texte technique, non traduit).</param>
     /// <returns>Le chemin du fichier, ou <c>null</c> s'il n'a pas pu être écrit.</returns>
-    public static string? Write(Exception exception, string what) => Write(Folder, exception, what, DateTime.Now);
+    public static string? Write(Exception exception, string what)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return Write(Folder, exception, what, DateTime.Now);
+    }
 
     internal static string? Write(string folder, Exception exception, string what, DateTime now)
     {

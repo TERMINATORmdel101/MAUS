@@ -59,6 +59,8 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
     public async Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var catalog = _catalog ?? GpuDriverCatalog.Default;
         var gpus = ReadGpus(context);
         var findings = new List<Finding>();

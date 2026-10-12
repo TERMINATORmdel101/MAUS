@@ -35,6 +35,8 @@ public sealed class NetworkModule : IAuditModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         IReadOnlyList<CimRow> adapters;
         try
         {

@@ -16,6 +16,8 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+        ArgumentNullException.ThrowIfNull(e);
+
         // Filet de sécurité : fil de l'interface, autres fils (l'erreur ferme MAUS, la trace reste) et tâches jamais attendues.
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
@@ -174,6 +176,8 @@ public partial class App : Application
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
+        ArgumentNullException.ThrowIfNull(e);
+
         base.OnExit(e);
         PresentMonCapture.WaitForBackgroundStops(TimeSpan.FromSeconds(8));
         Environment.Exit(e.ApplicationExitCode);

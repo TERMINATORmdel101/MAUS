@@ -179,6 +179,8 @@ public static class SpaceHints
 {
     public static string? Describe(string path)
     {
+        ArgumentNullException.ThrowIfNull(path);
+
         // Découpage explicite sur « \ » : le même code tourne dans les tests sous Linux.
         var lower = path.Replace('/', '\\').TrimEnd('\\').ToLowerInvariant();
         var name = lower[(lower.LastIndexOf('\\') + 1)..];

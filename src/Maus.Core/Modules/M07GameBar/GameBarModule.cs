@@ -36,6 +36,8 @@ public sealed class GameBarModule : IFixableModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var registry = context.Registry;
         var x3d = context.Hardware.Cpu.IsAsymmetricDualCcdX3D;
         var packages = GamingPackages.TryRead(context.Packages);
@@ -62,8 +64,11 @@ public sealed class GameBarModule : IFixableModule
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
 
-    public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings) =>
-        GameBarPlanner.Plan(Id, context, findings);
+    public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return GameBarPlanner.Plan(Id, context, findings);
+    }
 
     /// <summary>« Enregistrer ce qui s'est passé » : absente, la valeur vaut 0 (désactivé), comme le défaut de Windows.</summary>
     private static Finding DetectBackgroundRecording(IRegistryReader registry)

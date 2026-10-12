@@ -17,10 +17,13 @@ public sealed class AuditEngine
     /// <summary>Modules intégrés, trouvés par réflexion : ajouter un module ne demande aucune inscription manuelle.</summary>
     public static AuditEngine CreateWithBuiltInModules() => new(DiscoverModules(typeof(IAuditModule).Assembly));
 
-    public static IEnumerable<IAuditModule> DiscoverModules(Assembly assembly) =>
-        assembly.GetTypes()
+    public static IEnumerable<IAuditModule> DiscoverModules(Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        return assembly.GetTypes()
             .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IAuditModule).IsAssignableFrom(t) && t.GetConstructor(Type.EmptyTypes) is not null)
             .Select(t => (IAuditModule)Activator.CreateInstance(t)!);
+    }
 
     public async Task<IReadOnlyList<ModuleResult>> RunAsync(
         AuditContext context,
@@ -50,6 +53,9 @@ public sealed class AuditEngine
 
     public static async Task<ModuleResult> RunModuleAsync(IAuditModule module, AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(module);
+
         var stopwatch = Stopwatch.StartNew();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(module.Timeout);

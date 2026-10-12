@@ -21,6 +21,8 @@ public sealed class PrivacyModule : IFixableModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var registry = context.Registry;
         var windows = context.Windows;
 
@@ -63,6 +65,9 @@ public sealed class PrivacyModule : IFixableModule
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
 
-    public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings) =>
-        [.. PrivacyPlanner.Plan(Id, context, findings), .. RegistryRulePlanner.Plan(Id, Rules.Value, findings)];
+    public IReadOnlyList<PlannedChange> Plan(AuditContext context, IReadOnlyList<Finding> findings)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return [.. PrivacyPlanner.Plan(Id, context, findings), .. RegistryRulePlanner.Plan(Id, Rules.Value, findings)];
+    }
 }

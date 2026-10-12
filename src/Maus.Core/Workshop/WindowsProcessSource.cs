@@ -146,6 +146,8 @@ public sealed class WindowsProcessTerminator : IProcessTerminator
 {
     public void Terminate(ProcessSample process)
     {
+        ArgumentNullException.ThrowIfNull(process);
+
         var (allowed, reason) = ProcessRules.CanTerminate(process, Environment.ProcessId);
         if (!allowed)
         {

@@ -15,7 +15,10 @@ public sealed record DriverRowViewModel(string Group, string Device, string Vers
 {
     public static DriverRowViewModel From(DriverEntry driver) => From(driver, DateTime.Today);
 
-    public static DriverRowViewModel From(DriverEntry driver, DateTime today) => new(
+    public static DriverRowViewModel From(DriverEntry driver, DateTime today)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        return new(
         DriverInventoryReader.GroupName(driver.Group),
         driver.Device,
         driver.Version ?? "—",
@@ -30,16 +33,20 @@ public sealed record DriverRowViewModel(string Group, string Device, string Vers
             false => T("non signé"),
             null => "—",
         });
+    }
 
     /// <summary>La ligne contient le texte recherché (nom, famille, version, éditeur, paquet ou signature).</summary>
-    public bool Matches(string filter) =>
-        filter.Length == 0
+    public bool Matches(string filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return filter.Length == 0
         || Device.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
         || Group.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
         || Version.Contains(filter, StringComparison.OrdinalIgnoreCase)
         || Provider.Contains(filter, StringComparison.CurrentCultureIgnoreCase)
         || Package.Contains(filter, StringComparison.OrdinalIgnoreCase)
         || Signature.Contains(filter, StringComparison.CurrentCultureIgnoreCase);
+    }
 }
 
 /// <summary>Carte d'une carte graphique dans l'onglet Pilotes : son pilote en détail et les actions manuelles.</summary>
@@ -47,6 +54,8 @@ public sealed class GraphicsDriverCardViewModel
 {
     public GraphicsDriverCardViewModel(DriverEntry driver, Uri? downloadPage, Func<GraphicsDriverAction, DriverEntry, Task> run, Action<Uri> open)
     {
+        ArgumentNullException.ThrowIfNull(driver);
+
         Driver = driver;
         Lines =
         [

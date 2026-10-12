@@ -27,6 +27,8 @@ public sealed class LetterTile : FrameworkElement
 
     protected override void OnRender(DrawingContext drawingContext)
     {
+        ArgumentNullException.ThrowIfNull(drawingContext);
+
         var size = Math.Min(ActualWidth, ActualHeight);
         if (size <= 0)
         {

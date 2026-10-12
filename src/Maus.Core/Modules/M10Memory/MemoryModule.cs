@@ -32,6 +32,8 @@ public sealed partial class MemoryModule : IAuditModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         IReadOnlyList<CimRow> rows;
         try
         {

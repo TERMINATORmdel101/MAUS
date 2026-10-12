@@ -40,6 +40,8 @@ public static class CpuTest
         Func<string?>? abortCheck = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(options);
+
         var fault = options.Fault;
         // Mode « automatique » : le tour mixte ; modes AVX et très lourd : charge vectorielle (voir CpuStress).
         Func<ulong> round = options.Mode == CpuStressMode.Automatic ? () => Round(0) : () => CpuStress.Round(options.Mode);

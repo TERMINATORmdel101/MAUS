@@ -69,6 +69,8 @@ public readonly record struct Rgb(byte R, byte G, byte B)
 {
     public static Rgb Parse(string hex)
     {
+        ArgumentNullException.ThrowIfNull(hex);
+
         var value = hex.TrimStart('#');
         return new Rgb(
             byte.Parse(value.AsSpan(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture),
@@ -200,6 +202,8 @@ public static class AccentPalette
     /// </summary>
     public static (Rgb Primary, Rgb? Secondary) For(AccentChoice choice, ComponentBrands brands, Rgb? windowsAccent)
     {
+        ArgumentNullException.ThrowIfNull(brands);
+
         switch (choice)
         {
             case AccentChoice.Components:
@@ -228,6 +232,8 @@ public static class GraphicsBrand
 
     public static ComponentBrand Read(IRegistryReader registry)
     {
+        ArgumentNullException.ThrowIfNull(registry);
+
         var vendors = new List<string>();
         try
         {

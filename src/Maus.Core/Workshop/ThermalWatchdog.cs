@@ -148,6 +148,8 @@ public sealed class ThermalWatchdog
     /// </summary>
     public int Record(SensorSnapshot snapshot, int? cpuMaxC, bool pawnIoInstalled)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
         var danger = SensorAlarms.Check(snapshot, cpuMaxC).FirstOrDefault(a => a.Level == AlarmLevel.Danger)?.Message;
         var cpuWatch = Assess(snapshot, cpuMaxC, pawnIoInstalled);
         var gpuWatched = snapshot.Gpus.Any(g => g is { TemperatureC: not null, SlowdownTemperatureC: not null });

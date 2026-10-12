@@ -205,6 +205,8 @@ public static class IntelMemoryController
     /// <summary>Lit les timings et horloges du contrôleur ; <c>null</c> si aucun canal n'est garni.</summary>
     public static IntelMemoryReport? Read(ImcFamily family, int cpuFamily, int cpuModel, IMchbarReader mchbar, IMsrReader? msr)
     {
+        ArgumentNullException.ThrowIfNull(family);
+
         var cache = new Dictionary<(int Offset, int Size), ulong>();
         ulong Raw(int offset, int size)
         {
@@ -288,6 +290,8 @@ public static class IntelMemoryController
     /// <summary>Extrait les bits « haut:bas » d'une valeur lue.</summary>
     public static ulong Extract(ulong raw, string bits)
     {
+        ArgumentNullException.ThrowIfNull(bits);
+
         var parts = bits.Split(':');
         var high = int.Parse(parts[0], CultureInfo.InvariantCulture);
         var low = parts.Length > 1 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : high;
@@ -296,7 +300,11 @@ public static class IntelMemoryController
         return (raw >> low) & mask;
     }
 
-    public static int Hex(string value) => int.Parse(value.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? value[2..] : value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+    public static int Hex(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return int.Parse(value.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? value[2..] : value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+    }
 
     /// <summary>« 0x9E » désigne le modèle 0x9E de la famille 6 ; « 0x12:0x01 », le modèle 1 de la famille 0x12.</summary>
     private static bool Matches(string entry, int cpuFamily, int cpuModel)

@@ -7,6 +7,9 @@ public static class HardwareProfileBuilder
 {
     public static HardwareProfile Build(ICimReader cim, IRegistryReader registry)
     {
+        ArgumentNullException.ThrowIfNull(cim);
+        ArgumentNullException.ThrowIfNull(registry);
+
         var system = TryFirst(cim, "SELECT Manufacturer, Model, PCSystemTypeEx, PartOfDomain FROM Win32_ComputerSystem");
         var enclosure = TryFirst(cim, "SELECT ChassisTypes FROM Win32_SystemEnclosure");
         var board = TryFirst(cim, "SELECT Manufacturer, Product FROM Win32_BaseBoard");

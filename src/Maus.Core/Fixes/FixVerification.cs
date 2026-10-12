@@ -27,11 +27,14 @@ public static class FixVerification
     /// Le nouvel audit a échoué : il n'y a rien à comparer. Chaque correction appliquée reste « non vérifiée » ; la comparer
     /// aux résultats d'avant les corrections la ferait passer à tort pour « sans effet », et le journal le garderait.
     /// </summary>
-    public static IReadOnlyList<VerifiedOutcome> AuditFailed(ApplyResult result) =>
-        result.Changes.Select(outcome => outcome.Status == ChangeStatus.Applied
+    public static IReadOnlyList<VerifiedOutcome> AuditFailed(ApplyResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Changes.Select(outcome => outcome.Status == ChangeStatus.Applied
                 ? new VerifiedOutcome(outcome, EffectCheck.NotChecked, T("Appliqué ; l'audit de vérification a échoué, l'effet n'a pas pu être relu."))
                 : new VerifiedOutcome(outcome, EffectCheck.NotChecked, outcome.Message))
             .ToList();
+    }
 
     public static IReadOnlyList<VerifiedOutcome> CompareWithAudit(
         IReadOnlyList<PlannedChange> changes,
@@ -39,6 +42,8 @@ public static class FixVerification
         IReadOnlyList<ModuleResult> after,
         Platform.WindowsInfo windows)
     {
+        ArgumentNullException.ThrowIfNull(result);
+
         var findings = after.Where(r => r.Error is null).SelectMany(r => r.Findings).GroupBy(f => f.Id, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         var byId = changes.GroupBy(c => c.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);

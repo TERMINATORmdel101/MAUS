@@ -93,6 +93,8 @@ public sealed record BenchmarkSensorSummary
     /// </summary>
     public static BenchmarkSensorSummary? Summarize(IReadOnlyList<BenchmarkSensorSample> samples, string device)
     {
+        ArgumentNullException.ThrowIfNull(samples);
+
         var gpu = device != "cpu";
         var temperatures = Values(samples, s => gpu ? s.GpuTemperatureC : s.CpuTemperatureC);
         var clocks = Values(samples, s => gpu ? s.GpuClockMhz : s.CpuMhz);

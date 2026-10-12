@@ -44,6 +44,8 @@ public sealed class DisplayModule : IAuditModule
 
     public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var paths = _reader.ReadActivePaths();
         if (paths is null || paths.Count == 0)
         {

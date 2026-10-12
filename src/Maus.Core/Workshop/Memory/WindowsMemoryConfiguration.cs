@@ -31,6 +31,8 @@ public static class WindowsMemoryConfiguration
 
     public static IReadOnlyList<MemorySlotConfiguration> Read(ICimReader cim)
     {
+        ArgumentNullException.ThrowIfNull(cim);
+
         try
         {
             return Parse(cim.Query(Query));
@@ -57,6 +59,8 @@ public static class WindowsMemoryConfiguration
     /// <summary>Une ligne par barrette : emplacement, référence, capacité, vitesse et tension appliquées.</summary>
     public static string Describe(IReadOnlyList<MemorySlotConfiguration> slots)
     {
+        ArgumentNullException.ThrowIfNull(slots);
+
         if (slots.Count == 0)
         {
             return T("Windows ne donne aucune information sur les barrettes de ce PC.");

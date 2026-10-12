@@ -112,6 +112,9 @@ public static partial class ProcessRules
 
     public static ProcessTrust TrustOf(ProcessSample process, SystemFolders folders)
     {
+        ArgumentNullException.ThrowIfNull(folders);
+        ArgumentNullException.ThrowIfNull(process);
+
         if (process.Path is not { Length: > 0 } path)
         {
             return IsCritical(process.Name) ? ProcessTrust.Windows : ProcessTrust.Unknown;
@@ -147,6 +150,8 @@ public static partial class ProcessRules
     /// <summary>Peut-on proposer d'arrêter ce processus ? Sinon, la raison, en clair.</summary>
     public static (bool Allowed, string? Reason) CanTerminate(ProcessSample process, int ownPid)
     {
+        ArgumentNullException.ThrowIfNull(process);
+
         if (process.Pid == ownPid)
         {
             return (false, T("C'est MAUS lui-même."));

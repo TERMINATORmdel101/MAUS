@@ -30,13 +30,23 @@ public static class Motion
     public static readonly DependencyProperty AnimateSelectionProperty = DependencyProperty.RegisterAttached(
         "AnimateSelection", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnAnimateSelectionChanged));
 
-    public static bool GetAnimateSelection(DependencyObject element) => (bool)element.GetValue(AnimateSelectionProperty);
+    public static bool GetAnimateSelection(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return (bool)element.GetValue(AnimateSelectionProperty);
+    }
 
-    public static void SetAnimateSelection(DependencyObject element, bool value) => element.SetValue(AnimateSelectionProperty, value);
+    public static void SetAnimateSelection(DependencyObject element, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(AnimateSelectionProperty, value);
+    }
 
     /// <summary>Fait apparaître un élément : fondu et léger glissement vers le haut.</summary>
     public static void Enter(UIElement element, TimeSpan delay = default, double offset = 12)
     {
+        ArgumentNullException.ThrowIfNull(element);
+
         // L'animation part de la valeur actuelle (un texte « discret » garde son opacité réduite) et s'efface à la fin :
         // aucune valeur locale n'est laissée sur l'élément.
         element.BeginAnimation(UIElement.OpacityProperty, null);
@@ -69,25 +79,49 @@ public static class Motion
     public static readonly DependencyProperty HoverLiftProperty = DependencyProperty.RegisterAttached(
         "HoverLift", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnHoverLiftChanged));
 
-    public static bool GetHoverLift(DependencyObject element) => (bool)element.GetValue(HoverLiftProperty);
+    public static bool GetHoverLift(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return (bool)element.GetValue(HoverLiftProperty);
+    }
 
-    public static void SetHoverLift(DependencyObject element, bool value) => element.SetValue(HoverLiftProperty, value);
+    public static void SetHoverLift(DependencyObject element, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(HoverLiftProperty, value);
+    }
 
     /// <summary>Bouton : s'enfonce légèrement pendant l'appui.</summary>
     public static readonly DependencyProperty PressProperty = DependencyProperty.RegisterAttached(
         "Press", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnPressChanged));
 
-    public static bool GetPress(DependencyObject element) => (bool)element.GetValue(PressProperty);
+    public static bool GetPress(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return (bool)element.GetValue(PressProperty);
+    }
 
-    public static void SetPress(DependencyObject element, bool value) => element.SetValue(PressProperty, value);
+    public static void SetPress(DependencyObject element, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(PressProperty, value);
+    }
 
     /// <summary>Élément d'une liste (fiche, constat) : apparaît en cascade quand il s'affiche, les premiers seulement.</summary>
     public static readonly DependencyProperty EnterOnLoadProperty = DependencyProperty.RegisterAttached(
         "EnterOnLoad", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnEnterOnLoadChanged));
 
-    public static bool GetEnterOnLoad(DependencyObject element) => (bool)element.GetValue(EnterOnLoadProperty);
+    public static bool GetEnterOnLoad(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return (bool)element.GetValue(EnterOnLoadProperty);
+    }
 
-    public static void SetEnterOnLoad(DependencyObject element, bool value) => element.SetValue(EnterOnLoadProperty, value);
+    public static void SetEnterOnLoad(DependencyObject element, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(EnterOnLoadProperty, value);
+    }
 
     private static readonly Duration HoverDuration = new(TimeSpan.FromMilliseconds(160));
 
@@ -244,6 +278,8 @@ public static class Motion
     /// <summary>Anime une valeur numérique d'un élément (par exemple la jauge du score) vers <paramref name="to"/>.</summary>
     public static void To(IAnimatable element, DependencyProperty property, double to, TimeSpan duration)
     {
+        ArgumentNullException.ThrowIfNull(element);
+
         if (!IsEnabled)
         {
             element.BeginAnimation(property, null);

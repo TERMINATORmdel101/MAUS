@@ -13,6 +13,9 @@ public static class SlownessDiagnosis
 {
     public static IReadOnlyList<SlownessCause> Analyze(IReadOnlyCollection<SensorSnapshot> samples, IReadOnlyList<ProcessSample> processes, ProcessCatalog catalog)
     {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(samples);
+
         var causes = new List<SlownessCause>();
         if (samples.Count == 0)
         {

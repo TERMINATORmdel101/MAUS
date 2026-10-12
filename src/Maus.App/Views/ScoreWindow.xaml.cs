@@ -16,6 +16,8 @@ public partial class ScoreWindow : Window
 {
     public ScoreWindow(ScoreBreakdown breakdown)
     {
+        ArgumentNullException.ThrowIfNull(breakdown);
+
         InitializeComponent();
         ScoreValue.Text = breakdown.Score.ToString(CultureInfo.CurrentCulture);
         ScoreWord.Text = HealthScore.Describe(breakdown.Score);

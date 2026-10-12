@@ -10,6 +10,9 @@ public static class RegistryRuleEvaluator
 
     public static Finding Evaluate(RegistryRule rule, IRegistryReader registry)
     {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(rule);
+
         string? current;
         try
         {
@@ -36,7 +39,10 @@ public static class RegistryRuleEvaluator
         };
     }
 
-    public static bool IsCompliant(RegistryRule rule, string? current) => rule.Expect switch
+    public static bool IsCompliant(RegistryRule rule, string? current)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        return rule.Expect switch
     {
         RuleExpectation.Absent => current is null,
         RuleExpectation.EqualTo => current is null ? rule.AbsentIsOk : Same(current, rule.Value),
@@ -44,6 +50,7 @@ public static class RegistryRuleEvaluator
         RuleExpectation.OneOf => current is null ? rule.AbsentIsOk : rule.Values.Any(v => Same(current, v)),
         _ => false,
     };
+    }
 
     private static bool Same(string current, string? expected) =>
         string.Equals(current, expected?.Trim(), StringComparison.OrdinalIgnoreCase);

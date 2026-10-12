@@ -98,6 +98,8 @@ public static class BenchmarkScoring
     /// <summary>Images par seconde du 1 % des images les plus lentes (à partir de 100 images).</summary>
     public static double? Low1Fps(IReadOnlyList<double> frameMilliseconds)
     {
+        ArgumentNullException.ThrowIfNull(frameMilliseconds);
+
         if (frameMilliseconds.Count < 100)
         {
             return null;
