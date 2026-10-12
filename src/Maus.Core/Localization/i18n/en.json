@@ -1693,6 +1693,7 @@
   "Mode de gestion de l'alimentation": "Power management scheme",
   "Mode de gestion de l'alimentation actif": "Active power scheme",
   "Mode effectif appliqué par Windows": "Effective mode applied by Windows",
+  "Mode limité : MAUS n'a pas reçu l'autorisation administrateur. L'audit lit ce qui est accessible sans droits (certains constats restent indéterminés), et aucune correction n'est possible. Fermez puis relancez MAUS pour accepter l'autorisation.": "Limited mode: MAUS did not receive administrator permission. The audit reads what is accessible without rights (some findings stay undetermined), and no fix is possible. Close and restart MAUS to accept the permission.",
   "Mode personnalisé": "Custom plan",
   "Modifications risquées faites par des scripts ou des logiciels": "Risky changes made by scripts or software",
   "Modifié depuis": "Changed since",

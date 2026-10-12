@@ -1693,6 +1693,7 @@
   "Mode de gestion de l'alimentation": "Plan de administración de energía",
   "Mode de gestion de l'alimentation actif": "Plan de energía activo",
   "Mode effectif appliqué par Windows": "Modo efectivo aplicado por Windows",
+  "Mode limité : MAUS n'a pas reçu l'autorisation administrateur. L'audit lit ce qui est accessible sans droits (certains constats restent indéterminés), et aucune correction n'est possible. Fermez puis relancez MAUS pour accepter l'autorisation.": "Modo limitado: MAUS no recibió la autorización de administrador. La auditoría lee lo que es accesible sin derechos (algunos resultados quedan indeterminados) y no es posible ninguna corrección. Cierra y vuelve a abrir MAUS para aceptar la autorización.",
   "Mode personnalisé": "Plan personalizado",
   "Modifications risquées faites par des scripts ou des logiciels": "Cambios arriesgados hechos por scripts o programas",
   "Modifié depuis": "Modificado desde entonces",

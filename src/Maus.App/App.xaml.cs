@@ -27,13 +27,24 @@ public partial class App : Application
         // UseLanguage ne remplace la culture du fil par celle de la langue de MAUS.
         Texts.UseRegionalCulture(CultureInfo.CurrentCulture);
 
-        var preferences = FilePreferencesStore.CreateDefault().Load();
-        UseLanguage(preferences.Language);
-
-        // Thème Fluent de Windows 11 (clair, sombre ou comme Windows), couleur d'accentuation et animations choisies.
-        AppearanceManager.DetectComponents();
-        AppearanceManager.Apply(preferences);
         base.OnStartup(e);
+
+        if (e.Args.Length >= 3 && e.Args[0].Equals(EngineArgument, StringComparison.OrdinalIgnoreCase))
+        {
+            // Moteur administrateur (0.8.0) : aucune fenêtre ; il sert l'interface qui l'a lancé, puis s'arrête avec elle.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            RunEngineAsync(e.Args[1], e.Args[2]).Forget("moteur", _ => Shutdown(1));
+            return;
+        }
+
+        if (!IsInterface(e.Args))
+        {
+            // Audit planifié ou benchmark : lancés avec les droits administrateur, ils lisent les choix eux-mêmes.
+            var own = FilePreferencesStore.CreateDefault().Load();
+            UseLanguage(own.Language);
+            AppearanceManager.DetectComponents();
+            AppearanceManager.Apply(own);
+        }
 
         if (e.Args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase))
         {
@@ -64,6 +75,14 @@ public partial class App : Application
             return;
         }
 
+        // Le moteur d'abord (demande d'autorisation de Windows), puis les choix de l'utilisateur, qu'il est seul à lire.
+        var limited = StartEngine();
+        var preferences = LoadPreferences();
+        UseLanguage(preferences.Language);
+        AppearanceManager.DetectComponents();
+        AppearanceManager.Apply(preferences);
+        StartupNotice = limited;
+
         // Écran de démarrage : le logo s'affiche tout de suite, pendant que la fenêtre principale se prépare.
         SplashScreen? splash = new SplashScreen(typeof(App).Assembly, "Assets/splash.png");
         splash.Show(autoClose: false);
@@ -83,6 +102,95 @@ public partial class App : Application
 
         ShowMainWindow(splash);
         UiWatchdog.Start(Dispatcher);
+    }
+
+    /// <summary>Argument du processus « moteur » : <c>--engine &lt;canal&gt; &lt;processus de l'interface&gt;</c>.</summary>
+    internal const string EngineArgument = "--engine";
+
+    /// <summary>Choix de l'utilisateur lus par le moteur (interface).</summary>
+    private static Maus.Core.Engine.Broker.EnginePreferencesStore? s_preferences;
+
+    /// <summary>Message à afficher dès l'ouverture (mode limité), ou <c>null</c>.</summary>
+    public static string? StartupNotice { get; private set; }
+
+    private static bool IsInterface(string[] args) =>
+        !(args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase)
+          || (args.Length > 0 && args[0].Equals("--benchmark", StringComparison.OrdinalIgnoreCase)));
+
+    /// <summary>
+    /// Lance le moteur administrateur (demande d'autorisation de Windows, comme avant au lancement de MAUS) et s'y relie.
+    /// Interface déjà administrateur : le moteur reste dans ce processus. Autorisation refusée : mode limité.
+    /// </summary>
+    /// <returns>Le message du mode limité, ou <c>null</c>.</returns>
+    private static string? StartEngine()
+    {
+        if (Environment.IsPrivilegedProcess)
+        {
+            EngineHost.Current = new Maus.Core.Engine.Broker.LocalMausEngine();
+            EngineHost.IsElevated = true;
+            return null;
+        }
+
+        var pipe = "MAUS-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            var exe = Environment.ProcessPath ?? throw new InvalidOperationException("MAUS.exe introuvable.");
+            using var engine = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe)
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                Arguments = $"{EngineArgument} {pipe} {Environment.ProcessId.ToString(CultureInfo.InvariantCulture)}",
+            }) ?? throw new InvalidOperationException("Le moteur n'a pas démarré.");
+            var remote = new Maus.Core.Engine.Broker.RemoteMausEngine(pipe, engine.Id);
+            var ping = remote.PingAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+            EngineHost.Current = remote;
+            EngineHost.IsElevated = ping.IsElevated;
+            Breadcrumbs.Add("moteur administrateur relié (processus " + engine.Id.ToString(CultureInfo.InvariantCulture) + ")");
+            return null;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or Maus.Core.Engine.Broker.EngineException)
+        {
+            // Autorisation refusée (ou moteur muet) : MAUS s'ouvre quand même, sans rien pouvoir modifier.
+            Breadcrumbs.Add("mode limité (" + ex.GetType().Name + ")");
+            EngineHost.Current = new Maus.Core.Engine.Broker.LocalMausEngine(preferences: new MemoryPreferencesStore());
+            EngineHost.IsElevated = false;
+            return Texts.T("Mode limité : MAUS n'a pas reçu l'autorisation administrateur. L'audit lit ce qui est accessible sans droits (certains constats restent indéterminés), et aucune correction n'est possible. Fermez puis relancez MAUS pour accepter l'autorisation.");
+        }
+    }
+
+    private static UserPreferences LoadPreferences()
+    {
+        s_preferences = new Maus.Core.Engine.Broker.EnginePreferencesStore(EngineHost.Current);
+        try
+        {
+            return s_preferences.Load();
+        }
+        catch (Maus.Core.Engine.Broker.EngineException)
+        {
+            return UserPreferences.Default;
+        }
+    }
+
+    /// <summary>Le processus moteur : sert le canal privé jusqu'à la fermeture de l'interface, puis rend tout à Windows.</summary>
+    private async Task RunEngineAsync(string pipe, string clientPid)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(pipe, "^MAUS-[0-9a-f]{32}$")
+            || !int.TryParse(clientPid, NumberStyles.None, CultureInfo.InvariantCulture, out var pid))
+        {
+            Shutdown(2);
+            return;
+        }
+
+        var engine = new Maus.Core.Engine.Broker.LocalMausEngine { ProtectedProcessId = pid };
+        try
+        {
+            await new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid).RunAsync(CancellationToken.None).ConfigureAwait(true);
+        }
+        finally
+        {
+            await Task.Run(engine.Dispose).ConfigureAwait(true);
+            Shutdown(0);
+        }
     }
 
     /// <summary>Tenu tant que MAUS est ouvert (signale aux lancements suivants qu'une fenêtre existe déjà).</summary>
@@ -108,7 +216,7 @@ public partial class App : Application
     /// </summary>
     private static bool MustAskDisclaimer(UserPreferences preferences) =>
         preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version
-        && FilePreferencesStore.CreateDefault().State != PreferencesFileState.Unavailable;
+        && s_preferences?.State != PreferencesFileState.Unavailable;
 
     /// <summary>
     /// Avertissements au premier lancement (et après chaque changement de fond du texte).
@@ -125,9 +233,9 @@ public partial class App : Application
 
         try
         {
-            FilePreferencesStore.CreateDefault().Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
+            (s_preferences ?? new Maus.Core.Engine.Broker.EnginePreferencesStore(EngineHost.Current)).Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Maus.Core.Engine.Broker.EngineException)
         {
             // Accord non enregistré : les avertissements reviendront au prochain lancement, MAUS s'ouvre quand même.
         }
@@ -280,7 +388,7 @@ public partial class App : Application
             return;
         }
 
-        if (MustAskDisclaimer(FilePreferencesStore.CreateDefault().Load()) && !AskDisclaimer())
+        if (MustAskDisclaimer(LoadPreferences()) && !AskDisclaimer())
         {
             Shutdown(0);
             return;

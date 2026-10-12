@@ -5,8 +5,10 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- Plusieurs contrôles (VBS, BitLocker, santé des disques) exigent les droits administrateur. -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- 0.8.0 : l'interface tourne sans droits administrateur. Les contrôles et les corrections qui les exigent (VBS,
+             BitLocker, santé des disques, registre de la machine) sont faits par le moteur, un second processus MAUS.exe
+             lancé avec la demande d'autorisation de Windows (« runas ») et relié à l'interface par un canal privé. -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

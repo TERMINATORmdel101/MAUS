@@ -42,8 +42,8 @@ public sealed partial class MainViewModel : ObservableObject
         _laptopChoice = LaptopOptions[0];
         LoadHealthTrend();
 
-        // Fichier des choix illisible ou abîmé au démarrage : l'utilisateur le sait dès l'ouverture.
-        if (PreferencesStore.Notice is { } notice)
+        // Mode limité ou fichier des choix illisible au démarrage : l'utilisateur le sait dès l'ouverture.
+        if ((App.StartupNotice ?? PreferencesStore.Notice) is { } notice)
         {
             _statusText = notice;
         }
