@@ -87,45 +87,72 @@ public static class CurveOptimizerProgram
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(topology);
 
-        var started = DateTimeOffset.Now;
-        var clock = Stopwatch.StartNew();
-        var cores = topology.Cores();
-        var kernel = CpuStress.Kernel(options.Load);
-        var reference = kernel();
-        var total = options.CyclingPhase + options.TransientPhase;
-        var verdicts = cores.ToDictionary(c => c.Index, c => new CoreVerdict(c.Index, 0, 0, false, true));
-        string? abortReason = null;
-        long transientRounds = 0;
-        var transientErrors = 0;
-        var transientFroze = false;
-        var bursts = 0;
+        var run = new ProgramRun(topology, checkpoint, options, progress, danger, cancellationToken);
+        await run.CyclingPhaseAsync().ConfigureAwait(false);
+        await run.TransientPhaseAsync().ConfigureAwait(false);
 
-        string? Check()
+        // Fin du programme (même interrompu par l'utilisateur) : seule une vraie coupure laisse la trace pour le lancement suivant.
+        checkpoint?.Clear();
+        run.Clock.Stop();
+        int? whea = null;
+        try
         {
-            if (cancellationToken.IsCancellationRequested)
+            whea = wheaSince?.Invoke(run.Started);
+        }
+        catch (InvalidOperationException)
+        {
+            // Journal illisible : le bilan se fait sans lui.
+        }
+
+        return run.Result(whea);
+    }
+
+    /// <summary>État d'un programme en cours, partagé par ses deux phases.</summary>
+    private sealed class ProgramRun(
+        ICoreTopology topology,
+        ICoreTestCheckpoint? checkpoint,
+        CurveProgramOptions options,
+        IProgress<CurveProgramProgress>? progress,
+        Func<string?>? danger,
+        CancellationToken cancellationToken)
+    {
+        private readonly IReadOnlyList<CpuCore> _cores = topology.Cores();
+        private readonly Func<ulong> _kernel = CpuStress.Kernel(options.Load);
+        private readonly TimeSpan _total = options.CyclingPhase + options.TransientPhase;
+        private readonly Dictionary<int, CoreVerdict> _verdicts = [];
+        private ulong _reference;
+        private string? _abortReason;
+        private long _transientRounds;
+        private int _transientErrors;
+        private bool _transientFroze;
+        private int _bursts;
+
+        public DateTimeOffset Started { get; } = DateTimeOffset.Now;
+
+        public Stopwatch Clock { get; } = Stopwatch.StartNew();
+
+        /// <summary>Phase 1 : un cœur à la fois, pic puis chute.</summary>
+        public async Task CyclingPhaseAsync()
+        {
+            _reference = _kernel();
+            foreach (var core in _cores)
             {
-                return T("Test arrêté par l'utilisateur.");
+                _verdicts[core.Index] = new CoreVerdict(core.Index, 0, 0, false, true);
             }
 
-            return danger?.Invoke() is { } alarm ? T("arrêt de sécurité : {0}", alarm) : null;
+            var phase = Stopwatch.StartNew();
+            for (var step = 0; _cores.Count > 0 && _abortReason is null && phase.Elapsed < options.CyclingPhase; step++)
+            {
+                await CycleCoreAsync(step % _cores.Count).ConfigureAwait(false);
+            }
         }
 
-        void Report(int phase, int? core, int position, int currentErrors)
+        /// <summary>Un passage sur un cœur : pic, chute et réveil, avec le chien de garde.</summary>
+        private async Task CycleCoreAsync(int position)
         {
-            var share = Math.Min(1, clock.Elapsed / total);
-            progress?.Report(new CurveProgramProgress(phase, core, position, cores.Count, 100 * share,
-                total - clock.Elapsed > TimeSpan.Zero ? total - clock.Elapsed : TimeSpan.Zero,
-                verdicts.Values.Count(v => !v.Stable) + currentErrors, transientErrors, bursts));
-        }
-
-        // ----- Phase 1 : un cœur à la fois, pic puis chute -----
-        var phase = Stopwatch.StartNew();
-        for (var step = 0; cores.Count > 0 && abortReason is null && phase.Elapsed < options.CyclingPhase; step++)
-        {
-            var position = step % cores.Count;
-            var core = cores[position];
-            checkpoint?.Save(new CoreTestCheckpoint(started, core.Index, position, cores.Count, Phase: 1));
-            var worker = new SpikeWorker(core, topology, options, kernel, reference);
+            var core = _cores[position];
+            checkpoint?.Save(new CoreTestCheckpoint(Started, core.Index, position, _cores.Count, Phase: 1));
+            var worker = new SpikeWorker(core, topology, options, _kernel, _reference);
             var thread = new Thread(worker.Run) { IsBackground = true, Name = $"MAUS pic cœur {core.Index}", Priority = ThreadPriority.BelowNormal };
             thread.Start();
             var froze = false;
@@ -133,10 +160,10 @@ public static class CurveOptimizerProgram
             {
                 await Task.Delay(50, CancellationToken.None).ConfigureAwait(false);
                 // Le cœur en cours ne compte qu'une fois : il peut déjà être en erreur depuis un tour précédent.
-                Report(1, core.Index, position, worker.Errors > 0 && verdicts[core.Index].Stable ? 1 : 0);
+                Report(1, core.Index, position, worker.Errors > 0 && _verdicts[core.Index].Stable ? 1 : 0);
                 if (Check() is { } reason)
                 {
-                    abortReason = reason;
+                    _abortReason = reason;
                     break;
                 }
 
@@ -154,69 +181,85 @@ public static class CurveOptimizerProgram
                 thread.Join(TimeSpan.FromSeconds(5));
             }
 
-            var previous = verdicts[core.Index];
-            verdicts[core.Index] = new CoreVerdict(core.Index, previous.Rounds + worker.Rounds, previous.Errors + worker.Errors, previous.Froze || froze, previous.Pinned && worker.Pinned);
+            var previous = _verdicts[core.Index];
+            _verdicts[core.Index] = new CoreVerdict(core.Index, previous.Rounds + worker.Rounds, previous.Errors + worker.Errors, previous.Froze || froze, previous.Pinned && worker.Pinned);
         }
 
-        // ----- Phase 2 : tous les fils ensemble, arrêt simultané, repos, et on recommence -----
-        if (abortReason is null && options.TransientPhase > TimeSpan.Zero)
+        /// <summary>Phase 2 : tous les fils ensemble, arrêt simultané, repos, et on recommence.</summary>
+        public async Task TransientPhaseAsync()
         {
-            var threads = Math.Max(1, options.Threads ?? Environment.ProcessorCount);
-            checkpoint?.Save(new CoreTestCheckpoint(started, -1, 0, threads, Phase: 2));
-            using var group = new BurstGroup(threads, options, kernel, reference);
-            phase.Restart();
-            while (abortReason is null && !transientFroze && phase.Elapsed < options.TransientPhase)
+            if (_abortReason is not null || options.TransientPhase <= TimeSpan.Zero)
             {
-                group.Start(options.BurstLength(bursts));
-                while (group.Running)
-                {
-                    await Task.Delay(50, CancellationToken.None).ConfigureAwait(false);
-                    transientErrors = group.Errors;
-                    Report(2, null, 0, 0);
-                    if (Check() is { } reason)
-                    {
-                        abortReason = reason;
-                        group.StopNow();
-                        break;
-                    }
+                return;
+            }
 
-                    if (group.SilentFor > options.FreezeAfter)
-                    {
-                        transientFroze = true;
-                        group.StopNow();
-                        break;
-                    }
-                }
-
-                bursts++;
+            var threads = Math.Max(1, options.Threads ?? Environment.ProcessorCount);
+            checkpoint?.Save(new CoreTestCheckpoint(Started, -1, 0, threads, Phase: 2));
+            using var group = new BurstGroup(threads, options, _kernel, _reference);
+            var phase = Stopwatch.StartNew();
+            while (_abortReason is null && !_transientFroze && phase.Elapsed < options.TransientPhase)
+            {
+                await BurstAsync(group).ConfigureAwait(false);
+                _bursts++;
                 var rest = Stopwatch.StartNew();
-                while (abortReason is null && !transientFroze && rest.Elapsed < options.Rest)
+                while (_abortReason is null && !_transientFroze && rest.Elapsed < options.Rest)
                 {
                     await Task.Delay(50, CancellationToken.None).ConfigureAwait(false);
                     Report(2, null, 0, 0);
-                    abortReason = Check();
+                    _abortReason = Check();
                 }
             }
 
-            transientRounds = group.Rounds;
-            transientErrors = group.Errors;
+            _transientRounds = group.Rounds;
+            _transientErrors = group.Errors;
         }
 
-        // Fin du programme (même interrompu par l'utilisateur) : seule une vraie coupure laisse la trace pour le lancement suivant.
-        checkpoint?.Clear();
-        clock.Stop();
-        int? whea = null;
-        try
+        /// <summary>Une rafale : tous les fils en charge, surveillés jusqu'à leur arrêt simultané.</summary>
+        private async Task BurstAsync(BurstGroup group)
         {
-            whea = wheaSince?.Invoke(started);
-        }
-        catch (InvalidOperationException)
-        {
-            // Journal illisible : le bilan se fait sans lui.
+            group.Start(options.BurstLength(_bursts));
+            while (group.Running)
+            {
+                await Task.Delay(50, CancellationToken.None).ConfigureAwait(false);
+                _transientErrors = group.Errors;
+                Report(2, null, 0, 0);
+                if (Check() is { } reason)
+                {
+                    _abortReason = reason;
+                    group.StopNow();
+                    return;
+                }
+
+                if (group.SilentFor > options.FreezeAfter)
+                {
+                    _transientFroze = true;
+                    group.StopNow();
+                    return;
+                }
+            }
         }
 
-        return new CurveProgramResult(cores.Select(c => verdicts[c.Index]).ToList(), transientRounds, transientErrors, transientFroze, bursts,
-            clock.Elapsed, abortReason is not null, abortReason, whea);
+        public CurveProgramResult Result(int? whea) =>
+            new(_cores.Select(c => _verdicts[c.Index]).ToList(), _transientRounds, _transientErrors, _transientFroze, _bursts,
+                Clock.Elapsed, _abortReason is not null, _abortReason, whea);
+
+        private string? Check()
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return T("Test arrêté par l'utilisateur.");
+            }
+
+            return danger?.Invoke() is { } alarm ? T("arrêt de sécurité : {0}", alarm) : null;
+        }
+
+        private void Report(int phase, int? core, int position, int currentErrors)
+        {
+            var share = Math.Min(1, Clock.Elapsed / _total);
+            progress?.Report(new CurveProgramProgress(phase, core, position, _cores.Count, 100 * share,
+                _total - Clock.Elapsed > TimeSpan.Zero ? _total - Clock.Elapsed : TimeSpan.Zero,
+                _verdicts.Values.Count(v => !v.Stable) + currentErrors, _transientErrors, _bursts));
+        }
     }
 
     /// <summary>Phase 1 : un fil épinglé sur un cœur fait un pic de charge, laisse le cœur s'endormir, puis le réveille par un calcul vérifié.</summary>
