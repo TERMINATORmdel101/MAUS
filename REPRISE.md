@@ -113,7 +113,7 @@ Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@user
 
 ## 6. Outils utiles
 
-- Traductions : `python3 tools/i18n.py missing en` (et `es`) liste les textes à traduire ; écrire un fichier JSON `{ "texte français": "traduction" }` puis `python3 tools/i18n.py merge en fichier.json` ; `prune en|es` retire les traductions devenues inutiles. Les `{0}` et les espaces en début / fin doivent être identiques.
+- Traductions : `dotnet run tools/i18n.cs -- missing en` (et `es`) liste les textes à traduire ; écrire un fichier JSON `{ "texte français": "traduction" }` puis `python3 tools/i18n.py merge en fichier.json` ; `prune en|es` retire les traductions devenues inutiles. Les `{0}` et les espaces en début / fin doivent être identiques.
 - Seuils de sécurité : `src/Maus.Core/Catalog/hw-safety-limits.json`. **Pas de source = pas de seuil.** Chaque ajout cite sa source dans le champ `source`.
 - Sources des emplacements SPD et des registres mémoire AMD : `THIRD-PARTY-NOTICES.md` et le commentaire en tête de `src/Maus.Core/Workshop/Memory/SpdDecoder.cs`.
 

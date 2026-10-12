@@ -9,6 +9,9 @@
 # - src/Maus.App/Assets/maus-logo-512.png : le logo entier pour « À propos ».
 # - src/Maus.App/Assets/splash.png : la bannière aux coins arrondis, fond transparent, pour l'écran de démarrage.
 # - src/Maus.Core/Reporting/maus-report-logo.jpg : petite bannière pour l'en-tête du rapport HTML.
+# - src/Maus.App/Assets/maus-banner.png : les lettres, serrées, pour la barre de navigation (720 px de large).
+# - assets/logo/maus-logo-800.jpg : logo réduit pour le README.
+#   (Ces deux-là venaient de tools/make-logo-assets.py, en Python, retiré le 12/10/2026 : moins de langages.)
 
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
@@ -71,6 +74,16 @@ $quality = New-Object System.Drawing.Imaging.EncoderParameters 1
 $quality.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality), ([long]85)
 $report.Save((Join-Path $root 'src\Maus.Core\Reporting\maus-report-logo.jpg'), $jpeg, $quality)
 
+# Bannière de la barre de navigation : les lettres, serrées, avec un peu du contour du char.
+$navBanner = Crop $logo $bannerBox 720 ([int][Math]::Round(720 * 900 / 1848))
+$navBanner.Save((Join-Path $assets 'maus-banner.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+
+# Logo réduit pour le README.
+$logo800 = Crop $logo (New-Object System.Drawing.Rectangle 0, 0, $logo.Width, $logo.Height) 800 800
+$quality90 = New-Object System.Drawing.Imaging.EncoderParameters 1
+$quality90.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality), ([long]90)
+$logo800.Save((Join-Path $root 'assets\logo\maus-logo-800.jpg'), $jpeg, $quality90)
+
 # Icône : le M aux petites tailles, le logo entier aux grandes.
 function Get-DibBytes([System.Drawing.Bitmap]$bitmap) {
     $size = $bitmap.Width
@@ -120,4 +133,4 @@ for ($i = 0; $i -lt $sizes.Count; $i++) {
 foreach ($bytes in $images) { $writer.Write([byte[]]$bytes) }
 $writer.Flush()
 [System.IO.File]::WriteAllBytes((Join-Path $assets 'maus.ico'), $out.ToArray())
-"images : maus-letter-256.png, maus-logo-512.png, splash.png ($splashW x $splashH), maus-report-logo.jpg, maus.ico"
+"images : maus-letter-256.png, maus-logo-512.png, splash.png ($splashW x $splashH), maus-report-logo.jpg, maus-banner.png, maus-logo-800.jpg, maus.ico"

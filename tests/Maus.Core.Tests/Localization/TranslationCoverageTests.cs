@@ -63,7 +63,7 @@ public partial class TranslationCoverageTests
             }
         }
 
-        // Catalogues JSON traduits : leurs champs de texte comptent aussi (même liste que tools/i18n.py).
+        // Catalogues JSON traduits : leurs champs de texte comptent aussi (même liste que tools/i18n.cs).
         var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
         foreach (var (name, paths) in Catalogs)
         {
