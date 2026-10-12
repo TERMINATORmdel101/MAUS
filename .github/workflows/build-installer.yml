@@ -20,6 +20,9 @@ on:
 
 permissions:
   contents: read
+  # Attestation de provenance (Sigstore, par l'identité du workflow).
+  id-token: write
+  attestations: write
 
 concurrency:
   group: installateur-${{ github.ref }}
@@ -37,6 +40,14 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Tests (l'installateur n'est fabriqué que s'ils passent tous)
+        shell: pwsh
+        run: |
+          dotnet build Maus.slnx -c Release -warnaserror --disable-build-servers
+          if ($LASTEXITCODE -ne 0) { throw "Compilation en échec" }
+          dotnet test Maus.slnx -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { throw "Tests en échec : pas d'installateur" }
 
       - name: Inno Setup 7.1.0 (empreinte vérifiée)
         shell: pwsh
@@ -57,6 +68,13 @@ jobs:
       - name: Installateur
         shell: pwsh
         run: ./installer/build-installer.ps1 -Iscc $env:ISCC
+
+      # Preuve d'origine vérifiable (gratuite pour un dépôt public) : n'importe qui peut contrôler que ce fichier a été
+      # fabriqué par ce workflow, à partir de ce commit : gh attestation verify MAUS-x.y.z-installation.exe -R TERMINATORmdel101/MAUS
+      - name: Attestation de provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/installer/MAUS-*-installation.exe
 
       - name: Installateur à télécharger
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

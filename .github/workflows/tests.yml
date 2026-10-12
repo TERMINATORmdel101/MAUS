@@ -1,0 +1,45 @@
+# Compile MAUS et lance tous ses tests sur une vraie machine Windows de GitHub, à chaque envoi de code et à chaque demande
+# de fusion : une régression connue ne doit jamais passer inaperçue (l'installateur, lui, ne se fabrique que si les tests
+# passent, voir build-installer.yml).
+name: Tests
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Code du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: SDK .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compilation (aucun avertissement accepté)
+        shell: pwsh
+        run: dotnet build Maus.slnx -c Release -warnaserror --disable-build-servers
+
+      - name: Tests
+        shell: pwsh
+        run: dotnet test Maus.slnx -c Release --no-build --logger "trx;LogFileName=tests.trx" --results-directory artifacts/tests
+
+      - name: Résultats des tests
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: resultats-des-tests
+          path: artifacts/tests
+          if-no-files-found: ignore
