@@ -55,15 +55,21 @@ public static class TaskSchedulerClient
         }
 
         var xml = ScheduledAudit.TaskXml(executable, day, WindowsIdentity.GetCurrent().Name, DateTime.Now);
-        var path = Path.Combine(Path.GetTempPath(), $"maus-task-{Guid.NewGuid():N}.xml");
+        // Jamais dans le dossier temporaire de l'utilisateur : un programme sans droits pourrait y remplacer le fichier entre
+        // son écriture et sa lecture par schtasks, et obtenir une tâche lancée avec les droits administrateur. Le dossier
+        // %ProgramData%\MAUS\tasks n'est modifiable que par SYSTEM et les administrateurs (comme le journal des corrections).
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "MAUS", "tasks");
+        var path = Path.Combine(folder, $"maus-task-{Guid.NewGuid():N}.xml");
         try
         {
+            Directory.CreateDirectory(folder);
+            new Maus.Core.Fixes.WindowsDirectoryProtector().EnsureProtected(folder);
             // schtasks attend un fichier UTF-16, comme l'annonce l'en-tête XML.
             await File.WriteAllTextAsync(path, xml, Encoding.Unicode);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.AccessControl.PrivilegeNotHeldException)
         {
-            // Dossier temporaire plein, protégé ou inaccessible : aucune tâche n'est créée, et on le dit.
+            // Dossier plein, protégé ou inaccessible : aucune tâche n'est créée, et on le dit.
             DeleteQuietly(path);
             return ex.Message;
         }

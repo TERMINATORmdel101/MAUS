@@ -108,6 +108,19 @@ public static partial class ProcessRules
         "smss", "csrss", "wininit", "winlogon", "services", "lsass", "svchost", "dwm",
     };
 
+    /// <summary>
+    /// Dossiers de Windows où un utilisateur sans droits administrateur peut écrire, donc déposer un programme. Liste publiée
+    /// par Oddvar Moe (« UltimateAppLockerByPassList », dossier « Generic-AppLockerbypasses », github.com/api0cradle), relevée
+    /// le 12/10/2026 ; vérifiée par AccessChk sur Windows 10 et 11 dans cette liste.
+    /// </summary>
+    private static readonly string[] UserWritableWindowsFolders =
+    [
+        "Tasks", "Temp", "tracing", @"Registration\CRMLog",
+        @"System32\FxsTmp", @"System32\com\dmp", @"System32\Microsoft\Crypto\RSA\MachineKeys",
+        @"System32\spool\PRINTERS", @"System32\spool\SERVERS", @"System32\spool\drivers\color", @"System32\Tasks",
+        @"SysWOW64\FxsTmp", @"SysWOW64\com\dmp", @"SysWOW64\Tasks",
+    ];
+
     public static bool IsCritical(string name) => Critical.Contains(name) || Critical.Contains(name + ".exe");
 
     public static ProcessTrust TrustOf(ProcessSample process, SystemFolders folders)
@@ -118,6 +131,13 @@ public static partial class ProcessRules
         if (process.Path is not { Length: > 0 } path)
         {
             return IsCritical(process.Name) ? ProcessTrust.Windows : ProcessTrust.Unknown;
+        }
+
+        // Sous-dossiers de Windows modifiables par un simple utilisateur (C:\Windows\Temp, Tasks, tracing…) : un programme
+        // y est posé sans droits administrateur, ce n'est pas un composant de Windows.
+        if (UserWritableWindowsFolders.Any(sub => Under(path, folders.Windows + @"\" + sub)))
+        {
+            return ProcessTrust.Unusual;
         }
 
         if (Under(path, folders.Windows))

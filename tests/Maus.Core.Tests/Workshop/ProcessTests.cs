@@ -63,6 +63,9 @@ public class ProcessTests
     [InlineData(@"C:\Users\x\AppData\Local\Temp\a1b2\run.exe", ProcessTrust.Unusual)]
     [InlineData(@"C:\Users\x\Downloads\setup.exe", ProcessTrust.Unusual)]
     [InlineData(@"D:\Jeux\game.exe", ProcessTrust.Unknown)]
+    [InlineData(@"C:\Windows\Temp\svchost.exe", ProcessTrust.Unusual)]
+    [InlineData(@"C:\Windows\System32\Tasks\update.exe", ProcessTrust.Unusual)]
+    [InlineData(@"C:\Windows\tracing\x.exe", ProcessTrust.Unusual)]
     public void Trust_depends_on_location(string path, ProcessTrust expected)
     {
         Assert.Equal(expected, ProcessRules.TrustOf(Sample("x.exe", path), Folders));
