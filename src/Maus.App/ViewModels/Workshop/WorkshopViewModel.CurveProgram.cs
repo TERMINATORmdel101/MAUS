@@ -101,20 +101,7 @@ public sealed partial class WorkshopViewModel
         CurveStatus = T("Recherche des programmes qui utilisent le processeur…");
         var busy = await BusyProgramsAsync();
         CurveStatus = string.Empty;
-        var warning = T("Pendant {0}, le PC sera INUTILISABLE : tous les cœurs vont être poussés tour à tour, puis tous ensemble par à-coups. Enregistrez votre travail et fermez vos programmes avant de continuer.", FormatDuration(total))
-            + Environment.NewLine + Environment.NewLine
-            + T("Phase 1 ({0}) : un cœur à la fois, pic de charge d'une seconde, chute au repos, réveil vérifié, cœur suivant. Phase 2 ({0}) : tous les fils en charge 5 à 10 secondes, arrêt simultané, 2 secondes de repos, et on recommence.", FormatDuration(total / 2))
-            + Environment.NewLine + Environment.NewLine
-            + T("MAUS ne ferme et ne suspend aucun autre programme (cela pourrait provoquer de faux plantages) : c'est à vous de les fermer. Pendant le programme, MAUS passe en priorité haute : pendant les rafales de la phase 2, les autres programmes seront presque à l'arrêt, c'est voulu. Jamais de priorité « temps réel » : elle peut empêcher Windows de vider ses caches disque et bloquer la souris. La mise en veille est suspendue jusqu'à la fin.")
-            + Environment.NewLine + Environment.NewLine
-            + T("Si vos ventilateurs sont pilotés par un logiciel plutôt que par le BIOS, ce logiciel peut réagir en retard pendant les rafales : pour un test long, préférez une courbe de ventilation réglée dans le BIOS.")
-            + (busy.Count > 0 ? Environment.NewLine + Environment.NewLine + T("Programmes qui utilisent le processeur en ce moment : {0}.", string.Join(", ", busy)) : string.Empty)
-            + HeavyWarning(CoreMode)
-            + TemperatureCaveat()
-            + Environment.NewLine + Environment.NewLine
-            + T("Si le PC gèle ou redémarre, MAUS dira au prochain lancement dans quelle phase et sur quel cœur. Le programme s'arrête à tout moment avec « Arrêter le test ».")
-            + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder
-            + Environment.NewLine + Environment.NewLine + T("Lancer le programme complet ?");
+        var warning = CurveProgramWarning(total, busy);
         if (!_confirm(T("Programme complet Curve Optimizer"), warning))
         {
             return;
@@ -122,17 +109,11 @@ public sealed partial class WorkshopViewModel
 
         using var cancellation = new CancellationTokenSource();
         await StartTestAsync(cancellation);
-        var process = Process.GetCurrentProcess();
+        using var process = Process.GetCurrentProcess();
         var previousPriority = process.PriorityClass;
         CoreChips.Clear();
         CurveProgress = 0;
-        var hybrid = cores.Select(c => c.EfficiencyClass).Distinct().Count() > 1;
-        var topClass = cores.Max(c => c.EfficiencyClass);
-        string Name(int index)
-        {
-            var core = cores.First(c => c.Index == index);
-            return hybrid ? T("Cœur {0} ({1})", index, core.EfficiencyClass == topClass ? "P" : "E") : T("Cœur {0}", index);
-        }
+        var name = CoreNamer(cores);
 
         try
         {
@@ -152,7 +133,7 @@ public sealed partial class WorkshopViewModel
                 CurveProgress = p.Percent;
                 var remaining = FormatDuration(p.Remaining);
                 CurveStatus = p.Phase == 1
-                    ? T("Phase 1/2 · cœur par cœur · {0} ({1}/{2}) · {3:0} % · reste {4} · {5} cœur(s) en erreur", Name(p.Core ?? 0), p.Position + 1, p.CoreCount, p.Percent, remaining, p.FailedCores)
+                    ? T("Phase 1/2 · cœur par cœur · {0} ({1}/{2}) · {3:0} % · reste {4} · {5} cœur(s) en erreur", name(p.Core ?? 0), p.Position + 1, p.CoreCount, p.Percent, remaining, p.FailedCores)
                     : T("Phase 2/2 · transitoires (tous les cœurs) · rafale {0} · {1:0} % · reste {2} · {3} cœur(s) en erreur en phase 1 · {4} erreur(s) de calcul en phase 2", p.Bursts + 1, p.Percent, remaining, p.FailedCores, p.TransientErrors);
             });
             var logs = new Maus.Core.Platform.WindowsEventLogReader();
@@ -161,53 +142,7 @@ public sealed partial class WorkshopViewModel
                 since => WheaEvents.CountSince(logs, since), cancellation.Token);
             CurveProgress = 100;
 
-            foreach (var verdict in result.Cores)
-            {
-                CoreChips.Add(new CoreChipViewModel(
-                    verdict.Froze ? T("{0} · figé", Name(verdict.Core))
-                        : verdict.Errors > 0 ? T("{0} · {1} erreur(s)", Name(verdict.Core), verdict.Errors)
-                        : verdict.Rounds > 0 ? T("{0} · stable", Name(verdict.Core)) : Name(verdict.Core),
-                    verdict.Froze || verdict.Errors > 0 ? Controls.Palette.Red : verdict.Rounds > 0 ? Controls.Palette.Green : Controls.Palette.Grey));
-            }
-
-            if (result.Bursts > 0)
-            {
-                CoreChips.Add(new CoreChipViewModel(
-                    result.TransientFroze ? T("Transitoires · gel")
-                        : result.TransientErrors > 0 ? T("Transitoires · {0} erreur(s)", result.TransientErrors)
-                        : T("Transitoires · {0} rafales, stable", result.Bursts),
-                    result.TransientsStable ? Controls.Palette.Green : Controls.Palette.Red));
-            }
-
-            var failing = result.Cores.Where(c => !c.Stable).Select(c => Name(c.Core)).ToList();
-            var whea = result.WheaEvents is > 0 ? " " + T("{0} erreur(s) matérielle(s) WHEA pendant le test : même sans plantage, le processeur est à la limite.", result.WheaEvents) : string.Empty;
-            var advice = new List<string>();
-            if (failing.Count > 0)
-            {
-                advice.Add(T("Cœur(s) instable(s) en phase 1 : {0}. Remontez le Curve Optimizer de ce(s) cœur(s) de 2 ou 3 points (par exemple de −15 à −12).", string.Join(", ", failing)));
-            }
-
-            if (!result.TransientsStable)
-            {
-                advice.Add(T("Erreur pendant les transitoires (tous les cœurs à la fois) : le réglage global ne tient pas les brusques variations de charge. Remontez l'ensemble du Curve Optimizer de 2 ou 3 points (ou réduisez l'undervolt)."));
-            }
-
-            CurveStatus = result.Aborted
-                ? T("Programme interrompu : {0}", result.AbortReason) + " " + string.Join(" ", advice) + whea
-                : advice.Count > 0
-                    ? string.Join(" ", advice) + whea + " " + T("Puis refaites le programme.")
-                    : result.WheaEvents is > 0
-                        ? T("Aucune erreur de calcul, mais le processeur a signalé des erreurs matérielles.") + whea + " " + T("Remontez légèrement le Curve Optimizer ou l'undervolt, puis refaites le programme.")
-                        : T("Programme complet réussi : {0} cœur(s) stables en phase 1, {1} rafales sans erreur en phase 2.", result.Cores.Count, result.Bursts) + " "
-                          + (result.WheaEvents is null
-                              ? T("Le journal des erreurs matérielles (WHEA) n'a pas pu être lu : regardez-le dans l'Observateur d'événements avant de conclure.")
-                              : T("Aucune erreur matérielle WHEA."))
-                          + " " + T("Utilisez ensuite le PC normalement quelques jours : certains gels n'arrivent qu'au repos.");
-
-            if (result.Cores.Any(c => !c.Pinned))
-            {
-                CurveStatus += " " + T("Windows a refusé de fixer le test sur certains cœurs : le résultat par cœur est moins fiable.");
-            }
+            ShowCurveResult(result, name);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -225,6 +160,89 @@ public sealed partial class WorkshopViewModel
             }
 
             await StopTestAsync();
+        }
+    }
+
+    /// <summary>Avertissement affiché avant le programme complet (durée, déroulé, programmes ouverts, précautions).</summary>
+    private string CurveProgramWarning(TimeSpan total, IReadOnlyList<string> busy)
+    {
+        return T("Pendant {0}, le PC sera INUTILISABLE : tous les cœurs vont être poussés tour à tour, puis tous ensemble par à-coups. Enregistrez votre travail et fermez vos programmes avant de continuer.", FormatDuration(total))
+            + Environment.NewLine + Environment.NewLine
+            + T("Phase 1 ({0}) : un cœur à la fois, pic de charge d'une seconde, chute au repos, réveil vérifié, cœur suivant. Phase 2 ({0}) : tous les fils en charge 5 à 10 secondes, arrêt simultané, 2 secondes de repos, et on recommence.", FormatDuration(total / 2))
+            + Environment.NewLine + Environment.NewLine
+            + T("MAUS ne ferme et ne suspend aucun autre programme (cela pourrait provoquer de faux plantages) : c'est à vous de les fermer. Pendant le programme, MAUS passe en priorité haute : pendant les rafales de la phase 2, les autres programmes seront presque à l'arrêt, c'est voulu. Jamais de priorité « temps réel » : elle peut empêcher Windows de vider ses caches disque et bloquer la souris. La mise en veille est suspendue jusqu'à la fin.")
+            + Environment.NewLine + Environment.NewLine
+            + T("Si vos ventilateurs sont pilotés par un logiciel plutôt que par le BIOS, ce logiciel peut réagir en retard pendant les rafales : pour un test long, préférez une courbe de ventilation réglée dans le BIOS.")
+            + (busy.Count > 0 ? Environment.NewLine + Environment.NewLine + T("Programmes qui utilisent le processeur en ce moment : {0}.", string.Join(", ", busy)) : string.Empty)
+            + HeavyWarning(CoreMode)
+            + TemperatureCaveat()
+            + Environment.NewLine + Environment.NewLine
+            + T("Si le PC gèle ou redémarre, MAUS dira au prochain lancement dans quelle phase et sur quel cœur. Le programme s'arrête à tout moment avec « Arrêter le test ».")
+            + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder
+            + Environment.NewLine + Environment.NewLine + T("Lancer le programme complet ?");
+    }
+
+    /// <summary>« Cœur 3 », ou « Cœur 3 (P) » / « (E) » sur un processeur hybride.</summary>
+    private static Func<int, string> CoreNamer(IReadOnlyList<CpuCore> cores)
+    {
+        var hybrid = cores.Select(c => c.EfficiencyClass).Distinct().Count() > 1;
+        var topClass = cores.Max(c => c.EfficiencyClass);
+        return index =>
+        {
+            var core = cores.First(c => c.Index == index);
+            return hybrid ? T("Cœur {0} ({1})", index, core.EfficiencyClass == topClass ? "P" : "E") : T("Cœur {0}", index);
+        };
+    }
+
+    /// <summary>Pastilles par cœur et conseils du bilan.</summary>
+    private void ShowCurveResult(CurveProgramResult result, Func<int, string> name)
+    {
+        foreach (var verdict in result.Cores)
+        {
+            CoreChips.Add(new CoreChipViewModel(
+                verdict.Froze ? T("{0} · figé", name(verdict.Core))
+                    : verdict.Errors > 0 ? T("{0} · {1} erreur(s)", name(verdict.Core), verdict.Errors)
+                    : verdict.Rounds > 0 ? T("{0} · stable", name(verdict.Core)) : name(verdict.Core),
+                verdict.Froze || verdict.Errors > 0 ? Controls.Palette.Red : verdict.Rounds > 0 ? Controls.Palette.Green : Controls.Palette.Grey));
+        }
+
+        if (result.Bursts > 0)
+        {
+            CoreChips.Add(new CoreChipViewModel(
+                result.TransientFroze ? T("Transitoires · gel")
+                    : result.TransientErrors > 0 ? T("Transitoires · {0} erreur(s)", result.TransientErrors)
+                    : T("Transitoires · {0} rafales, stable", result.Bursts),
+                result.TransientsStable ? Controls.Palette.Green : Controls.Palette.Red));
+        }
+
+        var failing = result.Cores.Where(c => !c.Stable).Select(c => name(c.Core)).ToList();
+        var whea = result.WheaEvents is > 0 ? " " + T("{0} erreur(s) matérielle(s) WHEA pendant le test : même sans plantage, le processeur est à la limite.", result.WheaEvents) : string.Empty;
+        var advice = new List<string>();
+        if (failing.Count > 0)
+        {
+            advice.Add(T("Cœur(s) instable(s) en phase 1 : {0}. Remontez le Curve Optimizer de ce(s) cœur(s) de 2 ou 3 points (par exemple de −15 à −12).", string.Join(", ", failing)));
+        }
+
+        if (!result.TransientsStable)
+        {
+            advice.Add(T("Erreur pendant les transitoires (tous les cœurs à la fois) : le réglage global ne tient pas les brusques variations de charge. Remontez l'ensemble du Curve Optimizer de 2 ou 3 points (ou réduisez l'undervolt)."));
+        }
+
+        CurveStatus = result.Aborted
+            ? T("Programme interrompu : {0}", result.AbortReason) + " " + string.Join(" ", advice) + whea
+            : advice.Count > 0
+                ? string.Join(" ", advice) + whea + " " + T("Puis refaites le programme.")
+                : result.WheaEvents is > 0
+                    ? T("Aucune erreur de calcul, mais le processeur a signalé des erreurs matérielles.") + whea + " " + T("Remontez légèrement le Curve Optimizer ou l'undervolt, puis refaites le programme.")
+                    : T("Programme complet réussi : {0} cœur(s) stables en phase 1, {1} rafales sans erreur en phase 2.", result.Cores.Count, result.Bursts) + " "
+                      + (result.WheaEvents is null
+                          ? T("Le journal des erreurs matérielles (WHEA) n'a pas pu être lu : regardez-le dans l'Observateur d'événements avant de conclure.")
+                          : T("Aucune erreur matérielle WHEA."))
+                      + " " + T("Utilisez ensuite le PC normalement quelques jours : certains gels n'arrivent qu'au repos.");
+
+        if (result.Cores.Any(c => !c.Pinned))
+        {
+            CurveStatus += " " + T("Windows a refusé de fixer le test sur certains cœurs : le résultat par cœur est moins fiable.");
         }
     }
 
