@@ -256,7 +256,15 @@ public class ThermalWatchdogTests
         var clock = new FakeClock();
         var watchdog = new ThermalWatchdog(clock.Now);
 
+        // Le pilote s'ouvre en arrière-plan : sur une machine lente (GitHub Actions), la première mesure peut arriver avant
+        // lui. On attend la première température, au plus 10 s.
         var first = source.Sample();
+        for (var attempt = 0; attempt < 100 && first.CpuTemperatureC is null; attempt++)
+        {
+            Thread.Sleep(100);
+            first = source.Sample();
+        }
+
         Assert.Equal(CpuTemperatureWatch.Watched, ThermalWatchdog.Assess(first, Limit, pawnIoInstalled: true));
         watchdog.Begin(ThermalTarget.Cpu, CpuTemperatureWatch.Watched);
         watchdog.Record(first, Limit, pawnIoInstalled: true);
