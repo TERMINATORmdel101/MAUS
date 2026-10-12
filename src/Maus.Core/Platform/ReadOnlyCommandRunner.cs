@@ -136,9 +136,12 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         {
             await process.WaitForExitAsync(timeoutSource.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
-            process.Kill(entireProcessTree: true);
+            // Délai dépassé ou annulation par l'utilisateur : le programme lancé est arrêté dans les deux cas (avant, une
+            // annulation le laissait tourner après le retour de MAUS).
+            StopTree(process);
+            cancellationToken.ThrowIfCancellationRequested();
             return new CommandResult(-1, string.Empty, string.Empty, TimedOut: true);
         }
 
@@ -152,6 +155,20 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         }
 
         return new CommandResult(process.ExitCode, output, errors, TimedOut: false);
+    }
+
+    /// <summary>Arrête le programme et ses enfants ; déjà terminé ou refusé : rien de plus à faire.</summary>
+    private static void StopTree(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(5000);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            // Déjà terminé, ou Windows refuse de l'arrêter : il n'y a rien d'autre à tenter.
+        }
     }
 
     /// <summary>

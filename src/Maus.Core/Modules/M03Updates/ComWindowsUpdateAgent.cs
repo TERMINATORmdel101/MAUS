@@ -46,11 +46,19 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
         }
     }
 
-    public Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken) =>
-        RunOnDedicatedThread(() => Search(criteria), timeout, cancellationToken);
+    public async Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        // Le fil de recherche reçoit l'annulation : il demande lui-même à l'agent d'interrompre la recherche (RequestAbort),
+        // au lieu de la laisser tourner dans Windows après le délai ou l'annulation.
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        stop.CancelAfter(timeout);
+        var token = stop.Token;
+        return await RunOnDedicatedThread(() => Search(criteria, token), timeout, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>
-    /// La recherche WUA est bloquante et ne s'annule pas : elle tourne sur un fil dédié qu'on abandonne au-delà du délai.
+    /// La recherche WUA tourne sur un fil dédié ; au-delà du délai, la tâche rend la main tout de suite et le fil interrompt
+    /// la recherche de l'agent (voir <see cref="Search"/>).
     /// Aucune erreur ne sort de ce fil (elle fermerait MAUS sans trace) : toutes deviennent l'erreur de la tâche, donc un
     /// constat « recherche impossible ».
     /// </summary>
@@ -89,7 +97,12 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
             ? exception
             : new InvalidOperationException(T("Réponse inattendue de l'agent Windows Update."), exception);
 
-    private static List<PendingUpdate> Search(string criteria)
+    /// <summary>
+    /// Recherche asynchrone de l'agent (BeginSearch / EndSearch, Microsoft Learn « IUpdateSearcher::BeginSearch ») surveillée
+    /// toutes les 200 ms : à l'annulation ou au délai, <c>RequestAbort</c> l'interrompt dans Windows. Si l'agent refuse la
+    /// forme asynchrone, recherche bloquante comme avant.
+    /// </summary>
+    private static List<PendingUpdate> Search(string criteria, CancellationToken cancellationToken)
     {
         var type = Type.GetTypeFromProgID("Microsoft.Update.Session")
             ?? throw new DataSourceUnavailableException("Agent Windows Update absent (Microsoft.Update.Session).");
@@ -100,7 +113,7 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
             dynamic session = instance!;
             session.ClientApplicationID = T("MAUS (audit en lecture seule)");
             dynamic searcher = session.CreateUpdateSearcher();
-            dynamic result = searcher.Search(criteria);
+            dynamic result = SearchWithAbort(searcher, criteria, cancellationToken);
             int resultCode = result.ResultCode;
             if (resultCode is ResultFailed or ResultAborted)
             {
@@ -121,6 +134,53 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
         finally
         {
             Release(instance);
+        }
+    }
+
+    private static dynamic SearchWithAbort(dynamic searcher, string criteria, CancellationToken cancellationToken)
+    {
+        dynamic job;
+        try
+        {
+            // L'agent exige un objet de rappel (null est refusé : « Could not convert argument 1 », vérifié le 12/10/2026).
+            job = searcher.BeginSearch(criteria, new SearchCompleted(), null);
+        }
+        catch (Exception ex) when (ex is COMException or ArgumentException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+        {
+            return searcher.Search(criteria);
+        }
+
+        try
+        {
+            // Borne de sécurité : au plus une heure d'attente, quoi qu'il arrive (le délai du module est bien plus court).
+            for (var waited = 0; !(bool)job.IsCompleted && waited < 3600 * 5; waited++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    job.RequestAbort();
+                    for (var i = 0; !(bool)job.IsCompleted && i < 50; i++)
+                    {
+                        Thread.Sleep(200);
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                Thread.Sleep(200);
+            }
+
+            return searcher.EndSearch(job);
+        }
+        finally
+        {
+            try
+            {
+                job.CleanUp();
+            }
+            catch (Exception ex) when (ex is COMException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+            {
+                // Tâche déjà libérée par l'agent.
+            }
         }
     }
 
@@ -194,5 +254,23 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
         {
             Marshal.FinalReleaseComObject(instance);
         }
+    }
+}
+
+/// <summary>Interface de rappel de fin de recherche de l'agent Windows Update (wuapi.h, ISearchCompletedCallback).</summary>
+[ComImport]
+[Guid("88AEE058-D4B0-4725-A2F1-814A67AE964C")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface ISearchCompletedCallback
+{
+    void Invoke([MarshalAs(UnmanagedType.IUnknown)] object searchJob, [MarshalAs(UnmanagedType.IUnknown)] object callbackArgs);
+}
+
+/// <summary>Rappel vide : MAUS surveille lui-même la fin de la recherche (IsCompleted).</summary>
+[ComVisible(true)]
+internal sealed class SearchCompleted : ISearchCompletedCallback
+{
+    public void Invoke(object searchJob, object callbackArgs)
+    {
     }
 }
