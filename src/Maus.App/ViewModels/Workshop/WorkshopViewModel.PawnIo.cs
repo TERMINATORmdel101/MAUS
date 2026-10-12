@@ -39,64 +39,33 @@ public sealed partial class WorkshopViewModel
     public ICommand UninstallPawnIoCommand => _uninstallPawnIo ??= new AsyncCommand(() => Run(() => RunPawnIoConsole(install: false)));
 
     /// <summary>
-    /// Mesures sans pilote, complétées par PawnIO s'il est installé et que MAUS a les droits administrateur. Une erreur du
-    /// pilote ne bloque jamais les autres mesures.
+    /// Mesures lues par le moteur : sans pilote, complétées par PawnIO s'il est installé (le moteur a les droits
+    /// administrateur). Une erreur du pilote ne bloque jamais les autres mesures.
     /// </summary>
-    private ISensorSource CreateSensors()
-    {
-        ISensorSource basic = new WindowsSensorSource();
-        var registry = new WindowsRegistryReader();
-        var (installed, version) = PawnIo.State(registry);
-        Live.CpuMaxC = CpuName(registry) is { } name ? SafetyLimits.Load().ForCpu(name)?.MaxC : null;
-        IsPawnIoInstalled = installed;
-        if (!installed)
-        {
-            PawnIoStatus = T("Sans pilote, MAUS ne lit ni la vraie température du processeur, ni sa tension, ni les sondes et ventilateurs de la carte mère. "
-                + "PawnIO est un pilote libre et signé, utilisé par LibreHardwareMonitor, FanControl et OpenRGB : il permet de les lire. "
-                + "Il s'installe et se retire en un clic (winget, fenêtre visible). Certains anti-triche de jeux peuvent refuser les pilotes "
-                + "d'accès au matériel : en cas de souci, retirez-le.");
-            return basic;
-        }
+    private ISensorSource CreateSensors() => new Maus.Core.Engine.Broker.EngineSensorSource(EngineHost.Current);
 
-        if (!ProcessElevation.IsElevated())
-        {
-            PawnIoStatus = T("PawnIO {0} est installé, mais il faut lancer MAUS en administrateur pour lire les capteurs.", version ?? "?");
-            return basic;
-        }
-
-        // Le pilote s'ouvre en arrière-plan : les mesures sans pilote s'affichent tout de suite.
-        PawnIoStatus = T("PawnIO {0} installé : température, tension et puissance du processeur, sondes et ventilateurs de la carte mère lus par LibreHardwareMonitor (bibliothèque libre, MPL-2.0).", version ?? "?");
-        return new CombinedSensorSource(basic, () => new LhmAdvancedSensors());
-    }
-
-    /// <summary>Après chaque mesure : signale un pilote qui n'a pas pu s'ouvrir ou qui ne répond plus.</summary>
+    /// <summary>Après chaque mesure : état du pilote PawnIO tel que le moteur le voit.</summary>
     private void CheckAdvancedSensors()
     {
-        if (_sensors is not CombinedSensorSource combined)
+        if (_sensors is not Maus.Core.Engine.Broker.EngineSensorSource { State: { } state })
         {
             return;
         }
 
-        if (combined.Failure is { } failure)
-        {
-            PawnIoStatus = T("PawnIO est installé mais n'a pas pu être utilisé : {0}", failure);
-        }
-        else if (combined.IsStalled)
-        {
-            PawnIoStatus = T("Le pilote PawnIO ne répond plus depuis quelques secondes : les mesures sans pilote continuent. Un autre logiciel de surveillance l'occupe peut-être.");
-        }
-    }
-
-    private static string? CpuName(WindowsRegistryReader registry)
-    {
-        try
-        {
-            return registry.GetValue(Microsoft.Win32.RegistryHive.LocalMachine, @"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString") as string;
-        }
-        catch (MausAccessDeniedException)
-        {
-            return null;
-        }
+        Live.CpuMaxC = state.CpuMaxC;
+        IsPawnIoInstalled = state.PawnIoInstalled;
+        PawnIoStatus = !state.PawnIoInstalled
+            ? T("Sans pilote, MAUS ne lit ni la vraie température du processeur, ni sa tension, ni les sondes et ventilateurs de la carte mère. "
+                + "PawnIO est un pilote libre et signé, utilisé par LibreHardwareMonitor, FanControl et OpenRGB : il permet de les lire. "
+                + "Il s'installe et se retire en un clic (winget, fenêtre visible). Certains anti-triche de jeux peuvent refuser les pilotes "
+                + "d'accès au matériel : en cas de souci, retirez-le.")
+            : !state.EngineElevated
+                ? T("PawnIO {0} est installé, mais il faut lancer MAUS en administrateur pour lire les capteurs.", state.PawnIoVersion ?? "?")
+                : state.Failure is { } failure
+                    ? T("PawnIO est installé mais n'a pas pu être utilisé : {0}", failure)
+                    : state.IsStalled
+                        ? T("Le pilote PawnIO ne répond plus depuis quelques secondes : les mesures sans pilote continuent. Un autre logiciel de surveillance l'occupe peut-être.")
+                        : T("PawnIO {0} installé : température, tension et puissance du processeur, sondes et ventilateurs de la carte mère lus par LibreHardwareMonitor (bibliothèque libre, MPL-2.0).", state.PawnIoVersion ?? "?");
     }
 
     private void RunPawnIoConsole(bool install)
@@ -113,16 +82,12 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        var winget = Winget.Locate(new WinRtPackageInventory(), new LocalFileSystemReader());
-        if (winget is null)
+        var outcome = EngineHost.Current.OpenConsoleAsync(new Maus.Core.Engine.Broker.ConsoleRequest(
+            install ? Maus.Core.Engine.Broker.ConsoleKind.PawnIoInstall : Maus.Core.Engine.Broker.ConsoleKind.PawnIoUninstall), CancellationToken.None)
+            .ConfigureAwait(false).GetAwaiter().GetResult();
+        if (!outcome.Opened)
         {
-            PawnIoStatus = T("winget est absent : réinstallez « Programme d'installation d'application » depuis le Microsoft Store.");
-            return;
-        }
-
-        if (!ShellLauncher.RunConsole(install ? PawnIo.InstallConsoleArguments(winget) : PawnIo.UninstallConsoleArguments(winget)))
-        {
-            PawnIoStatus = T("La fenêtre de commande n'a pas pu s'ouvrir.");
+            PawnIoStatus = outcome.Message ?? T("La fenêtre de commande n'a pas pu s'ouvrir.");
         }
     }
 }

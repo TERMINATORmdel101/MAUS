@@ -72,8 +72,11 @@ public sealed partial class LocalMausEngine
         }
     }
 
-    public Task<IReadOnlyList<DriverEntry>> ReadDriversAsync(CancellationToken cancellationToken) =>
-        Task.Run(() => DriverInventoryReader.Read(WorkshopContext().Cim, new CfgMgrDriverDateSource()), cancellationToken);
+    public Task<DriversReading> ReadDriversAsync(CancellationToken cancellationToken) => Task.Run(() =>
+    {
+        var context = WorkshopContext();
+        return new DriversReading(DriverInventoryReader.Read(context.Cim, new CfgMgrDriverDateSource()), context.Hardware);
+    }, cancellationToken);
 
     public Task<IReadOnlyList<string>> DriverBackupsAsync(CancellationToken cancellationToken) => Task.Run<IReadOnlyList<string>>(() =>
     {
@@ -276,7 +279,7 @@ public sealed partial class LocalMausEngine
                     : new ConsoleOutcome(false, WingetMissing);
             case ConsoleKind.DriverAction:
             {
-                var drivers = await ReadDriversAsync(cancellationToken).ConfigureAwait(false);
+                var drivers = (await ReadDriversAsync(cancellationToken).ConfigureAwait(false)).Drivers;
                 if (request.Action is not { } action || drivers.FirstOrDefault(d => d.InstanceId == request.InstanceId && d.Group == DriverGroup.Graphics) is not { } gpu)
                 {
                     return new ConsoleOutcome(false, T("Carte graphique introuvable : actualisez la liste des pilotes."));

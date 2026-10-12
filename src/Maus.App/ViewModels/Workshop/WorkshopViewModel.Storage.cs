@@ -179,7 +179,7 @@ public sealed partial class WorkshopViewModel
         {
             ScanStatus = T("Analyse en cours…");
             var progress = new Progress<long>(files => ScanStatus = T("Analyse en cours… {0:N0} fichiers parcourus", files));
-            var report = await SpaceAnalyzer.ScanAsync(root, progress, cancellation.Token);
+            var report = await EngineHost.Current.ScanSpaceAsync(root, progress, cancellation.Token);
             foreach (var file in report.Largest)
             {
                 LargestFiles.Add(new SpaceEntryViewModel(file.Name, file.Path, file.Bytes, report.Root.Bytes, false, SpaceHints.Describe(file.Path), null));

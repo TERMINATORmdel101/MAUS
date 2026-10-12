@@ -10,8 +10,8 @@ public sealed partial class RemoteMausEngine
     public async Task<InventoryReading> ReadInventoryAsync(CancellationToken cancellationToken) =>
         await CallAsync<InventoryReading>("inventory", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
 
-    public async Task<IReadOnlyList<DriverEntry>> ReadDriversAsync(CancellationToken cancellationToken) =>
-        await CallAsync<List<DriverEntry>>("drivers", null, null, cancellationToken).ConfigureAwait(false) ?? [];
+    public async Task<DriversReading> ReadDriversAsync(CancellationToken cancellationToken) =>
+        await CallAsync<DriversReading>("drivers", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
 
     public async Task<IReadOnlyList<string>> DriverBackupsAsync(CancellationToken cancellationToken) =>
         await CallAsync<List<string>>("drivers.backups", null, null, cancellationToken).ConfigureAwait(false) ?? [];

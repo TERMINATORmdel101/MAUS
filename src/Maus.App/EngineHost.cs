@@ -15,4 +15,10 @@ public static class EngineHost
         get => s_current ??= new LocalMausEngine();
         set => s_current = value;
     }
+
+    /// <summary>
+    /// Le moteur a les droits administrateur (capteurs PawnIO, fiche mémoire, corrections). Sans moteur séparé, ce sont ceux
+    /// de ce processus.
+    /// </summary>
+    public static bool IsElevated { get; set; } = Environment.IsPrivilegedProcess;
 }

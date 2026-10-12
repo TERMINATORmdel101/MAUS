@@ -123,11 +123,7 @@ public sealed partial class WorkshopViewModel
         try
         {
             _board = DramVoltageCalibrations.Board(new WindowsRegistryReader());
-            _boardReadings = await Task.Run(() =>
-            {
-                using var sensors = new LhmAdvancedSensors();
-                return sensors.Read();
-            }).WaitAsync(TimeSpan.FromSeconds(20));
+            _boardReadings = await ReadBoardSensorsAsync().WaitAsync(TimeSpan.FromSeconds(20));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -153,6 +149,31 @@ public sealed partial class WorkshopViewModel
         }
 
         return T("Tension réellement appliquée : la puce de surveillance de cette carte mère ne dit pas à MAUS laquelle de ses entrées porte la tension de la mémoire (modèle non décrit par LibreHardwareMonitor), et MAUS ne la devine pas. Vous pouvez l'étalonner ci-dessous avec la tension que vous avez réglée dans le BIOS.");
+    }
+
+    /// <summary>
+    /// Capteurs de la carte mère lus par le moteur (PawnIO) : le pilote s'ouvre en arrière-plan, les premières mesures peuvent
+    /// arriver sans eux, d'où quelques essais.
+    /// </summary>
+    private static async Task<IReadOnlyList<HardwareReading>> ReadBoardSensorsAsync()
+    {
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            var reading = await EngineHost.Current.SampleSensorsAsync(CancellationToken.None);
+            if (reading.Snapshot.Readings is { Count: > 0 } readings)
+            {
+                return readings;
+            }
+
+            if (reading.State.Failure is { } failure)
+            {
+                throw new InvalidOperationException(failure);
+            }
+
+            await Task.Delay(500);
+        }
+
+        return [];
     }
 
     private Task FindCandidatesAsync()

@@ -253,8 +253,7 @@ public sealed partial class WorkshopViewModel
     {
         try
         {
-            using var source = new WindowsProcessSource();
-            var monitor = new ProcessMonitor(source, Environment.ProcessorCount);
+            var monitor = new ProcessMonitor(new Maus.Core.Engine.Broker.EngineProcessSource(EngineHost.Current), Environment.ProcessorCount);
             await Task.Run(monitor.Sample);
             await Task.Delay(1000);
             var samples = await Task.Run(monitor.Sample);

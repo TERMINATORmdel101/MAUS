@@ -24,7 +24,6 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     public const int SectionStorage = 4;
 
     private readonly Func<string, string, bool> _confirm;
-    private readonly Func<AuditContext?> _context;
     private readonly IPreferencesStore _preferences;
     private readonly DispatcherTimer _liveTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
@@ -35,8 +34,6 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     private ISensorSource? _sensors;
     private ProcessMonitor? _processes;
 
-    /// <summary>Source des processus (requête PDH de Windows) : rendue à la fermeture de l'Atelier.</summary>
-    private WindowsProcessSource? _processSource;
     private bool _isActive;
     private bool _monitorOpen;
     private int _section;
@@ -68,10 +65,9 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     private double _vramProgress;
     private string _vramStatus = string.Empty;
 
-    public WorkshopViewModel(Func<string, string, bool> confirm, Func<AuditContext?> context, IPreferencesStore preferences)
+    public WorkshopViewModel(Func<string, string, bool> confirm, IPreferencesStore preferences)
     {
         _confirm = confirm;
-        _context = context;
         _preferences = preferences;
         _liveTimer.Interval = Appearance.AppearanceManager.Current.RefreshInterval;
         Appearance.AppearanceManager.Changed += OnAppearanceChanged;
@@ -557,22 +553,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             }).Forget("atelier : fermeture des capteurs");
         }
 
-        // Rend la requête PDH des processus une fois la dernière lecture terminée.
-        var processSource = _processSource;
-        _processSource = null;
         _processes = null;
-        if (processSource is not null)
-        {
-            Task.Run(async () =>
-            {
-                while (_processSampling)
-                {
-                    await Task.Delay(50);
-                }
-
-                processSource.Dispose();
-            }).Forget("atelier : fermeture de la liste des processus");
-        }
     }
 
     /// <summary>Nouvel échantillon des mesures en direct (pour la fenêtre de surveillance : aucune mesure en double).</summary>
@@ -695,23 +676,16 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         IsReadingInventory = true;
         try
         {
-            var context = _context() ?? await Task.Run(AuditContext.CreateDefault);
-            var inventory = await Task.Run(() => HardwareInventoryReader.Read(context, new X86CpuIdSource(), new WindowsNvmlSource()));
-            _details = await Task.Run(() => ReadDetails(context));
+            // Le moteur lit le matériel (et les puces SPD des barrettes si PawnIO est installé) : lecture seule.
+            var reading = await EngineHost.Current.ReadInventoryAsync(CancellationToken.None);
+            _details = reading.Details;
             var limits = SafetyLimits.Load();
-            ShowInventory(inventory, limits, null);
-            InventoryStatus = T("Lu directement dans le matériel et le BIOS, sans pilote. « Rechercher la fiche » ouvre votre navigateur ; MAUS n'envoie rien de lui-même.");
-
-            // Profils XMP / EXPO des barrettes : puce SPD, lisible seulement avec PawnIO et en administrateur (lecture seule).
-            if (PawnIo.State(new WindowsRegistryReader()).Installed && ProcessElevation.IsElevated())
-            {
-                InventoryStatus = T("Lecture des puces SPD des barrettes (profils XMP / EXPO)…");
-                var spd = await Task.Run(ReadSpdModules);
-                ShowInventory(inventory, limits, spd);
-                InventoryStatus = spd is null
+            ShowInventory(reading.Inventory, limits, reading.Spd);
+            InventoryStatus = !reading.SpdRead
+                ? T("Lu directement dans le matériel et le BIOS, sans pilote. « Rechercher la fiche » ouvre votre navigateur ; MAUS n'envoie rien de lui-même.")
+                : reading.Spd is null
                     ? T("Profils XMP / EXPO illisibles : la carte mère bloque peut-être l'accès au bus SMBus. Le reste de la fiche est lu sans pilote.")
                     : T("Lu dans le matériel et le BIOS ; profils XMP / EXPO lus dans la puce SPD de chaque barrette par PawnIO, sans rien modifier.");
-            }
         }
         catch (Exception ex)
         {
@@ -733,36 +707,6 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>
-    /// Windows, écrans, réseau, son et emplacements mémoire ; <c>null</c> en cas d'échec imprévu : les cartes des composants
-    /// s'affichent quand même, seules ces cartes-là manquent.
-    /// </summary>
-    private static MachineDetails? ReadDetails(AuditContext context)
-    {
-        try
-        {
-            return MachineDetailsReader.Read(context);
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            Maus.Core.Diagnostics.Breadcrumbs.Add("Mon PC : informations supplémentaires illisibles (" + ex.GetType().Name + ")");
-            return null;
-        }
-    }
-
-    /// <summary>Puces SPD décodées, ou <c>null</c> si aucune n'a pu être lue.</summary>
-    private static List<SpdModule>? ReadSpdModules()
-    {
-        try
-        {
-            var modules = new PawnIoSpdSource().ReadAll().Select(SpdDecoder.Decode).OfType<SpdModule>().ToList();
-            return modules.Count > 0 ? modules : null;
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            return null;
-        }
-    }
 
     private async Task SampleLiveAsync()
     {
@@ -834,11 +778,8 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         _processSampling = true;
         try
         {
-            if (_processes is null)
-            {
-                _processSource = new WindowsProcessSource();
-                _processes = new ProcessMonitor(_processSource, Environment.ProcessorCount);
-            }
+            // Processus lus par le moteur : tous les comptes, chemins complets.
+            _processes ??= new ProcessMonitor(new Maus.Core.Engine.Broker.EngineProcessSource(EngineHost.Current), Environment.ProcessorCount);
 
             var monitor = _processes;
             _lastProcesses = await Task.Run(monitor.Sample);
@@ -888,8 +829,9 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 
         try
         {
-            await Task.Run(() => new WindowsProcessTerminator().Terminate(process.Sample));
-            DiagnosisStatus = T("« {0} » a été arrêté.", process.Name);
+            // Le moteur relit lui-même le processus (nom, heure de lancement) avant de décider.
+            DiagnosisStatus = await EngineHost.Current.TerminateProcessAsync(process.Sample.Pid, process.Sample.StartTime, CancellationToken.None)
+                ?? T("« {0} » a été arrêté.", process.Name);
         }
         catch (Exception ex)
         {

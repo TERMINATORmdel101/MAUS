@@ -373,7 +373,7 @@ public sealed partial class WorkshopViewModel
 
     private async Task RunBenchmarkAsync()
     {
-        if (IsBenchmarkRunning || Environment.ProcessPath is not { } exe)
+        if (IsBenchmarkRunning)
         {
             return;
         }
@@ -382,33 +382,11 @@ public sealed partial class WorkshopViewModel
         BenchmarkStatus = T("Benchmark en cours dans sa propre fenêtre plein écran. Échap l'arrête à tout moment.");
         try
         {
-            var start = new ProcessStartInfo(exe) { UseShellExecute = false };
-            foreach (var argument in new[] { "--benchmark", "--api", BenchmarkApi.Value, "--resolution", BenchmarkResolution.Value, "--lang", Texts.Language })
-            {
-                start.ArgumentList.Add(argument);
-            }
-
-            if (BenchmarkScope.Value != "all")
-            {
-                start.ArgumentList.Add("--only");
-                start.ArgumentList.Add(BenchmarkScope.Value);
-            }
-
-            if (!BenchmarkIncludeRayTracing)
-            {
-                start.ArgumentList.Add("--raytracing");
-                start.ArgumentList.Add("off");
-            }
-
-            using var process = Process.Start(start);
-            if (process is null)
-            {
-                BenchmarkStatus = T("Le benchmark n'a pas pu démarrer.");
-                return;
-            }
-
-            await process.WaitForExitAsync().ConfigureAwait(true);
-            BenchmarkStatus = process.ExitCode switch
+            // Lancé par le moteur, qui vérifie les réglages : il lit aussi la température du processeur pour l'arrêt de sécurité.
+            var exitCode = await EngineHost.Current.RunBenchmarkAsync(
+                new Maus.Core.Engine.Broker.BenchmarkLaunch(BenchmarkApi.Value, BenchmarkResolution.Value, BenchmarkScope.Value, BenchmarkIncludeRayTracing, Texts.Language),
+                CancellationToken.None);
+            BenchmarkStatus = exitCode switch
             {
                 0 => "",
                 3 => T("La carte graphique a cessé de répondre pendant le benchmark (pilote réinitialisé par Windows). Une carte stable ne devrait jamais le faire : vérifiez sa température, son alimentation et ses réglages d'overclocking."),
@@ -417,7 +395,7 @@ public sealed partial class WorkshopViewModel
                 var code => T("Le benchmark s'est arrêté sur une erreur (code {0}). Le détail est dans l'Observateur d'événements de Windows, journal Application, source « .NET Runtime ».", code),
             };
         }
-        catch (System.ComponentModel.Win32Exception ex)
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or Maus.Core.Engine.Broker.EngineException)
         {
             BenchmarkStatus = T("Le benchmark n'a pas pu démarrer : {0}", ex.Message);
         }

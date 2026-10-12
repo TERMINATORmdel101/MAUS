@@ -13,7 +13,9 @@ public sealed partial class WorkshopViewModel
     private SessionRecording? _recording;
 
     /// <summary>Images par seconde (PresentMon) pendant le relevé ; <c>null</c> si indisponible.</summary>
-    private PresentMonCapture? _frameCapture;
+    /// <summary>PresentMon tourne dans le moteur pendant le relevé (session « MAUS_Releve »).</summary>
+    private bool _frameCapture;
+    private const string RecordingSession = "MAUS_Releve";
     private SessionRecording? _lastRecording;
     private TimeSpan? _recordLimit;
     private bool _isRecording;
@@ -75,17 +77,25 @@ public sealed partial class WorkshopViewModel
 
     public bool HasSessionSummary => SessionSummary.Length > 0;
 
-    public ICommand StartSessionCommand => _startSession ??= new AsyncCommand(() => Run(() =>
+    public ICommand StartSessionCommand => _startSession ??= new AsyncCommand(async () =>
     {
         _recording = new SessionRecording(DateTimeOffset.Now);
         _recordLimit = SessionDuration.Value;
         SessionSummary = string.Empty;
-        _frameCapture = PresentMonCapture.TryStart();
-        SessionStatus = _frameCapture is null
+        try
+        {
+            _frameCapture = await EngineHost.Current.StartFramesAsync(RecordingSession, null, CancellationToken.None);
+        }
+        catch (Maus.Core.Engine.Broker.EngineException)
+        {
+            _frameCapture = false;
+        }
+
+        SessionStatus = !_frameCapture
             ? T("Enregistrement en cours… lancez votre jeu. (Images par seconde non mesurées : PresentMon indisponible.)")
             : T("Enregistrement en cours… lancez votre jeu.");
         IsRecording = true;
-    }));
+    });
 
     public ICommand StopSessionCommand => _stopSession ??= new AsyncCommand(() => Run(FinishSession));
 
@@ -117,10 +127,10 @@ public sealed partial class WorkshopViewModel
         _recording = null;
         _lastRecording = recording;
         IsRecording = false;
-        if (_frameCapture is { } capture)
+        if (_frameCapture)
         {
-            _frameCapture = null;
-            FinishFramesAsync(capture).Forget("relevé : images par seconde");
+            _frameCapture = false;
+            FinishFramesAsync().Forget("relevé : images par seconde");
         }
 
         if (recording.Count < 5)
@@ -154,15 +164,9 @@ public sealed partial class WorkshopViewModel
     }
 
     /// <summary>Arrête PresentMon hors du fil de l'interface (quelques secondes), puis ajoute son bilan en tête du relevé.</summary>
-    private async Task FinishFramesAsync(PresentMonCapture capture)
+    private async Task FinishFramesAsync()
     {
-        var frames = await Task.Run(() =>
-        {
-            using (capture)
-            {
-                return capture.Stop();
-            }
-        });
+        var frames = await EngineHost.Current.StopFramesAsync(RecordingSession, CancellationToken.None);
         var refresh = Maus.Core.Platform.DisplayRefresh.PrimaryHz();
         var line = frames is null
             ? T("Images par seconde : pas assez d'images d'un même jeu pendant le relevé (au moins {0}).", FrameTimeLog.MinimumFrames)
@@ -176,13 +180,10 @@ public sealed partial class WorkshopViewModel
     /// </summary>
     private void StopFrameCapture()
     {
-        if (_frameCapture is { } capture)
+        if (_frameCapture)
         {
-            _frameCapture = null;
-            using (capture)
-            {
-                capture.Stop();
-            }
+            _frameCapture = false;
+            EngineHost.Current.StopFramesAsync(RecordingSession, CancellationToken.None).Forget("relevé : arrêt de PresentMon");
         }
     }
 

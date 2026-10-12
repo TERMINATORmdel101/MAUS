@@ -25,7 +25,9 @@ public sealed partial class MonitorViewModel
 
     // Deux fois par seconde : le chiffre en direct suit le jeu sans à-coups.
     private readonly DispatcherTimer _fpsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
-    private PresentMonCapture? _fps;
+    /// <summary>Mesure en cours : PresentMon tourne dans le moteur, session « MAUS_Compteur ».</summary>
+    private bool _measuringFps;
+    private const string FpsSession = "MAUS_Compteur";
     private int? _refreshHz;
     private string _fpsGame = string.Empty;
     private string _fpsAverage = "—";
@@ -36,7 +38,7 @@ public sealed partial class MonitorViewModel
     private string _fpsStatus = T("Lancez la mesure, puis votre jeu : MAUS affiche les images par seconde des dix dernières secondes.");
     private ICommand? _toggleFps;
 
-    public bool IsMeasuringFps => _fps is not null;
+    public bool IsMeasuringFps => _measuringFps;
 
     public string FpsButton => IsMeasuringFps ? T("Arrêter la mesure") : T("Mesurer les images par seconde");
 
@@ -94,26 +96,36 @@ public sealed partial class MonitorViewModel
 
     private async Task ToggleFpsAsync()
     {
-        if (_fps is not null)
+        if (_measuringFps)
         {
-            await Task.Run(StopFps);
+            await StopFpsAsync();
             OnFpsStateChanged();
             FpsStatus = T("Mesure arrêtée.");
             return;
         }
 
         _refreshHz = DisplayRefresh.PrimaryHz();
-        var capture = await Task.Run(() => PresentMonCapture.TryStart(FpsWindow + FpsWindow, "MAUS_Compteur"));
-        if (capture is null)
+        bool started;
+        try
+        {
+            started = await EngineHost.Current.StartFramesAsync(FpsSession, FpsWindow + FpsWindow, CancellationToken.None);
+        }
+        catch (Maus.Core.Engine.Broker.EngineException ex)
+        {
+            FpsStatus = ex.Message;
+            return;
+        }
+
+        if (!started)
         {
             FpsStatus = T("PresentMon est indisponible : les images par seconde ne peuvent pas être mesurées.");
             return;
         }
 
-        _fps = capture;
+        _measuringFps = true;
         if (!_fpsTimerHooked)
         {
-            _fpsTimer.Tick += (_, _) => RefreshFps();
+            _fpsTimer.Tick += async (_, _) => await RefreshFpsAsync();
             _fpsTimerHooked = true;
         }
 
@@ -126,10 +138,39 @@ public sealed partial class MonitorViewModel
     }
 
     private bool _fpsTimerHooked;
+    private bool _fpsReading;
 
-    private void RefreshFps()
+    private async Task RefreshFpsAsync()
     {
-        if (_fps is { HasExited: true })
+        if (!_measuringFps || _fpsReading)
+        {
+            return;
+        }
+
+        _fpsReading = true;
+        Maus.Core.Engine.Broker.FrameReading reading;
+        try
+        {
+            reading = await EngineHost.Current.ReadFramesAsync(FpsSession, FpsWindow, FpsSilence, FrameTimeLog.MinimumLiveFrames, CancellationToken.None);
+        }
+        catch (Maus.Core.Engine.Broker.EngineException ex)
+        {
+            StopFpsWithoutWaiting();
+            OnFpsStateChanged();
+            FpsStatus = ex.Message;
+            return;
+        }
+        finally
+        {
+            _fpsReading = false;
+        }
+
+        if (!_measuringFps)
+        {
+            return;
+        }
+
+        if (reading.Exited)
         {
             StopFpsWithoutWaiting();
             OnFpsStateChanged();
@@ -137,7 +178,7 @@ public sealed partial class MonitorViewModel
             return;
         }
 
-        var summary = _fps?.Log.Summarize(FpsWindow, FpsSilence, FrameTimeLog.MinimumLiveFrames);
+        var summary = reading.Summary;
         _overlay?.Display(summary);
         if (summary is not { } frames)
         {
@@ -155,17 +196,21 @@ public sealed partial class MonitorViewModel
         FpsAdvice = string.Join(Environment.NewLine + Environment.NewLine, FrameAdvice.Explain(frames, _refreshHz));
     }
 
-    /// <summary>Arrête PresentMon (bouton) ; quelques secondes au plus, hors du fil de l'interface.</summary>
-    private void StopFps()
+    /// <summary>Arrête PresentMon (bouton) : le moteur referme sa session d'écoute.</summary>
+    private async Task StopFpsAsync()
     {
-        _fpsTimer.Dispatcher.Invoke(_fpsTimer.Stop);
+        _fpsTimer.Stop();
         CloseOverlay();
-        if (_fps is { } capture)
+        if (_measuringFps)
         {
-            _fps = null;
-            using (capture)
+            _measuringFps = false;
+            try
             {
-                capture.Stop();
+                await EngineHost.Current.StopFramesAsync(FpsSession, CancellationToken.None);
+            }
+            catch (Maus.Core.Engine.Broker.EngineException)
+            {
+                // Moteur arrêté : PresentMon s'est arrêté avec lui.
             }
 
             Breadcrumbs.Add("compteur d'images par seconde arrêté");
@@ -173,17 +218,18 @@ public sealed partial class MonitorViewModel
     }
 
     /// <summary>
-    /// Fermeture de la fenêtre pendant la mesure : PresentMon est arrêté tout de suite, et sa session d'écoute refermée en
-    /// arrière-plan. Attendre ici (jusqu'à huit secondes) figeait toute l'interface de MAUS.
+    /// Fermeture de la fenêtre pendant la mesure : l'interface n'attend pas, le moteur arrête PresentMon et referme sa session
+    /// d'écoute de son côté (attendre ici figeait toute l'interface de MAUS).
     /// </summary>
     private void StopFpsWithoutWaiting()
     {
         _fpsTimer.Stop();
         CloseOverlay();
-        if (_fps is { } capture)
+        if (_measuringFps)
         {
-            _fps = null;
-            capture.StopInBackground("compteur d'images par seconde arrêté (fenêtre fermée)");
+            _measuringFps = false;
+            EngineHost.Current.StopFramesAsync(FpsSession, CancellationToken.None)
+                .Forget("compteur d'images par seconde : arrêt (fenêtre fermée)");
         }
     }
 

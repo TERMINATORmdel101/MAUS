@@ -40,24 +40,9 @@ public sealed partial class MainViewModel
     /// <summary>Lit l'état réel de la tâche (elle peut avoir été retirée dans le Planificateur de tâches).</summary>
     private async Task LoadScheduleAsync()
     {
-        var (day, command) = await TaskSchedulerClient.GetAsync();
-        if (day is { } existing && command is not null && ScheduledAudit.IsOlderStoreFolder(command, TaskSchedulerClient.Executable)
-            && TaskSchedulerClient.Refusal() is null)
-        {
-            // Version du Microsoft Store : chaque mise à jour change le dossier de MAUS ; la tâche suit le nouveau dossier.
-            var error = await TaskSchedulerClient.CreateAsync(existing);
-            Breadcrumbs.Add("audit hebdomadaire : tâche remise sur le nouveau dossier du Store" + (error is null ? "" : " (échec)"));
-            if (error is null)
-            {
-                command = TaskSchedulerClient.Executable;
-            }
-            else
-            {
-                StatusText = T("L'audit automatique n'a pas pu suivre la mise à jour de MAUS : {0}", error);
-            }
-        }
-
-        if (day is not null && command is not null && TaskSchedulerClient.Refusal(command) is not null)
+        var state = await Engine.GetScheduleAsync(CancellationToken.None);
+        var day = state.Day;
+        if (day is not null && state.Command is { } command && state.CommandRefusal is not null)
         {
             // Tâche créée par une version précédente depuis un dossier non protégé : à retirer.
             StatusText = T("La tâche d'audit automatique lance MAUS depuis un dossier non protégé ({0}) avec les droits administrateur : choisissez « Désactivé » pour la retirer, puis installez MAUS dans Program Files avant de la recréer.",
@@ -80,7 +65,7 @@ public sealed partial class MainViewModel
     {
         if (choice.Value is { } day)
         {
-            if (TaskSchedulerClient.Refusal() is { } refusal)
+            if ((await Engine.GetScheduleAsync(CancellationToken.None)).Refusal is { } refusal)
             {
                 StatusText = T("La tâche n'a pas pu être créée : {0}", refusal);
                 await LoadScheduleAsync();
@@ -100,17 +85,17 @@ public sealed partial class MainViewModel
         {
             if (choice.Value is { } chosenDay)
             {
-                var error = await TaskSchedulerClient.CreateAsync(chosenDay);
+                var error = await Engine.SetScheduleAsync(chosenDay, CancellationToken.None);
                 StatusText = error is null ? T("Audit automatique programmé (« {0} »).", choice.Label) : T("La tâche n'a pas pu être créée : {0}", error);
             }
             else
             {
-                var error = await TaskSchedulerClient.DeleteAsync();
+                var error = await Engine.SetScheduleAsync(null, CancellationToken.None);
                 StatusText = error is null ? T("Audit automatique arrêté : la tâche planifiée a été retirée.") : T("La tâche n'a pas pu être retirée : {0}", error);
             }
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException
-            or System.ComponentModel.Win32Exception or System.Security.SecurityException)
+            or System.ComponentModel.Win32Exception or System.Security.SecurityException or Maus.Core.Engine.Broker.EngineException)
         {
             StatusText = T("L'audit automatique n'a pas pu être modifié : {0}", ex.Message);
         }

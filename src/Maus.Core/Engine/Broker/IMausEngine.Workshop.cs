@@ -9,6 +9,9 @@ namespace Maus.Core.Engine.Broker;
 /// <param name="SpdRead">Une lecture SPD a été tentée (PawnIO installé, moteur administrateur).</param>
 public sealed record InventoryReading(HardwareInventory Inventory, MachineDetails? Details, IReadOnlyList<SpdModule>? Spd, bool SpdRead);
 
+/// <summary>Pilotes installés et profil matériel (pour relier chaque carte graphique à la page de son fabricant).</summary>
+public sealed record DriversReading(IReadOnlyList<DriverEntry> Drivers, Hardware.HardwareProfile Hardware);
+
 /// <summary>État du pilote PawnIO et des capteurs avancés, vu par le moteur.</summary>
 /// <param name="Failure">Le pilote n'a pas pu s'ouvrir (message), ou <c>null</c>.</param>
 /// <param name="IsStalled">Le pilote ne répond plus depuis quelques secondes.</param>
@@ -68,7 +71,7 @@ public partial interface IMausEngine
 {
     Task<InventoryReading> ReadInventoryAsync(CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<DriverEntry>> ReadDriversAsync(CancellationToken cancellationToken);
+    Task<DriversReading> ReadDriversAsync(CancellationToken cancellationToken);
 
     /// <summary>Noms des dossiers de sauvegarde de pilotes faits par MAUS (dossier réservé aux administrateurs), du plus récent au plus ancien.</summary>
     Task<IReadOnlyList<string>> DriverBackupsAsync(CancellationToken cancellationToken);

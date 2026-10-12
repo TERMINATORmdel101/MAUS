@@ -205,7 +205,7 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        if (!ProcessElevation.IsElevated())
+        if (!EngineHost.IsElevated)
         {
             MemoryStatus = PawnIoMemoryDetails.DriverRequired;
             return;
@@ -227,8 +227,8 @@ public sealed partial class WorkshopViewModel
         var log = new StepLogFile("lecture-memoire.txt");
         try
         {
-            var cpu = CpuIdParser.Read(new X86CpuIdSource());
-            var reading = Task.Run(() => PawnIoMemoryDetails.Read(cpu, null, log.Write));
+            // Lecture faite par le moteur (pilote PawnIO, lecture seule) ; une lecture bloquée y est gardée et signalée.
+            var reading = EngineHost.Current.ReadMemoryDetailsAsync(CancellationToken.None);
             _pendingMemoryRead = reading;
             if (await Task.WhenAny(reading, Task.Delay(MemoryReadTimeout)) != reading)
             {

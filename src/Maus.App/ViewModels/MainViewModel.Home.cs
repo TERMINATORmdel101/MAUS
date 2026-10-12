@@ -69,7 +69,7 @@ public sealed partial class MainViewModel
     private int _selectedTab;
     private WorkshopViewModel? _workshop;
 
-    public WorkshopViewModel Workshop => _workshop ??= new WorkshopViewModel(Confirm, () => null, PreferencesStore);
+    public WorkshopViewModel Workshop => _workshop ??= new WorkshopViewModel(Confirm, PreferencesStore);
 
     /// <summary>Partie affichée : Accueil, Constats, Corrections, Atelier ou Historique.</summary>
     public int SelectedTab

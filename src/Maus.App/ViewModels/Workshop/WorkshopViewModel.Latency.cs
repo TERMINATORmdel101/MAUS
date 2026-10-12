@@ -10,7 +10,6 @@ namespace Maus.App.ViewModels.Workshop;
 /// </summary>
 public sealed partial class WorkshopViewModel
 {
-    private readonly EtwDriverLatencyTracer _latencyTracer = new();
     private bool _isLatencyRunning;
     private string _latencyStatus = T("Laissez tourner ce qui crée le problème (musique, jeu, appel vidéo), puis lancez la mesure.");
     private TestOption<TimeSpan>? _latencyDuration;
@@ -64,12 +63,12 @@ public sealed partial class WorkshopViewModel
         LatencyStatus = T("Mesure en cours ({0:0} s)… continuez d'utiliser le PC normalement.", duration.TotalSeconds);
         try
         {
-            var result = await _latencyTracer.MeasureAsync(duration, CancellationToken.None);
+            var result = await EngineHost.Current.MeasureLatencyAsync(duration, CancellationToken.None);
             LatencyStatus = result.Describe()
                 + Environment.NewLine + Environment.NewLine
                 + T("Un pilote qui garde le processeur longtemps d'affilée peut retarder le son et les images (craquements, micro-saccades). Si un nom revient en tête quand le problème se produit, cherchez une mise à jour de ce pilote (fabricant de la carte mère, de la carte son, de la carte réseau ou de la carte graphique).");
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or Maus.Core.Engine.Broker.EngineException)
         {
             LatencyStatus = ex.Message;
         }

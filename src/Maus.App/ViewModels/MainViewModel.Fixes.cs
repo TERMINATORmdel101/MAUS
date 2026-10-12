@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using System.Windows.Input;
 using Maus.Core;
+using Maus.Core.Engine.Broker;
 using Maus.Core.Fixes;
 using Maus.Core.Modules.M20Software;
 using Maus.Core.Platform;
@@ -290,7 +291,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>« Réparer les fichiers de Windows » : DISM puis SFC dans une console visible, après confirmation.</summary>
-    public ICommand RepairWindowsCommand => _repairWindows ??= new ParameterCommand(_ =>
+    public ICommand RepairWindowsCommand => _repairWindows ??= new AsyncCommand(async () =>
     {
         var message = T("MAUS va ouvrir une fenêtre de commande qui lance deux outils officiels de Microsoft :") + Environment.NewLine
             + T("• DISM répare la copie de référence de Windows en la comparant à Windows Update (connexion Internet conseillée) ;") + Environment.NewLine
@@ -307,8 +308,9 @@ public sealed partial class MainViewModel
             return;
         }
 
+        var opened = (await Engine.OpenConsoleAsync(new ConsoleRequest(ConsoleKind.Repair), CancellationToken.None)).Opened;
         FixReport = (FixReport.Length > 0 ? FixReport + Environment.NewLine + Environment.NewLine : string.Empty)
-            + (ShellLauncher.RunRepairConsole()
+            + (opened
                 ? T("Réparation lancée dans une fenêtre de commande. Quand elle est terminée, redémarrez le PC puis relancez l'audit.")
                 : T("La fenêtre de commande n'a pas pu s'ouvrir."));
     });
@@ -342,21 +344,19 @@ public sealed partial class MainViewModel
     {
         StatusText = T("Recherche des mises à jour des logiciels (winget), jusqu'à une minute…");
         IReadOnlyList<SoftwareUpdate> updates;
-        string? winget;
         IsCheckingSoftware = true;
         try
         {
-            var context = await Task.Run(AuditContext.CreateDefault);
-            winget = await Task.Run(() => Winget.Locate(context.Packages, context.Files));
-            if (winget is null)
+            var listing = await Engine.ListSoftwareUpdatesAsync(CancellationToken.None);
+            if (!listing.WingetFound)
             {
                 StatusText = T("winget est absent : réinstallez « Programme d'installation d'application » depuis le Microsoft Store.");
                 return;
             }
 
-            updates = await Winget.ListUpgradesAsync(context.Commands, winget, TimeSpan.FromSeconds(90), CancellationToken.None);
+            updates = listing.Updates;
         }
-        catch (Exception ex) when (ex is DataSourceUnavailableException or MausAccessDeniedException or InvalidOperationException)
+        catch (Exception ex) when (ex is DataSourceUnavailableException or MausAccessDeniedException or InvalidOperationException or EngineException)
         {
             StatusText = T("La liste des mises à jour n'a pas pu être lue : {0}", ex.Message);
             return;
@@ -378,9 +378,10 @@ public sealed partial class MainViewModel
             return;
         }
 
-        AddToFixReport(ShellLauncher.RunConsole(Winget.UpgradeConsoleArguments(winget, chosen))
+        var outcome = await Engine.OpenConsoleAsync(new ConsoleRequest(ConsoleKind.WingetUpgrade, [.. chosen.Select(u => u.Id)]), CancellationToken.None);
+        AddToFixReport(outcome.Opened
             ? T("Mise à jour de {0} logiciel(s) lancée dans une fenêtre de commande. Quand elle est terminée, relancez l'audit.", chosen.Count)
-            : T("La fenêtre de commande n'a pas pu s'ouvrir."));
+            : outcome.Message ?? T("La fenêtre de commande n'a pas pu s'ouvrir."));
     }
 
     private async Task RestartExplorerAsync()
