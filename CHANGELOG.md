@@ -2,7 +2,24 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
-## Prochaine version (en préparation)
+## 0.8.0 — 12/10/2026 — interface sans droits administrateur, revue de sécurité
+
+Modification majeure (chiffre du milieu, accord du porteur : « ok pour la 0.8.0 »). Suite d'une revue de sécurité et de stabilité en onze points (P0 à P2) : chaque point a d'abord été vérifié dans le code, puis corrigé s'il était réel.
+
+- **L'interface tourne sans droits administrateur** (P0). Tout ce qui lit le système en profondeur ou le modifie est fait par un second processus, le **moteur** (`MAUS.exe --engine`), lancé avec la demande d'autorisation de Windows (le même écran qu'avant) et relié à l'interface par un canal privé :
+  - canal au nom aléatoire, réservé au compte de l'utilisateur et refusé au réseau ; chaque côté vérifie par Windows l'identité du processus en face ;
+  - le moteur n'accepte qu'une **liste fermée d'opérations** et ne reçoit jamais d'écriture ni de commande toute faite : les corrections sont désignées par leur identifiant et reprises dans son propre plan, les fenêtres de commande (DISM, winget, pnputil) sont construites par lui, un processus à arrêter est relu par lui, chaque identifiant, dossier et réglage est vérifié ;
+  - le moteur s'arrête avec l'interface ; autorisation refusée : **mode limité** (audit sans droits, aucune correction), dit à l'ouverture ;
+  - un navigateur, une boîte de dialogue ou une image ouverts par l'interface n'ont plus les droits administrateur.
+- **Retours arrière incomplets** (P0) : une correction en échec dont la remise des valeurs d'origine échouait aussi était rangée « échec, origine remise », et la modification restait dans Windows sans bouton « Annuler ». Elle reste maintenant visible (« à reprendre »), « Annuler » réessaie, et MAUS le signale à l'ouverture.
+- **Opérations qui survivaient à l'annulation** (P0) : la recherche Windows Update est interrompue dans Windows au délai ou à l'annulation (avant : abandonnée sur un fil, elle continuait) ; une commande lancée par MAUS (winget…) est arrêtée aussi quand l'utilisateur annule.
+- **Arrêt de sécurité du benchmark** (P0) : arrêt si la carte graphique atteint son seuil de ralentissement ou si le processeur dépasse sa limite de plus de 5 °C (seuils donnés par les puces, mêmes règles que les tests de stabilité).
+- **Faux « stable »** (P1) : le test cœur par cœur ne dit plus « tous les cœurs ont tenu, aucune erreur WHEA » si des cœurs n'ont pas été testés ou si le journal WHEA est illisible ; un test qui n'a rien vérifié n'a pas de verdict ; un test du processeur interrompu dans le benchmark n'est plus enregistré comme complet.
+- **Confiance** (P1) : un programme lancé depuis un dossier de Windows modifiable par un simple utilisateur (C:\Windows\Temp, Tasks…) n'est plus « Composant de Windows » ; le fichier de la tâche de l'audit de la semaine n'est plus écrit dans le dossier temporaire de l'utilisateur (il pouvait y être remplacé avant sa lecture) mais dans un dossier réservé aux administrateurs.
+- **Tests sur GitHub** (P1) : compilation sans avertissement et tous les tests à chaque envoi ; l'installateur n'est fabriqué que s'ils passent.
+- **Comparaison des benchmarks** (P2) : édition du benchmark (scènes et étalonnage changés en 0.7.5), interface, passe interrompue et tests différents sont signalés ; score combiné comparé seulement entre mêmes tests ; « comparer avec la précédente » et la courbe ne prennent que des passes comparables.
+- **Versions identifiables** (P2) : le commit de fabrication est affiché à côté du numéro (À propos, `maus --version`, journaux) ; l'installateur porte une attestation de provenance vérifiable (`gh attestation verify`).
+- **Code plus simple à maintenir** (P2) : l'interface ne parle plus qu'au moteur (une seule interface d'opérations), au lieu d'appeler directement le registre, WMI, le journal et les outils de Windows.
 
 - **Images hors de la mémoire pendant le benchmark** (demande du porteur) : les vignettes des scènes, qui servent à l'image du résultat, ne sont plus gardées en mémoire du début à la fin (environ 15 Mo) ; chacune est réduite tout de suite à 480 × 270 et rangée dans un fichier temporaire (`%TEMP%\MAUS-benchmark-…`), effacé à la fin.
 - Page Benchmark : l'image du résultat est chargée à la taille de son affichage (800 pixels de large au plus) au lieu de 1920 × 1080.
