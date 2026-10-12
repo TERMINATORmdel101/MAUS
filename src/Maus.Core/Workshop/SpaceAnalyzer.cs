@@ -67,9 +67,22 @@ public static class SpaceAnalyzer
         return new SpaceReport(node, top, state.Files, state.Folders, state.Inaccessible, clock.Elapsed);
     }
 
-    private static void Walk(SpaceNode node, ScanState state)
+    /// <summary>
+    /// Profondeur de dossiers au plus (règle 1 : récursion bornée). Au-delà, le dossier est compté comme inaccessible : un
+    /// dossier imbriqué des milliers de fois (même créé exprès) épuiserait la pile et fermerait MAUS sans message.
+    /// </summary>
+    internal const int MaxDepth = 256;
+
+    private static void Walk(SpaceNode node, ScanState state, int depth = 0)
     {
         state.CancellationToken.ThrowIfCancellationRequested();
+        if (depth >= MaxDepth)
+        {
+            node.Inaccessible = true;
+            state.Inaccessible++;
+            return;
+        }
+
         state.Folders++;
         var options = new EnumerationOptions
         {
@@ -95,7 +108,7 @@ public static class SpaceAnalyzer
             if (entry is DirectoryInfo directory)
             {
                 var child = new SpaceNode { Path = directory.FullName, Name = directory.Name, Parent = node };
-                Walk(child, state);
+                Walk(child, state, depth + 1);
                 node.Folders.Add(child);
                 node.Bytes += child.Bytes;
                 node.Files += child.Files;

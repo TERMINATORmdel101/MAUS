@@ -262,7 +262,25 @@ internal static class TankMeshes
 
     private static (Vector2 Position, Vector2 Tangent) Sample(List<Vector2> path, float distance)
     {
-        for (var i = 0; ; i = (i + 1) % path.Count)
+        // Règle 2 (boucle bornée) : la distance est ramenée à un seul tour du chemin, qui est parcouru au plus une fois.
+        var length = 0f;
+        for (var i = 0; i < path.Count; i++)
+        {
+            length += Vector2.Distance(path[i], path[(i + 1) % path.Count]);
+        }
+
+        if (!float.IsFinite(distance) || !(length > 0f))
+        {
+            return (path[0], Vector2.UnitX);
+        }
+
+        distance %= length;
+        if (distance < 0f)
+        {
+            distance += length;
+        }
+
+        for (var i = 0; i < path.Count; i++)
         {
             var a = path[i];
             var c = path[(i + 1) % path.Count];
@@ -275,6 +293,8 @@ internal static class TankMeshes
 
             distance -= segment;
         }
+
+        return (path[0], Vector2.UnitX);
     }
 }
 

@@ -44,6 +44,24 @@ public sealed class StorageTests : IDisposable
     }
 
     [Fact]
+    public void Very_deep_folders_stop_at_the_depth_limit_instead_of_crashing()
+    {
+        var deep = _root;
+        for (var i = 0; i < SpaceAnalyzer.MaxDepth + 20; i++)
+        {
+            deep = Path.Combine(deep, "d");
+        }
+
+        Directory.CreateDirectory(deep);
+        File.WriteAllBytes(Path.Combine(deep, "fond.bin"), new byte[10]);
+
+        var report = SpaceAnalyzer.Scan(_root);
+
+        Assert.Equal(1, report.Inaccessible);
+        Assert.Equal(0, report.Files);
+    }
+
+    [Fact]
     public void Scanning_can_be_stopped()
     {
         Make("a.bin", 10);

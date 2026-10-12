@@ -23,7 +23,8 @@ public sealed unsafe partial class D3D11GpuMemoryProvider : IGpuMemoryProvider
         var factory = CreateFactory();
         try
         {
-            for (uint index = 0; ; index++)
+            // Borné (règle 2) : Windows signale la fin de la liste bien avant ; 64 cartes graphiques n'existent pas.
+            for (uint index = 0; index < 64; index++)
             {
                 nint adapter = 0;
                 var hr = Com.Call(factory, 12, index, &adapter);

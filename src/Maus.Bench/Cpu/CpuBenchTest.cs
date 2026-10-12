@@ -85,29 +85,39 @@ internal struct FastRandom(uint seed)
         return (_state >> 8) * (1f / 16777216f);
     }
 
+    /// <summary>Nombre d'essais au plus (règle 2 : boucle bornée) ; un point sur deux environ est accepté.</summary>
+    private const int MaxTries = 64;
+
     public Vector3 InUnitSphere()
     {
-        while (true)
+        var p = Vector3.Zero;
+        for (var i = 0; i < MaxTries; i++)
         {
-            var p = new Vector3((NextFloat() * 2f) - 1f, (NextFloat() * 2f) - 1f, (NextFloat() * 2f) - 1f);
+            p = new Vector3((NextFloat() * 2f) - 1f, (NextFloat() * 2f) - 1f, (NextFloat() * 2f) - 1f);
             if (p.LengthSquared() < 1f)
             {
                 return p;
             }
         }
+
+        // Jamais atteint en pratique (probabilité inférieure à 10⁻²⁰) : le dernier point, ramené dans la sphère.
+        return p * 0.5f;
     }
 
     public Vector3 UnitVector() => Vector3.Normalize(InUnitSphere() + new Vector3(1e-6f));
 
     public Vector2 InUnitDisk()
     {
-        while (true)
+        var p = Vector2.Zero;
+        for (var i = 0; i < MaxTries; i++)
         {
-            var p = new Vector2((NextFloat() * 2f) - 1f, (NextFloat() * 2f) - 1f);
+            p = new Vector2((NextFloat() * 2f) - 1f, (NextFloat() * 2f) - 1f);
             if (p.LengthSquared() < 1f)
             {
                 return p;
             }
         }
+
+        return p * 0.5f;
     }
 }
