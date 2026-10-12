@@ -62,105 +62,22 @@ public sealed class ComponentCardViewModel
             cards.Add(SystemCard(details.System, now ?? DateTime.Now));
         }
 
-        var cpu = inventory.Cpu;
-        var cpuLimit = limits.ForCpu(cpu.Name);
-        cards.Add(new ComponentCardViewModel("P", T("Processeur"), cpu.Name,
-        [
-            new(T("Cœurs / threads"), $"{cpu.Cores} / {cpu.Threads}"),
-            new(T("Fréquence de base"), cpu.BaseClockMhz > 0 ? $"{cpu.BaseClockMhz} MHz" : "—"),
-            new(T("Cache L2 / L3"), $"{Kb(cpu.L2CacheKb)} / {Kb(cpu.L3CacheKb)}"),
-            new(T("Signature"), cpu.Signature ?? "—"),
-            new(T("Microcode"), details?.Microcode ?? "—"),
-            new(T("Instructions"), cpu.InstructionSets.Count == 0 ? "—" : string.Join(", ", cpu.InstructionSets)),
-            new(T("Architecture hybride"), cpu.Hybrid ? T("oui") : T("non")),
-            new(T("Température maximale prévue"), cpuLimit is null ? T("non répertoriée") : $"{cpuLimit.MaxC} °C"),
-        ], cpu.Name, search));
-
-        cards.Add(new ComponentCardViewModel("C", T("Carte mère et BIOS"), $"{inventory.Board.Manufacturer} {inventory.Board.Product}".Trim(),
-        [
-            new(T("Fabricant du BIOS"), inventory.Board.BiosVendor ?? "—"),
-            new(T("Version du BIOS"), inventory.Board.BiosVersion ?? "—"),
-            new(T("Date du BIOS"), inventory.Board.BiosDate?.ToString("d", Culture) ?? "—"),
-            .. SlotLines(details?.Slots, inventory.Memory.Count),
-        ], inventory.Board.Product is { } board ? $"{inventory.Board.Manufacturer} {board}" : null, search));
-
+        cards.Add(CpuCard(inventory.Cpu, limits, details, search));
+        cards.Add(BoardCard(inventory, details, search));
         for (var index = 0; index < inventory.Memory.Count; index++)
         {
-            var module = inventory.Memory[index];
-            var limit = limits.ForMemory(module.Generation);
-            var gauge = module.ConfiguredMillivolts is { } mv && limit is not null
-                ? limit.DangerAboveMv is { } danger
-                    ? new GaugeInfo(T("Tension déclarée par le BIOS"), limit.NominalMv - 200, danger + 150, limit.ElevatedAboveMv, danger, mv,
-                        T("{0} · élevée au-delà de {1} · maximum absolu {2}", V(mv), V(limit.ElevatedAboveMv), V(danger)))
-                    : new GaugeInfo(T("Tension déclarée par le BIOS"), limit.NominalMv - 200, limit.ElevatedAboveMv + 150, limit.ElevatedAboveMv, limit.ElevatedAboveMv + 150, mv,
-                        T("{0} · élevée au-delà de {1}", V(mv), V(limit.ElevatedAboveMv)))
-                : null;
-            cards.Add(new ComponentCardViewModel("R", T("Mémoire vive · {0}", module.Slot),
-                $"{Gb(module.CapacityBytes)} DDR{module.Generation?.ToString(CultureInfo.InvariantCulture) ?? "?"} · {module.Manufacturer ?? T("fabricant inconnu")}",
-            [
-                new(T("Référence"), module.PartNumber ?? "—"),
-                .. ProfileLines(spd, module.PartNumber, index),
-                new(T("Vitesse nominale / appliquée"), $"{module.RatedSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} / {module.ConfiguredSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} MT/s"),
-                new(T("Tension déclarée (min / max)"), module.MinMillivolts is null ? "—" : $"{V(module.MinMillivolts.Value)} / {V(module.MaxMillivolts ?? 0)}"),
-            ], module.PartNumber, search, gauge));
+            cards.Add(MemoryCard(inventory.Memory[index], index, limits, spd, search));
         }
 
-        foreach (var gpu in inventory.Gpus)
-        {
-            var nvidia = gpu.Nvidia;
-            var lines = new List<InfoLine>
-            {
-                new(T("Mémoire vidéo"), gpu.MemoryBytes is { } vram ? Gb(vram) : "—"),
-                new(T("Pilote"), gpu.Info.DriverVersion ?? "—"),
-                new(T("Date du pilote"), gpu.Info.DriverDate?.ToString("d", Culture) ?? "—"),
-            };
-            GaugeInfo? gauge = null;
-            if (nvidia is not null)
-            {
-                lines.Add(new(T("Fréquence max (GPU / mémoire)"), $"{nvidia.MaxGraphicsClockMhz?.ToString(CultureInfo.InvariantCulture) ?? "—"} / {nvidia.MaxMemoryClockMhz?.ToString(CultureInfo.InvariantCulture) ?? "—"} MHz"));
-                lines.Add(new(T("Limite de puissance (appliquée / défaut)"), $"{nvidia.PowerLimitWatts:0} / {nvidia.DefaultPowerLimitWatts:0} W"));
-                lines.Add(new(T("Lien PCIe"), $"Gen {nvidia.PcieGeneration}/{nvidia.PcieMaxGeneration} · x{nvidia.PcieWidth}/{nvidia.PcieMaxWidth}"));
-                lines.Add(new(T("BIOS de la carte"), nvidia.VbiosVersion ?? "—"));
-                if (nvidia.TemperatureC is { } t && nvidia.SlowdownTemperatureC is { } slow)
-                {
-                    var shutdown = nvidia.ShutdownTemperatureC ?? slow + 5;
-                    gauge = new GaugeInfo(T("Température"), 20, shutdown + 5, slow - 10, slow, t,
-                        T("{0} °C · ralentit à {1} °C · s'éteint à {2} °C", t, slow, shutdown));
-                }
-            }
-
-            cards.Add(new ComponentCardViewModel("G", T("Carte graphique"), gpu.Info.Name, lines, gpu.Info.Name, search, gauge));
-        }
+        cards.AddRange(inventory.Gpus.Select(gpu => GpuCard(gpu, search)));
 
         foreach (var display in details?.Displays ?? [])
         {
             cards.Add(DisplayCard(display, search));
         }
 
-        foreach (var disk in inventory.Disks)
-        {
-            cards.Add(new ComponentCardViewModel("D", T("Disque"), disk.Model,
-            [
-                new(T("Type"), $"{disk.Media ?? "?"} · {disk.Bus ?? "?"}"),
-                new(T("Capacité"), disk.SizeBytes is { } size ? Gb(size) : "—"),
-                new(T("Température"), disk.TemperatureC is { } c ? $"{c} °C" : "—"),
-                new(T("Usure"), disk.WearPercent is { } w ? $"{w} %" : "—"),
-                new(T("Heures de fonctionnement"), disk.PowerOnHours?.ToString("N0", Culture) ?? "—"),
-                new(T("Micrologiciel"), disk.Firmware ?? "—"),
-            ], disk.Model, search));
-        }
-
-        foreach (var battery in inventory.Batteries)
-        {
-            var gauge = battery.HealthPercent is { } health
-                ? new GaugeInfo(T("Capacité restante"), 0, 100, 60, 80, health, T("{0} % de la capacité d'origine", health))
-                : null;
-            cards.Add(new ComponentCardViewModel("B", T("Batterie"), $"{battery.Manufacturer} {battery.Name}".Trim(),
-            [
-                new(T("Capacité d'origine / actuelle"), $"{battery.DesignCapacityMwh?.ToString("N0", Culture) ?? "—"} / {battery.FullChargeCapacityMwh?.ToString("N0", Culture) ?? "—"} mWh"),
-                new(T("Tension"), battery.VoltageMv is { } mv ? V(mv) : "—"),
-            ], battery.Name, search, gauge));
-        }
+        cards.AddRange(inventory.Disks.Select(disk => DiskCard(disk, search)));
+        cards.AddRange(inventory.Batteries.Select(battery => BatteryCard(battery, search)));
 
         if (details is { Network.Count: > 0 })
         {
@@ -176,6 +93,105 @@ public sealed class ComponentCardViewModel
         }
 
         return cards;
+    }
+
+    private static ComponentCardViewModel CpuCard(CpuIdentity cpu, SafetyLimits limits, MachineDetails? details, Action<string> search)
+    {
+        var cpuLimit = limits.ForCpu(cpu.Name);
+        return new ComponentCardViewModel("P", T("Processeur"), cpu.Name,
+        [
+            new(T("Cœurs / threads"), $"{cpu.Cores} / {cpu.Threads}"),
+            new(T("Fréquence de base"), cpu.BaseClockMhz > 0 ? $"{cpu.BaseClockMhz} MHz" : "—"),
+            new(T("Cache L2 / L3"), $"{Kb(cpu.L2CacheKb)} / {Kb(cpu.L3CacheKb)}"),
+            new(T("Signature"), cpu.Signature ?? "—"),
+            new(T("Microcode"), details?.Microcode ?? "—"),
+            new(T("Instructions"), cpu.InstructionSets.Count == 0 ? "—" : string.Join(", ", cpu.InstructionSets)),
+            new(T("Architecture hybride"), cpu.Hybrid ? T("oui") : T("non")),
+            new(T("Température maximale prévue"), cpuLimit is null ? T("non répertoriée") : $"{cpuLimit.MaxC} °C"),
+        ], cpu.Name, search);
+    }
+
+    private static ComponentCardViewModel BoardCard(HardwareInventory inventory, MachineDetails? details, Action<string> search)
+    {
+        return new ComponentCardViewModel("C", T("Carte mère et BIOS"), $"{inventory.Board.Manufacturer} {inventory.Board.Product}".Trim(),
+        [
+            new(T("Fabricant du BIOS"), inventory.Board.BiosVendor ?? "—"),
+            new(T("Version du BIOS"), inventory.Board.BiosVersion ?? "—"),
+            new(T("Date du BIOS"), inventory.Board.BiosDate?.ToString("d", Culture) ?? "—"),
+            .. SlotLines(details?.Slots, inventory.Memory.Count),
+        ], inventory.Board.Product is { } board ? $"{inventory.Board.Manufacturer} {board}" : null, search);
+    }
+
+    private static ComponentCardViewModel MemoryCard(MemoryModuleInfo module, int index, SafetyLimits limits, IReadOnlyList<SpdModule>? spd, Action<string> search)
+    {
+        var limit = limits.ForMemory(module.Generation);
+        var gauge = module.ConfiguredMillivolts is { } mv && limit is not null
+            ? limit.DangerAboveMv is { } danger
+                ? new GaugeInfo(T("Tension déclarée par le BIOS"), limit.NominalMv - 200, danger + 150, limit.ElevatedAboveMv, danger, mv,
+                    T("{0} · élevée au-delà de {1} · maximum absolu {2}", V(mv), V(limit.ElevatedAboveMv), V(danger)))
+                : new GaugeInfo(T("Tension déclarée par le BIOS"), limit.NominalMv - 200, limit.ElevatedAboveMv + 150, limit.ElevatedAboveMv, limit.ElevatedAboveMv + 150, mv,
+                    T("{0} · élevée au-delà de {1}", V(mv), V(limit.ElevatedAboveMv)))
+            : null;
+        return new ComponentCardViewModel("R", T("Mémoire vive · {0}", module.Slot),
+            $"{Gb(module.CapacityBytes)} DDR{module.Generation?.ToString(CultureInfo.InvariantCulture) ?? "?"} · {module.Manufacturer ?? T("fabricant inconnu")}",
+        [
+            new(T("Référence"), module.PartNumber ?? "—"),
+            .. ProfileLines(spd, module.PartNumber, index),
+            new(T("Vitesse nominale / appliquée"), $"{module.RatedSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} / {module.ConfiguredSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} MT/s"),
+            new(T("Tension déclarée (min / max)"), module.MinMillivolts is null ? "—" : $"{V(module.MinMillivolts.Value)} / {V(module.MaxMillivolts ?? 0)}"),
+        ], module.PartNumber, search, gauge);
+    }
+
+    private static ComponentCardViewModel GpuCard(GpuIdentity gpu, Action<string> search)
+    {
+        var nvidia = gpu.Nvidia;
+        var lines = new List<InfoLine>
+        {
+            new(T("Mémoire vidéo"), gpu.MemoryBytes is { } vram ? Gb(vram) : "—"),
+            new(T("Pilote"), gpu.Info.DriverVersion ?? "—"),
+            new(T("Date du pilote"), gpu.Info.DriverDate?.ToString("d", Culture) ?? "—"),
+        };
+        GaugeInfo? gauge = null;
+        if (nvidia is not null)
+        {
+            lines.Add(new(T("Fréquence max (GPU / mémoire)"), $"{nvidia.MaxGraphicsClockMhz?.ToString(CultureInfo.InvariantCulture) ?? "—"} / {nvidia.MaxMemoryClockMhz?.ToString(CultureInfo.InvariantCulture) ?? "—"} MHz"));
+            lines.Add(new(T("Limite de puissance (appliquée / défaut)"), $"{nvidia.PowerLimitWatts:0} / {nvidia.DefaultPowerLimitWatts:0} W"));
+            lines.Add(new(T("Lien PCIe"), $"Gen {nvidia.PcieGeneration}/{nvidia.PcieMaxGeneration} · x{nvidia.PcieWidth}/{nvidia.PcieMaxWidth}"));
+            lines.Add(new(T("BIOS de la carte"), nvidia.VbiosVersion ?? "—"));
+            if (nvidia.TemperatureC is { } t && nvidia.SlowdownTemperatureC is { } slow)
+            {
+                var shutdown = nvidia.ShutdownTemperatureC ?? slow + 5;
+                gauge = new GaugeInfo(T("Température"), 20, shutdown + 5, slow - 10, slow, t,
+                    T("{0} °C · ralentit à {1} °C · s'éteint à {2} °C", t, slow, shutdown));
+            }
+        }
+
+        return new ComponentCardViewModel("G", T("Carte graphique"), gpu.Info.Name, lines, gpu.Info.Name, search, gauge);
+    }
+
+    private static ComponentCardViewModel DiskCard(DiskIdentity disk, Action<string> search)
+    {
+        return new ComponentCardViewModel("D", T("Disque"), disk.Model,
+        [
+            new(T("Type"), $"{disk.Media ?? "?"} · {disk.Bus ?? "?"}"),
+            new(T("Capacité"), disk.SizeBytes is { } size ? Gb(size) : "—"),
+            new(T("Température"), disk.TemperatureC is { } c ? $"{c} °C" : "—"),
+            new(T("Usure"), disk.WearPercent is { } w ? $"{w} %" : "—"),
+            new(T("Heures de fonctionnement"), disk.PowerOnHours?.ToString("N0", Culture) ?? "—"),
+            new(T("Micrologiciel"), disk.Firmware ?? "—"),
+        ], disk.Model, search);
+    }
+
+    private static ComponentCardViewModel BatteryCard(BatteryIdentity battery, Action<string> search)
+    {
+        var gauge = battery.HealthPercent is { } health
+            ? new GaugeInfo(T("Capacité restante"), 0, 100, 60, 80, health, T("{0} % de la capacité d'origine", health))
+            : null;
+        return new ComponentCardViewModel("B", T("Batterie"), $"{battery.Manufacturer} {battery.Name}".Trim(),
+        [
+            new(T("Capacité d'origine / actuelle"), $"{battery.DesignCapacityMwh?.ToString("N0", Culture) ?? "—"} / {battery.FullChargeCapacityMwh?.ToString("N0", Culture) ?? "—"} mWh"),
+            new(T("Tension"), battery.VoltageMv is { } mv ? V(mv) : "—"),
+        ], battery.Name, search, gauge);
     }
 
     /// <summary>Carte « Windows et ce PC » : modèle, version, installation, démarrage, UEFI, Secure Boot et TPM.</summary>
