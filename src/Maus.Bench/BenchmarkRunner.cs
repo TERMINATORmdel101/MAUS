@@ -32,6 +32,10 @@ internal sealed class BenchmarkRunner : IDisposable
     private readonly List<BenchmarkTestResult> _results = [];
     private readonly List<SharePicture> _pictures = [];
     private readonly SharePictureStore _pictureStore = new();
+    private readonly BenchmarkSafetyStop _safety = new();
+
+    /// <summary>Le benchmark s'est arrêté pour la chaleur (code de sortie à part pour l'Atelier).</summary>
+    public bool StoppedForSafety { get; private set; }
     private readonly string _cpuName = CpuName();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly BenchmarkSensorSampler _sensors;
@@ -93,6 +97,11 @@ internal sealed class BenchmarkRunner : IDisposable
         {
             error = ex.Message;
         }
+        catch (SafetyStopException ex)
+        {
+            error = ex.Message;
+            StoppedForSafety = true;
+        }
         catch (SharpGen.Runtime.SharpGenException ex) when (DeviceLost.IsLoss(ex))
         {
             // Plantage du pilote signalé par un appel ordinaire : les résultats déjà mesurés sont gardés.
@@ -134,6 +143,15 @@ internal sealed class BenchmarkRunner : IDisposable
         _post.Dispose();
         _device.Dispose();
         _window.Dispose();
+    }
+
+    /// <summary>Arrêt de sécurité (voir <see cref="BenchmarkSafetyStop"/>) : la mesure en cours est abandonnée.</summary>
+    private void ThrowIfTooHot()
+    {
+        if (_safety.Check(_sensors.Latest) is { } reason)
+        {
+            throw new SafetyStopException(reason);
+        }
     }
 
     private BenchmarkReport Finish(bool completed, string? error)
@@ -233,6 +251,7 @@ internal sealed class BenchmarkRunner : IDisposable
                 return false;
             }
 
+            ThrowIfTooHot();
             var now = _clock.Elapsed.TotalSeconds;
             var elapsed = now - start;
             if (elapsed >= WarmupSeconds + duration)
@@ -323,6 +342,9 @@ internal sealed class BenchmarkRunner : IDisposable
         var workAtStart = 0L;
         var measured = false;
         var aborted = false;
+        // Résultat enregistré seulement si la mesure est allée jusqu'au bout : un arrêt (Échap, chaleur, carte perdue) ne
+        // laisse jamais un résultat partiel passer pour un résultat complet.
+        var finished = false;
         var nextUpload = 0.0;
         try
         {
@@ -334,6 +356,7 @@ internal sealed class BenchmarkRunner : IDisposable
                     break;
                 }
 
+                ThrowIfTooHot();
                 var elapsed = _clock.Elapsed.TotalSeconds - start;
                 if (!measured && elapsed >= measureFrom)
                 {
@@ -344,6 +367,7 @@ internal sealed class BenchmarkRunner : IDisposable
 
                 if (elapsed >= measureFrom + duration)
                 {
+                    finished = true;
                     break;
                 }
 
@@ -381,7 +405,7 @@ internal sealed class BenchmarkRunner : IDisposable
             worker.Wait();
             _device.WaitIdle();
             picture.Dispose();
-            if (!aborted && measured && seconds > 0)
+            if (finished && measured && seconds > 0)
             {
                 if (test.Id == "cpu-render")
                 {

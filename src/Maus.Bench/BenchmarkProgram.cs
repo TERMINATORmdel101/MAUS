@@ -38,9 +38,11 @@ public static partial class BenchmarkProgram
             }
 
             BenchmarkReport report;
+            bool stoppedForSafety;
             using (var runner = new BenchmarkRunner(options))
             {
                 report = runner.Run();
+                stoppedForSafety = runner.StoppedForSafety;
             }
 
             // Les passes d'essai (accélérées ou fermées automatiquement) ne vont pas dans l'historique de l'utilisateur.
@@ -56,7 +58,8 @@ public static partial class BenchmarkProgram
                 File.WriteAllText(file, BenchmarkHistoryStore.Serialize(report));
             }
 
-            return report.Error is null ? 0 : 3;
+            // 5 = arrêt de sécurité (chaleur), 3 = carte perdue.
+            return stoppedForSafety ? 5 : report.Error is null ? 0 : 3;
         }
         catch (DeviceLostException ex)
         {

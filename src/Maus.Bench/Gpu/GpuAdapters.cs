@@ -44,6 +44,11 @@ internal static class GpuAdapters
     private static bool IsSoftware(IDXGIAdapter1 adapter) => (adapter.Description1.Flags & AdapterFlags.Software) != 0;
 }
 
+/// <summary>Benchmark arrêté par sécurité : température au-delà du seuil donné par la carte ou le processeur.</summary>
+public sealed class SafetyStopException(string message) : Exception(message)
+{
+}
+
 /// <summary>La carte graphique a été perdue (plantage du pilote, réinitialisation par Windows, carte retirée).</summary>
 public sealed class DeviceLostException(string message, Exception? inner = null) : Exception(message, inner)
 {
