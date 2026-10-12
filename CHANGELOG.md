@@ -2,6 +2,13 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## Prochaine version (en préparation)
+
+- **Images hors de la mémoire pendant le benchmark** (demande du porteur) : les vignettes des scènes, qui servent à l'image du résultat, ne sont plus gardées en mémoire du début à la fin (environ 15 Mo) ; chacune est réduite tout de suite à 480 × 270 et rangée dans un fichier temporaire (`%TEMP%\MAUS-benchmark-…`), effacé à la fin.
+- Page Benchmark : l'image du résultat est chargée à la taille de son affichage (800 pixels de large au plus) au lieu de 1920 × 1080.
+- Sécurité du dépôt GitHub : fichier `SECURITY.md` (signalement privé des failles), alertes Dependabot, détection des secrets, branche `main` protégée.
+- Moins de langages : plus de Python dans le projet (outil des traductions réécrit en C#).
+
 ## 0.7.6 — 10/10/2026 — compteur d'images par seconde réactif, stabilité
 
 Corrections (dernier chiffre, règle du porteur). Demande du porteur : « la fenêtre de surveillance par-dessus les jeux […] les FPS mettent 50 ans à calculer correctement », puis recherche de défauts et d'améliorations de stabilité.

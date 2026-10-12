@@ -507,6 +507,8 @@ public sealed partial class WorkshopViewModel
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
+            // Affichée sur 400 pixels de large : décodée à 800 au plus (écrans à forte densité), pas en 1920 × 1080.
+            image.DecodePixelWidth = 800;
             image.UriSource = new Uri(path);
             image.EndInit();
             image.Freeze();

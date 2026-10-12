@@ -31,6 +31,7 @@ internal sealed class BenchmarkRunner : IDisposable
     private readonly FrameBuilder _builder = new();
     private readonly List<BenchmarkTestResult> _results = [];
     private readonly List<SharePicture> _pictures = [];
+    private readonly SharePictureStore _pictureStore = new();
     private readonly string _cpuName = CpuName();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly BenchmarkSensorSampler _sensors;
@@ -125,6 +126,7 @@ internal sealed class BenchmarkRunner : IDisposable
 
     public void Dispose()
     {
+        _pictureStore.Dispose();
         _sensors.Dispose();
         _logo?.Dispose();
         _ui.Dispose();
@@ -288,7 +290,11 @@ internal sealed class BenchmarkRunner : IDisposable
             // Lecture de la vignette pendant une image noire : la scène vient de finir par un fondu au noir.
             _device.BeginFrame();
             _device.Commands.Clear(_device.BackBuffer, new ColorF(0f, 0f, 0f, 1f));
-            _pictures.Add(new SharePicture(scene.Id, _device.ReadTexture(snapshot), snapshot.Desc.Width, snapshot.Desc.Height));
+            if (_pictureStore.Save(scene.Id, _device.ReadTexture(snapshot), snapshot.Desc.Width, snapshot.Desc.Height) is { } picture)
+            {
+                _pictures.Add(picture);
+            }
+
             _device.Present();
             _device.WaitIdle();
         }
@@ -379,7 +385,11 @@ internal sealed class BenchmarkRunner : IDisposable
             {
                 if (test.Id == "cpu-render")
                 {
-                    _pictures.Add(new SharePicture(test.Id, [.. test.Image], test.Width, test.Height));
+                    if (_pictureStore.Save(test.Id, test.Image, test.Width, test.Height) is { } vignette)
+                    {
+                        _pictures.Add(vignette);
+                    }
+
                 }
 
                 var value = (endWork - workAtStart) / seconds / test.UnitScale;

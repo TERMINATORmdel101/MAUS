@@ -7,8 +7,51 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.Bench;
 
-/// <summary>Une vignette pour l'image du résultat : image RVBA 8 bits d'une scène ou d'un test du processeur.</summary>
-internal sealed record SharePicture(string Id, byte[] Pixels, int Width, int Height);
+/// <summary>
+/// Une vignette pour l'image du résultat (scène ou test du processeur), déjà réduite à 480 × 270 et rangée dans un fichier
+/// temporaire : rien n'est gardé en mémoire pendant le benchmark (demande du porteur, 12/10/2026).
+/// </summary>
+internal sealed record SharePicture(string Id, string File);
+
+/// <summary>
+/// Dossier temporaire des vignettes (<c>%TEMP%\MAUS-benchmark-&lt;processus&gt;</c>), effacé à la fin du benchmark.
+/// </summary>
+internal sealed class SharePictureStore : IDisposable
+{
+    private readonly string _folder = Path.Combine(Path.GetTempPath(), "MAUS-benchmark-" + Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    /// <summary>Réduit l'image à la taille d'une vignette et l'écrit sur le disque ; l'image entière n'est pas gardée.</summary>
+    public SharePicture? Save(string id, byte[] pixels, int width, int height)
+    {
+        try
+        {
+            Directory.CreateDirectory(_folder);
+            var file = Path.Combine(_folder, id + ".rgba");
+            File.WriteAllBytes(file, ShareCard.Fit(pixels, width, height));
+            return new SharePicture(id, file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Sans vignette, l'image du résultat garde ses scores.
+            return null;
+        }
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(_folder))
+            {
+                Directory.Delete(_folder, recursive: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Dossier temporaire : Windows le nettoiera.
+        }
+    }
+}
 
 /// <summary>
 /// Image du résultat à partager (1920 × 1080, PNG) : score combiné, scores de la carte graphique, du processeur et du
@@ -27,7 +70,7 @@ internal static class ShareCard
     /// <summary>Dessine l'image (dans une image en cours de la carte) et la rend en RVBA 8 bits.</summary>
     public static byte[] Render(IGpuDevice device, UiRenderer ui, ITexture? logo, BenchmarkReport report, IReadOnlyList<SharePicture> pictures, string resolutionName)
     {
-        var cells = pictures.Take(Columns * Rows).ToList();
+        var cells = pictures.Where(p => File.Exists(p.File)).Take(Columns * Rows).ToList();
         ITexture? atlas = null;
         if (cells.Count > 0)
         {
@@ -252,7 +295,12 @@ internal static class ShareCard
         var atlas = new byte[width * height * 4];
         for (var i = 0; i < cells.Count; i++)
         {
-            var cell = Fit(cells[i]);
+            var cell = File.ReadAllBytes(cells[i].File);
+            if (cell.Length != CellWidth * CellHeight * 4)
+            {
+                continue;
+            }
+
             var ox = (i % Columns) * CellWidth;
             var oy = (i / Columns) * CellHeight;
             for (var row = 0; row < CellHeight; row++)
@@ -268,9 +316,8 @@ internal static class ShareCard
     /// Ramène une image à la taille d'une vignette (480 × 270) : recadrée au format 16/9 puis réduite en faisant la moyenne
     /// des pixels de chaque bloc (pas de scintillement des détails fins).
     /// </summary>
-    internal static byte[] Fit(SharePicture picture)
+    internal static byte[] Fit(byte[] pixels, int w, int h)
     {
-        var (w, h, pixels) = (picture.Width, picture.Height, picture.Pixels);
         var cropH = Math.Min(h, w * CellHeight / CellWidth);
         var cropW = Math.Min(w, cropH * CellWidth / CellHeight);
         var x0 = (w - cropW) / 2;
