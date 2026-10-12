@@ -8,6 +8,13 @@ Les versions sont testées avec des simulations (faux registre, faux WMI, faux r
 - Page Benchmark : l'image du résultat est chargée à la taille de son affichage (800 pixels de large au plus) au lieu de 1920 × 1080.
 - Sécurité du dépôt GitHub : fichier `SECURITY.md` (signalement privé des failles), alertes Dependabot, détection des secrets, branche `main` protégée.
 - Moins de langages : plus de Python dans le projet (outil des traductions réécrit en C#).
+- **Règles de la NASA pour un code sûr** (« Power of 10 », G. Holzmann, JPL), adaptées au C# (demande du porteur) :
+  - **sécurité** : les bibliothèques de Windows appelées par MAUS ne sont cherchées que dans System32 (un fichier piégé du même nom ailleurs ne peut plus être chargé avec les droits administrateur) ;
+  - **mémoire** : la requête de Windows qui liste les processus est rendue (elle fuyait à chaque programme Curve Optimizer et à la fermeture de l'Atelier) ;
+  - **boucles et récursion bornées** : l'analyse de l'espace disque s'arrête à 256 niveaux de dossiers (un dossier imbriqué des milliers de fois fermait MAUS sans message), le calcul des chenilles des chars et les tirages au hasard du test processeur ne peuvent plus tourner sans fin ;
+  - **paramètres vérifiés** : 199 paramètres de fonctions publiques refusent une valeur vide avec un message clair ;
+  - **fonctions courtes** : plus aucune fonction de plus de 120 lignes (six découpées, comportement identique : tests, audit réel, image du benchmark identique au pixel près) ;
+  - avertissements du compilateur : toujours 0 ; au niveau le plus strict de Microsoft, les avertissements restants sont des choix vérifiés (règles faites pour les bibliothèques, hasard non cryptographique du benchmark…). Les règles 3 (pas d'allocation de mémoire), 8 (préprocesseur) et 9 (pointeurs de fonction) ne s'appliquent pas au C#.
 
 ## 0.7.6 — 10/10/2026 — compteur d'images par seconde réactif, stabilité
 
