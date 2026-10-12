@@ -53,7 +53,7 @@ public sealed class UiWatchdog
         {
             var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "logs");
             Directory.CreateDirectory(directory);
-            var text = $"{Environment.NewLine}MAUS {Maus.Core.AppVersion.Display} · {DateTime.Now.ToString("g", CultureInfo.InvariantCulture)}{Environment.NewLine}{title}{Environment.NewLine}"
+            var text = $"{Environment.NewLine}MAUS {Maus.Core.AppVersion.Full} · {DateTime.Now.ToString("g", CultureInfo.InvariantCulture)}{Environment.NewLine}{title}{Environment.NewLine}"
                 + string.Join(Environment.NewLine, lines.Select(l => "  " + l)) + Environment.NewLine;
             File.AppendAllText(Path.Combine(directory, "interface-bloquee.txt"), text);
         }

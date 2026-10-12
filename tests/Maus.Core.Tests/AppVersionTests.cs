@@ -11,4 +11,12 @@ public class AppVersionTests
 
     [Fact]
     public void Current_version_is_0_7_6() => Assert.Equal("0.7.6", AppVersion.Display);
+
+    [Theory]
+    [InlineData("0.7.6+00155f56a8e6a877341d6e6ca9f7cc51b0afb4fe", "00155f5")]
+    [InlineData("0.7.6", null)]
+    [InlineData("0.7.6+abc", null)]
+    [InlineData(null, null)]
+    public void Commit_is_the_short_hash_after_the_plus(string? informational, string? expected) =>
+        Assert.Equal(expected, AppVersion.CommitOf(informational));
 }

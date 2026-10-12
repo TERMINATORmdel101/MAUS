@@ -26,7 +26,7 @@ public sealed class CrashLogTests : IDisposable
 
         Assert.Equal(Path.Combine(_folder, "erreur-20260930-140312.txt"), path);
         var text = File.ReadAllText(path!);
-        Assert.Contains("MAUS " + AppVersion.Display + " · 2026-09-30 14:03:12", text, StringComparison.Ordinal);
+        Assert.Contains("MAUS " + AppVersion.Full + " · 2026-09-30 14:03:12", text, StringComparison.Ordinal);
         Assert.Contains("Erreur sur un fil d'arrière-plan", text, StringComparison.Ordinal);
         Assert.Contains("System.InvalidOperationException: boum", text, StringComparison.Ordinal);
         Assert.Contains("Dernières actions :", text, StringComparison.Ordinal);

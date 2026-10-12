@@ -30,7 +30,7 @@ public static class CrashLog
             Directory.CreateDirectory(folder);
             var path = Path.Combine(folder, "erreur-" + now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".txt");
             var text = new StringBuilder()
-                .Append("MAUS ").Append(AppVersion.Display).Append(" · ").AppendLine(now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))
+                .Append("MAUS ").Append(AppVersion.Full).Append(" · ").AppendLine(now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))
                 .AppendLine(what)
                 .AppendLine()
                 .AppendLine(exception.ToString())

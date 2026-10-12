@@ -233,7 +233,7 @@ public static class Ui
 
     public static string AboutTitle => T("À propos de MAUS");
 
-    public static string AboutVersion => T("Version {0}", Maus.Core.AppVersion.Display);
+    public static string AboutVersion => T("Version {0}", Maus.Core.AppVersion.Full);
 
     public static string AboutMadeBy => T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur. MAUS audite d'abord sans rien modifier ; chaque correction est expliquée, réversible et ne s'applique qu'avec votre accord.");
 

@@ -19,7 +19,7 @@ public sealed class StepLogFile
             var directory = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "logs");
             Directory.CreateDirectory(directory);
             Path = System.IO.Path.Combine(directory, fileName);
-            File.WriteAllText(Path, $"MAUS {Maus.Core.AppVersion.Display} · {DateTime.Now.ToString("g", CultureInfo.InvariantCulture)}{Environment.NewLine}");
+            File.WriteAllText(Path, $"MAUS {Maus.Core.AppVersion.Full} · {DateTime.Now.ToString("g", CultureInfo.InvariantCulture)}{Environment.NewLine}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

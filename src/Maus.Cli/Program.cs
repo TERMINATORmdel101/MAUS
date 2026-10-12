@@ -56,7 +56,7 @@ var only = args
 
 if (Has("--version"))
 {
-    Console.WriteLine("MAUS " + Maus.Core.AppVersion.Display);
+    Console.WriteLine("MAUS " + Maus.Core.AppVersion.Full);
     return 0;
 }
 
