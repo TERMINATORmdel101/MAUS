@@ -1,6 +1,5 @@
 using System.Numerics;
 using Maus.Bench.Gpu;
-using Maus.Bench.Render;
 using Maus.Bench.Ui;
 using Maus.Core.Workshop.Benchmark;
 using static Maus.Core.Localization.Texts;

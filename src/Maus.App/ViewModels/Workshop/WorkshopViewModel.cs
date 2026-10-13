@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using System.Windows.Threading;
-using Maus.Core;
 using Maus.Core.Diagnostics;
 using Maus.Core.Platform;
 using Maus.Core.Preferences;

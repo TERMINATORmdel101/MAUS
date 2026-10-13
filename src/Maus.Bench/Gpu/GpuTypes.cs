@@ -76,8 +76,6 @@ public sealed record TextureDesc(
     public int MipWidth(int mip) => Math.Max(1, Width >> mip);
 
     public int MipHeight(int mip) => Math.Max(1, Height >> mip);
-
-    public int MipDepth(int mip) => Kind == TextureKind.Texture3D ? Math.Max(1, Depth >> mip) : Depth;
 }
 
 [Flags]
@@ -167,8 +165,6 @@ public readonly record struct ColorF(float R, float G, float B, float A)
     public static ColorF Black => new(0, 0, 0, 1);
 
     public static ColorF Transparent => new(0, 0, 0, 0);
-
-    public Vector4 ToVector() => new(R, G, B, A);
 }
 
 /// <summary>Résolution interne de rendu, fixe pour que les scores restent comparables d'un écran à l'autre.</summary>

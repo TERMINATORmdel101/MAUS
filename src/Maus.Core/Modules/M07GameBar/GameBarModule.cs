@@ -2,8 +2,8 @@ using System.Globalization;
 using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Microsoft.Win32;
-using static Maus.Core.Modules.M07GameBar.GameBarKeys;
 using static Maus.Core.Localization.Texts;
+using static Maus.Core.Modules.M07GameBar.GameBarKeys;
 
 namespace Maus.Core.Modules.M07GameBar;
 

@@ -1,6 +1,4 @@
 using System.Windows.Input;
-using Maus.Core.Modules.M20Software;
-using Maus.Core.Platform;
 using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
 

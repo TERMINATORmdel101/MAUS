@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Microsoft.Win32;

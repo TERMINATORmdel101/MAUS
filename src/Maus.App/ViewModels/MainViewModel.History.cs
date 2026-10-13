@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using Maus.Core;
 using Maus.Core.Fixes;
 using Maus.Core.Reporting;
 using static Maus.Core.Localization.Texts;

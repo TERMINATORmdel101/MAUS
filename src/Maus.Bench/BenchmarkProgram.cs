@@ -5,7 +5,6 @@ using Maus.Bench.Cpu;
 using Maus.Bench.Gpu;
 using Maus.Bench.Gpu.D3D11;
 using Maus.Bench.Gpu.D3D12;
-using Maus.Bench.Platform;
 using Maus.Bench.Render;
 using Maus.Bench.Scenes;
 using Maus.Core.Workshop.Benchmark;

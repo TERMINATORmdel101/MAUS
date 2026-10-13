@@ -29,15 +29,6 @@ internal static class DxgiFormats
     /// <summary>Format de lecture par les shaders (profondeur lue comme un flottant 32 bits).</summary>
     public static Format View(PixelFormat format) => format == PixelFormat.D32Float ? Format.R32_Float : ToDxgi(format);
 
-    public static int BytesPerPixel(PixelFormat format) => format switch
-    {
-        PixelFormat.Rgba16Float => 8,
-        PixelFormat.Rgba32Float => 16,
-        PixelFormat.R16Float => 2,
-        PixelFormat.R8Unorm => 1,
-        _ => 4,
-    };
-
     public static Format ToDxgi(VertexFormat format) => format switch
     {
         VertexFormat.Float1 => Format.R32_Float,

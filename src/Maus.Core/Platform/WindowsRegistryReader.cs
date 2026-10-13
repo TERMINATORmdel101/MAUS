@@ -1,6 +1,6 @@
 using System.Security;
-using Microsoft.Win32;
 using Maus.Core.Localization;
+using Microsoft.Win32;
 
 namespace Maus.Core.Platform;
 

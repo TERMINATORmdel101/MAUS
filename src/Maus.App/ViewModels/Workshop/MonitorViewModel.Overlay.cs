@@ -3,7 +3,6 @@ using Maus.App.Appearance;
 using Maus.App.Views;
 using Maus.Core.Diagnostics;
 using Maus.Core.Preferences;
-using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels.Workshop;

@@ -57,32 +57,6 @@ public static class ShellLauncher
         }
     }
 
-    /// <summary>Réparation DISM puis SFC dans une fenêtre de commande visible (voir <see cref="RunConsole"/>).</summary>
-    public static bool RunRepairConsole() => RunConsole(Maus.Core.Modules.M02Repair.RepairConsole.Arguments());
-
-    /// <summary>
-    /// Ouvre une fenêtre de commande visible avec les droits administrateur de MAUS (DISM, SFC et les installateurs
-    /// les exigent), pour que l'utilisateur voie tout ce qui se passe. Renvoie faux si la fenêtre n'a pas pu s'ouvrir.
-    /// </summary>
-    public static bool RunConsole(string arguments)
-    {
-        var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        try
-        {
-            using var _ = Process.Start(new ProcessStartInfo(Path.Combine(system, "cmd.exe"), arguments)
-            {
-                UseShellExecute = false,
-                CreateNoWindow = false,
-                WorkingDirectory = system,
-            });
-            return true;
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
-        {
-            return false;
-        }
-    }
-
     private static void Start(string arguments)
     {
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);

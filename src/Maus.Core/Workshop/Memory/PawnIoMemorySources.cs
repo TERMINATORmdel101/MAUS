@@ -1,8 +1,7 @@
-using LibreHardwareMonitor.Hardware;
 using LibreHardwareMonitor.PawnIo;
+using Maus.Core.Workshop.Memory.PawnIo;
 using RAMSPDToolkit.I2CSMBus;
 using RAMSPDToolkit.SPD;
-using Maus.Core.Workshop.Memory.PawnIo;
 using RAMSPDToolkit.SPD.Interop.Shared;
 using RAMSPDToolkit.Windows.Driver;
 using static Maus.Core.Localization.Texts;

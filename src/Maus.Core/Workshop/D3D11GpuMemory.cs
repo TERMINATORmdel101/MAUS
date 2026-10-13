@@ -9,7 +9,6 @@ namespace Maus.Core.Workshop;
 /// </summary>
 public sealed unsafe partial class D3D11GpuMemoryProvider : IGpuMemoryProvider
 {
-    private const int DxgiErrorNotFound = unchecked((int)0x887A0002);
     private const uint SoftwareAdapterFlag = 2;
     private const uint SdkVersion = 7;
 

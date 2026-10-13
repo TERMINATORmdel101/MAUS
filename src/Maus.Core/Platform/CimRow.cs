@@ -51,9 +51,6 @@ public sealed class CimRow
         _ => [],
     };
 
-    /// <summary>Objet CIM imbriqué.</summary>
-    public CimRow? GetRow(string name) => this[name] as CimRow;
-
     /// <summary>Tableau d'objets CIM imbriqués, vide si absent.</summary>
     public IReadOnlyList<CimRow> GetRows(string name) => this[name] as CimRow[] ?? [];
 

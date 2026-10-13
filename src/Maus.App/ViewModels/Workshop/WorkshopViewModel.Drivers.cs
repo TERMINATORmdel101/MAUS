@@ -4,7 +4,6 @@ using System.Windows.Input;
 using Maus.Core;
 using Maus.Core.Hardware;
 using Maus.Core.Modules.M09Gpu;
-using Maus.Core.Platform;
 using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
 

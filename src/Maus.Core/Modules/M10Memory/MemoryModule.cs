@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
 using Maus.Core.Hardware;
 using Maus.Core.Platform;

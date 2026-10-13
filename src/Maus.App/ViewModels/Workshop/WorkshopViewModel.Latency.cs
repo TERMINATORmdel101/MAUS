@@ -1,5 +1,4 @@
 using System.Windows.Input;
-using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels.Workshop;

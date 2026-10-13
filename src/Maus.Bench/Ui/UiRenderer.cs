@@ -1,7 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Maus.Bench.Gpu;
-using Maus.Bench.Render;
 
 namespace Maus.Bench.Ui;
 

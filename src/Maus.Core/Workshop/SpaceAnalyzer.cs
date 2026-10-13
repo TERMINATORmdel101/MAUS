@@ -1,5 +1,5 @@
-using System.Text.Json.Serialization;
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Workshop;

@@ -1,7 +1,7 @@
 using Maus.Core.Fixes;
 using Maus.Core.Platform;
-using static Maus.Core.Modules.M04Privacy.PrivacyKeys;
 using static Maus.Core.Localization.Texts;
+using static Maus.Core.Modules.M04Privacy.PrivacyKeys;
 
 namespace Maus.Core.Modules.M04Privacy;
 

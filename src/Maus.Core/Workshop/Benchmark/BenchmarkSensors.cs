@@ -1,4 +1,3 @@
-using System.Globalization;
 using Maus.Core.Platform;
 using static Maus.Core.Localization.Texts;
 

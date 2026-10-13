@@ -2,9 +2,9 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 using static Maus.Core.Modules.M04Privacy.PrivacyFindings;
 using static Maus.Core.Modules.M04Privacy.PrivacyKeys;
-using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M04Privacy;
 

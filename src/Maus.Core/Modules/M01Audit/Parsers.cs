@@ -1,5 +1,3 @@
-using static Maus.Core.Localization.Texts;
-
 namespace Maus.Core.Modules.M01Audit;
 
 /// <summary>Lecture de <c>bcdedit /enum {current}</c> : un élément par ligne, nom puis valeur (noms non traduits, valeurs parfois traduites).</summary>

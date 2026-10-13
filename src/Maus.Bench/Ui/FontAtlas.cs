@@ -1,6 +1,6 @@
 using Maus.Bench.Gpu;
-using MeasuringMode = Vortice.DCommon.MeasuringMode;
 using Vortice.DirectWrite;
+using MeasuringMode = Vortice.DCommon.MeasuringMode;
 
 namespace Maus.Bench.Ui;
 

@@ -1,8 +1,8 @@
 using SharpGen.Runtime;
 using Vortice.D3DCompiler;
-using FeatureLevel = Vortice.Direct3D.FeatureLevel;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
+using FeatureLevel = Vortice.Direct3D.FeatureLevel;
 
 namespace Maus.Bench.Gpu.D3D12;
 

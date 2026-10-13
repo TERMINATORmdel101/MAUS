@@ -20,7 +20,6 @@ public sealed class WindowsSensorSource : ISensorSource
     private readonly nint _network;
     private readonly nint _thermal;
     private readonly nint _gpuEngine;
-    private readonly nint _gpuMemory;
     private readonly INvmlSource _nvml;
 
     public WindowsSensorSource(INvmlSource? nvml = null)
@@ -36,7 +35,6 @@ public sealed class WindowsSensorSource : ISensorSource
         _network = _pdh.Add(@"\Network Interface(*)\Bytes Total/sec");
         _thermal = _pdh.Add(@"\Thermal Zone Information(*)\Temperature");
         _gpuEngine = _pdh.Add(@"\GPU Engine(*)\Utilization Percentage");
-        _gpuMemory = _pdh.Add(@"\GPU Adapter Memory(*)\Dedicated Usage");
         _pdh.Collect();
     }
 

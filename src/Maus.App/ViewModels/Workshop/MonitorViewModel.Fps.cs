@@ -1,7 +1,7 @@
 using System.Windows.Input;
-using Maus.Core.Platform;
 using System.Windows.Threading;
 using Maus.Core.Diagnostics;
+using Maus.Core.Platform;
 using Maus.Core.Workshop;
 using static Maus.Core.Localization.Texts;
 

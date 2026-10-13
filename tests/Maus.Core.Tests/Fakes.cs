@@ -1,4 +1,3 @@
-using Maus.Core;
 using Maus.Core.Fixes;
 using Maus.Core.Hardware;
 using Maus.Core.Platform;
