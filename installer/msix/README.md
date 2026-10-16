@@ -34,7 +34,7 @@ Différences avec l'installateur classique :
 
 > **runFullTrust** — MAUS is a WPF desktop application (.NET 10) that runs as a full-trust packaged desktop app.
 >
-> **allowElevation** — MAUS asks for administrator rights at launch (UAC prompt), because its purpose is to audit and repair Windows. The audit reads data that is only available to administrators: component store health (DISM API), system event logs, some WMI classes, hardware sensors. The fixes, which are only applied after the user selects them and confirms, create a system restore point, write machine-wide settings (HKLM, Group Policy values on Pro editions) and can create an optional weekly read-only audit task. Without elevation, most of the audit and all of the fixes cannot work.
+> **allowElevation** — Since version 0.8.0, the MAUS window itself runs without administrator rights. At launch it starts a separate "engine" process (the same MAUS.exe with the `--engine` argument) through ShellExecute "runas", which shows the standard UAC prompt. Only this engine runs elevated: it accepts a closed list of operations from the window over a private named pipe restricted to the current user (no network access, the process on each side is checked), and it exits when the window closes. Elevation is needed because MAUS audits and repairs Windows: the audit reads data that is only available to administrators (component store health through the DISM API, system event logs, some WMI classes, hardware sensors), and the fixes, which are only applied after the user selects them and confirms, create a system restore point, write machine-wide settings (HKLM, Group Policy values on Pro editions) and can create an optional weekly read-only audit task. If the user declines the UAC prompt, MAUS still opens in a limited mode (read-only audit of what is accessible without rights, no fixes).
 >
 > **unvirtualizedResources** (RegistryWriteVirtualization and FileSystemWriteVirtualization disabled) — many fixes are user settings stored under HKEY_CURRENT_USER (visual effects, privacy options, Game Bar, startup apps). With write virtualization, these changes would only go to a private copy and would not change Windows' actual settings, so the fixes would silently have no effect. Every change is logged with its original value and can be undone from the app.
 
@@ -42,11 +42,19 @@ Différences avec l'installateur classique :
 
 > Please see the restricted capabilities notes above for runFullTrust, allowElevation and unvirtualizedResources.
 >
-> How to test: launch MAUS and accept the UAC prompt (administrator rights are required). The language can be switched to English with the selector at the bottom left. Click "Run the audit" on the home page: it is read-only and takes about 15 seconds. The "Fixes" page lists the suggested changes; nothing is changed until the user ticks a fix and confirms, and a restore point is created first. Every applied fix can be undone from the "History" page. No account, no sign-in and no internet connection are needed (the network is only used on explicit user request, for example to check software updates through winget). MAUS collects no data.
+> How to test: launch MAUS and accept the UAC prompt (it starts the elevated engine; if it is declined, MAUS opens in a limited mode and says so at the bottom of the window). The language can be switched to English with the selector at the bottom left. Click "Run the audit" on the home page: it is read-only and takes about 15 seconds. The "Fixes" page lists the suggested changes; nothing is changed until the user ticks a fix and confirms, and a restore point is created first. Every applied fix can be undone from the "History" page. No account, no sign-in and no internet connection are needed (the network is only used on explicit user request, for example to check software updates through winget). MAUS collects no data.
 >
 > The optional visual benchmark (Benchmark page) runs in full screen for about ten minutes and can be stopped at any time with Esc.
 >
 > Source code (GPL-3.0): https://github.com/TERMINATORmdel101/MAUS
+
+### Nouveautés de la version (« Nouveautés de cette version », 0.8.0)
+
+> **Français** — Version de sécurité et de stabilité. La fenêtre de MAUS ne tourne plus avec les droits administrateur : seul un moteur séparé, lancé avec l'autorisation de Windows, lit le système en profondeur et applique les corrections. Corrections dont le retour arrière a échoué gardées visibles, recherche Windows Update vraiment interrompue à l'annulation, arrêt de sécurité du benchmark en cas de surchauffe, plus de faux résultat « stable » dans les tests, comparaisons de benchmark plus justes.
+>
+> **English** — Security and stability release. The MAUS window no longer runs with administrator rights: only a separate engine, started with the Windows permission prompt, reads the system in depth and applies fixes. Fixes whose rollback failed now stay visible, the Windows Update search is really stopped on cancel, the benchmark stops on overheating, no more false "stable" test results, fairer benchmark comparisons.
+>
+> **Español** — Versión de seguridad y estabilidad. La ventana de MAUS ya no se ejecuta con derechos de administrador: solo un motor separado, iniciado con la autorización de Windows, lee el sistema en profundidad y aplica las correcciones. Las correcciones cuya restauración falló siguen visibles, la búsqueda de Windows Update se detiene de verdad al cancelar, el benchmark se detiene en caso de sobrecalentamiento, ya no hay falsos resultados «estable» en las pruebas, comparaciones de benchmark más justas.
 
 ## Fiche du Store
 
