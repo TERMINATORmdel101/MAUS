@@ -161,7 +161,14 @@ public sealed partial class LocalMausEngine
             }
 
             var cpu = CpuIdParser.Read(new X86CpuIdSource());
-            _memoryRead = Task.Run(() => PawnIoMemoryDetails.Read(cpu, null, step => Breadcrumbs.Add("mémoire : " + step)), CancellationToken.None);
+            _memoryRead = Task.Run(
+                () =>
+                {
+                    // Vitesse que le BIOS déclare à Windows : contrôle de l'horloge lue dans le contrôleur Intel.
+                    var windows = WindowsMemoryConfiguration.Read(new WmiCimReader()).Select(s => s.ConfiguredMts).OfType<int>().DefaultIfEmpty().Max();
+                    return PawnIoMemoryDetails.Read(cpu, null, step => Breadcrumbs.Add("mémoire : " + step), windows > 0 ? windows : null);
+                },
+                CancellationToken.None);
             return _memoryRead;
         }
     }

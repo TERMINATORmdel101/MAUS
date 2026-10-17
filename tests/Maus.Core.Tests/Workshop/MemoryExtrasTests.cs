@@ -35,7 +35,7 @@ public class MemoryExtrasTests
 
         Assert.Equal("DDR4-3467 · 16-19-19-39 · 2N", snapshot.Summary);
         Assert.Contains(snapshot.Values, v => v is { Key: "tCL", Value: "16" });
-        Assert.Contains(snapshot.Values, v => v.Key == "Horloge mémoire" && v.Value == "1733 MHz");
+        Assert.Contains(snapshot.Values, v => v.Key == "Débit mémoire" && v.Value == "3467 MT/s");
         Assert.Contains(snapshot.Values, v => v.Key == "Tension mesurée" && v.Value == "1.452 V");
         Assert.Contains(snapshot.Values, v => v.Value == "Patriot 3200 Series");
     }

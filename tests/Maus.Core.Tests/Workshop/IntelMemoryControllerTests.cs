@@ -81,6 +81,88 @@ public class IntelMemoryControllerTests
         Assert.Equal(350.2, report.Timings.Single(t => t.Key == "tRFC").Nanoseconds!.Value, 1);
     }
 
+    /// <summary>
+    /// Autre PC Coffee Lake (rapport d'essai du 16/10/2026) : DDR4-4000, tCL 19, tCWL 18, tRDPRE 12, tWRPRE 46, tRFC 700,
+    /// tREFI 15600, et un registre d'horloge qui donne, par le calcul habituel, 4000 MHz au lieu de 2000.
+    /// </summary>
+    private static Dictionary<int, ulong> Ddr4At4000Registers()
+    {
+        var registers = CoffeeLakeRegisters();
+        registers[0x5918] = 30 | (8 << 8) | (43UL << 24);
+        foreach (var channel in new[] { 0x4000, 0x4400 })
+        {
+            registers[channel + 0x000] = 19 | (39 << 8) | (12 << 16) | (46UL << 24);
+            registers[channel + 0x070] = (19 << 16) | (18 << 21);
+            registers[channel + 0x23C] = 15600 | (700UL << 16);
+        }
+
+        return registers;
+    }
+
+    [Fact]
+    public void Clock_doubled_against_windows_is_halved_and_nanoseconds_follow()
+    {
+        var report = IntelMemoryController.Read(CoffeeLakeFamily, 6, CoffeeLake, new FakeMchbar(Ddr4At4000Registers()), null, windowsSpeedMts: 4000)!;
+
+        Assert.Equal(ImcClockCheck.Halved, report.ClockCheck);
+        Assert.Equal(2000, report.DclkMhz!.Value, 1);
+        Assert.Equal(2000, report.Clocks.Single(c => c.Key == "DCLK").Mhz, 1);
+        double? Ns(string key) => report.Timings.Single(t => t.Key == key).Nanoseconds;
+        Assert.Equal(9.5, Ns("tCL")!.Value, 2);
+        Assert.Equal(350, Ns("tRFC")!.Value, 1);
+        Assert.Equal(7800, Ns("tREFI")!.Value, 1);
+        Assert.StartsWith("DDR4-4000", MemoryDetails.IntelSettings(report), StringComparison.Ordinal);
+        Assert.Contains("2000 MHz (4000 MT/s)", MemoryDetails.IntelClocks(report), StringComparison.Ordinal);
+        Assert.Contains("rapport 30 × 133.33 MHz", MemoryDetails.ToText(new MemoryDetailReport([], null, null, [], report)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Clock_matching_windows_is_confirmed_even_when_the_bios_declares_mhz()
+    {
+        var confirmed = IntelMemoryController.Read(CoffeeLakeFamily, 6, CoffeeLake, new FakeMchbar(CoffeeLakeRegisters()), null, windowsSpeedMts: 3467)!;
+        Assert.Equal(ImcClockCheck.Confirmed, confirmed.ClockCheck);
+        Assert.Equal(1733.3, confirmed.DclkMhz!.Value, 1);
+
+        // Vieux BIOS (SMBIOS antérieur à 3.1) : 1733 MHz déclarés, soit 3466 MT/s. Le bon registre n'est pas divisé.
+        var oldBios = IntelMemoryController.Read(CoffeeLakeFamily, 6, CoffeeLake, new FakeMchbar(CoffeeLakeRegisters()), null, windowsSpeedMts: 1733)!;
+        Assert.Equal(ImcClockCheck.Confirmed, oldBios.ClockCheck);
+        Assert.Equal(1733.3, oldBios.DclkMhz!.Value, 1);
+    }
+
+    [Fact]
+    public void Clock_without_windows_or_with_another_speed_is_kept_as_read()
+    {
+        var notChecked = IntelMemoryController.Read(CoffeeLakeFamily, 6, CoffeeLake, new FakeMchbar(CoffeeLakeRegisters()), null)!;
+        Assert.Equal(ImcClockCheck.NotChecked, notChecked.ClockCheck);
+        Assert.Equal(1733.3, notChecked.DclkMhz!.Value, 1);
+
+        var other = IntelMemoryController.Read(CoffeeLakeFamily, 6, CoffeeLake, new FakeMchbar(CoffeeLakeRegisters()), null, windowsSpeedMts: 3000)!;
+        Assert.Equal(ImcClockCheck.Unconfirmed, other.ClockCheck);
+        Assert.Equal(1733.3, other.DclkMhz!.Value, 1);
+    }
+
+    [Fact]
+    public void Write_recovery_and_read_to_precharge_are_derived_and_marked()
+    {
+        var report = IntelMemoryController.Read(CoffeeLakeFamily, 6, CoffeeLake, new FakeMchbar(Ddr4At4000Registers()), null, windowsSpeedMts: 4000)!;
+
+        var wr = report.Timings.Single(t => t.Key == "tWR");
+        var rtp = report.Timings.Single(t => t.Key == "tRTP");
+        Assert.Equal(24, wr.Clocks);
+        Assert.Equal(12, rtp.Clocks);
+        Assert.True(wr.Derived);
+        Assert.True(rtp.Derived);
+        Assert.DoesNotContain("tWR", report.Unavailable);
+        Assert.DoesNotContain("tRTP", report.Unavailable);
+        Assert.False(report.Timings.Single(t => t.Key == "tWRPRE").Derived);
+    }
+
+    [Fact]
+    public void Coffee_lake_shares_one_field_for_trcd_and_trp()
+    {
+        Assert.True(IntelMemoryController.Read(CoffeeLakeFamily, 6, CoffeeLake, new FakeMchbar(CoffeeLakeRegisters()), null)!.RcdRpShared);
+    }
+
     [Fact]
     public void Reference_bit_switches_the_memory_clock_to_100_mhz()
     {

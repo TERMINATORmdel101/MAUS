@@ -50,7 +50,8 @@ public sealed record MemorySnapshot
             dclk = intel.DclkMhz;
             foreach (var clock in intel.Clocks)
             {
-                Add(ClockName(clock.Key), Mhz(clock.Mhz));
+                // L'horloge mémoire est notée en débit (MT/s), l'unité du BIOS et de l'étiquette des barrettes.
+                Add(ClockName(clock.Key), clock.Key == "DCLK" ? string.Create(CultureInfo.InvariantCulture, $"{clock.Mhz * 2:0} MT/s") : Mhz(clock.Mhz));
             }
 
             foreach (var setting in intel.Settings)
@@ -151,7 +152,7 @@ public sealed record MemorySnapshot
 
     private static string ClockName(string key) => key switch
     {
-        "DCLK" => T("Horloge mémoire"),
+        "DCLK" => T("Débit mémoire"),
         "RING" => "Ring",
         "SA" => T("Agent système"),
         _ => key,

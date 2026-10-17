@@ -106,6 +106,9 @@
         "sources": [ "336465-001 §7.2 SC_GS_CFG, CMD_stretch (00 1N, 01 2N, 10 3N, 11 N:1)" ]
       }
     ],
+    // Horloge mémoire : rapport × référence = DCLK d'après la fiche 336465-001 et CoreFreq (SKL_SA_PLL_RATIOS), vérifié sur
+    // l'i7-8700K du porteur (référence 133 MHz). Un autre PC Coffee Lake en DDR4-4000 donnait le double (rapport d'essai du
+    // 16/10/2026) : MAUS compare donc l'horloge avec la vitesse déclarée par Windows (IntelMemoryController.CheckClock).
     "clocks": [
       {
         "key": "DCLK", "offset": "0x5918", "bits": "6:0",

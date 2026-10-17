@@ -19,8 +19,11 @@ public sealed record MemoryDetailReport(
     IReadOnlyList<string> Notes,
     IntelMemoryReport? Intel = null);
 
-/// <summary>Accès au contrôleur mémoire d'un processeur Intel : identité CPUID et ouverture des modules PawnIO de lecture.</summary>
-public sealed record IntelControllerAccess(int CpuFamily, int CpuModel, Func<IMchbarReader> OpenMchbar, Func<IMsrReader?> OpenMsr);
+/// <summary>
+/// Accès au contrôleur mémoire d'un processeur Intel : identité CPUID, ouverture des modules PawnIO de lecture, et vitesse
+/// appliquée que le BIOS déclare à Windows (contrôle de l'horloge lue).
+/// </summary>
+public sealed record IntelControllerAccess(int CpuFamily, int CpuModel, Func<IMchbarReader> OpenMchbar, Func<IMsrReader?> OpenMsr, int? WindowsSpeedMts = null);
 
 public static class MemoryDetails
 {
@@ -144,7 +147,7 @@ public static class MemoryDetails
                 notes.Add(T("Plage de fréquence du ring illisible : {0}", ex.Message));
             }
 
-            var report = IntelMemoryController.Read(family, intel.CpuFamily, intel.CpuModel, mchbar, msr);
+            var report = IntelMemoryController.Read(family, intel.CpuFamily, intel.CpuModel, mchbar, msr, intel.WindowsSpeedMts);
             if (report is null)
             {
                 notes.Add(T("Timings réels illisibles : le contrôleur mémoire ne signale aucun canal garni."));
@@ -159,6 +162,24 @@ public static class MemoryDetails
             if (report.DclkMhz is null)
             {
                 notes.Add(T("Horloge mémoire réelle non affichée : son codage n'est pas établi de façon sûre pour ce processeur ou ce mode, et MAUS ne la devine pas."));
+            }
+            else if (report.ClockCheck == ImcClockCheck.Halved)
+            {
+                notes.Add(T("Horloge mémoire : le calcul habituel du registre du contrôleur donnait le double de la vitesse déclarée par Windows ({0} MT/s). MAUS retient {1} MT/s (horloge {2:0} MHz), et les durées en nanosecondes en tiennent compte. Pour confirmer : CPU-Z, onglet Memory, « DRAM Frequency » doit indiquer {2:0} MHz.", report.WindowsSpeedMts, report.DclkMhz * 2, report.DclkMhz));
+            }
+            else if (report.ClockCheck == ImcClockCheck.Unconfirmed)
+            {
+                notes.Add(T("Horloge mémoire lue dans le contrôleur ({0:0} MT/s) différente de la vitesse déclarée par Windows ({1} MT/s) : comparez avec CPU-Z (onglet Memory) et signalez l'écart sur GitHub.", report.DclkMhz * 2, report.WindowsSpeedMts));
+            }
+
+            if (report.RcdRpShared)
+            {
+                notes.Add(T("tRCD et tRP : une seule valeur dans le contrôleur de ce processeur (fiche Intel, registre TC_PRE : « tRP (and tRCD) »). Un tRP réglé plus bas que tRCD dans le BIOS n'est pas appliqué : le contrôleur utilise la même valeur pour les deux."));
+            }
+
+            if (report.Timings.Any(t => t.Derived))
+            {
+                notes.Add(T("tWR et tRTP n'ont pas de registre sur ce processeur : MAUS les déduit de tWRPRE et tRDPRE (tWR = tWRPRE − tCWL − 4, tRTP = tRDPRE), la relation utilisée par coreboot pour les contrôleurs Intel et la norme JEDEC (rafales de 8)."));
             }
 
             if (report.ChannelsDiffer)
@@ -189,6 +210,7 @@ public static class MemoryDetails
     public static string? Describe(string key) => key switch
     {
         "tCL" => T("Latence CAS : cycles entre la demande de lecture et l'arrivée des données. Le plus connu des timings."),
+        "tRCD / tRP" => T("Délai entre l'ouverture d'une ligne et la première lecture (tRCD), et temps pour refermer une ligne (tRP) : une seule valeur dans ce contrôleur."),
         "tRCD" or "tRCDRD" => T("Délai entre l'ouverture d'une ligne et la première lecture dans cette ligne."),
         "tRCDWR" => T("Délai entre l'ouverture d'une ligne et la première écriture dans cette ligne."),
         "tRP" => T("Temps pour refermer une ligne avant d'en ouvrir une autre dans la même banque."),
@@ -261,9 +283,10 @@ public static class MemoryDetails
         var text = new StringBuilder();
         void Line(string value = "") => text.AppendLine(value);
         string Timings(IEnumerable<MemoryTiming> timings) => string.Join("  ", timings.Select(t =>
-            t.Nanoseconds is { } ns
+            (t.Nanoseconds is { } ns
                 ? string.Create(CultureInfo.InvariantCulture, $"{t.Key} {t.Clocks} ({ns:0.#} ns)")
-                : string.Create(CultureInfo.InvariantCulture, $"{t.Key} {t.Clocks}")));
+                : string.Create(CultureInfo.InvariantCulture, $"{t.Key} {t.Clocks}"))
+            + (t.Derived ? T(" (déduit)") : string.Empty)));
 
         Line(T("Fiche mémoire (MAUS)"));
         if (report.Clocks is { } clocks)
@@ -290,6 +313,14 @@ public static class MemoryDetails
             Line();
             Line(T("Contrôleur Intel : {0}", intel.Family));
             Line(IntelClocks(intel));
+            if (intel.Clocks.FirstOrDefault(c => c.Key == "DCLK") is { ReferenceMhz: { } reference } dclk)
+            {
+                // Valeurs brutes, pour qu'un écart signalé puisse être compris (voir IntelMemoryController.CheckClock).
+                Line(T("Registre de l'horloge mémoire : rapport {0} × {1} MHz · vitesse déclarée par Windows : {2}", dclk.Ratio,
+                    reference.ToString("0.##", CultureInfo.InvariantCulture),
+                    intel.WindowsSpeedMts is { } windows ? T("{0} MT/s", windows) : T("inconnue")));
+            }
+
             Line(IntelSettings(intel));
             foreach (var channel in intel.ChannelsDiffer ? intel.PerChannel : intel.PerChannel.Take(1))
             {

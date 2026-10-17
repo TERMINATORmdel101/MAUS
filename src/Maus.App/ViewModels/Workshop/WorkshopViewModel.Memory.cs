@@ -15,9 +15,10 @@ public sealed class TimingRowViewModel(MemoryTiming timing)
 {
     public string Key { get; } = timing.Key;
 
-    public string Value { get; } = timing.Nanoseconds is { } ns
+    public string Value { get; } = (timing.Nanoseconds is { } ns
         ? T("{0} ({1:0.#} ns)", timing.Clocks, ns)
-        : timing.Clocks?.ToString(CultureInfo.InvariantCulture) ?? "—";
+        : timing.Clocks?.ToString(CultureInfo.InvariantCulture) ?? "—")
+        + (timing.Derived ? T(" (déduit)") : string.Empty);
 
     public string? Hint { get; } = MemoryDetails.Describe(timing.Key);
 }
@@ -279,7 +280,7 @@ public sealed partial class WorkshopViewModel
                 + (intel.ChannelsDiffer ? Environment.NewLine + T("Attention : les canaux n'ont pas tous les mêmes timings ; ceux du premier canal sont affichés.") : string.Empty);
             foreach (var group in Enum.GetValues<TimingGroup>())
             {
-                var timings = intel.Timings.Where(t => t.Group == group).ToList();
+                var timings = SharedRcdRp(intel, intel.Timings.Where(t => t.Group == group)).ToList();
                 if (timings.Count > 0)
                 {
                     LiveTimingBlocks.Add(new TimingBlockViewModel(MemoryDetails.GroupName(group), null, timings));
@@ -327,6 +328,26 @@ public sealed partial class WorkshopViewModel
         }
 
         MemoryConfiguration = text;
+    }
+
+    /// <summary>Contrôleur qui n'a qu'une valeur pour tRCD et tRP : une seule ligne « tRCD / tRP » plutôt que deux.</summary>
+    private static IEnumerable<MemoryTiming> SharedRcdRp(IntelMemoryReport report, IEnumerable<MemoryTiming> timings)
+    {
+        foreach (var timing in timings)
+        {
+            if (!report.RcdRpShared)
+            {
+                yield return timing;
+            }
+            else if (timing.Key == "tRCD")
+            {
+                yield return timing with { Key = "tRCD / tRP" };
+            }
+            else if (timing.Key != "tRP")
+            {
+                yield return timing;
+            }
+        }
     }
 
     private static string OnOff(bool value) => value ? T("activé") : T("désactivé");

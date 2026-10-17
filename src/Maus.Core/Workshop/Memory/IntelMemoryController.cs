@@ -158,7 +158,24 @@ public sealed record ImcFamily
 
 public sealed record ImcSettingValue(string Key, string Value);
 
-public sealed record ImcClockValue(string Key, int Ratio, double Mhz);
+/// <summary>Horloge lue : rapport, fréquence obtenue et fréquence de référence utilisée (gardée pour la fiche copiée).</summary>
+public sealed record ImcClockValue(string Key, int Ratio, double Mhz, double? ReferenceMhz = null);
+
+/// <summary>Contrôle de l'horloge mémoire lue dans le contrôleur avec la vitesse que le BIOS déclare à Windows (SMBIOS).</summary>
+public enum ImcClockCheck
+{
+    /// <summary>Pas de vitesse déclarée par Windows, ou type de mémoire non contrôlé.</summary>
+    NotChecked,
+
+    /// <summary>Même vitesse que Windows.</summary>
+    Confirmed,
+
+    /// <summary>Le registre donnait exactement le double de la vitesse de Windows : horloge divisée par deux.</summary>
+    Halved,
+
+    /// <summary>Vitesse différente de celle de Windows, sans rapport simple : affichée telle quelle, à vérifier.</summary>
+    Unconfirmed,
+}
 
 public sealed record ImcChannelTimings(string Channel, IReadOnlyList<MemoryTiming> Timings);
 
@@ -175,7 +192,10 @@ public sealed record IntelMemoryReport(
     IReadOnlyList<MemoryTiming> Timings,
     IReadOnlyList<ImcChannelTimings> PerChannel,
     bool ChannelsDiffer,
-    IReadOnlyList<string> Unavailable)
+    IReadOnlyList<string> Unavailable,
+    ImcClockCheck ClockCheck = ImcClockCheck.NotChecked,
+    int? WindowsSpeedMts = null,
+    bool RcdRpShared = false)
 {
     /// <summary>Horloge mémoire DCLK en MHz ; le débit vaut le double, en MT/s.</summary>
     public double? DclkMhz => Clocks.FirstOrDefault(c => c.Key == "DCLK")?.Mhz;
@@ -202,8 +222,14 @@ public static class IntelMemoryController
     public static ImcFamily? FamilyFor(int cpuFamily, int cpuModel) =>
         Families.FirstOrDefault(f => f.CpuModels.Any(m => Matches(m, cpuFamily, cpuModel)));
 
-    /// <summary>Lit les timings et horloges du contrôleur ; <c>null</c> si aucun canal n'est garni.</summary>
-    public static IntelMemoryReport? Read(ImcFamily family, int cpuFamily, int cpuModel, IMchbarReader mchbar, IMsrReader? msr)
+    /// <summary>Écart toléré avec la vitesse de Windows (arrondis du BIOS : 3466 contre 3467).</summary>
+    public const int SpeedToleranceMts = 50;
+
+    /// <summary>
+    /// Lit les timings et horloges du contrôleur ; <c>null</c> si aucun canal n'est garni. <paramref name="windowsSpeedMts"/> :
+    /// vitesse appliquée que le BIOS déclare à Windows (SMBIOS), pour contrôler l'horloge lue (voir <see cref="CheckClock"/>).
+    /// </summary>
+    public static IntelMemoryReport? Read(ImcFamily family, int cpuFamily, int cpuModel, IMchbarReader mchbar, IMsrReader? msr, int? windowsSpeedMts = null)
     {
         ArgumentNullException.ThrowIfNull(family);
 
@@ -232,7 +258,13 @@ public static class IntelMemoryController
             .Select(c => ReadClock(c, Raw))
             .OfType<ImcClockValue>()
             .ToList();
-        var dclk = clocks.FirstOrDefault(c => c.Key == "DCLK")?.Mhz;
+        var firstType = MemoryTypeOf(family, present[0], ForThisCpu, Raw);
+        var (dclk, check) = CheckClock(clocks.FirstOrDefault(c => c.Key == "DCLK")?.Mhz, firstType, windowsSpeedMts);
+        if (check == ImcClockCheck.Halved)
+        {
+            var index = clocks.FindIndex(c => c.Key == "DCLK");
+            clocks[index] = clocks[index] with { Mhz = dclk!.Value };
+        }
 
         var perChannel = present.Select(channel =>
         {
@@ -251,6 +283,7 @@ public static class IntelMemoryController
                     return new MemoryTiming(f.Key, f.Group, clocksValue, Nanoseconds(f.Key, clocksValue, dclk));
                 })
                 .ToList();
+            timings.AddRange(Derive(timings, type));
             return (channel.Name, Type: type, Settings: settings, Timings: timings);
         }).ToList();
 
@@ -284,7 +317,77 @@ public static class IntelMemoryController
             first.Timings,
             perChannel.Select(c => new ImcChannelTimings(c.Name, c.Timings)).ToList(),
             differ,
-            family.Unavailable);
+            family.Unavailable.Where(key => !first.Timings.Any(t => t.Key == key)).ToList(),
+            check,
+            windowsSpeedMts,
+            SharesField(family, "tRCD", "tRP"));
+    }
+
+    /// <summary>
+    /// Contrôle l'horloge mémoire DCLK avec la vitesse que le BIOS déclare à Windows. Le débit vaut deux fois DCLK (fiche Intel
+    /// 336465-001, MC_BIOS_REQ : « QCLK » = 2 × DCLK). Sur le PC du porteur (i7-8700K, référence 133 MHz), rapport × référence
+    /// donne bien DCLK (comparé à CPU-Z) ; sur un autre PC Coffee Lake en DDR4-4000 (rapport d'essai du 16/10/2026), le même
+    /// calcul donnait le double. Aucune source publiée n'explique l'écart : MAUS ne le devine pas, il compare. Même vitesse que
+    /// Windows : confirmée ; exactement le double, en DDR4 : divisée par deux et signalée ; autre écart : affichée, à vérifier.
+    /// Les vieux BIOS déclarent la fréquence en MHz (moitié des MT/s) : elle est d'abord convertie, comme dans le module 10.
+    /// </summary>
+    public static (double? DclkMhz, ImcClockCheck Check) CheckClock(double? dclkMhz, string? memoryType, int? windowsSpeedMts)
+    {
+        if (dclkMhz is not { } dclk || windowsSpeedMts is not > 0 || memoryType is not ("DDR4" or "DDR5"))
+        {
+            return (dclkMhz, ImcClockCheck.NotChecked);
+        }
+
+        var windows = Modules.M10Memory.MemorySpeeds.ToTransfersPerSecond(memoryType == "DDR5" ? 5 : 4, windowsSpeedMts.Value);
+        var register = dclk * 2;
+        if (Math.Abs(register - windows) <= SpeedToleranceMts)
+        {
+            return (dclk, ImcClockCheck.Confirmed);
+        }
+
+        return memoryType == "DDR4" && Math.Abs(register - (2 * windows)) <= 2 * SpeedToleranceMts
+            ? (dclk / 2, ImcClockCheck.Halved)
+            : (dclk, ImcClockCheck.Unconfirmed);
+    }
+
+    /// <summary>
+    /// tRTP et tWR, que les contrôleurs Skylake à Comet Lake n'exposent pas : coreboot programme le contrôleur Intel avec
+    /// tRDPRE = tRTP et tWRPRE = 4 + tCWL + tWR (src/northbridge/intel/haswell/native_raminit/timings_refresh.c), soit la
+    /// relation JEDEC « écriture → fermeture = WL + BL/2 + tWR » pour des rafales de 8 (DDR3, DDR4). Calculés seulement quand
+    /// le registre manque et que les timings nécessaires sont lus.
+    /// </summary>
+    public static IEnumerable<MemoryTiming> Derive(IReadOnlyList<MemoryTiming> timings, string? memoryType)
+    {
+        ArgumentNullException.ThrowIfNull(timings);
+        if (memoryType is not ("DDR4" or "DDR3"))
+        {
+            yield break;
+        }
+
+        int? Clocks(string key) => timings.FirstOrDefault(t => t.Key == key)?.Clocks;
+        if (Clocks("tRTP") is null && Clocks("tRDPRE") is { } rdpre and > 0)
+        {
+            yield return new MemoryTiming("tRTP", TimingGroup.Secondary, rdpre, Derived: true);
+        }
+
+        if (Clocks("tWR") is null && Clocks("tWRPRE") is { } wrpre && Clocks("tCWL") is { } cwl && wrpre - cwl - 4 is > 0 and var wr)
+        {
+            yield return new MemoryTiming("tWR", TimingGroup.Secondary, wr, Derived: true);
+        }
+    }
+
+    /// <summary>Deux timings lus dans le même champ (Skylake à Comet Lake : « tRP (and tRCD) », fiche Intel 336465-001, TC_PRE).</summary>
+    private static bool SharesField(ImcFamily family, string first, string second) =>
+        family.Fields.FirstOrDefault(f => f.Key == first) is { } a
+        && family.Fields.FirstOrDefault(f => f.Key == second) is { } b
+        && Hex(a.Offset) == Hex(b.Offset) && a.Bits == b.Bits && a.Size == b.Size;
+
+    /// <summary>Type de mémoire d'un canal : registre de la génération, ou type unique de la famille.</summary>
+    private static string? MemoryTypeOf(ImcFamily family, ImcChannelDefinition channel, Func<IReadOnlyList<string>, bool> forThisCpu, Func<int, int, ulong> raw)
+    {
+        var setting = family.Settings.FirstOrDefault(s => s.Key == "MemoryType" && forThisCpu(s.CpuModels));
+        var value = setting is null ? null : Decode(setting, setting.PerChannel ? Hex(channel.Base) : 0, raw);
+        return value ?? (family.MemoryTypes.Count == 1 ? family.MemoryTypes[0] : null);
     }
 
     /// <summary>Extrait les bits « haut:bas » d'une valeur lue.</summary>
@@ -359,10 +462,13 @@ public static class IntelMemoryController
             }
         }
 
-        return reference is { } r ? new ImcClockValue(clock.Key, ratio, ratio * r * gear * clock.Scale) : null;
+        return reference is { } r ? new ImcClockValue(clock.Key, ratio, ratio * r * gear * clock.Scale, r) : null;
     }
 
-    /// <summary>Durée en nanosecondes des timings de rafraîchissement, les seuls qu'on compare habituellement en temps.</summary>
+    /// <summary>
+    /// Durée en nanosecondes de la latence CAS (latence réelle) et des timings de rafraîchissement, ceux qu'on compare
+    /// habituellement en temps : cycles × 1000 / DCLK (MHz), soit cycles × 2000 / débit (MT/s).
+    /// </summary>
     private static double? Nanoseconds(string key, int clocks, double? dclkMhz) =>
-        dclkMhz is > 0 && key is "tRFC" or "tRFC2" or "tRFC4" or "tRFCpb" or "tRFCsb" or "tREFI" ? clocks * 1000.0 / dclkMhz.Value : null;
+        dclkMhz is > 0 && key is "tCL" or "tRFC" or "tRFC2" or "tRFC4" or "tRFCpb" or "tRFCsb" or "tREFI" ? clocks * 1000.0 / dclkMhz.Value : null;
 }

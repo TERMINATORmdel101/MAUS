@@ -257,7 +257,8 @@ public static class PawnIoMemoryDetails
     /// Lit la fiche mémoire. <paramref name="log"/> reçoit chaque étape (journal de diagnostic
     /// <c>%LOCALAPPDATA%\MAUS\logs\lecture-memoire.txt</c>, utile si une lecture bloque).
     /// </summary>
-    public static MemoryDetailReport Read(CpuIdInfo? cpu, bool? ddr5Hint, Action<string>? log = null)
+    /// <param name="windowsSpeedMts">Vitesse appliquée que le BIOS déclare à Windows, pour contrôler l'horloge du contrôleur Intel.</param>
+    public static MemoryDetailReport Read(CpuIdInfo? cpu, bool? ddr5Hint, Action<string>? log = null, int? windowsSpeedMts = null)
     {
         log ??= _ => { };
         PawnIoSpdSource.StepLog = log;
@@ -269,7 +270,8 @@ public static class PawnIoMemoryDetails
                 cpu.Family,
                 cpu.Model,
                 () => Logged(log, "module IntelMCHBAR", () => new PawnIoMchbarReader()),
-                () => Logged(log, "module IntelMSR", () => new PawnIoMsrReader()));
+                () => Logged(log, "module IntelMSR", () => new PawnIoMsrReader()),
+                windowsSpeedMts);
             var report = MemoryDetails.Read(spd, null, null, ddr5Hint, intel);
             log($"contrôleur Intel : {(report.Intel is { } i ? $"{i.Timings.Count} timings, canaux {string.Join(",", i.Channels)}" : "non lu")}");
             return report;

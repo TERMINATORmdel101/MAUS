@@ -2,6 +2,16 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.8.1 — 17/10/2026 — onglet Mémoire : horloge et timings des processeurs Intel
+
+Corrections (dernier chiffre, règle du porteur), d'après un essai sur un autre PC (Intel Coffee Lake, DDR4-4000).
+
+- **Horloge mémoire doublée** (Intel Core 6e à 10e génération) : MAUS affichait « Horloge mémoire 4000 MHz (8000 MT/s) » et « DDR4-8000 » pour une mémoire à 4000 MT/s (« DDR4-6400 » pour un kit 3200). Le calcul suit la fiche d'Intel et CoreFreq, et il est juste sur le PC du porteur (comparé à CPU-Z) : aucune source publiée n'explique l'écart. MAUS ne devine donc pas : il compare l'horloge avec la vitesse que le BIOS déclare à Windows. Même vitesse : confirmée. Exactement le double : divisée par deux, avec une note qui le dit. Autre écart : affichée, avec une note qui invite à comparer avec CPU-Z. La fiche copiée contient maintenant le rapport et la référence lus dans le registre, pour comprendre un écart futur.
+- **Durées en nanosecondes** : elles suivent l'horloge corrigée (à 4000 MT/s : tRFC 700 = 350 ns, tREFI 15600 = 7800 ns) ; la latence CAS a maintenant sa durée (tCL 19 = 9,5 ns).
+- **tRCD et tRP** : sur ces processeurs, le contrôleur n'a qu'une seule valeur pour les deux (fiche Intel, registre TC_PRE : « tRP (and tRCD) »). Ils s'affichent sur une ligne « tRCD / tRP », avec une note : un tRP réglé plus bas que tRCD dans le BIOS n'est pas appliqué.
+- **tWR et tRTP** : affichés, marqués « déduit » (le contrôleur n'a pas de registre pour eux) : tWR = tWRPRE − tCWL − 4 et tRTP = tRDPRE, la relation que coreboot utilise pour programmer les contrôleurs Intel (norme JEDEC, rafales de 8).
+- **Comparaison de deux fiches** : la vitesse s'appelle « Débit mémoire » et s'exprime en MT/s (avant : « Horloge mémoire 3200 → 4000 MHz », qui étaient en fait des MT/s). Une fiche enregistrée avant la 0.8.1 montre donc une fois l'ancienne ligne disparue et la nouvelle apparue.
+
 ## 0.8.0 — 12/10/2026 — interface sans droits administrateur, revue de sécurité
 
 Modification majeure (chiffre du milieu, accord du porteur : « ok pour la 0.8.0 »). Suite d'une revue de sécurité et de stabilité en onze points (P0 à P2) : chaque point a d'abord été vérifié dans le code, puis corrigé s'il était réel.

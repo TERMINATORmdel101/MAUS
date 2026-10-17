@@ -8,8 +8,11 @@ public enum TimingGroup
     Tertiary,
 }
 
-/// <summary>Un timing mémoire : en cycles d'horloge (ce que le BIOS affiche) et, quand c'est parlant, en nanosecondes.</summary>
-public sealed record MemoryTiming(string Key, TimingGroup Group, int? Clocks, double? Nanoseconds = null);
+/// <summary>
+/// Un timing mémoire : en cycles d'horloge (ce que le BIOS affiche) et, quand c'est parlant, en nanosecondes.
+/// <paramref name="Derived"/> : calculé à partir d'autres timings lus (le contrôleur n'a pas de registre pour lui).
+/// </summary>
+public sealed record MemoryTiming(string Key, TimingGroup Group, int? Clocks, double? Nanoseconds = null, bool Derived = false);
 
 public enum ProfileKind
 {
