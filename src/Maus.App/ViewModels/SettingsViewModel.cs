@@ -93,6 +93,7 @@ public sealed class SettingsViewModel : ObservableObject
         _animations = AnimationOptions.FirstOrDefault(o => o.Value == current.Animations) ?? AnimationOptions[0];
         _refresh = RefreshOptions.FirstOrDefault(o => o.Value == (int)current.RefreshInterval.TotalMilliseconds) ?? RefreshOptions[1];
         _monitorOnTop = current.MonitorOnTop;
+        _offerAllFeatures = current.OfferAllFeatures;
         OpenMonitorCommand = new AsyncCommand(() =>
         {
             openMonitor();
@@ -154,6 +155,21 @@ public sealed class SettingsViewModel : ObservableObject
             if (value is not null && SetProperty(ref _refresh, value))
             {
                 Change(p => p with { RefreshMilliseconds = value.Value });
+            }
+        }
+    }
+
+    private bool _offerAllFeatures;
+
+    /// <summary>Proposer d'activer toutes les fonctionnalités (droits administrateur) à l'ouverture de MAUS.</summary>
+    public bool OfferAllFeatures
+    {
+        get => _offerAllFeatures;
+        set
+        {
+            if (SetProperty(ref _offerAllFeatures, value))
+            {
+                Change(p => p with { OfferAllFeatures = value });
             }
         }
     }

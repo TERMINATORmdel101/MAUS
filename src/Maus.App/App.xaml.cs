@@ -264,6 +264,47 @@ public partial class App : Application
         }
 
         window.Show();
+
+        // MAUS sans droits administrateur : une fois la fenêtre dessinée, il propose d'activer toutes ses fonctionnalités.
+        // La demande d'autorisation de Windows ne vient qu'après « Oui ».
+        if (EngineHost.OnDemand is not null && LoadPreferences().OfferAllFeatures)
+        {
+            void Offer(object? sender, EventArgs e)
+            {
+                window.ContentRendered -= Offer;
+                window.Dispatcher.BeginInvoke(() => OfferAllFeaturesAsync().Forget("proposition des droits administrateur"));
+            }
+
+            window.ContentRendered += Offer;
+        }
+    }
+
+    private static async Task OfferAllFeaturesAsync()
+    {
+        var (accept, dontAskAgain) = Views.ElevationOfferWindow.Ask();
+        if (dontAskAgain)
+        {
+            try
+            {
+                await Task.Run(() => EngineHost.Preferences.Update(p => p with { OfferAllFeatures = false }));
+            }
+            catch (Exception ex) when (ex is IOException or Maus.Core.Engine.Broker.EngineException or Maus.Core.Fixes.JournalUnsafeException)
+            {
+                // Choix non enregistré : la proposition reviendra à la prochaine ouverture.
+            }
+        }
+
+        if (accept && EngineHost.OnDemand is { } onDemand)
+        {
+            try
+            {
+                await onDemand.EnsureElevatedAsync(CancellationToken.None);
+            }
+            catch (Maus.Core.Engine.Broker.EngineException ex)
+            {
+                MessageBox.Show(ex.Message, "MAUS", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
     }
 
     /// <summary>

@@ -66,6 +66,12 @@ public sealed record UserPreferences
     /// <summary>La fenêtre de surveillance reste au premier plan.</summary>
     public bool MonitorOnTop { get; init; }
 
+    /// <summary>
+    /// À l'ouverture, MAUS (sans droits administrateur) propose d'activer toutes ses fonctionnalités ; l'utilisateur peut
+    /// ne plus le voir (case du message, ou Paramètres).
+    /// </summary>
+    public bool OfferAllFeatures { get; init; } = true;
+
     /// <summary>Compteur d'images par seconde affiché au-dessus du jeu pendant la mesure.</summary>
     public bool OverlayEnabled { get; init; } = true;
 

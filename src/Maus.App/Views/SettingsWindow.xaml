@@ -83,6 +83,15 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Droits administrateur (0.8.1) -->
+                <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
+                    <StackPanel>
+                        <TextBlock Text="{x:Static app:Ui.OfferAllFeaturesTitle}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{x:Static app:Ui.OfferAllFeaturesIntro}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,2,0,8" />
+                        <CheckBox Content="{x:Static app:Ui.OfferAllFeatures}" IsChecked="{Binding OfferAllFeatures}" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Fenêtre de surveillance -->
                 <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
                     <StackPanel>
