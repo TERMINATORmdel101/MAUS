@@ -381,6 +381,20 @@ public sealed partial class WorkshopViewModel
         BenchmarkStatus = T("Benchmark en cours dans sa propre fenêtre plein écran. Échap l'arrête à tout moment.");
         try
         {
+            // Avec PawnIO, la température du processeur (arrêt de sécurité) se lit avec les droits administrateur : le moteur
+            // est lancé d'abord (demande de Windows). Un refus n'empêche pas le benchmark, qui part alors sans cette mesure.
+            if (EngineHost.OnDemand is { IsElevatedRunning: false } onDemand && Maus.Core.Workshop.PawnIo.State(new Maus.Core.Platform.WindowsRegistryReader()).Installed)
+            {
+                try
+                {
+                    await onDemand.EnsureElevatedAsync(CancellationToken.None);
+                }
+                catch (Maus.Core.Engine.Broker.EngineException)
+                {
+                    BenchmarkStatus = T("Benchmark lancé sans l'autorisation administrateur : la température du processeur n'est pas suivie, seul l'arrêt de sécurité de la carte graphique reste actif. Échap l'arrête à tout moment.");
+                }
+            }
+
             // Lancé par le moteur, qui vérifie les réglages : il lit aussi la température du processeur pour l'arrêt de sécurité.
             var exitCode = await EngineHost.Current.RunBenchmarkAsync(
                 new Maus.Core.Engine.Broker.BenchmarkLaunch(BenchmarkApi.Value, BenchmarkResolution.Value, BenchmarkScope.Value, BenchmarkIncludeRayTracing, Texts.Language),

@@ -410,6 +410,7 @@
   "Benchmark arrêté par sécurité : la carte graphique a atteint son seuil de ralentissement, ou le processeur a dépassé sa limite de température. Vérifiez le refroidissement (ventilation du boîtier, poussière) avant de recommencer.": "Benchmark detenido por seguridad: la tarjeta gráfica alcanzó su umbral de ralentización o el procesador superó su límite de temperatura. Revisa la refrigeración (ventilación de la caja, polvo) antes de volver a empezar.",
   "Benchmark de MAUS, logiciel libre et gratuit : github.com/TERMINATORmdel101/MAUS": "Benchmark de MAUS, software libre y gratuito: github.com/TERMINATORmdel101/MAUS",
   "Benchmark en cours dans sa propre fenêtre plein écran. Échap l'arrête à tout moment.": "Benchmark en curso en su propia ventana a pantalla completa. Esc lo detiene en cualquier momento.",
+  "Benchmark lancé sans l'autorisation administrateur : la température du processeur n'est pas suivie, seul l'arrêt de sécurité de la carte graphique reste actif. Échap l'arrête à tout moment.": "Benchmark iniciado sin la autorización de administrador: la temperatura del procesador no se supervisa, solo queda activa la parada de seguridad de la tarjeta gráfica. Esc lo detiene en cualquier momento.",
   "Benchmark visuel : carte graphique et processeur": "Benchmark visual: tarjeta gráfica y procesador",
   "Bibliothèques injectées dans tous les programmes (AppInit_DLLs)": "Bibliotecas inyectadas en todos los programas (AppInit_DLLs)",
   "Bienvenue dans MAUS": "Bienvenido a MAUS",
