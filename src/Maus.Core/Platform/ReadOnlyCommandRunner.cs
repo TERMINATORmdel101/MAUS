@@ -22,6 +22,7 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         ["netsh.exe"] = ["winhttp"],
         ["nvidia-smi.exe"] = ["--query-gpu", "-q", "--help"],
         ["winget.exe"] = ["upgrade"],
+        ["dism.exe"] = ["/english"],
     };
 
     /// <summary>winget : la liste seule, argument par argument (« --all » ou un identifiant installeraient des mises à jour).</summary>
@@ -33,6 +34,9 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         ["fsutil.exe"] = args => args.Count >= 2 && args[1].Equals("query", StringComparison.OrdinalIgnoreCase),
         ["netsh.exe"] = args => args.Count >= 2 && args[1].Equals("show", StringComparison.OrdinalIgnoreCase),
         ["winget.exe"] = args => args.All(WingetListArguments.Contains),
+
+        // DISM : seulement /CheckHealth, qui lit l'indicateur d'altération (/RestoreHealth réparerait).
+        ["dism.exe"] = args => args.SequenceEqual(Modules.M02Repair.DismCommandImageHealthChecker.Arguments, StringComparer.OrdinalIgnoreCase),
     };
 
     /// <summary>

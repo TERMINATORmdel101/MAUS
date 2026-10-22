@@ -64,15 +64,22 @@ public sealed class WindowsHealthModule : IAuditModule
     internal static readonly TimeSpan ImageHealthTimeout = TimeSpan.FromSeconds(45);
 
     private readonly string _windowsDirectory;
-    private readonly IImageHealthChecker _imageHealth;
+    private readonly IImageHealthChecker? _imageHealth;
 
+    /// <summary>
+    /// Lecture DISM par son API, sauf dans le paquet du Microsoft Store, où elle échoue : l'outil dism.exe la remplace
+    /// (<see cref="DismCommandImageHealthChecker"/>).
+    /// </summary>
     public WindowsHealthModule()
-        : this(Environment.GetFolderPath(Environment.SpecialFolder.Windows), new DismImageHealthChecker())
+        : this(Environment.GetFolderPath(Environment.SpecialFolder.Windows), PackageIdentity.IsPackaged() ? null : new DismImageHealthChecker())
     {
     }
 
-    /// <summary>Dossier Windows (minidumps, lecteur système) et lecture DISM injectés pour les tests.</summary>
-    internal WindowsHealthModule(string windowsDirectory, IImageHealthChecker imageHealth)
+    /// <summary>
+    /// Dossier Windows (minidumps, lecteur système) et lecture DISM injectés pour les tests ; <c>null</c> : dism.exe, lancé
+    /// par les commandes en lecture seule de l'audit.
+    /// </summary>
+    internal WindowsHealthModule(string windowsDirectory, IImageHealthChecker? imageHealth)
     {
         _windowsDirectory = string.IsNullOrEmpty(windowsDirectory) ? @"C:\Windows" : windowsDirectory;
         _imageHealth = imageHealth;
@@ -134,7 +141,7 @@ public sealed class WindowsHealthModule : IAuditModule
             DetectFreeSpace(context.Files),
             DetectReliability(context.Cim, context.Now),
             DetectWmi(context.Cim),
-            DetectComponentStore(context.IsElevated),
+            DetectComponentStore(context.IsElevated, _imageHealth ?? new DismCommandImageHealthChecker(context.Commands)),
             DetectMinidumps(context.Files),
         };
 
@@ -670,7 +677,7 @@ public sealed class WindowsHealthModule : IAuditModule
         };
     }
 
-    private Finding DetectComponentStore(bool elevated)
+    private static Finding DetectComponentStore(bool elevated, IImageHealthChecker imageHealth)
     {
         const string id = "M02.component-store";
         var title = T("Fichiers de Windows (magasin des composants)");
@@ -682,7 +689,7 @@ public sealed class WindowsHealthModule : IAuditModule
         ImageHealth health;
         try
         {
-            health = _imageHealth.Check(ImageHealthTimeout);
+            health = imageHealth.Check(ImageHealthTimeout);
         }
         catch (MausAccessDeniedException)
         {
