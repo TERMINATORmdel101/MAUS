@@ -2,9 +2,16 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
-## 0.8.1 — 17/10/2026 — onglet Mémoire : horloge et timings des processeurs Intel
+## 0.8.1 — 22/10/2026 — autorisation administrateur seulement quand il le faut, onglet Mémoire Intel
 
-Corrections (dernier chiffre, règle du porteur), d'après un essai sur un autre PC (Intel Coffee Lake, DDR4-4000).
+Améliorations et corrections (dernier chiffre, règle du porteur).
+
+- **MAUS s'ouvre sans demander l'autorisation administrateur** (demande du porteur, pour le Microsoft Store qui a refusé la 0.8.0 au motif 10.6.3 sur `allowElevation`) : aucune fenêtre de Windows à l'ouverture, et aucun moteur lancé. Le moteur administrateur (même liste fermée d'opérations, même canal privé réservé à l'utilisateur et à la fenêtre qui l'a lancé) démarre seulement au premier clic sur une action qui en a besoin : audit, appliquer ou annuler une correction, historique des corrections, réparation de Windows, actions sur les pilotes, capteurs avancés PawnIO (nouveau bouton « Activer les capteurs avancés »), fiche mémoire, latence des pilotes, compteur d'images, audit de la semaine. Un refus n'annule que cette action : MAUS reste utilisable sans droits (Mon PC, mesures en direct sans pilote, processus, stockage, benchmark).
+- **Le moteur s'arrête seul après 15 minutes sans demande** (jamais au milieu d'une demande), ou à la fermeture de la fenêtre : les droits administrateur ne restent pas ouverts inutilement. L'action suivante redemande l'autorisation ; avant de préparer des corrections, le nouveau moteur refait d'abord son propre audit (lecture seule).
+- **Choix de l'utilisateur en deux fichiers** : ceux de l'affichage (langue, thème, compteur d'images, moteur de recherche, avertissements acceptés) dans `%LOCALAPPDATA%\MAUS\settings`, lus et écrits sans droits ; ceux qui guident l'audit et les corrections (constats « voulus », profil Game Bar, alimentation du portable) restent dans le dossier réservé aux administrateurs et ne passent que par le moteur. À la première ouverture de la 0.8.1, la fenêtre des avertissements revient une fois ; les autres choix d'affichage sont repris dès la première action administrateur.
+- Vérifié à l'écran sur le PC du porteur : aucune demande à l'ouverture, demande de Windows une seconde après le clic sur « Lancer l'audit », audit complet par le moteur.
+
+D'après un essai sur un autre PC (Intel Coffee Lake, DDR4-4000) :
 
 - **Horloge mémoire doublée** (Intel Core 6e à 10e génération) : MAUS affichait « Horloge mémoire 4000 MHz (8000 MT/s) » et « DDR4-8000 » pour une mémoire à 4000 MT/s (« DDR4-6400 » pour un kit 3200). Le calcul suit la fiche d'Intel et CoreFreq, et il est juste sur le PC du porteur (comparé à CPU-Z) : aucune source publiée n'explique l'écart. MAUS ne devine donc pas : il compare l'horloge avec la vitesse que le BIOS déclare à Windows. Même vitesse : confirmée. Exactement le double : divisée par deux, avec une note qui le dit. Autre écart : affichée, avec une note qui invite à comparer avec CPU-Z. La fiche copiée contient maintenant le rapport et la référence lus dans le registre, pour comprendre un écart futur.
 - **Durées en nanosecondes** : elles suivent l'horloge corrigée (à 4000 MT/s : tRFC 700 = 350 ns, tREFI 15600 = 7800 ns) ; la latence CAS a maintenant sa durée (tCL 19 = 9,5 ns).
