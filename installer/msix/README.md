@@ -34,7 +34,7 @@ Différences avec l'installateur classique :
 
 > **runFullTrust** — MAUS is a WPF desktop application (.NET 10) that runs as a full-trust packaged desktop app.
 >
-> **allowElevation** — Since version 0.8.0, the MAUS window itself runs without administrator rights. At launch it starts a separate "engine" process (the same MAUS.exe with the `--engine` argument) through ShellExecute "runas", which shows the standard UAC prompt. Only this engine runs elevated: it accepts a closed list of operations from the window over a private named pipe restricted to the current user (no network access, the process on each side is checked), and it exits when the window closes. Elevation is needed because MAUS audits and repairs Windows: the audit reads data that is only available to administrators (component store health through the DISM API, system event logs, some WMI classes, hardware sensors), and the fixes, which are only applied after the user selects them and confirms, create a system restore point, write machine-wide settings (HKLM, Group Policy values on Pro editions) and can create an optional weekly read-only audit task. If the user declines the UAC prompt, MAUS still opens in a limited mode (read-only audit of what is accessible without rights, no fixes).
+> **allowElevation** — Since version 0.8.1, MAUS opens without administrator rights and without any UAC prompt. Only when the user clicks an action that needs administrator rights (the audit, applying or undoing a fix, the history of fixes, Windows repair with DISM/SFC, graphics driver actions, the optional advanced sensors through the PawnIO driver, memory module details, driver latency measurement, the frame counter, the optional weekly audit task) does MAUS start a separate "engine" process: the same MAUS.exe with the `--engine` argument, through ShellExecute "runas", which shows the standard UAC prompt. If the user declines, only that action is cancelled and MAUS stays usable without rights. Only the engine runs elevated: it accepts a closed list of operations from the window that started it, over a private named pipe restricted to the current user (closed to the network; Windows checks the process on each side), and it exits when the window closes or after 15 minutes without a request (the next action asks again). Elevation is needed because MAUS audits and repairs Windows: the audit reads data that is only available to administrators (component store health through the DISM API, system event logs, some WMI classes, hardware sensors), and the fixes, which are only applied after the user selects them and confirms, create a system restore point, write machine-wide settings (HKLM, Group Policy values on Pro editions) and can create an optional weekly read-only audit task.
 >
 > **unvirtualizedResources** (RegistryWriteVirtualization and FileSystemWriteVirtualization disabled) — many fixes are user settings stored under HKEY_CURRENT_USER (visual effects, privacy options, Game Bar, startup apps). With write virtualization, these changes would only go to a private copy and would not change Windows' actual settings, so the fixes would silently have no effect. Every change is logged with its original value and can be undone from the app.
 
@@ -42,13 +42,29 @@ Différences avec l'installateur classique :
 
 > Please see the restricted capabilities notes above for runFullTrust, allowElevation and unvirtualizedResources.
 >
-> How to test: launch MAUS and accept the UAC prompt (it starts the elevated engine; if it is declined, MAUS opens in a limited mode and says so at the bottom of the window). The language can be switched to English with the selector at the bottom left. Click "Run the audit" on the home page: it is read-only and takes about 15 seconds. The "Fixes" page lists the suggested changes; nothing is changed until the user ticks a fix and confirms, and a restore point is created first. Every applied fix can be undone from the "History" page. No account, no sign-in and no internet connection are needed (the network is only used on explicit user request, for example to check software updates through winget). MAUS collects no data.
+> How to test:
+>
+> 1. Launch MAUS. It opens without administrator rights and shows no UAC prompt. The language can be switched to English with the selector at the bottom left.
+> 2. Click "Run the audit" on the home page. Windows shows a UAC prompt for MAUS: accept it. This starts the MAUS engine (the same MAUS.exe, with administrator rights). The audit is read-only and takes about 15 seconds.
+> 3. If the UAC prompt is declined, only that action is cancelled and a message says so: MAUS stays open and usable without rights (for example Workshop > My PC, Live readings without the optional driver, Processes, Storage, Benchmark). The next action that needs administrator rights asks again.
+> 4. The "Fixes" page lists the suggested changes; nothing is changed until the user ticks a fix and confirms, and a restore point is created first. Every applied fix can be undone from the "History" page.
+> 5. The engine stops by itself after 15 minutes without a request, and when the MAUS window is closed; the next action that needs administrator rights shows the UAC prompt again.
+>
+> No account, no sign-in and no internet connection are needed (the network is only used on explicit user request, for example to check software updates through winget). MAUS collects no data.
 >
 > The optional visual benchmark (Benchmark page) runs in full screen for about ten minutes and can be stopped at any time with Esc.
 >
 > Source code (GPL-3.0): https://github.com/TERMINATORmdel101/MAUS
 
-### Nouveautés de la version (« Nouveautés de cette version », 0.8.0)
+### Nouveautés de la version (« Nouveautés de cette version », 0.8.1)
+
+> **Français** — MAUS s'ouvre sans demander l'autorisation administrateur : Windows la demande seulement quand vous lancez une action qui en a besoin (audit, corrections, réparation, capteurs avancés…). Un refus n'annule que cette action. Les droits administrateur se referment seuls après 15 minutes sans utilisation. Onglet Mémoire des processeurs Intel : horloge contrôlée avec la vitesse déclarée par Windows, durées en nanosecondes corrigées, tWR et tRTP affichés.
+>
+> **English** — MAUS opens without asking for administrator permission: Windows asks only when you start an action that needs it (audit, fixes, repair, advanced sensors…). Declining cancels only that action. Administrator rights close by themselves after 15 minutes without use. Memory tab for Intel processors: clock checked against the speed reported by Windows, corrected durations in nanoseconds, tWR and tRTP shown.
+>
+> **Español** — MAUS se abre sin pedir la autorización de administrador: Windows la pide solo cuando inicias una acción que la necesita (auditoría, correcciones, reparación, sensores avanzados…). Rechazarla solo cancela esa acción. Los derechos de administrador se cierran solos tras 15 minutos sin uso. Pestaña Memoria de los procesadores Intel: reloj comprobado con la velocidad que declara Windows, duraciones en nanosegundos corregidas, tWR y tRTP visibles.
+
+#### 0.8.0 (pour mémoire)
 
 > **Français** — Version de sécurité et de stabilité. La fenêtre de MAUS ne tourne plus avec les droits administrateur : seul un moteur séparé, lancé avec l'autorisation de Windows, lit le système en profondeur et applique les corrections. Corrections dont le retour arrière a échoué gardées visibles, recherche Windows Update vraiment interrompue à l'annulation, arrêt de sécurité du benchmark en cas de surchauffe, plus de faux résultat « stable » dans les tests, comparaisons de benchmark plus justes.
 >
@@ -61,8 +77,8 @@ Différences avec l'installateur classique :
 - **Catégorie** : Utilitaires et outils (Utilities & tools).
 - **Prix** : gratuit. **Marchés** : tous.
 - **Politique de confidentialité** : https://github.com/TERMINATORmdel101/MAUS/blob/main/PRIVACY
-- **Site web** : https://github.com/TERMINATORmdel101/MAUS
-- **Contact d'assistance** : https://github.com/TERMINATORmdel101/MAUS/issues
+- **Site web** : laisser vide (pas de lien GitHub).
+- **Contact d'assistance** : l'adresse e-mail de contact du compte développeur, à saisir par le porteur dans le Partner Center (pas de lien GitHub).
 - **Captures** : `docs/captures` (accueil, Atelier > Tests, Benchmark). La capture de la fenêtre de surveillance est en
   hauteur ; le Store demande des captures d'ordinateur d'au moins 1366 × 768 : la garder pour GitHub seulement.
 - **Classification par âge** : questionnaire du Partner Center (aucun contenu sensible, pas d'achats, pas de discussion
