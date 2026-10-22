@@ -77,8 +77,8 @@ Différences avec l'installateur classique :
 - **Catégorie** : Utilitaires et outils (Utilities & tools).
 - **Prix** : gratuit. **Marchés** : tous.
 - **Politique de confidentialité** : https://github.com/TERMINATORmdel101/MAUS/blob/main/PRIVACY
-- **Site web** : laisser vide (pas de lien GitHub).
-- **Contact d'assistance** : l'adresse e-mail de contact du compte développeur, à saisir par le porteur dans le Partner Center (pas de lien GitHub).
+- **Site web** : https://sites.google.com/view/maus-help/accueil
+- **Contact d'assistance** : https://sites.google.com/view/maus-help/accueil
 - **Captures** : `docs/captures` (accueil, Atelier > Tests, Benchmark). La capture de la fenêtre de surveillance est en
   hauteur ; le Store demande des captures d'ordinateur d'au moins 1366 × 768 : la garder pour GitHub seulement.
 - **Classification par âge** : questionnaire du Partner Center (aucun contenu sensible, pas d'achats, pas de discussion
