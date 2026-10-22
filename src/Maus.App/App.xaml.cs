@@ -37,9 +37,9 @@ public partial class App : Application
             return;
         }
 
-        if (!IsInterface(e.Args))
+        if (e.Args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase))
         {
-            // Audit planifié ou benchmark : lancés avec les droits administrateur, ils lisent les choix eux-mêmes.
+            // Audit planifié : lancé avec les droits administrateur, il lit les choix lui-même (le benchmark reçoit sa langue).
             var own = FilePreferencesStore.CreateDefault().Load();
             UseLanguage(own.Language);
             AppearanceManager.DetectComponents();
@@ -75,13 +75,12 @@ public partial class App : Application
             return;
         }
 
-        // Le moteur d'abord (demande d'autorisation de Windows), puis les choix de l'utilisateur, qu'il est seul à lire.
-        var limited = StartEngine();
+        // 0.8.1 : aucune autorisation demandée à l'ouverture ; le moteur administrateur attend la première action qui en a besoin.
+        EngineHost.Configure();
         var preferences = LoadPreferences();
         UseLanguage(preferences.Language);
         AppearanceManager.DetectComponents();
         AppearanceManager.Apply(preferences);
-        StartupNotice = limited;
 
         // Écran de démarrage : le logo s'affiche tout de suite, pendant que la fenêtre principale se prépare.
         SplashScreen? splash = new SplashScreen(typeof(App).Assembly, "Assets/splash.png");
@@ -107,65 +106,13 @@ public partial class App : Application
     /// <summary>Argument du processus « moteur » : <c>--engine &lt;canal&gt; &lt;processus de l'interface&gt;</c>.</summary>
     internal const string EngineArgument = "--engine";
 
-    /// <summary>Choix de l'utilisateur lus par le moteur (interface).</summary>
-    private static Maus.Core.Engine.Broker.EnginePreferencesStore? s_preferences;
-
-    /// <summary>Message à afficher dès l'ouverture (mode limité), ou <c>null</c>.</summary>
-    public static string? StartupNotice { get; private set; }
-
-    private static bool IsInterface(string[] args) =>
-        !(args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase)
-          || (args.Length > 0 && args[0].Equals("--benchmark", StringComparison.OrdinalIgnoreCase)));
-
-    /// <summary>
-    /// Lance le moteur administrateur (demande d'autorisation de Windows, comme avant au lancement de MAUS) et s'y relie.
-    /// Interface déjà administrateur : le moteur reste dans ce processus. Autorisation refusée : mode limité.
-    /// </summary>
-    /// <returns>Le message du mode limité, ou <c>null</c>.</returns>
-    private static string? StartEngine()
-    {
-        if (Environment.IsPrivilegedProcess)
-        {
-            EngineHost.Current = new Maus.Core.Engine.Broker.LocalMausEngine();
-            EngineHost.IsElevated = true;
-            return null;
-        }
-
-        var pipe = "MAUS-" + Guid.NewGuid().ToString("N");
-        try
-        {
-            var exe = Environment.ProcessPath ?? throw new InvalidOperationException("MAUS.exe introuvable.");
-            using var engine = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe)
-            {
-                UseShellExecute = true,
-                Verb = "runas",
-                Arguments = $"{EngineArgument} {pipe} {Environment.ProcessId.ToString(CultureInfo.InvariantCulture)}",
-            }) ?? throw new InvalidOperationException("Le moteur n'a pas démarré.");
-            var remote = new Maus.Core.Engine.Broker.RemoteMausEngine(pipe, engine.Id);
-            var ping = remote.PingAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
-            EngineHost.Current = remote;
-            EngineHost.IsElevated = ping.IsElevated;
-            Breadcrumbs.Add("moteur administrateur relié (processus " + engine.Id.ToString(CultureInfo.InvariantCulture) + ")");
-            return null;
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or Maus.Core.Engine.Broker.EngineException)
-        {
-            // Autorisation refusée (ou moteur muet) : MAUS s'ouvre quand même, sans rien pouvoir modifier.
-            Breadcrumbs.Add("mode limité (" + ex.GetType().Name + ")");
-            EngineHost.Current = new Maus.Core.Engine.Broker.LocalMausEngine(preferences: new MemoryPreferencesStore());
-            EngineHost.IsElevated = false;
-            return Texts.T("Mode limité : MAUS n'a pas reçu l'autorisation administrateur. L'audit lit ce qui est accessible sans droits (certains constats restent indéterminés), et aucune correction n'est possible. Fermez puis relancez MAUS pour accepter l'autorisation.");
-        }
-    }
-
     private static UserPreferences LoadPreferences()
     {
-        s_preferences = new Maus.Core.Engine.Broker.EnginePreferencesStore(EngineHost.Current);
         try
         {
-            return s_preferences.Load();
+            return EngineHost.Preferences.Load();
         }
-        catch (Maus.Core.Engine.Broker.EngineException)
+        catch (Exception ex) when (ex is IOException or Maus.Core.Engine.Broker.EngineException or Maus.Core.Fixes.JournalUnsafeException)
         {
             return UserPreferences.Default;
         }
@@ -216,7 +163,7 @@ public partial class App : Application
     /// </summary>
     private static bool MustAskDisclaimer(UserPreferences preferences) =>
         preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version
-        && s_preferences?.State != PreferencesFileState.Unavailable;
+        && (EngineHost.Preferences as SplitPreferencesStore)?.State != PreferencesFileState.Unavailable;
 
     /// <summary>
     /// Avertissements au premier lancement (et après chaque changement de fond du texte).
@@ -233,7 +180,7 @@ public partial class App : Application
 
         try
         {
-            (s_preferences ?? new Maus.Core.Engine.Broker.EnginePreferencesStore(EngineHost.Current)).Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
+            EngineHost.Preferences.Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Maus.Core.Engine.Broker.EngineException)
         {

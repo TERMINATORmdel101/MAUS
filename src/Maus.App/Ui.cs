@@ -362,6 +362,8 @@ public static class Ui
 
     public static string InstallPawnIo => T("Installer PawnIO");
 
+    public static string EnableAdvancedSensors => T("Activer les capteurs avancés");
+
     public static string UninstallPawnIo => T("Retirer PawnIO");
 
     public static string AllSensors => T("Tous les capteurs");

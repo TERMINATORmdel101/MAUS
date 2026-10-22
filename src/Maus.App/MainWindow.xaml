@@ -844,6 +844,8 @@
                                         <TextBlock Text="{x:Static app:Ui.PawnIoTitle}" Style="{StaticResource CardTitle}" Foreground="{DynamicResource PastelSandInk}" />
                                         <TextBlock Text="{Binding Workshop.PawnIoStatus}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                         <WrapPanel Margin="0,10,0,0">
+                                            <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.EnableAdvancedSensors}"
+                                                    Command="{Binding Workshop.EnableAdvancedSensorsCommand}" Visibility="{Binding Workshop.CanEnableAdvancedSensors, Converter={StaticResource BoolToVisibility}}" />
                                             <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.InstallPawnIo}"
                                                     Command="{Binding Workshop.InstallPawnIoCommand}" Visibility="{Binding Workshop.IsPawnIoMissing, Converter={StaticResource BoolToVisibility}}" />
                                             <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.UninstallPawnIo}"

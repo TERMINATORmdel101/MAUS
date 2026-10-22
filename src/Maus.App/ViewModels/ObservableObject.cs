@@ -45,6 +45,11 @@ public sealed class AsyncCommand(Func<Task> execute) : ICommand
         {
             await execute();
         }
+        catch (Maus.Core.Engine.Broker.EngineDeclinedException declined)
+        {
+            // Autorisation administrateur refusée : un choix de l'utilisateur, pas une erreur. Seule cette action est annulée.
+            System.Windows.MessageBox.Show(declined.Message, "MAUS", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+        }
         catch (Exception ex) when (ex is not (OutOfMemoryException or InsufficientExecutionStackException or AccessViolationException))
         {
             Maus.Core.Diagnostics.Breadcrumbs.Add("action d'un bouton en erreur (" + ex.GetType().Name + ")");

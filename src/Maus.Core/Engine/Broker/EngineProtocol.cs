@@ -108,4 +108,7 @@ public static partial class EngineProtocol
 }
 
 /// <summary>Le moteur a refusé ou n'a pas pu faire l'opération (message à afficher), ou il ne répond plus.</summary>
-public sealed class EngineException(string message, Exception? inner = null) : Exception(message, inner);
+public class EngineException(string message, Exception? inner = null) : Exception(message, inner);
+
+/// <summary>Le canal du moteur n'a pas pu être ouvert : rien n'a été envoyé (moteur arrêté, ou pas encore prêt).</summary>
+public sealed class EngineUnavailableException(string message, Exception? inner = null) : EngineException(message, inner);

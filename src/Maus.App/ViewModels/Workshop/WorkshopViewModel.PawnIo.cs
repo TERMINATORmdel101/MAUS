@@ -32,6 +32,26 @@ public sealed partial class WorkshopViewModel
 
     public bool IsPawnIoMissing => !IsPawnIoInstalled;
 
+    private ICommand? _enableAdvancedSensors;
+    private bool _canEnableAdvancedSensors;
+
+    /// <summary>PawnIO installé, moteur administrateur pas encore lancé : le bouton « Activer les capteurs avancés » s'affiche.</summary>
+    public bool CanEnableAdvancedSensors
+    {
+        get => _canEnableAdvancedSensors;
+        private set => SetProperty(ref _canEnableAdvancedSensors, value);
+    }
+
+    /// <summary>Lance le moteur administrateur (demande d'autorisation de Windows) : les mesures suivantes passent par PawnIO.</summary>
+    public ICommand EnableAdvancedSensorsCommand => _enableAdvancedSensors ??= new AsyncCommand(async () =>
+    {
+        if (EngineHost.OnDemand is { } onDemand)
+        {
+            await onDemand.EnsureElevatedAsync(CancellationToken.None);
+            CanEnableAdvancedSensors = false;
+        }
+    });
+
     public ICommand InstallPawnIoCommand => _installPawnIo ??= new AsyncCommand(() => Run(() => RunPawnIoConsole(install: true)));
 
     public ICommand UninstallPawnIoCommand => _uninstallPawnIo ??= new AsyncCommand(() => Run(() => RunPawnIoConsole(install: false)));
@@ -52,13 +72,14 @@ public sealed partial class WorkshopViewModel
 
         Live.CpuMaxC = state.CpuMaxC;
         IsPawnIoInstalled = state.PawnIoInstalled;
+        CanEnableAdvancedSensors = state.PawnIoInstalled && !state.EngineElevated && EngineHost.OnDemand is not null;
         PawnIoStatus = !state.PawnIoInstalled
             ? T("Sans pilote, MAUS ne lit ni la vraie température du processeur, ni sa tension, ni les sondes et ventilateurs de la carte mère. "
                 + "PawnIO est un pilote libre et signé, utilisé par LibreHardwareMonitor, FanControl et OpenRGB : il permet de les lire. "
                 + "Il s'installe et se retire en un clic (winget, fenêtre visible). Certains anti-triche de jeux peuvent refuser les pilotes "
                 + "d'accès au matériel : en cas de souci, retirez-le.")
             : !state.EngineElevated
-                ? T("PawnIO {0} est installé, mais il faut lancer MAUS en administrateur pour lire les capteurs.", state.PawnIoVersion ?? "?")
+                ? T("PawnIO {0} est installé. La vraie température du processeur, sa tension et les sondes de la carte mère se lisent avec les droits administrateur : bouton « Activer les capteurs avancés » (Windows demande votre autorisation). Ces mesures servent aussi à arrêter les tests de stabilité en cas de surchauffe.", state.PawnIoVersion ?? "?")
                 : state.Failure is { } failure
                     ? T("PawnIO est installé mais n'a pas pu être utilisé : {0}", failure)
                     : state.IsStalled

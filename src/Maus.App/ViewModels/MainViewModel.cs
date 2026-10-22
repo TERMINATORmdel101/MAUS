@@ -43,7 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
         LoadHealthTrend();
 
         // Mode limité ou fichier des choix illisible au démarrage : l'utilisateur le sait dès l'ouverture.
-        if ((App.StartupNotice ?? PreferencesStore.Notice) is { } notice)
+        if (PreferencesStore.Notice is { } notice)
         {
             _statusText = notice;
         }
@@ -54,7 +54,7 @@ public sealed partial class MainViewModel : ObservableObject
         MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     /// <summary>Préférences enregistrées (profil Game Bar, alimentation, constats « voulus ») ; remplaçable pour les tests.</summary>
-    public IPreferencesStore PreferencesStore { get; init; } = new EnginePreferencesStore(EngineHost.Current);
+    public IPreferencesStore PreferencesStore { get; init; } = EngineHost.Preferences;
 
     /// <summary>Le moteur (audit, corrections, journal) ; remplaçable pour les tests.</summary>
     public IMausEngine Engine { get; init; } = EngineHost.Current;
@@ -183,6 +183,11 @@ public sealed partial class MainViewModel : ObservableObject
             await RecordHealthAsync();
             await RefreshJournalAsync();
             await AskLaptopChoiceOnceAsync(context);
+        }
+        catch (Maus.Core.Engine.Broker.EngineDeclinedException declined)
+        {
+            // Autorisation refusée : l'audit n'a pas lieu, le reste de MAUS reste utilisable.
+            StatusText = declined.Message;
         }
         catch (Exception ex)
         {

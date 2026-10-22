@@ -79,7 +79,7 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
             catch (Exception ex) when (ex is OperationCanceledException or IOException or TimeoutException)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                throw new EngineException(T("Le moteur de MAUS ne répond pas (il a peut-être été fermé) : relancez MAUS."), ex);
+                throw new EngineUnavailableException(T("Le moteur de MAUS ne répond pas (il a peut-être été fermé) : relancez MAUS."), ex);
             }
 
             // Le processus en face doit être le moteur lancé par l'interface : un autre programme qui aurait pris ce nom de

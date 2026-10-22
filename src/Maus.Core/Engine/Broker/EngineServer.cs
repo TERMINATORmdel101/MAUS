@@ -17,7 +17,8 @@ namespace Maus.Core.Engine.Broker;
 /// un programme qui aurait créé un canal du même nom avant le moteur le fait échouer, au lieu d'être servi à sa place ;</item>
 /// <item>chaque connexion vient du processus de l'interface (identifiant vérifié par Windows), sinon elle est fermée ;</item>
 /// <item>paramètres vérifiés (identifiants bornés), opération inconnue refusée ;</item>
-/// <item>le moteur s'arrête avec l'interface.</item>
+/// <item>le moteur s'arrête avec l'interface, ou après <see cref="IdleTimeout"/> sans demande : les droits administrateur ne
+/// restent pas ouverts plus longtemps que nécessaire (l'action suivante les redemande).</item>
 /// </list>
 /// </summary>
 public sealed partial class EngineServer(IMausEngine engine, string pipeName, int clientProcessId)
@@ -26,11 +27,21 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
     private const int MaxIds = 500;
     private static readonly SecurityIdentifier Network = new(WellKnownSidType.NetworkSid, null);
 
-    /// <summary>Sert les demandes jusqu'à la fin de l'interface (ou l'annulation).</summary>
+    /// <summary>Demandes en cours : le moteur ne s'arrête jamais au milieu de l'une d'elles.</summary>
+    private int _busy;
+
+    /// <summary>Fin de la dernière demande (ou démarrage), en millisecondes depuis le démarrage de Windows.</summary>
+    private long _lastActivity = Environment.TickCount64;
+
+    /// <summary>Arrêt du moteur après ce délai sans aucune demande (15 minutes, demande du porteur du 22/10/2026).</summary>
+    public TimeSpan IdleTimeout { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>Sert les demandes jusqu'à la fin de l'interface, l'annulation ou <see cref="IdleTimeout"/> sans demande.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _ = WatchClientAsync(stop);
+        _ = WatchIdleAsync(stop);
         var first = true;
         while (!stop.IsCancellationRequested)
         {
@@ -61,6 +72,30 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
             PipeTransmissionMode.Byte, options, 0, 0, security);
     }
 
+    /// <summary>Aucune demande en cours ni reçue depuis <see cref="IdleTimeout"/> : le moteur s'arrête.</summary>
+    private async Task WatchIdleAsync(CancellationTokenSource stop)
+    {
+        var step = TimeSpan.FromMilliseconds(Math.Clamp(IdleTimeout.TotalMilliseconds / 4, 50, 30_000));
+        try
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                await Task.Delay(step, stop.Token).ConfigureAwait(false);
+                if (Volatile.Read(ref _busy) == 0 && Environment.TickCount64 - Interlocked.Read(ref _lastActivity) >= IdleTimeout.TotalMilliseconds)
+                {
+                    Breadcrumbs.Add("moteur : arrêt après " + IdleTimeout.TotalMinutes.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " min sans demande");
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await stop.CancelAsync().ConfigureAwait(false);
+    }
+
     private async Task WatchClientAsync(CancellationTokenSource stop)
     {
         try
@@ -77,6 +112,20 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
     }
 
     private async Task ServeAsync(NamedPipeServerStream pipe, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref _busy);
+        try
+        {
+            await ServeOneAsync(pipe, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _lastActivity, Environment.TickCount64);
+            Interlocked.Decrement(ref _busy);
+        }
+    }
+
+    private async Task ServeOneAsync(NamedPipeServerStream pipe, CancellationToken cancellationToken)
     {
         await using (pipe.ConfigureAwait(false))
         {

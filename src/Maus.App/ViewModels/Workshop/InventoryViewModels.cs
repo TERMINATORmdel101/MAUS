@@ -239,7 +239,7 @@ public sealed class ComponentCardViewModel
     {
         if (system.Tpm is not { } tpm)
         {
-            return system.TpmNeedsAdministrator ? T("lisible avec MAUS en administrateur") : T("aucune détectée");
+            return system.TpmNeedsAdministrator ? T("lisible avec l'autorisation administrateur (par exemple après « Lancer l'audit »)") : T("aucune détectée");
         }
 
         var parts = new List<string> { tpm.SpecVersion is { } spec ? T("version {0}", spec) : T("version inconnue") };
@@ -357,7 +357,7 @@ public sealed class ComponentCardViewModel
     {
         if (spd is null)
         {
-            return [new(T("Profils XMP / EXPO"), T("lisibles avec le pilote PawnIO et MAUS en administrateur"))];
+            return [new(T("Profils XMP / EXPO"), T("lisibles avec le pilote PawnIO, dans l'onglet Mémoire"))];
         }
 
         if (MemoryDetails.MatchModule(spd, partNumber, index) is not { } module)

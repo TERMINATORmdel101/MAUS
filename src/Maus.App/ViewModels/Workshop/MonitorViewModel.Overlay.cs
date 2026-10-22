@@ -134,7 +134,7 @@ public sealed partial class MonitorViewModel
                 {
                     try
                     {
-                        new Maus.Core.Engine.Broker.EnginePreferencesStore(EngineHost.Current).Update(p => p with { OverlayEnabled = enabled, OverlayScale = scale, OverlayOpacity = opacity, OverlayCorner = corner });
+                        EngineHost.Preferences.Update(p => p with { OverlayEnabled = enabled, OverlayScale = scale, OverlayOpacity = opacity, OverlayCorner = corner });
                     }
                     catch (Exception ex) when (ex is Maus.Core.Fixes.JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException or Maus.Core.Engine.Broker.EngineException)
                     {

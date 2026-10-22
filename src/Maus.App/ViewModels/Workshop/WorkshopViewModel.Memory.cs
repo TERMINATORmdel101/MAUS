@@ -202,14 +202,23 @@ public sealed partial class WorkshopViewModel
         IsMemoryDriverMissing = !installed;
         if (!installed)
         {
-            MemoryStatus = T("Pour lire les puces des barrettes et les timings réels, il faut le pilote libre PawnIO : bouton « Installer PawnIO » ci-dessus, puis relancez MAUS en administrateur. La vitesse appliquée et la tension déclarée par le BIOS, lues sans pilote, sont déjà affichées ci-dessous.");
+            MemoryStatus = T("Pour lire les puces des barrettes et les timings réels, il faut le pilote libre PawnIO : bouton « Installer PawnIO » ci-dessus, puis relancez MAUS. La vitesse appliquée et la tension déclarée par le BIOS, lues sans pilote, sont déjà affichées ci-dessous.");
             return;
         }
 
-        if (!EngineHost.IsElevated)
+        // Les puces des barrettes se lisent avec les droits administrateur : le moteur est lancé ici au besoin, avec la
+        // demande d'autorisation de Windows, avant la tension (lue elle aussi par le pilote).
+        if (EngineHost.OnDemand is { } onDemand)
         {
-            MemoryStatus = PawnIoMemoryDetails.DriverRequired;
-            return;
+            try
+            {
+                await onDemand.EnsureElevatedAsync(CancellationToken.None);
+            }
+            catch (Maus.Core.Engine.Broker.EngineException ex)
+            {
+                MemoryStatus = ex.Message;
+                return;
+            }
         }
 
         Maus.Core.Diagnostics.Breadcrumbs.Add("Mémoire : tension mesurée par la carte mère");
