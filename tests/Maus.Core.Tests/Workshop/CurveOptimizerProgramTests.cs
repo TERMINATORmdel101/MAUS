@@ -61,7 +61,10 @@ public class CurveOptimizerProgramTests
         var checkpoint = new FakeCheckpoint();
         var reports = new List<CurveProgramProgress>();
 
-        var result = await CurveOptimizerProgram.RunAsync(topology, checkpoint, Quick(TimeSpan.FromMilliseconds(900), TimeSpan.FromMilliseconds(900)),
+        // Seuil « figé » large : sur une machine lente (GitHub Actions, peu de processeurs pour trois fils), un cœur sain peut
+        // rester muet plus de 0,8 s ; la détection d'un cœur figé a son propre test.
+        var options = Quick(TimeSpan.FromMilliseconds(900), TimeSpan.FromMilliseconds(900)) with { FreezeAfter = TimeSpan.FromSeconds(5) };
+        var result = await CurveOptimizerProgram.RunAsync(topology, checkpoint, options,
             new SyncProgress<CurveProgramProgress>(reports.Add), wheaSince: _ => 0);
 
         Assert.True(result.Stable);
