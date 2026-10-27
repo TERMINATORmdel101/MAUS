@@ -89,6 +89,11 @@ public sealed class VisualEffectsModule : IFixableModule
             DetectMinimizeAnimation(context.SystemParameters),
         };
 
+        if (VisualEffectDefaults.Read(context.Registry, SpiSetters).Count > 0)
+        {
+            findings.Add(VisualEffectDefaults.Detect(context.Registry, context.SystemParameters, SpiSetters));
+        }
+
         foreach (var effect in SpiEffects)
         {
             var current = context.SystemParameters.GetBool(effect.Action);
@@ -160,6 +165,11 @@ public sealed class VisualEffectsModule : IFixableModule
 
         var fromRules = RegistryRulePlanner.Plan(Id, Rules.Value, findings);
         changes.AddRange(fromRules.Where(c => c.Id != "M06.visualfx-mode"));
+        if (VisualEffectDefaults.Plan(Id, context.Registry, context.SystemParameters, SpiSetters, findings) is { } defaults)
+        {
+            changes.Add(defaults);
+        }
+
         changes.AddRange(fromRules.Where(c => c.Id == "M06.visualfx-mode"));
         return changes;
     }

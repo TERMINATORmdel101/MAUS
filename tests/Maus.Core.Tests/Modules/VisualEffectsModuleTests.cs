@@ -114,6 +114,73 @@ public class VisualEffectsFixTests
     }
 
     [Fact]
+    public async Task Windows_defaults_are_read_from_windows_own_declarations_applied_alone_and_reverted()
+    {
+        const string root = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects";
+        const string advanced = @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
+        const string dsh = @"SOFTWARE\Policies\Microsoft\Dsh";
+        var registry = new FakeRegistry();
+        void Spi(string name, int defaultValue, uint get, uint set) => registry
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\{name}", "Type", "checkbox")
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\{name}", "DefaultValue", defaultValue)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\{name}", "SPIActionGet", (int)get)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\{name}", "SPIActionSet", (int)set);
+
+        Spi("MenuAnimation", 1, SpiGet.MenuAnimation, SpiSet.MenuAnimation);
+        Spi("DragFullWindows", 1, SpiGet.DragFullWindows, SpiSet.DragFullWindows);
+        Spi("CursorShadow", 0, SpiGet.CursorShadow, SpiSet.CursorShadow);
+        Spi("AnimateMinMax", 1, SpiGet.Animation, 0x0049);
+        Spi("Unknown", 1, 0x0071, 0x0072);
+        registry
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\TaskbarAnimations", "Type", "checkbox")
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\TaskbarAnimations", "DefaultValue", 1)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\TaskbarAnimations", "HKeyRoot", unchecked((int)0x80000001))
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\TaskbarAnimations", "RegPath", advanced)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\TaskbarAnimations", "ValueName", "TaskbarAnimations")
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\TaskbarAnimations", "CheckedValue", 1)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\TaskbarAnimations", "UncheckedValue", 0)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\ThumbnailsOrIcon", "Type", "checkbox")
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\ThumbnailsOrIcon", "DefaultValue", 1)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\ThumbnailsOrIcon", "CLSID", "{71E32BAA-73EE-40a1-933C-F166F0192B72}")
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, $@"{root}\DWMEnabled", "DefaultValue", 1)
+            .Set(Microsoft.Win32.RegistryHive.CurrentUser, advanced, "TaskbarAnimations", 0)
+            .Set(Microsoft.Win32.RegistryHive.LocalMachine, dsh, "AllowNewsAndInterests", 0);
+        var parameters = WindowsDefaults();
+        parameters.Values[SpiGet.MenuAnimation] = false;
+        parameters.MinimizeAnimation = false;
+        var audit = TestContext.Create(registry, parameters: parameters);
+        var module = new VisualEffectsModule();
+
+        var before = await module.DetectAsync(audit, CancellationToken.None);
+        var finding = before.Single(f => f.Id == "M06.windows-defaults");
+        Assert.Equal(FindingStatus.Info, finding.Status);
+        Assert.True(finding.Fixable);
+        Assert.Equal("4 réglage(s) différent(s) des valeurs de Windows (5 cases comparées)", finding.Current);
+
+        var change = module.Plan(audit, before).Single(c => c.Id == "M06.windows-defaults");
+        Assert.True(change.Advanced);
+        Assert.False(change.Recommended);
+        Assert.Equal(4, change.Writes.Count);
+        Assert.DoesNotContain(change.Writes, w => w.Key.Name == "VisualFXSetting");
+
+        var engine = new Maus.Core.Fixes.FixEngine(TestFixContext.Create(audit, registry, parameters));
+        var applied = engine.Apply([change], new Maus.Core.Fixes.ApplyOptions());
+        Assert.All(applied.Changes, c => Assert.Equal(Maus.Core.Fixes.ChangeStatus.Applied, c.Status));
+        Assert.True(parameters.Values[SpiGet.MenuAnimation]);
+        Assert.True(parameters.MinimizeAnimation);
+        Assert.Equal(1, registry.GetValue(Microsoft.Win32.RegistryHive.CurrentUser, advanced, "TaskbarAnimations"));
+        Assert.Null(registry.GetValue(Microsoft.Win32.RegistryHive.LocalMachine, dsh, "AllowNewsAndInterests"));
+        var after = (await module.DetectAsync(audit, CancellationToken.None)).Single(f => f.Id == "M06.windows-defaults");
+        Assert.Equal("identiques aux valeurs de Windows (5 cases comparées)", after.Current);
+        Assert.False(after.Fixable);
+
+        Assert.True(engine.Revert(applied.Session!.Id).Completed);
+        Assert.Equal(
+            before.Select(f => (f.Id, f.Status, f.Current)),
+            (await module.DetectAsync(audit, CancellationToken.None)).Select(f => (f.Id, f.Status, f.Current)));
+    }
+
+    [Fact]
     public async Task Widgets_policy_is_not_proposed_on_home_edition()
     {
         var audit = TestContext.Create(windows: new WindowsInfo("Windows 11 Famille", "Core", "25H2", 26200, 1000));
