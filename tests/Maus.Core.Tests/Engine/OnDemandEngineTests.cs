@@ -252,4 +252,18 @@ public sealed class OnDemandEngineTests
         var stopped = await Task.WhenAny(server, Task.Delay(TimeSpan.FromSeconds(10)));
         Assert.Same(server, stopped);
     }
+
+    [Fact]
+    public async Task Restore_points_are_listed_and_a_manual_point_is_created_and_checked()
+    {
+        using var local = Local();
+
+        var reading = await local.ReadRestorePointsAsync(CancellationToken.None);
+        var outcome = await local.CreateRestorePointAsync(CancellationToken.None);
+
+        Assert.Equal(ProtectionState.Enabled, reading.Protection);
+        Assert.Contains(reading.Points, p => p.Description == "Windows Update");
+        Assert.Null(reading.UsedBytes);
+        Assert.True(outcome.Succeeded, outcome.Message);
+    }
 }
