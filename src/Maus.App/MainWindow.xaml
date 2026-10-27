@@ -731,9 +731,14 @@
                                                             <TextBlock Text="{Binding Subtitle}" Style="{StaticResource CardTitle}" />
                                                         </StackPanel>
                                                     </DockPanel>
-                                                    <Button DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="12,4"
-                                                            Content="{x:Static app:Ui.SearchSheet}" Command="{Binding SearchCommand}"
-                                                            Visibility="{Binding HasSearch, Converter={StaticResource BoolToVisibility}}" />
+                                                    <WrapPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                                                        <Button Padding="12,4" Margin="0,0,8,0"
+                                                                Content="{x:Static app:Ui.SearchSheet}" Command="{Binding SearchCommand}"
+                                                                Visibility="{Binding HasSearch, Converter={StaticResource BoolToVisibility}}" />
+                                                        <Button Padding="12,4" Content="{Binding ActionLabel, Mode=OneWay}" Command="{Binding ActionCommand}"
+                                                                AutomationProperties.Name="{Binding ActionLabel, Mode=OneWay}"
+                                                                Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibility}}" />
+                                                    </WrapPanel>
                                                     <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0" Visibility="{Binding HasGauge, Converter={StaticResource BoolToVisibility}}">
                                                         <TextBlock Text="{Binding Gauge.Caption}" Style="{StaticResource SectionLabel}" Margin="0,0,0,4" />
                                                         <controls:SafetyGauge Height="18" Minimum="{Binding Gauge.Minimum, Mode=OneWay}" Maximum="{Binding Gauge.Maximum, Mode=OneWay}"

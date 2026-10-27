@@ -55,7 +55,7 @@ public sealed class WorkshopModule : IAuditModule
             index++;
         }
 
-        findings.AddRange(inventory.Batteries.Select((battery, i) => DetectBattery(battery, i, limits)));
+        findings.AddRange(inventory.Batteries.Select(DetectBattery));
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
 
@@ -258,7 +258,12 @@ public sealed class WorkshopModule : IAuditModule
         };
     }
 
-    private static Finding DetectBattery(BatteryIdentity battery, int index, SafetyLimits limits)
+    /// <summary>
+    /// Capacité restante de la batterie, sans jugement : aucun seuil d'usure général n'est publié pour les PC (les « 80 % »
+    /// souvent cités sont une règle empirique ou une donnée propre à un fabricant ; recherche du 27/10/2026). Pas de source,
+    /// pas d'alarme (principe 7).
+    /// </summary>
+    private static Finding DetectBattery(BatteryIdentity battery, int index)
     {
         var id = string.Create(CultureInfo.InvariantCulture, $"M16.battery.{index}");
         var title = T("Usure de la batterie");
@@ -267,18 +272,18 @@ public sealed class WorkshopModule : IAuditModule
             return Finding.Unknown(id, title, T("Capacités de la batterie illisibles."), T("Batterie"));
         }
 
-        var worn = health < limits.BatteryWornBelowPercent;
         return new Finding
         {
             Id = id,
             Title = title,
             Category = T("Batterie"),
-            Status = worn ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
-            Severity = worn ? Severity.Medium : Severity.Info,
-            Current = T("{0} % de la capacité d'origine ({1} / {2} mWh)", health, battery.FullChargeCapacityMwh, battery.DesignCapacityMwh),
-            Expected = T("au moins {0} %", limits.BatteryWornBelowPercent),
-            Explanation = T("Une batterie perd de la capacité avec les cycles de charge et la chaleur : l'autonomie baisse d'autant."),
-            Advice = worn ? T("Autonomie réduite : pensez à la faire remplacer (pièce d'origine ou compatible de qualité), surtout si le PC s'éteint sans prévenir.") : null,
+            Status = FindingStatus.Info,
+            Severity = Severity.Info,
+            Current = T("{0} % de la capacité d'origine ({1} / {2} mWh)", health, battery.FullChargeCapacityMwh, battery.DesignCapacityMwh)
+                + (battery.CycleCount is { } cycles ? T(", {0} cycles de charge", cycles) : string.Empty),
+            Explanation = T("Une batterie perd de la capacité avec les cycles de charge et la chaleur : l'autonomie baisse d'autant. Aucun seuil d'usure n'est publié de façon générale pour les PC : MAUS donne la valeur sans la juger."),
+            Advice = T("Le rapport de batterie de Windows (Atelier > Mon PC, carte « Batterie ») montre l'évolution de la capacité depuis l'achat. Si le PC s'éteint sans prévenir ou que l'autonomie ne vous suffit plus, faites remplacer la batterie (pièce d'origine ou compatible de qualité)."),
+            SettingsPage = "ms-settings:batterysaver",
         };
     }
 

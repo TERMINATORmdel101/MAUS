@@ -65,6 +65,9 @@ public sealed partial class RemoteMausEngine
     public Task<string?> SetScheduleAsync(DayOfWeek? day, CancellationToken cancellationToken) =>
         CallAsync<string>("schedule.set", new { day }, null, cancellationToken);
 
+    public Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken) =>
+        CallAsync<string>("battery.report", null, null, cancellationToken);
+
     public async Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken) =>
         await CallAsync<SoftwareListing>("software", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
 

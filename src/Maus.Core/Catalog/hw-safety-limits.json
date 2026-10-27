@@ -25,6 +25,5 @@
     { "pattern": "Core\\(TM\\) Ultra 9 285K\\b", "maxC": 105, "source": "Intel : Core Ultra 9 285K, 105 °C (TechPowerUp)" },
     { "pattern": "Core\\(TM\\) i7-13700K\\b", "maxC": 100, "source": "Intel ARK : Core i7-13700K, TJUNCTION 100 °C" }
   ],
-  "batteryWornBelowPercent": 80,
   "gpuIdleHotMarginC": 15
 }

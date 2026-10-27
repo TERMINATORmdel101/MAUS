@@ -15,8 +15,6 @@ public sealed record SafetyLimits
 
     public IReadOnlyList<CpuTemperatureLimit> CpuMaxTemperature { get; init; } = [];
 
-    public int BatteryWornBelowPercent { get; init; } = 80;
-
     /// <summary>Au repos, une carte à moins de ce nombre de degrés de son seuil de ralentissement refroidit mal.</summary>
     public int GpuIdleHotMarginC { get; init; } = 15;
 

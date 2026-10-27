@@ -14,8 +14,10 @@ public sealed record GaugeInfo(string Caption, double Minimum, double Maximum, d
 /// <summary>Fiche d'un composant dans « Mon PC ».</summary>
 public sealed class ComponentCardViewModel
 {
-    public ComponentCardViewModel(string letter, string title, string subtitle, IReadOnlyList<InfoLine> lines, string? searchReference, Action<string> search, GaugeInfo? gauge = null)
+    public ComponentCardViewModel(string letter, string title, string subtitle, IReadOnlyList<InfoLine> lines, string? searchReference, Action<string> search, GaugeInfo? gauge = null, (string Label, Func<Task> Run)? action = null)
     {
+        ActionLabel = action?.Label;
+        ActionCommand = new AsyncCommand(action?.Run ?? (() => Task.CompletedTask));
         Letter = letter;
         Title = title;
         Subtitle = subtitle;
@@ -49,9 +51,17 @@ public sealed class ComponentCardViewModel
 
     public ICommand SearchCommand { get; }
 
+    /// <summary>Bouton propre à cette carte (rapport de batterie de Windows), ou <c>null</c>.</summary>
+    public string? ActionLabel { get; }
+
+    public bool HasAction => ActionLabel is not null;
+
+    public ICommand ActionCommand { get; }
+
     /// <param name="spd">Puces SPD lues par PawnIO, ou <c>null</c> si elles ne sont pas lisibles (pilote absent, pas d'administrateur).</param>
     /// <param name="details">Windows, écrans, réseau, son et emplacements mémoire, ou <c>null</c> s'ils n'ont pas été lus.</param>
-    public static IReadOnlyList<ComponentCardViewModel> From(HardwareInventory inventory, SafetyLimits limits, Action<string> search, IReadOnlyList<SpdModule>? spd = null, MachineDetails? details = null, DateTime? now = null)
+    /// <param name="batteryReport">Ouvre le rapport de batterie de Windows (bouton de la carte « Batterie »).</param>
+    public static IReadOnlyList<ComponentCardViewModel> From(HardwareInventory inventory, SafetyLimits limits, Action<string> search, IReadOnlyList<SpdModule>? spd = null, MachineDetails? details = null, DateTime? now = null, Func<Task>? batteryReport = null)
     {
         ArgumentNullException.ThrowIfNull(inventory);
         ArgumentNullException.ThrowIfNull(limits);
@@ -77,7 +87,7 @@ public sealed class ComponentCardViewModel
         }
 
         cards.AddRange(inventory.Disks.Select(disk => DiskCard(disk, search)));
-        cards.AddRange(inventory.Batteries.Select(battery => BatteryCard(battery, search)));
+        cards.AddRange(inventory.Batteries.Select(battery => BatteryCard(battery, search, batteryReport)));
 
         if (details is { Network.Count: > 0 })
         {
@@ -193,16 +203,19 @@ public sealed class ComponentCardViewModel
         ], disk.Model, search);
     }
 
-    private static ComponentCardViewModel BatteryCard(BatteryIdentity battery, Action<string> search)
+    /// <summary>
+    /// Carte « Batterie » : capacité restante sans couleurs de seuil (aucun seuil d'usure général n'est publié pour les PC),
+    /// cycles de charge, et le rapport de batterie de Windows (évolution de la capacité depuis l'achat).
+    /// </summary>
+    private static ComponentCardViewModel BatteryCard(BatteryIdentity battery, Action<string> search, Func<Task>? batteryReport)
     {
-        var gauge = battery.HealthPercent is { } health
-            ? new GaugeInfo(T("Capacité restante"), 0, 100, 60, 80, health, T("{0} % de la capacité d'origine", health))
-            : null;
         return new ComponentCardViewModel("B", T("Batterie"), $"{battery.Manufacturer} {battery.Name}".Trim(),
         [
+            new(T("Capacité restante"), battery.HealthPercent is { } health ? T("{0} % de la capacité d'origine", health) : "—"),
             new(T("Capacité d'origine / actuelle"), $"{battery.DesignCapacityMwh?.ToString("N0", Culture) ?? "—"} / {battery.FullChargeCapacityMwh?.ToString("N0", Culture) ?? "—"} mWh"),
+            new(T("Cycles de charge"), battery.CycleCount?.ToString("N0", Culture) ?? T("non communiqué par la batterie")),
             new(T("Tension"), battery.VoltageMv is { } mv ? V(mv) : "—"),
-        ], battery.Name, search, gauge);
+        ], battery.Name, search, action: batteryReport is null ? null : (T("Rapport de batterie de Windows"), batteryReport));
     }
 
     /// <summary>Carte « Windows et ce PC » : modèle, version, installation, démarrage, UEFI, Secure Boot et TPM.</summary>

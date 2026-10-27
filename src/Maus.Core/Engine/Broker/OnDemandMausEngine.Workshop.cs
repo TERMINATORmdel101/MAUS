@@ -33,6 +33,9 @@ public sealed partial class OnDemandMausEngine
     public Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken) =>
         Available(e => e.ListSoftwareUpdatesAsync(cancellationToken));
 
+    public Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken) =>
+        Available(e => e.CreateBatteryReportAsync(cancellationToken));
+
     public Task<int> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken) =>
         Available(e => e.RunBenchmarkAsync(launch, cancellationToken));
 

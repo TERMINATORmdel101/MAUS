@@ -13,7 +13,7 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
     /// <summary>Exécutable autorisé et premiers arguments admis (comparaison insensible à la casse).</summary>
     private static readonly Dictionary<string, string[]> AllowedFirstArguments = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["powercfg.exe"] = ["/getactivescheme", "/list", "/l", "/a", "/availablesleepstates", "/query", "/q"],
+        ["powercfg.exe"] = ["/getactivescheme", "/list", "/l", "/a", "/availablesleepstates", "/query", "/q", "/batteryreport"],
         ["bcdedit.exe"] = ["/enum"],
         ["fsutil.exe"] = ["behavior"],
         ["reagentc.exe"] = ["/info"],
@@ -32,6 +32,11 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
     private static readonly Dictionary<string, Func<IReadOnlyList<string>, bool>> ExtraChecks = new(StringComparer.OrdinalIgnoreCase)
     {
         ["fsutil.exe"] = args => args.Count >= 2 && args[1].Equals("query", StringComparison.OrdinalIgnoreCase),
+
+        // Rapport de batterie : écrit seulement le fichier du rapport, à l'emplacement prévu par MAUS (rien d'autre n'est admis).
+        ["powercfg.exe"] = args => !args[0].Equals("/batteryreport", StringComparison.OrdinalIgnoreCase)
+            || (args.Count == 3 && args[1].Equals("/output", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(Path.GetFullPath(args[2]), BatteryReportPath, StringComparison.OrdinalIgnoreCase)),
         ["netsh.exe"] = args => args.Count >= 2 && args[1].Equals("show", StringComparison.OrdinalIgnoreCase),
         ["winget.exe"] = args => args.All(WingetListArguments.Contains),
 
@@ -44,6 +49,10 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
     /// culture du fil, que l'application remplace par la langue de MAUS (un Windows russe lu en page 437 serait illisible).
     /// </summary>
     internal static Encoding ToolOutputEncoding => OemEncoding.Current;
+
+    /// <summary>Seul emplacement admis pour le rapport de batterie de Windows : <c>%LOCALAPPDATA%\MAUS\rapports</c>.</summary>
+    public static string BatteryReportPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "rapports", "rapport-batterie.html");
 
     public static bool IsAllowed(string executable, IReadOnlyList<string> arguments)
     {

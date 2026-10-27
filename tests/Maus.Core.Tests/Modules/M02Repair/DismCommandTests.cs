@@ -33,4 +33,13 @@ public sealed class DismCommandTests
         var commands = new FakeCommands().Answer(dism + " /English /Online /Cleanup-Image /CheckHealth", "No component store corruption detected.");
         Assert.Equal(ImageHealth.Healthy, new DismCommandImageHealthChecker(commands).Check(TimeSpan.FromSeconds(5)));
     }
+
+    [Fact]
+    public void Battery_report_is_only_written_where_maus_expects_it()
+    {
+        Assert.True(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/batteryreport", "/output", ReadOnlyCommandRunner.BatteryReportPath]));
+        Assert.False(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/batteryreport", "/output", @"C:\Windows\System32\x.html"]));
+        Assert.False(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/batteryreport"]));
+        Assert.True(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/getactivescheme"]));
+    }
 }

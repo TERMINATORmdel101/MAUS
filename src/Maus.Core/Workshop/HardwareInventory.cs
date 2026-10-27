@@ -39,7 +39,7 @@ public sealed record GpuIdentity(GpuInfo Info, long? MemoryBytes, NvidiaGpuState
 
 public sealed record DiskIdentity(string Model, string? Bus, string? Media, long? SizeBytes, string? Firmware, int? TemperatureC, int? WearPercent, long? PowerOnHours);
 
-public sealed record BatteryIdentity(string? Name, string? Manufacturer, int? DesignCapacityMwh, int? FullChargeCapacityMwh, int? VoltageMv, int? ChargeRateMw, int? DischargeRateMw)
+public sealed record BatteryIdentity(string? Name, string? Manufacturer, int? DesignCapacityMwh, int? FullChargeCapacityMwh, int? VoltageMv, int? ChargeRateMw, int? DischargeRateMw, int? CycleCount = null)
 {
     /// <summary>Capacité restante par rapport à la capacité d'origine (usure).</summary>
     public int? HealthPercent => DesignCapacityMwh is > 0 && FullChargeCapacityMwh is { } full
@@ -71,6 +71,7 @@ public static class HardwareInventoryReader
     internal const string BatteryStaticQuery = "SELECT InstanceName, DeviceName, ManufactureName, DesignedCapacity FROM BatteryStaticData";
     internal const string BatteryFullQuery = "SELECT InstanceName, FullChargedCapacity FROM BatteryFullChargedCapacity";
     internal const string BatteryStatusQuery = "SELECT InstanceName, Voltage, ChargeRate, DischargeRate FROM BatteryStatus";
+    internal const string BatteryCycleQuery = "SELECT InstanceName, CycleCount FROM BatteryCycleCount";
     internal const string DisplayClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
 
     /// <summary>Codes fabricant JEDEC (JEP106) que le SMBIOS donne parfois à la place du nom.</summary>
@@ -250,11 +251,13 @@ public static class HardwareInventoryReader
     {
         var full = Query(cim, BatteryFullQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
         var status = Query(cim, BatteryStatusQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        var cycles = Query(cim, BatteryCycleQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
         return Query(cim, BatteryStaticQuery, CimScopes.Wmi).Select(row =>
         {
             var name = row.GetString("InstanceName") ?? string.Empty;
             full.TryGetValue(name, out var capacity);
             status.TryGetValue(name, out var state);
+            cycles.TryGetValue(name, out var cycle);
             return new BatteryIdentity(
                 Clean(row.GetString("DeviceName")),
                 Clean(row.GetString("ManufactureName")),
@@ -262,7 +265,8 @@ public static class HardwareInventoryReader
                 (int?)capacity?.GetInt64("FullChargedCapacity"),
                 (int?)state?.GetInt64("Voltage"),
                 (int?)state?.GetInt64("ChargeRate"),
-                (int?)state?.GetInt64("DischargeRate"));
+                (int?)state?.GetInt64("DischargeRate"),
+                cycle?.GetInt64("CycleCount") is > 0 and var count ? (int)count : null);
         }).ToList();
     }
 

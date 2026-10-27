@@ -700,7 +700,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     private void ShowInventory(HardwareInventory inventory, SafetyLimits limits, IReadOnlyList<SpdModule>? spd)
     {
         Components.Clear();
-        foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd, _details))
+        foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd, _details, batteryReport: OpenBatteryReportAsync))
         {
             Components.Add(card);
         }
@@ -1224,6 +1224,20 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     }
 
     private void OpenSearch(string query) => ShellLauncher.OpenUrl(WebSearch.Build(SearchEngineChoice.Value, query));
+
+    /// <summary>Rapport de batterie de Windows (powercfg), écrit par le moteur puis ouvert dans le navigateur.</summary>
+    private async Task OpenBatteryReportAsync()
+    {
+        var file = await EngineHost.Current.CreateBatteryReportAsync(CancellationToken.None);
+        if (file is null)
+        {
+            System.Windows.MessageBox.Show(T("Windows n'a pas pu faire le rapport de batterie (aucune batterie détectée, ou rapport refusé)."), "MAUS",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            return;
+        }
+
+        ShellLauncher.OpenFile(file);
+    }
 
     private static Task Run(Action action)
     {

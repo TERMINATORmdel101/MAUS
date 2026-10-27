@@ -78,17 +78,22 @@ public class WorkshopModuleTests
     }
 
     [Fact]
-    public async Task Worn_battery_and_disabled_virtualization_are_reported()
+    public async Task Worn_battery_is_reported_without_an_unsourced_threshold_and_disabled_virtualization_too()
     {
         var cim = new FakeCim()
             .Answer(HardwareInventoryReader.BatteryStaticQuery, CimScopes.Wmi, new Dictionary<string, object?> { ["InstanceName"] = "B0", ["DesignedCapacity"] = 50000u })
             .Answer(HardwareInventoryReader.BatteryFullQuery, CimScopes.Wmi, new Dictionary<string, object?> { ["InstanceName"] = "B0", ["FullChargedCapacity"] = 35000u })
+            .Answer(HardwareInventoryReader.BatteryCycleQuery, CimScopes.Wmi, new Dictionary<string, object?> { ["InstanceName"] = "B0", ["CycleCount"] = 412u })
             .Answer(WorkshopModule.VirtualizationQuery, new Dictionary<string, object?> { ["VirtualizationFirmwareEnabled"] = false })
             .Answer(WorkshopModule.HypervisorQuery, new Dictionary<string, object?> { ["HypervisorPresent"] = false });
 
         var findings = await Run(cim);
 
-        Assert.Equal(FindingStatus.Warning, findings.Single(f => f.Id == "M16.battery.0").Status);
+        // Aucun seuil d'usure général n'est publié pour les PC : la valeur est donnée, sans orange ni rouge (principe 7).
+        var battery = findings.Single(f => f.Id == "M16.battery.0");
+        Assert.Equal(FindingStatus.Info, battery.Status);
+        Assert.StartsWith("70 % de la capacité d'origine (35000 / 50000 mWh), 412 cycles de charge", battery.Current, StringComparison.Ordinal);
+        Assert.Null(battery.Expected);
         Assert.Equal("désactivée dans le BIOS", findings.Single(f => f.Id == "M16.virtualization").Current);
         Assert.Equal("13th Gen Intel(R) Core(TM) i7-13700K", findings.Single(f => f.Id == "M16.cpu").Title);
         Assert.Contains("100 °C", findings.Single(f => f.Id == "M16.cpu").Expected, StringComparison.Ordinal);

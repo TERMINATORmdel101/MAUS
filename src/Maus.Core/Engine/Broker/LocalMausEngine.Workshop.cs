@@ -362,6 +362,20 @@ public sealed partial class LocalMausEngine
         return TaskSchedulerClient.Refusal() ?? await TaskSchedulerClient.CreateAsync(chosen).ConfigureAwait(false);
     }
 
+    public async Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken)
+    {
+        var file = ReadOnlyCommandRunner.BatteryReportPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        if (File.Exists(file))
+        {
+            File.Delete(file);
+        }
+
+        var powercfg = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "powercfg.exe");
+        var result = await WorkshopContext().Commands.RunAsync(powercfg, ["/batteryreport", "/output", file], TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        return result.ExitCode == 0 && File.Exists(file) ? file : null;
+    }
+
     public async Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken)
     {
         var context = WorkshopContext();

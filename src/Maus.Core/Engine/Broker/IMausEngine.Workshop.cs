@@ -109,6 +109,12 @@ public partial interface IMausEngine
 
     Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Rapport de batterie de Windows (<c>powercfg /batteryreport</c>), écrit dans le dossier des rapports de MAUS ; chemin du
+    /// fichier, ou <c>null</c> si Windows n'a pas pu le faire (pas de batterie).
+    /// </summary>
+    Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken);
+
     /// <summary>Lance le benchmark dans sa fenêtre plein écran et attend sa fin ; renvoie son code de sortie.</summary>
     Task<int> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken);
 }
