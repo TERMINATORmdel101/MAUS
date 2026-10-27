@@ -2,13 +2,13 @@
 
 À lire après `CLAUDE.md` (mémoire complète du projet). Ce fichier ne garde que ce qui sert encore pour reprendre le travail ; l'historique des reprises de septembre et d'octobre 2026 (sessions cloud, ancien PC `C:\Users\CARO`, branches des agents de la 0.5.3) est dans l'historique Git de ce fichier (`git log -p REPRISE.md`).
 
-## 1. Où en est le projet (13/10/2026)
+## 1. Où en est le projet (27/10/2026)
 
-- Version **0.8.0**, publiée sur GitHub (préversion) et acceptée dans **winget** (`winget show TERMINATORmdel101.MAUS --versions` : 0.8.0, 0.7.6, 0.7.5). Contenu de chaque version : `CHANGELOG.md`.
+- Version **0.8.1**, publiée sur GitHub (préversion, 22/10) et acceptée dans **winget** (demande #458592 ; versions dans le catalogue : 0.8.1, 0.8.0, 0.7.6, 0.7.5). Contenu de chaque version : `CHANGELOG.md`.
 - Branche de travail : `claude/youthful-ride-ivazlw` ; `main` = ligne de publication (un envoi sur `main` lance les workflows « Tests » et « Installateur »).
-- Microsoft Store : géré par le porteur lui-même (la MSIX 0.7.5 a été envoyée en certification). **Ne pas** s'en occuper sans sa demande.
+- Microsoft Store : soumis par le porteur lui-même. La 0.8.0 a été refusée (motif 10.6.3, `allowElevation` : demande d'autorisation dès l'ouverture) ; la 0.8.1 ne demande plus rien à l'ouverture, son paquet et ses textes sont dans `publish/store-0.8.1` (site web et assistance = https://sites.google.com/view/maus-help/accueil). **Ne pas** soumettre à sa place.
 
-## 2. Publier une version (procédure suivie pour la 0.7.6 et la 0.8.0)
+## 2. Publier une version (procédure suivie pour la 0.7.6, la 0.8.0 et la 0.8.1)
 
 Seulement avec l'accord du porteur.
 
@@ -20,7 +20,7 @@ Seulement avec l'accord du porteur.
 
 ## 3. Microsoft Store (avis donné au porteur le 06/10, sources Microsoft Learn vérifiées)
 
-(1) Installateur .exe/.msi : « The binary and all of its Portable Executable (PE) files must be digitally signed with a code signing certificate that chains up to … the Microsoft Trusted Root Program » (page « App package requirements for MSI/EXE app ») : impossible tant que MAUS n'est pas signé. (2) Paquet MSIX (signé gratuitement par Microsoft) : l'élévation demande la capacité restreinte `allowElevation`, « subject to approval under strict criteria » ; les écritures dans HKCU d'une application empaquetée vont dans une copie privée sauf avec `unvirtualizedResources` (autre capacité restreinte). **Depuis la 0.8.0**, l'interface ne demande plus l'administrateur (manifeste `asInvoker`) et lance le moteur par `runas` : le comportement de ce lancement dans un paquet MSIX n'a **pas été vérifié**. Avis : ne rien payer ; redemander la signature gratuite à la SignPath Foundation quand le projet sera plus connu (refus du 03/10 : manque de visibilité).
+(1) Installateur .exe/.msi : « The binary and all of its Portable Executable (PE) files must be digitally signed with a code signing certificate that chains up to … the Microsoft Trusted Root Program » (page « App package requirements for MSI/EXE app ») : impossible tant que MAUS n'est pas signé. (2) Paquet MSIX (signé gratuitement par Microsoft) : l'élévation demande la capacité restreinte `allowElevation`, « subject to approval under strict criteria » ; les écritures dans HKCU d'une application empaquetée vont dans une copie privée sauf avec `unvirtualizedResources` (autre capacité restreinte). **Depuis la 0.8.1**, l'interface ne demande plus rien à l'ouverture (manifeste `asInvoker`) et lance le moteur par `runas` à la première action administrateur. **Vérifié le 22/10** sur le PC du porteur avec le paquet installé (signé par un certificat d'essai) : le moteur s'élève depuis `WindowsApps` avec `allowElevation` ; l'API DISM échoue dans un paquet (remplacée par `dism.exe /CheckHealth`). **Pas vérifié** : la même chose sans `allowElevation` (variante prête dans `artifacts/msix-essai`). Avis : ne rien payer ; redemander la signature gratuite à la SignPath Foundation quand le projet sera plus connu (refus du 03/10 : manque de visibilité).
 
 ## 4. Règles de sécurité (rappel)
 
