@@ -1,0 +1,52 @@
+# Analyse de sécurité du code C# par CodeQL, l'analyseur de GitHub (gratuit pour un dépôt public) : injections de commandes,
+# chemins et données non vérifiés, usages dangereux de l'API .NET. Les alertes s'affichent dans l'onglet « Security » du
+# dépôt (Code scanning). Demande du porteur du 27/10/2026 (directives de sécurité, analyseur statique).
+name: CodeQL
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyse:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Code du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: SDK .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Préparation de CodeQL (C#, règles de sécurité étendues)
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: csharp
+          build-mode: manual
+          queries: security-extended
+
+      - name: Compilation observée par CodeQL
+        shell: pwsh
+        run: dotnet build Maus.slnx -c Release --disable-build-servers
+
+      - name: Analyse
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: '/language:csharp'
