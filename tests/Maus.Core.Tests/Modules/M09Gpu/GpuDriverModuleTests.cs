@@ -22,10 +22,10 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Up_to_date_nvidia_card_on_full_link_is_compliant()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx2080Ti, width: 16, maxWidth: 16, bus: 1);
         var commands = new FakeCommands()
-            .Answer(NvidiaQuery, "00000000:01:00.0, 617.14, NVIDIA GeForce RTX 2080 Ti\r\n")
+            .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 2080 Ti\r\n")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true, EnabledByDefault: false));
 
@@ -34,7 +34,7 @@ public class GpuDriverModuleTests
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.basic-display-driver").Status);
         var driver = Get(findings, "M09.driver.nvidia");
         Assert.Equal(FindingStatus.Ok, driver.Status);
-        Assert.StartsWith("617.14 (version Windows 32.0.16.1714)", driver.Current, StringComparison.Ordinal);
+        Assert.StartsWith("621.01 (version Windows 32.0.16.2101)", driver.Current, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.pcie-link.nvidia").Status);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.hags").Status);
         Assert.Null(Get(findings, "M09.hags").SettingsPage);
@@ -46,11 +46,11 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Old_catalog_cannot_say_up_to_date_forever()
     {
-        // Même pilote « à jour », mais le catalogue intégré (vérifié le 24/09/2026) a plus de 45 jours au moment de l'audit.
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
+        // Même pilote « à jour », mais le catalogue intégré (vérifié le 27/10/2026) a plus de 45 jours au moment de l'audit.
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx2080Ti, width: 16, maxWidth: 16, bus: 1);
         var commands = new FakeCommands()
-            .Answer(NvidiaQuery, "00000000:01:00.0, 617.14, NVIDIA GeForce RTX 2080 Ti\r\n")
+            .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 2080 Ti\r\n")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true, EnabledByDefault: false));
         var later = new DateTimeOffset(2027, 1, 15, 12, 0, 0, TimeSpan.FromHours(1));
@@ -135,7 +135,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Narrow_pcie_link_on_a_desktop_is_to_check_under_load_before_reseating()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx2080Ti, width: 8, maxWidth: 16, bus: 1);
 
         var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
@@ -152,7 +152,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Laptop_wired_with_fewer_lanes_is_information_without_reseating_advice()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070 Laptop GPU", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070 Laptop GPU", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 8, maxWidth: 16, bus: 1);
 
         var findings = await Detect(TestContext.Create(cim: cim, hardware: Laptop), new FakeScheduling());
@@ -168,7 +168,7 @@ public class GpuDriverModuleTests
     [InlineData(false, "son slot ou le processeur la limitent à x8")]
     public async Task System_limit_given_by_nvidia_smi_is_the_reference(bool laptop, string advice)
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 8, maxWidth: 16, bus: 1);
         var commands = new FakeCommands().Answer(NvidiaPcie, "00000000:01:00.0, 8, 8\r\n");
 
@@ -183,7 +183,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Reduced_width_below_the_system_limit_is_still_flagged_on_a_desktop()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 4, maxWidth: 16, bus: 1);
         var commands = new FakeCommands().Answer(NvidiaPcie, "00000000:01:00.0, 4, 16\r\n");
 
@@ -195,7 +195,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task External_thunderbolt_enclosure_is_not_judged_like_a_slot()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 4, maxWidth: 16, bus: 1, tunneled: true);
 
         var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
@@ -208,7 +208,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Sleeping_laptop_gpu_gives_an_unknown_width_with_the_reason()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070 Laptop GPU", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070 Laptop GPU", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 0, maxWidth: 16, bus: 1);
 
         var findings = await Detect(TestContext.Create(cim: cim, hardware: Laptop), new FakeScheduling());
@@ -221,7 +221,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Unreadable_pcie_link_is_unknown()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
 
         var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
 
@@ -231,10 +231,10 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Rtx_40_without_hags_and_resizable_bar_is_improvable()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 16, maxWidth: 16, bus: 1);
         var commands = new FakeCommands()
-            .Answer(NvidiaQuery, "00000000:01:00.0, 617.14, NVIDIA GeForce RTX 4070")
+            .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 4070")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false, EnabledByDefault: true));
 
@@ -254,10 +254,10 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Rtx_40_with_large_bar1_has_resizable_bar_active()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 16, maxWidth: 16, bus: 1);
         var commands = new FakeCommands()
-            .Answer(NvidiaQuery, "00000000:01:00.0, 617.14, NVIDIA GeForce RTX 4070")
+            .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 4070")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 16384));
 
         var findings = await Detect(TestContext.Create(cim: cim, commands: commands), new FakeScheduling());
@@ -268,19 +268,19 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Resizable_bar_without_nvidia_smi_or_memory_ranges_is_unknown()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
 
         var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
 
         Assert.Equal(FindingStatus.Unknown, Get(findings, "M09.resizable-bar.nvidia").Status);
-        Assert.StartsWith("617.14", Get(findings, "M09.driver.nvidia").Current, StringComparison.Ordinal);
+        Assert.StartsWith("621.01", Get(findings, "M09.driver.nvidia").Current, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Resizable_bar_falls_back_to_memory_ranges()
     {
         var cim = new FakeCim()
-            .Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"))
+            .Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"))
             .Answer(
                 GpuDriverModule.MemoryRangesQuery(Rtx4070),
                 new Dictionary<string, object?> { ["StartingAddress"] = 0xF6000000UL, ["EndingAddress"] = 0xF6FFFFFFUL },
@@ -296,7 +296,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Hags_falls_back_to_registry_value()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         var registry = new FakeRegistry().Set(RegistryHive.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode", 1);
 
         var findings = await Detect(TestContext.Create(registry, cim), new FakeScheduling(null));
@@ -309,7 +309,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Hags_unreadable_is_unknown()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         var registry = new FakeRegistry().Deny(RegistryHive.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers");
 
         var findings = await Detect(TestContext.Create(registry, cim), new FakeScheduling(null));
@@ -320,7 +320,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Hags_off_on_older_card_is_informative()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: false, EnabledByDefault: false));
 
         var findings = await Detect(TestContext.Create(cim: cim), scheduling);
@@ -333,7 +333,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Hags_not_supported_is_informative()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: false, Enabled: false, EnabledByDefault: false));
 
         var findings = await Detect(TestContext.Create(cim: cim), scheduling);
@@ -355,7 +355,7 @@ public class GpuDriverModuleTests
         var driver = Get(findings, "M09.driver.amd");
         Assert.Equal(FindingStatus.Improvable, driver.Status);
         Assert.StartsWith("25.11.1 (version Windows 32.0.21001.9024)", driver.Current, StringComparison.Ordinal);
-        Assert.StartsWith("26.9.1", driver.Expected, StringComparison.Ordinal);
+        Assert.StartsWith("26.10.1", driver.Expected, StringComparison.Ordinal);
         Assert.Contains("amd.com", driver.Advice, StringComparison.Ordinal);
 
         // Sur une Radeon, la largeur lue peut être celle du commutateur interne : simple information.
@@ -391,8 +391,8 @@ public class GpuDriverModuleTests
     {
         var cim = new FakeCim().Answer(
             VideoControllerQuery,
-            Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1714", Recent, "oem157.inf"),
-            Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+            Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"),
+            Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
 
         var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
 
@@ -505,7 +505,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Hags_fix_needs_a_restart_and_is_reported_as_pending_until_then()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.1714", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 16, maxWidth: 16, bus: 1);
         var registry = new FakeRegistry();
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false, EnabledByDefault: true));

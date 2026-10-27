@@ -1,0 +1,41 @@
+# Rappel mensuel : le catalogue des pilotes graphiques (src/Maus.Core/Catalog/m09-gpu-drivers.json) doit être revérifié
+# chaque mois sur les pages officielles ; passé 45 jours, MAUS ne dit plus « à jour » et le signale. Le 1er de chaque mois,
+# un ticket est ouvert (s'il n'y en a pas déjà un d'ouvert). Aucun code n'est lancé, aucune action extérieure n'est utilisée.
+name: Rappel du catalogue des pilotes
+
+on:
+  schedule:
+    - cron: "0 7 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  rappel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ouvrir le ticket de vérification
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          title="Vérifier le catalogue des pilotes graphiques ($(date -u +%Y-%m))"
+          if gh issue list --state open --search "Vérifier le catalogue des pilotes graphiques in:title" --json number --jq 'length' | grep -qv '^0$'; then
+            echo "Un ticket de vérification est déjà ouvert."
+            exit 0
+          fi
+          checked=$(gh api "repos/$GH_REPO/contents/src/Maus.Core/Catalog/m09-gpu-drivers.json" --jq .content | base64 -d | grep -o '"checkedOn": "[0-9-]*"' | cut -d'"' -f4 || true)
+          gh issue create --title "$title" --body "Rappel mensuel automatique.
+
+          Le catalogue \`src/Maus.Core/Catalog/m09-gpu-drivers.json\` doit être revérifié sur les pages officielles (au-delà de 45 jours, MAUS ne dit plus « à jour »).
+
+          - [ ] NVIDIA Game Ready et pilote de sécurité R580 (Maxwell, Pascal, Volta) : https://www.nvidia.com/fr-fr/drivers/
+          - [ ] AMD Adrenalin (RX 5000 à RX 9000) et Polaris / Vega : https://www.amd.com/fr/support/download/drivers.html
+          - [ ] Intel Arc et Core Ultra : https://www.intel.com/content/www/us/en/download/785597/intel-arc-graphics-windows.html
+          - [ ] Intel 11e à 14e génération : https://www.intel.com/content/www/us/en/download/864990/intel-11th-14th-gen-processor-graphics-windows.html
+          - [ ] Intel 7e à 10e génération : https://www.intel.com/content/www/us/en/download/776137/intel-7th-10th-gen-processor-graphics-windows.html
+          - [ ] Mettre à jour \`checkedOn\`, les versions, les dates et le commentaire des sources, puis les tests de M09.
+
+          Dernière vérification inscrite dans le catalogue : ${checked:-inconnue}."
