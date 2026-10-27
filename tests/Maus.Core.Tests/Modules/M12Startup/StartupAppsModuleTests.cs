@@ -257,7 +257,11 @@ public class StartupAppsModuleTests
             .Add(StartupAppsModule.PerformanceLog, "Microsoft-Windows-Diagnostics-Performance", 100, new DateTime(2026, 9, 1, 8, 0, 0),
                 new Dictionary<string, string> { ["BootTime"] = "90000" })
             .Add(StartupAppsModule.PerformanceLog, "Microsoft-Windows-Diagnostics-Performance", 101, new DateTime(2026, 9, 20, 8, 0, 0),
-                new Dictionary<string, string> { ["Name"] = "steam.exe", ["FriendlyName"] = "Steam", ["DegradationTime"] = "3200" });
+                new Dictionary<string, string> { ["Name"] = "steam.exe", ["FriendlyName"] = "Steam", ["DegradationTime"] = "3200" })
+            .Add(StartupAppsModule.PerformanceLog, "Microsoft-Windows-Diagnostics-Performance", 102, new DateTime(2026, 9, 20, 8, 0, 0),
+                new Dictionary<string, string> { ["Name"] = "xyz.sys", ["FriendlyName"] = "Pilote XYZ", ["DegradationTime"] = "1500" })
+            .Add(StartupAppsModule.PerformanceLog, "Microsoft-Windows-Diagnostics-Performance", 108, new DateTime(2026, 9, 20, 8, 0, 0),
+                new Dictionary<string, string> { ["DegradationTime"] = "900" });
 
         var findings = await Detect(eventLogs: logs);
 
@@ -265,7 +269,8 @@ public class StartupAppsModuleTests
         Assert.Equal(FindingStatus.Info, boot.Status);
         Assert.Equal("45,3 s, le 20/09/2026", boot.Current);
         Assert.Contains("20,1 s avant l'affichage du bureau", boot.Explanation, StringComparison.Ordinal);
-        Assert.Contains("Steam (+3,2 s)", boot.Explanation, StringComparison.Ordinal);
+        Assert.Contains("programme Steam (+3,2 s), pilote Pilote XYZ (+1,5 s), stratégies de l'utilisateur (+0,9 s)", boot.Explanation, StringComparison.Ordinal);
+        Assert.Contains("Derniers démarrages : 45,3 s le 20/09/2026, 90,0 s le 01/09/2026", boot.Explanation, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -426,7 +426,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         IReadOnlyList<EventRecordInfo> events;
         try
         {
-            events = context.EventLogs.Query(PerformanceLog, null, [100, 101], context.Now.DateTime.AddDays(-60), maxEvents: 200);
+            events = context.EventLogs.Query(PerformanceLog, null, [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110], context.Now.DateTime.AddDays(-60), maxEvents: 400);
         }
         catch (MausAccessDeniedException)
         {
@@ -452,22 +452,40 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         if (StartupParsers.ParseMilliseconds(boot.Data, "MainPathBootTime") is { } mainPath)
         {
             explanation += T(" Dont {0} s avant l'affichage du bureau.", mainPath.ToString("0.0", Culture));
+            if (StartupParsers.ParseMilliseconds(boot.Data, "BootPostBootTime") is { } postBoot)
+            {
+                explanation += T(" Puis {0} s après l'affichage du bureau, le temps que les programmes du démarrage se lancent.", postBoot.ToString("0.0", Culture));
+            }
         }
 
-        var slowApps = events
-            .Where(e => e.Id == 101)
-            .Select(e => (Name: e.Data.GetValueOrDefault("FriendlyName") is { Length: > 0 } friendly ? friendly : e.Data.GetValueOrDefault("Name"),
-                Delay: StartupParsers.ParseMilliseconds(e.Data, "DegradationTime")))
-            .Where(a => !string.IsNullOrWhiteSpace(a.Name) && a.Delay is > 0)
-            .GroupBy(a => a.Name!, StringComparer.OrdinalIgnoreCase)
-            .Select(g => (Name: g.Key, Delay: g.Max(a => a.Delay!.Value)))
-            .OrderByDescending(a => a.Delay)
-            .Take(3)
+        // Historique : les derniers démarrages mesurés, pour voir si la durée augmente avec le temps.
+        var history = events.Where(e => e.Id == 100)
+            .OrderByDescending(e => e.TimeCreated)
+            .Select(e => (e.TimeCreated, Seconds: StartupParsers.ParseMilliseconds(e.Data, "BootTime")))
+            .Where(b => b.Seconds is > 0)
+            .Take(5)
             .ToList();
-        if (slowApps.Count > 0)
+        if (history.Count > 1)
         {
-            explanation += T(" Programmes signalés par Windows comme ralentissant le démarrage : ")
-                + string.Join(", ", slowApps.Select(a => $"{a.Name} (+{a.Delay.ToString("0.0", Culture)} s)")) + ".";
+            explanation += T(" Derniers démarrages : {0}.",
+                string.Join(", ", history.Select(b => T("{0} s le {1}", b.Seconds!.Value.ToString("0.0", Culture), b.TimeCreated.ToString("d", Culture)))));
+        }
+
+        // Ce que Windows signale lui-même comme ayant ralenti le démarrage (événements 101 à 110 du même journal ;
+        // sens des numéros : eventlogxp.com, « Windows boot performance diagnostics » ; noms des champs relevés le 27/10/2026).
+        var slow = events
+            .Where(e => e.Id is >= 101 and <= 110)
+            .Select(e => (Label: SlowdownLabel(e), Delay: StartupParsers.ParseMilliseconds(e.Data, "DegradationTime")))
+            .Where(a => a.Label is not null && a.Delay is > 0)
+            .GroupBy(a => a.Label!, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (Label: g.Key, Delay: g.Max(a => a.Delay!.Value)))
+            .OrderByDescending(a => a.Delay)
+            .Take(5)
+            .ToList();
+        if (slow.Count > 0)
+        {
+            explanation += T(" Signalé par Windows comme ayant ralenti le démarrage (ces 60 derniers jours) : ")
+                + string.Join(", ", slow.Select(a => $"{a.Label} (+{a.Delay.ToString("0.0", Culture)} s)")) + ".";
         }
 
         return new Finding
@@ -479,6 +497,29 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Current = T("{0} s, le {1}", seconds.Value.ToString("0.0", Culture), boot.TimeCreated.ToString("d", Culture)),
             Explanation = explanation,
             Advice = T("Notez cette durée, désactivez les entrées inutiles, redémarrez, puis comparez."),
+        };
+    }
+
+    /// <summary>
+    /// Ce qui a ralenti un démarrage, d'après l'événement : son nom (programme, pilote, service, périphérique) précédé de sa
+    /// nature, ou la seule nature pour les étapes de Windows (stratégies, optimisations, gestionnaire de session).
+    /// </summary>
+    private static string? SlowdownLabel(EventRecordInfo record)
+    {
+        var name = record.Data.GetValueOrDefault("FriendlyName") is { Length: > 0 } friendly ? friendly : record.Data.GetValueOrDefault("Name");
+        string? Named(string kind) => string.IsNullOrWhiteSpace(name) ? null : T("{0} {1}", kind, name);
+        return record.Id switch
+        {
+            101 => Named(T("programme")),
+            102 => Named(T("pilote")),
+            103 => Named(T("service")),
+            109 => Named(T("périphérique")),
+            104 => T("démarrage du cœur de Windows"),
+            105 or 106 => T("préchargement des programmes par Windows"),
+            107 => T("stratégies de l'ordinateur"),
+            108 => T("stratégies de l'utilisateur"),
+            110 => T("gestionnaire de session de Windows"),
+            _ => null,
         };
     }
 
