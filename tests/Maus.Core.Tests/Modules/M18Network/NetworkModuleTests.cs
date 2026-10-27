@@ -5,9 +5,9 @@ namespace Maus.Core.Tests.Modules.M18Network;
 
 public class NetworkModuleTests
 {
-    private sealed class FakeWifi(WifiLink? link) : IWifiSource
+    private sealed class FakeWifi(WifiReading reading) : IWifiSource
     {
-        public WifiLink? Current() => link;
+        public WifiReading Read() => reading;
     }
 
     private static Dictionary<string, object?> Adapter(string name, long medium, long speed, bool connected = true, bool hardware = true) => new()
@@ -21,6 +21,9 @@ public class NetworkModuleTests
     };
 
     private static Task<IReadOnlyList<Finding>> Detect(FakeCim cim, WifiLink? wifi = null) =>
+        Detect(cim, new WifiReading(wifi, [], false));
+
+    private static Task<IReadOnlyList<Finding>> Detect(FakeCim cim, WifiReading wifi) =>
         new NetworkModule(new FakeWifi(wifi)).DetectAsync(TestContext.Create(cim: cim), CancellationToken.None);
 
     private static FakeCim Adapters(params Dictionary<string, object?>[] rows) =>
@@ -86,5 +89,70 @@ public class NetworkModuleTests
     public void The_band_is_only_given_when_certain(int phy, int channel, string? band)
     {
         Assert.Equal(band, new WifiLink("x", 50, 1, 1, phy, channel).Band);
+    }
+
+    [Fact]
+    public async Task Location_refusal_is_explained_with_the_settings_page_instead_of_a_stopped_service()
+    {
+        var finding = Assert.Single(await Detect(Adapters(Adapter("Wi-Fi", 9, 72_000_000)), new WifiReading(null, [], LocationDenied: true)));
+
+        Assert.Equal(FindingStatus.Info, finding.Status);
+        Assert.Contains("position précise", finding.Explanation, StringComparison.Ordinal);
+        Assert.Equal("ms-settings:privacy-location", finding.SettingsPage);
+    }
+
+    [Fact]
+    public async Task Nearby_access_points_are_counted_by_channel_without_their_names_and_the_frequency_gives_the_band()
+    {
+        // Wi-Fi 6 sur le canal 5 : sans la fréquence, 2,4 GHz et 6 GHz sont indiscernables ; 5975 MHz = 6 GHz.
+        var link = new WifiLink("Maison", 80, 1200, 1200, 10, 5) { FrequencyMhz = 5975 };
+        var nearby = new List<WifiAccessPoint>
+        {
+            new("AA0000000001", 40, 5975),
+            new("AA0000000002", 30, 2437),
+            new("AA0000000003", 20, 2437),
+            new("AA0000000004", 60, 5180),
+        };
+
+        var finding = Assert.Single(await Detect(Adapters(Adapter("Wi-Fi", 9, 1_201_000_000)), new WifiReading(link, nearby, false)));
+
+        Assert.Contains("6 GHz", finding.Current, StringComparison.Ordinal);
+        Assert.Contains("Autres points d'accès visibles : 4.", finding.Explanation, StringComparison.Ordinal);
+        Assert.Contains("Sur votre canal (5, 6 GHz) : 1.", finding.Explanation, StringComparison.Ordinal);
+        Assert.Contains("2,4 GHz : canal 6 (2) ; 5 GHz : canal 36 (1) ; 6 GHz : canal 5 (1)", finding.Explanation, StringComparison.Ordinal);
+        Assert.DoesNotContain("AA00", finding.Explanation, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(2412, 1)]
+    [InlineData(2472, 13)]
+    [InlineData(2484, 14)]
+    [InlineData(5180, 36)]
+    [InlineData(5825, 165)]
+    [InlineData(5955, 1)]
+    [InlineData(7115, 233)]
+    public void Channels_follow_the_ieee_frequency_formulas(int mhz, int channel) => Assert.Equal(channel, WifiChannels.Channel(mhz));
+
+    [Fact]
+    public void Bss_list_is_read_with_the_wlanapi_layout_and_bounded_by_its_size()
+    {
+        var buffer = new byte[8 + (2 * WifiBssList.EntrySize)];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(buffer, (uint)buffer.Length);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(4), 3); // annonce 3 entrées, n'en contient que 2
+        for (var i = 0; i < 2; i++)
+        {
+            var entry = buffer.AsSpan(8 + (i * WifiBssList.EntrySize));
+            entry[40] = 0xA0;
+            entry[45] = (byte)i;
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(entry[60..], 70 - (i * 10));
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(entry[92..], i == 0 ? 2_437_000u : 5_180_000u);
+        }
+
+        var points = WifiBssList.Parse(buffer);
+
+        Assert.Equal(2, points.Count);
+        Assert.Equal(new WifiAccessPoint("A00000000000", 70, 2437), points[0]);
+        Assert.Equal(36, points[1].Channel);
+        Assert.Equal("5 GHz", points[1].Band);
     }
 }

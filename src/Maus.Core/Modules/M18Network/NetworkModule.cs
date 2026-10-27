@@ -103,7 +103,8 @@ public sealed class NetworkModule : IAuditModule
     private Finding DescribeWifi(CimRow adapter)
     {
         var name = adapter.GetString("Name") ?? "Wi-Fi";
-        var link = _wifi.Current();
+        var reading = _wifi.Read();
+        var link = reading.Link;
         var speed = adapter.GetInt64("ReceiveLinkSpeed") ?? 0;
         if (link is null)
         {
@@ -114,7 +115,14 @@ public sealed class NetworkModule : IAuditModule
                 Category = Category,
                 Status = FindingStatus.Info,
                 Current = speed > 0 ? T("connecté à {0}", Rate(speed)) : T("connecté"),
-                Explanation = T("Le détail du signal Wi-Fi n'a pas pu être lu (service de configuration automatique WLAN arrêté ?)."),
+                Explanation = reading.LocationDenied
+                    ? T("Windows refuse le détail du Wi-Fi (signal, canal, réseaux voisins) aux applications qui n'ont pas l'accès à la position précise : "
+                        + "le nom des réseaux visibles suffit à situer un PC. MAUS ne s'en sert pas pour vous localiser et n'envoie rien.")
+                    : T("Le détail du signal Wi-Fi n'a pas pu être lu (service de configuration automatique WLAN arrêté ?)."),
+                Advice = reading.LocationDenied
+                    ? T("Pour voir le détail : Paramètres > Confidentialité et sécurité > Localisation, autorisez les applications de bureau, puis relancez l'audit.")
+                    : null,
+                SettingsPage = reading.LocationDenied ? "ms-settings:privacy-location" : null,
             };
         }
 
@@ -157,9 +165,37 @@ public sealed class NetworkModule : IAuditModule
             Severity = Severity.Low,
             Current = string.Join(" · ", details),
             Expected = T("signal de 50 % ou plus"),
-            Explanation = T("Un signal faible fait chuter le débit et monter la latence (le « ping » en jeu). Pour jouer en ligne, un câble Ethernet reste plus stable que le meilleur Wi-Fi."),
+            Explanation = T("Un signal faible fait chuter le débit et monter la latence (le « ping » en jeu). Pour jouer en ligne, un câble Ethernet reste plus stable que le meilleur Wi-Fi.")
+                + DescribeNearby(link, reading.Nearby),
             Advice = advice.Count == 0 ? null : string.Join(" ", advice),
         };
+    }
+
+    /// <summary>
+    /// Points d'accès voisins vus par la carte (liste en cache de Windows), par bande et canal, sans leur nom (vie privée des voisins).
+    /// Aucun jugement d'encombrement : aucun seuil publié ne dit à partir de combien de voisins un canal est « encombré ».
+    /// </summary>
+    private static string DescribeNearby(WifiLink link, IReadOnlyList<WifiAccessPoint> nearby)
+    {
+        if (nearby.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var byChannel = nearby.Where(p => p.Channel is not null && p.Band is not null)
+            .GroupBy(p => (Band: p.Band!, Channel: p.Channel!.Value))
+            .OrderBy(g => g.Key.Band, StringComparer.Ordinal).ThenBy(g => g.Key.Channel)
+            .GroupBy(g => g.Key.Band)
+            .Select(band => T("{0} : {1}", band.Key, string.Join(", ", band.Select(g => T("canal {0} ({1})", g.Key.Channel, g.Count())))))
+            .ToList();
+        var text = T(" Autres points d'accès visibles : {0}.", nearby.Count);
+        if (link.Channel is { } channel && link.Band is { } band)
+        {
+            var same = nearby.Count(p => p.Channel == channel && p.Band == band);
+            text += T(" Sur votre canal ({0}, {1}) : {2}.", channel, band, same);
+        }
+
+        return byChannel.Count == 0 ? text : text + T(" Par canal : {0}.", string.Join(" ; ", byChannel));
     }
 
     private static string Rate(long bitsPerSecond) => bitsPerSecond >= Gigabit
