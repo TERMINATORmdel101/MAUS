@@ -463,7 +463,7 @@ public sealed class DisplayModule : IAuditModule
     private static bool IsIndirect(OutputTechnology output) =>
         output is OutputTechnology.IndirectWired or OutputTechnology.IndirectVirtual or OutputTechnology.Miracast;
 
-    private static string Label(DisplayPath path, int index)
+    internal static string Label(DisplayPath path, int index)
     {
         if (!string.IsNullOrWhiteSpace(path.MonitorName))
         {

@@ -43,6 +43,9 @@
                         <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.FixThis}" Padding="14,4" FontSize="12" Margin="0,0,6,0"
                                 ToolTip="{x:Static app:Ui.FixThisTip}" Command="{Binding FixCommand}"
                                 Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}" />
+                        <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.TryMaxRefresh}" Padding="14,4" FontSize="12" Margin="0,0,6,0"
+                                ToolTip="{x:Static app:Ui.TryMaxRefreshTip}" Command="{Binding TryRefreshCommand}"
+                                Visibility="{Binding CanTryRefresh, Converter={StaticResource BoolToVisibility}}" />
                         <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenWebPage}" Padding="12,3" FontSize="12" Margin="0,0,6,0"
                                 ToolTip="{Binding Link, Mode=OneWay}" Command="{Binding OpenLinkCommand}"
                                 Visibility="{Binding HasLink, Converter={StaticResource BoolToVisibility}}" />

@@ -1,5 +1,7 @@
+using System.Windows;
 using System.Windows.Input;
 using Maus.Core;
+using Maus.Core.Modules.M14Display;
 using Maus.Core.Reporting;
 using static Maus.Core.Localization.Texts;
 
@@ -36,6 +38,16 @@ public sealed class FindingViewModel
         });
         AcknowledgeCommand = new AsyncCommand(() => actions.AcknowledgeAsync(moduleId, finding, true));
         UnacknowledgeCommand = new AsyncCommand(() => actions.AcknowledgeAsync(moduleId, finding, false));
+        TryRefreshCommand = new AsyncCommand(() =>
+        {
+            var target = RefreshRateTargets.Find(finding.Id);
+            MessageBox.Show(
+                target is null
+                    ? T("L'écran a changé depuis l'audit ou tourne déjà à sa fréquence maximale : relancez l'audit.")
+                    : Views.RefreshTrialWindow.Run(target),
+                "MAUS", MessageBoxButton.OK, MessageBoxImage.Information);
+            return Task.CompletedTask;
+        });
         OpenSettingsPageCommand = new AsyncCommand(() =>
         {
             if (finding.SettingsPage is { } page)
@@ -91,6 +103,11 @@ public sealed class FindingViewModel
 
     /// <summary>Le constat renvoie vers une page des Paramètres de Windows (bouton « Ouvrir dans Windows »).</summary>
     public bool HasSettingsPage => finding.SettingsPage is not null;
+
+    /// <summary>Écran sous sa fréquence maximale (Module 14) : bouton « Essayer la fréquence maximale », avec retour automatique.</summary>
+    public bool CanTryRefresh => RefreshRateTargets.IsRefreshFinding(finding.Id) && finding.Fixable && finding.AcknowledgedFrom is null;
+
+    public ICommand TryRefreshCommand { get; }
 
     public ICommand OpenSettingsPageCommand { get; }
 

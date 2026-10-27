@@ -145,6 +145,10 @@ public static class Ui
 
     public static string FixThisTip => T("Coche la correction de ce constat et ouvre l'onglet Corrections : rien n'est modifié avant que vous cliquiez sur « Appliquer ».");
 
+    public static string TryMaxRefresh => T("Essayer la fréquence maximale");
+
+    public static string TryMaxRefreshTip => T("Essai sans enregistrement : vous gardez la nouvelle fréquence d'un clic, sinon l'ancienne revient seule après 15 secondes.");
+
     public static string TestsStability => T("Stabilité");
 
     public static string TestsStabilityIntro => T("Ces tests font travailler le matériel à fond pour révéler une erreur ou une instabilité. Un seul test à la fois.");
