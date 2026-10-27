@@ -1952,12 +1952,14 @@
 
     <!-- Bas de la barre de navigation : langue, fenêtre de surveillance, paramètres (posés sur la barre, hors du gabarit). -->
     <StackPanel Width="232" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,16">
-        <!-- Langue sur toute la largeur (le nom de la langue était coupé à côté des boutons), puis les trois boutons ronds. -->
+        <!-- Langue sur toute la largeur (le nom de la langue était coupé à côté des boutons), puis les quatre boutons ronds. -->
         <ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding LanguageChoice}" DisplayMemberPath="Label" Margin="14,0,14,8"
                   AutomationProperties.Name="Language / Langue / Idioma" ToolTip="Language · Langue · Idioma" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
             <Button Style="{StaticResource IconButton}" Content="&#xE9D9;" Margin="0,0,12,0"
                     Command="{Binding OpenMonitorCommand}" ToolTip="{x:Static app:Ui.MonitorTitle}" AutomationProperties.Name="{x:Static app:Ui.MonitorTitle}" />
+            <Button Style="{StaticResource IconButton}" Content="&#xE897;" Margin="0,0,12,0"
+                    Command="{Binding OpenHelpSiteCommand}" ToolTip="{x:Static app:Ui.HelpSite}" AutomationProperties.Name="{x:Static app:Ui.HelpSite}" />
             <Button Style="{StaticResource IconButton}" Content="&#xE946;" Margin="0,0,12,0"
                     Command="{Binding OpenAboutCommand}" ToolTip="{x:Static app:Ui.AboutTitle}" AutomationProperties.Name="{x:Static app:Ui.AboutTitle}" />
             <Button Style="{StaticResource IconButton}" Content="&#xE713;"

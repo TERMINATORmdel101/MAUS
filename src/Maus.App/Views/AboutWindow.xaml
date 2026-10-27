@@ -22,6 +22,7 @@
     <DockPanel>
         <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
             <WrapPanel HorizontalAlignment="Right">
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.HelpSite}" Margin="0,0,8,4" Click="OnHelpSite" />
                 <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ReportProblem}" Margin="0,0,8,4" Click="OnReport"
                         Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}" />
                 <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ProjectPage}" Margin="0,0,8,4" Click="OnProject"

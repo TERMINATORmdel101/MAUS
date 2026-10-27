@@ -30,6 +30,15 @@ public sealed partial class MainViewModel
     });
 
     /// <summary>« À propos » : logo, version, licence, confidentialité, avertissements, composants et signalement.</summary>
+    private ICommand? _openHelpSite;
+
+    /// <summary>Site d'aide de MAUS, dans le navigateur (sans les droits administrateur).</summary>
+    public ICommand OpenHelpSiteCommand => _openHelpSite ??= new AsyncCommand(() =>
+    {
+        ShellLauncher.OpenUrl(Maus.Core.ProjectLinks.HelpSite);
+        return Task.CompletedTask;
+    });
+
     public ICommand OpenAboutCommand => _openAbout ??= new AsyncCommand(() =>
     {
         new AboutWindow { Owner = Application.Current?.MainWindow }.ShowDialog();

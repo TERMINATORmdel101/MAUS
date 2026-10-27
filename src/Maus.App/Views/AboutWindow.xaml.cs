@@ -21,6 +21,8 @@ public partial class AboutWindow : Window
 
     private void OnReport(object sender, RoutedEventArgs e) => ShellLauncher.OpenUrl(Maus.Core.ProjectLinks.NewIssue);
 
+    private void OnHelpSite(object sender, RoutedEventArgs e) => ShellLauncher.OpenUrl(Maus.Core.ProjectLinks.HelpSite);
+
     /// <summary>Dossier des licences livré avec MAUS (licence, composants tiers, LGPL-2.1, marque).</summary>
     private void OnLicenses(object sender, RoutedEventArgs e) => ShellLauncher.OpenFolder(Path.Combine(AppContext.BaseDirectory, "licenses"));
 }
