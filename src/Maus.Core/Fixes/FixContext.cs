@@ -31,7 +31,8 @@ public sealed class FixContext
     {
         ArgumentNullException.ThrowIfNull(audit);
 
-        var settings = new SettingsAccessor(audit.Registry, new WindowsRegistryWriter(), audit.SystemParameters, new Win32SystemParametersWriter());
+        var settings = new SettingsAccessor(audit.Registry, new WindowsRegistryWriter(), audit.SystemParameters, new Win32SystemParametersWriter(),
+            tasks: new WindowsScheduledTaskAccessor(audit.Cim));
         return new FixContext
         {
             Audit = audit,

@@ -19,6 +19,9 @@ public enum SettingKind
 
     /// <summary>Mode de gestion de l'alimentation actif (GUID).</summary>
     ActivePowerScheme,
+
+    /// <summary>Tâche planifiée active ou désactivée (<see cref="SettingKey.Path"/> = dossier, <see cref="SettingKey.Name"/> = nom).</summary>
+    ScheduledTask,
 }
 
 /// <summary>Désigne un réglage précis que MAUS sait lire, écrire et restaurer. Sérialisé tel quel dans le journal.</summary>
@@ -69,12 +72,20 @@ public sealed record SettingKey
 
     public static SettingKey ActivePowerScheme { get; } = new() { Kind = SettingKind.ActivePowerScheme };
 
+    public static SettingKey ScheduledTask(string taskPath, string taskName)
+    {
+        ArgumentNullException.ThrowIfNull(taskPath);
+        ArgumentNullException.ThrowIfNull(taskName);
+        return new() { Kind = SettingKind.ScheduledTask, Path = taskPath, Name = taskName };
+    }
+
     /// <summary>Emplacement lisible, affiché dans l'aperçu et le journal.</summary>
     public string Describe() => Kind switch
     {
         SettingKind.Registry => $@"{Hive}\{Path}\{Name}",
         SettingKind.SystemParameter => "SystemParametersInfo 0x" + SpiSet.ToString("X4", CultureInfo.InvariantCulture),
         SettingKind.ActivePowerScheme => T("Mode de gestion de l'alimentation actif"),
+        SettingKind.ScheduledTask => T("Tâche planifiée {0}", WindowsScheduledTaskAccessor.FullName(Path!, Name!)),
         _ => "SystemParametersInfo SPI_SETANIMATION",
     };
 

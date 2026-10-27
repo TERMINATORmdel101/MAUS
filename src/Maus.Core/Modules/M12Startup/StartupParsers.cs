@@ -11,7 +11,7 @@ namespace Maus.Core.Modules.M12Startup;
 internal sealed record ApprovalState(bool Enabled, DateTime? DisabledOnUtc);
 
 /// <summary>Tâche planifiée tierce lancée à l'ouverture de session : chemin dans la bibliothèque et commande.</summary>
-internal sealed record LogonTaskInfo(string Name, string? Command);
+internal sealed record LogonTaskInfo(string Name, string? Command, string TaskPath = @"\", string TaskName = "");
 
 /// <summary>Analyses sans accès au système utilisées par le module 12.</summary>
 internal static partial class StartupParsers
@@ -253,8 +253,9 @@ internal static partial class StartupParsers
             command = $"{command} {arguments}";
         }
 
-        var name = $"{path}{task.GetString("TaskName")}".TrimStart('\\');
-        return new LogonTaskInfo(name, string.IsNullOrEmpty(command) ? null : command);
+        var taskName = task.GetString("TaskName") ?? string.Empty;
+        var name = $"{path}{taskName}".TrimStart('\\');
+        return new LogonTaskInfo(name, string.IsNullOrEmpty(command) ? null : command, path, taskName);
     }
 
     /// <summary>

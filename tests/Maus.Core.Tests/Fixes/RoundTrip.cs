@@ -9,7 +9,8 @@ namespace Maus.Core.Tests.Fixes;
 public static class RoundTrip
 {
     public static async Task<(IReadOnlyList<PlannedChange> Plan, ApplyResult Applied)> AssertAsync(
-        IFixableModule module, AuditContext audit, FakeRegistry registry, FakeSystemParameters? parameters = null, Maus.Core.Platform.IPowerSchemeAccessor? power = null)
+        IFixableModule module, AuditContext audit, FakeRegistry registry, FakeSystemParameters? parameters = null, Maus.Core.Platform.IPowerSchemeAccessor? power = null,
+        IScheduledTaskAccessor? tasks = null)
     {
         var before = await module.DetectAsync(audit, CancellationToken.None);
         var plan = module.Plan(audit, before);
@@ -17,7 +18,7 @@ public static class RoundTrip
         Assert.All(plan, c => Assert.Equal(module.Id, c.ModuleId));
         Assert.Equal(plan.Count, plan.Select(c => c.Id).Distinct().Count());
 
-        var engine = new FixEngine(TestFixContext.Create(audit, registry, parameters, power: power));
+        var engine = new FixEngine(TestFixContext.Create(audit, registry, parameters, power: power, tasks: tasks));
         var applied = engine.Apply(plan, new ApplyOptions());
         Assert.False(applied.Blocked, applied.BlockedReason);
         Assert.All(applied.Changes, c => Assert.True(c.Status == ChangeStatus.Applied, $"{c.ChangeId} : {c.Message}"));

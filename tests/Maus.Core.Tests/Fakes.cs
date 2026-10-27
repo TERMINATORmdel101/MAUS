@@ -345,6 +345,28 @@ public sealed class FakeNotifier : ISettingChangeNotifier
     public void Broadcast() => Broadcasts++;
 }
 
+/// <summary>
+/// Tâches planifiées en mémoire, partagées avec les lignes du faux CIM : désactiver une tâche change son « State »
+/// (1 = désactivée, 3 = prête), et le prochain audit le voit.
+/// </summary>
+public sealed class FakeScheduledTasks(params Dictionary<string, object?>[] rows) : IScheduledTaskAccessor
+{
+    public List<(string Path, string Name, bool Enabled)> Calls { get; } = [];
+
+    public bool? IsEnabled(string taskPath, string taskName) =>
+        Find(taskPath, taskName) is { } row ? Convert.ToInt64(row["State"], System.Globalization.CultureInfo.InvariantCulture) != 1 : null;
+
+    public void SetEnabled(string taskPath, string taskName, bool enabled)
+    {
+        var row = Find(taskPath, taskName) ?? throw new InvalidOperationException("tâche absente");
+        row["State"] = enabled ? 3L : 1L;
+        Calls.Add((taskPath, taskName, enabled));
+    }
+
+    private Dictionary<string, object?>? Find(string path, string name) =>
+        rows.FirstOrDefault(r => Equals(r["TaskPath"], path) && Equals(r["TaskName"], name));
+}
+
 public static class TestFixContext
 {
     public static FixContext Create(
@@ -356,13 +378,14 @@ public static class TestFixContext
         FakeNotifier? notifier = null,
         bool elevatedAsAnotherUser = false,
         IPowerSchemeAccessor? power = null,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        IScheduledTaskAccessor? tasks = null)
     {
         parameters ??= (FakeSystemParameters)audit.SystemParameters;
         return new FixContext
         {
             Audit = audit,
-            Settings = new SettingsAccessor(registry, registry, parameters, parameters, power),
+            Settings = new SettingsAccessor(registry, registry, parameters, parameters, power, tasks),
             Journal = journal ?? new InMemoryJournalStore(),
             SystemRestore = restore ?? new FakeSystemRestore(),
             Notifier = notifier ?? new FakeNotifier(),

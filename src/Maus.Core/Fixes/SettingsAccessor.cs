@@ -28,9 +28,12 @@ public sealed class SettingsAccessor(
     IRegistryWriter registryWriter,
     ISystemParametersReader parametersReader,
     ISystemParametersWriter parametersWriter,
-    IPowerSchemeAccessor? power = null) : ISettingsAccessor
+    IPowerSchemeAccessor? power = null,
+    IScheduledTaskAccessor? tasks = null) : ISettingsAccessor
 {
     private readonly IPowerSchemeAccessor _power = power ?? new Win32PowerSchemeAccessor();
+
+    private IScheduledTaskAccessor Tasks => tasks ?? throw new InvalidOperationException(T("Les tâches planifiées ne sont pas modifiables ici."));
 
     public SettingValue? Read(SettingKey key)
     {
@@ -49,6 +52,8 @@ public sealed class SettingsAccessor(
                     ?? throw new InvalidOperationException(T("Paramètre système illisible : {0}", key)));
             case SettingKind.ActivePowerScheme:
                 return SettingValue.Text((_power.GetActiveScheme() ?? throw new InvalidOperationException(T("Mode de gestion actif illisible."))).ToString("D"));
+            case SettingKind.ScheduledTask:
+                return Tasks.IsEnabled(key.Path!, key.Name!) is { } enabled ? SettingValue.Bool(enabled) : null;
             default:
                 throw new NotSupportedException(key.Kind.ToString());
         }
@@ -93,6 +98,9 @@ public sealed class SettingsAccessor(
                     throw new InvalidOperationException(T("Windows a refusé le mode de gestion {0} (absent de ce PC ?).", value?.Data));
                 }
 
+                break;
+            case SettingKind.ScheduledTask:
+                Tasks.SetEnabled(key.Path!, key.Name!, RequireValue(key, value).AsBool());
                 break;
             default:
                 throw new NotSupportedException(key.Kind.ToString());

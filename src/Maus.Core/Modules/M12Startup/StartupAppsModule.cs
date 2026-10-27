@@ -129,7 +129,51 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             });
         }
 
+        changes.AddRange(PlanLogonTasks(context.Cim, byId));
         return changes;
+    }
+
+    /// <summary>
+    /// Une correction par tâche tierce lancée à l'ouverture de session : la désactiver (jamais la supprimer), comme la case
+    /// « Désactiver » du Planificateur de tâches. Jamais pré-cochée : MAUS ne sait pas à quoi sert la tâche (souvent une mise à jour).
+    /// </summary>
+    private static List<Fixes.PlannedChange> PlanLogonTasks(ICimReader cim, Dictionary<string, Finding> byId)
+    {
+        const string findingId = "M12.logon-tasks";
+        if (!byId.TryGetValue(findingId, out var finding) || !finding.Fixable)
+        {
+            return [];
+        }
+
+        IReadOnlyList<CimRow> rows;
+        try
+        {
+            rows = cim.Query(TasksQuery, TaskSchedulerScope);
+        }
+        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
+        {
+            return [];
+        }
+
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        return rows.Select(StartupParsers.ParseLogonTask)
+            .OfType<LogonTaskInfo>()
+            .Where(t => t.TaskName.Length > 0)
+            .Select(t => new Fixes.PlannedChange
+            {
+                Id = UniqueId("M12.logon-task-" + StartupParsers.Slug(t.Name), used),
+                ModuleId = "M12",
+                FindingId = findingId,
+                Title = T("Désactiver la tâche planifiée : {0}", t.Name),
+                Description = T("Désactive la tâche dans le Planificateur de tâches, sans la supprimer : elle ne se lance plus à l'ouverture de session. Commande lancée : {0}.", t.Command ?? T("action non exécutable")),
+                Gain = T("Ouverture de session un peu plus rapide, un programme de moins en arrière-plan."),
+                Risk = T("Si la tâche sert aux mises à jour automatiques d'un logiciel, celui-ci ne se mettra plus à jour seul."),
+                Category = finding.Category,
+                Effect = Fixes.ChangeEffect.SignOut,
+                Recommended = false,
+                Writes = [new Fixes.SettingWrite(Fixes.SettingKey.ScheduledTask(t.TaskPath, t.TaskName), Fixes.SettingValue.Bool(false))],
+            })
+            .ToList();
     }
 
     private List<StartupEntry> CollectEntries(AuditContext context, List<Finding> findings)
@@ -559,7 +603,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 + "pas dans le Gestionnaire des tâches. Les tâches de Windows (dossier Microsoft) sont exclues ; sans droits administrateur, "
                 + "les tâches d'autres comptes peuvent manquer.")
                 + (found.Count == 0 ? string.Empty : T(" Tâches trouvées : ") + string.Join(" ; ", found) + "."),
-            Advice = found.Count == 0 ? null : T("Affichage seul pour l'instant : une prochaine version proposera de désactiver une tâche, avec votre accord."),
+            Advice = found.Count == 0 ? null : T("Onglet Corrections : chaque tâche peut être désactivée (jamais celles de Windows), puis réactivée avec « Annuler »."),
             Fixable = found.Count > 0,
         };
     }
