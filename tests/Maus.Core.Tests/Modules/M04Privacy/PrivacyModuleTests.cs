@@ -56,7 +56,7 @@ public class PrivacyModuleTests
         Assert.Equal(FindingStatus.Ok, Single(findings, "M04.recall").Status);
         var copilot = Single(findings, "M04.copilot");
         Assert.Equal(FindingStatus.Info, copilot.Status);
-        Assert.True(copilot.Fixable);
+        Assert.False(copilot.Fixable);
     }
 
     [Fact]
@@ -76,6 +76,7 @@ public class PrivacyModuleTests
             ("M04.start-recommendations", "ms-settings:personalization-start"),
             ("M04.search-highlights", "ms-settings:search-permissions"),
             ("M04.activity-history", "ms-settings:privacy-activityhistory"),
+            ("M04.copilot", "ms-settings:appsfeatures"),
         })
         {
             Assert.Equal(page, Single(findings, id).SettingsPage);
@@ -85,7 +86,7 @@ public class PrivacyModuleTests
         foreach (var id in new[]
         {
             "M04.diagtrack", "M04.diagnostic-logs", "M04.ceip-tasks", "M04.web-search", "M04.delivery-optimization",
-            "M04.copilot", "M04.recall", "M04.error-reporting",
+            "M04.recall", "M04.error-reporting",
         })
         {
             Assert.Null(Single(findings, id).SettingsPage);
@@ -426,6 +427,8 @@ public class PrivacyModuleTests
         var installed = PrivacySystemChecks.Copilot(new FakePackages().Add(CopilotPackage, "1.25.0.0"));
         Assert.Equal(FindingStatus.Info, installed.Status);
         Assert.Equal("installée (version 1.25.0.0)", installed.Current);
+        Assert.False(installed.Fixable);
+        Assert.Equal("ms-settings:appsfeatures", installed.SettingsPage);
 
         var officeHubOnly = PrivacySystemChecks.Copilot(new FakePackages().Add("Microsoft.MicrosoftOfficeHub"));
         Assert.Equal(FindingStatus.Ok, officeHubOnly.Status);
@@ -443,25 +446,30 @@ public class PrivacyModuleTests
     public void Recall_is_left_to_the_user()
     {
         var registry = new FakeRegistry();
-        Assert.Equal(FindingStatus.Ok, PrivacySystemChecks.Recall(new FakeCim(), registry).Status);
+        Assert.Equal(FindingStatus.Ok, PrivacySystemChecks.Recall(new FakeCim(), registry, Pro).Status);
 
         var enabled = new FakeCim().Answer(RecallQuery, Row(("Name", "Recall"), ("InstallState", 1u)));
-        var available = PrivacySystemChecks.Recall(enabled, registry);
+        var available = PrivacySystemChecks.Recall(enabled, registry, Pro);
         Assert.Equal(FindingStatus.Info, available.Status);
         Assert.True(available.Fixable);
         Assert.Contains("supprime les instantanés", available.Advice, StringComparison.Ordinal);
 
+        var home = PrivacySystemChecks.Recall(enabled, registry, Home);
+        Assert.Equal(FindingStatus.Info, home.Status);
+        Assert.False(home.Fixable);
+        Assert.Contains("Recall et instantanés", home.Advice, StringComparison.Ordinal);
+
         registry.Set(Hkcu, WindowsAiPolicy, "DisableAIDataAnalysis", 1);
-        Assert.Equal(FindingStatus.Ok, PrivacySystemChecks.Recall(enabled, registry).Status);
+        Assert.Equal(FindingStatus.Ok, PrivacySystemChecks.Recall(enabled, registry, Pro).Status);
 
         var disabled = new FakeCim().Answer(RecallQuery, Row(("Name", "Recall"), ("InstallState", 2u)));
-        Assert.Equal("désactivé", PrivacySystemChecks.Recall(disabled, new FakeRegistry()).Current);
+        Assert.Equal("désactivé", PrivacySystemChecks.Recall(disabled, new FakeRegistry(), Pro).Current);
 
         var unknownState = new FakeCim().Answer(RecallQuery, Row(("Name", "Recall"), ("InstallState", 4u)));
-        Assert.Equal(FindingStatus.Unknown, PrivacySystemChecks.Recall(unknownState, new FakeRegistry()).Status);
+        Assert.Equal(FindingStatus.Unknown, PrivacySystemChecks.Recall(unknownState, new FakeRegistry(), Pro).Status);
 
         var denied = new FakeCim().Throw(RecallQuery, new MausAccessDeniedException("refusé"));
-        Assert.Equal(FindingStatus.Unknown, PrivacySystemChecks.Recall(denied, new FakeRegistry()).Status);
+        Assert.Equal(FindingStatus.Unknown, PrivacySystemChecks.Recall(denied, new FakeRegistry(), Pro).Status);
     }
 
     [Fact]

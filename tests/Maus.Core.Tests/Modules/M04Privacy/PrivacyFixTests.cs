@@ -26,6 +26,22 @@ public class PrivacyFixTests
     }
 
     [Fact]
+    public async Task Recall_snapshots_are_blocked_by_policy_with_a_warning_and_restored_by_deleting_it()
+    {
+        var registry = WindowsDefaults();
+        var cim = new FakeCim().Answer(PrivacyKeys.RecallQuery, new Dictionary<string, object?> { ["Name"] = "Recall", ["InstallState"] = 1u });
+        var audit = TestContext.Create(registry, cim);
+
+        var (plan, _) = await Fixes.RoundTrip.AssertAsync(new PrivacyModule(), audit, registry);
+
+        var recall = plan.Single(c => c.Id == "M04.recall");
+        Assert.False(recall.Recommended);
+        Assert.Contains("supprimés", recall.Warning, StringComparison.Ordinal);
+        Assert.Equal(@"HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI\DisableAIDataAnalysis", recall.Writes.Single().Key.Describe());
+        Assert.Null(registry.GetValue(RegistryHive.LocalMachine, PrivacyKeys.WindowsAiPolicy, "DisableAIDataAnalysis"));
+    }
+
+    [Fact]
     public async Task Home_edition_gets_no_policy_only_changes()
     {
         var registry = WindowsDefaults();
@@ -34,7 +50,7 @@ public class PrivacyFixTests
 
         var plan = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None));
 
-        Assert.DoesNotContain(plan, c => c.Id is "M04.diagnostic-logs" or "M04.delivery-optimization");
+        Assert.DoesNotContain(plan, c => c.Id is "M04.diagnostic-logs" or "M04.delivery-optimization" or "M04.recall");
         Assert.Single(plan.Single(c => c.Id == "M04.advertising-id").Writes);
     }
 

@@ -111,7 +111,12 @@ internal static class PrivacySystemChecks
         _ => T("{0} : valeur inconnue", mode.ToString(CultureInfo.InvariantCulture)),
     };
 
-    /// <summary>L'app Copilot se retire au choix (option avancée) ; Microsoft 365 Copilot (<c>Microsoft.MicrosoftOfficeHub</c>) n'est jamais concernée.</summary>
+    /// <summary>
+    /// L'app Copilot se désinstalle au choix depuis Paramètres ; MAUS ne la retire pas lui-même : la seule stratégie officielle
+    /// (<c>RemoveMicrosoftCopilotApp</c>, Policy CSP WindowsAI) est réservée aux éditions Entreprise et Éducation, et
+    /// <c>TurnOffWindowsCopilot</c> est dépréciée et ne vise pas la nouvelle application (Microsoft Learn).
+    /// Microsoft 365 Copilot (<c>Microsoft.MicrosoftOfficeHub</c>) n'est jamais concernée.
+    /// </summary>
     public static Finding Copilot(IPackageInventory packages)
     {
         const string id = "M04.copilot";
@@ -128,8 +133,8 @@ internal static class PrivacySystemChecks
                 return Finding.Unknown(id, title, T("L'inventaire des applications n'a pas pu être lu."), Ai);
             }
 
-            var explanation = T("Copilot est l'assistant d'IA de Microsoft. Windows fonctionne très bien sans lui. Son retrait suit la méthode publiée par Microsoft ; " +
-                "l'application Microsoft 365 Copilot n'est jamais touchée.");
+            var explanation = T("Copilot est l'assistant d'IA de Microsoft. Windows fonctionne très bien sans lui. " +
+                "L'application Microsoft 365 Copilot (Office) est une autre application, non concernée ici.");
             return copilot is null
                 ? new Finding
                 {
@@ -143,14 +148,19 @@ internal static class PrivacySystemChecks
                     Explanation = explanation,
                 }
                 : Info(id, title, Ai, T("installée (version {0})", copilot.Version), T("au choix : conservée ou désinstallée"), explanation,
-                    T("Si vous n'utilisez pas Copilot, vous pourrez la désinstaller (option avancée). Elle se réinstalle depuis le Microsoft Store."),
-                    fixable: true);
+                    T("Si vous n'utilisez pas Copilot, désinstallez-la dans Paramètres > Applications > Applications installées ; elle se réinstalle depuis le Microsoft Store. " +
+                    "MAUS ne la retire pas lui-même : Windows n'offre pas de stratégie officielle pour cela sur les éditions Famille et Pro."),
+                    settingsPage: "ms-settings:appsfeatures");
         });
     }
 
-    /// <summary>Recall n'existe que sur les PC Copilot+ et ne capture rien sans consentement : son sort est laissé au choix de l'utilisateur.</summary>
-    public static Finding Recall(ICimReader cim, IRegistryReader registry)
+    /// <summary>
+    /// Recall n'existe que sur les PC Copilot+ et ne capture rien sans consentement : son sort est laissé au choix de l'utilisateur.
+    /// Sur Pro et plus, MAUS peut poser la stratégie <c>DisableAIDataAnalysis</c> (Policy CSP WindowsAI) ; sur Famille, Paramètres.
+    /// </summary>
+    public static Finding Recall(ICimReader cim, IRegistryReader registry, WindowsInfo windows)
     {
+        ArgumentNullException.ThrowIfNull(windows);
         const string id = "M04.recall";
         var title = T("Recall (instantanés de l'écran)");
         return Guard(id, title, Ai, () =>
@@ -184,8 +194,10 @@ internal static class PrivacySystemChecks
 
             return Info(id, title, Ai, T("installé, activation au choix"), expected,
                 T("Recall enregistre régulièrement des instantanés de l'écran pour vous permettre de retrouver ce que vous avez vu. Il ne capture rien sans votre accord."),
-                T("Si vous n'utilisez pas Recall, MAUS pourra bloquer ses instantanés (DisableAIDataAnalysis = 1). Attention : cela supprime les instantanés déjà enregistrés ; une confirmation sera demandée."),
-                fixable: true);
+                windows.IsHomeEdition
+                    ? T("Si vous n'utilisez pas Recall, arrêtez l'enregistrement des instantanés dans Paramètres > Confidentialité et sécurité > Recall et instantanés.")
+                    : T("Si vous n'utilisez pas Recall, l'onglet Corrections peut bloquer ses instantanés (stratégie DisableAIDataAnalysis = 1). Attention : cela supprime les instantanés déjà enregistrés ; une confirmation est demandée."),
+                fixable: !windows.IsHomeEdition);
 
             Finding Inactive(string current, string explanation) => new()
             {

@@ -56,7 +56,7 @@ public sealed class PrivacyModule : IFixableModule
 
         cancellationToken.ThrowIfCancellationRequested();
         findings.Add(PrivacySystemChecks.Copilot(context.Packages));
-        findings.Add(PrivacySystemChecks.Recall(context.Cim, registry));
+        findings.Add(PrivacySystemChecks.Recall(context.Cim, registry, windows));
 
         cancellationToken.ThrowIfCancellationRequested();
         findings.Add(PrivacySystemChecks.DeliveryOptimization(context.Cim, registry));

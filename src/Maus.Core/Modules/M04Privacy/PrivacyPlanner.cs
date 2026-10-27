@@ -8,7 +8,8 @@ namespace Maus.Core.Modules.M04Privacy;
 /// <summary>
 /// Étape Plan du Module 4 : lignes « Standard » de la fiche qui passent par le registre. Les stratégies ne sont posées
 /// que sur Pro et plus ; ailleurs, MAUS écrit l'interrupteur de l'utilisateur, celui que change l'application Paramètres.
-/// Services (DiagTrack), tâches planifiées (CEIP) et applications (Copilot, Recall) arrivent dans une étape suivante.
+/// Recall : stratégie DisableAIDataAnalysis (Pro et plus). Copilot n'a pas de stratégie officielle sur Famille et Pro : renvoi vers Paramètres.
+/// Services (DiagTrack) et tâches planifiées (CEIP) arrivent dans une étape suivante.
 /// </summary>
 internal static class PrivacyPlanner
 {
@@ -22,6 +23,7 @@ internal static class PrivacyPlanner
         PlanOffersAndTips(plan);
         PlanSearchAndHistory(plan);
         PlanDownloads(plan);
+        PlanRecall(plan);
         return plan.Changes;
     }
 
@@ -166,6 +168,30 @@ internal static class PrivacyPlanner
         }
     }
 
+    /// <summary>
+    /// Recall : stratégie <c>DisableAIDataAnalysis</c> = 1 (Policy CSP WindowsAI, Microsoft Learn), qui empêche l'enregistrement
+    /// des instantanés et, d'après la même page, supprime ceux déjà enregistrés. Jamais pré-cochée, avertissement renforcé.
+    /// </summary>
+    private static void PlanRecall(PlanBuilder plan)
+    {
+        if (!plan.Policies || !plan.Fixable("M04.recall"))
+        {
+            return;
+        }
+
+        plan.Add("M04.recall", T("Bloquer les instantanés de Recall (stratégie DisableAIDataAnalysis)"),
+            T("Pose la stratégie officielle de Microsoft qui empêche Recall d'enregistrer des instantanés de l'écran. Recall reste installé ; « Annuler » retire la stratégie."),
+            Ai,
+            [Hklm(WindowsAiPolicy, "DisableAIDataAnalysis", 1)],
+            c => c with
+            {
+                Recommended = false,
+                Gain = T("Aucun gain de vitesse : Windows n'enregistre plus d'instantanés de l'écran."),
+                Warning = T("Les instantanés déjà enregistrés par Recall seront supprimés (documentation de la stratégie, Microsoft Learn). " +
+                    "« Annuler » permet à Recall d'enregistrer de nouveau, mais ne rend pas les instantanés effacés."),
+            });
+    }
+
     /// <summary>Constats du dernier audit et corrections prévues, partagés par les étapes de <see cref="Plan"/>.</summary>
     private sealed class PlanBuilder(string moduleId, WindowsInfo windows, IReadOnlyList<Finding> findings)
     {
@@ -179,6 +205,8 @@ internal static class PrivacyPlanner
         public bool Policies => !windows.IsHomeEdition;
 
         public Finding Finding(string id) => _byId[id];
+
+        public bool Fixable(string id) => _byId.TryGetValue(id, out var f) && f.Fixable;
 
         public bool Deviates(string id) => _byId.TryGetValue(id, out var f) && f.Status is FindingStatus.Improvable or FindingStatus.Warning;
 
