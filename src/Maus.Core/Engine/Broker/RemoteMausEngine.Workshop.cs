@@ -65,6 +65,12 @@ public sealed partial class RemoteMausEngine
     public Task<string?> SetScheduleAsync(DayOfWeek? day, CancellationToken cancellationToken) =>
         CallAsync<string>("schedule.set", new { day }, null, cancellationToken);
 
+    public async Task<RestorePointsReading> ReadRestorePointsAsync(CancellationToken cancellationToken) =>
+        await CallAsync<RestorePointsReading>("restorepoint.list", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
+
+    public async Task<RestorePointOutcome> CreateRestorePointAsync(CancellationToken cancellationToken) =>
+        await CallAsync<RestorePointOutcome>("restorepoint.create", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
+
     public Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken) =>
         CallAsync<string>("battery.report", null, null, cancellationToken);
 

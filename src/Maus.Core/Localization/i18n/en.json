@@ -1563,6 +1563,7 @@
   "MAUS (audit en lecture seule)": "MAUS (read-only audit)",
   "MAUS : avant corrections": "MAUS: before fixes",
   "MAUS : avant la suppression du pilote graphique": "MAUS: before deleting the graphics driver",
+  "MAUS : point créé à la main": "MAUS: manually created point",
   "MAUS Benchmark {0} : {1}": "MAUS Benchmark {0}: {1}",
   "MAUS a rencontré une erreur inattendue et doit s'arrêter. Les corrections déjà faites sont enregistrées : l'onglet Historique permet de les annuler au prochain lancement.": "MAUS ran into an unexpected error and must close. Fixes already made are recorded: the History tab lets you undo them next time you start MAUS.",
   "MAUS a trouvé un problème": "MAUS found a problem",

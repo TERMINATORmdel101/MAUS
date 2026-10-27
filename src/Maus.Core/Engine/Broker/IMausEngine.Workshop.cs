@@ -16,6 +16,9 @@ public sealed record DriversReading(IReadOnlyList<DriverEntry> Drivers, Hardware
 /// <param name="Failure">Le pilote n'a pas pu s'ouvrir (message), ou <c>null</c>.</param>
 /// <param name="IsStalled">Le pilote ne répond plus depuis quelques secondes.</param>
 /// <param name="CpuMaxC">Limite du processeur d'après le catalogue des seuils (modèles vérifiés), si connue.</param>
+/// <summary>Points de restauration de Windows : protection du lecteur système, points (du plus ancien au plus récent), espace utilisé.</summary>
+public sealed record RestorePointsReading(ProtectionState Protection, IReadOnlyList<RestorePointInfo> Points, long? UsedBytes, long? MaxBytes);
+
 public sealed record SensorState(bool PawnIoInstalled, string? PawnIoVersion, bool EngineElevated, string? Failure, bool IsStalled, int? CpuMaxC);
 
 /// <summary>Une mesure des capteurs et l'état du pilote.</summary>
@@ -101,6 +104,12 @@ public partial interface IMausEngine
 
     /// <summary>Point de restauration avant la suppression d'un pilote graphique, créé puis relu.</summary>
     Task<RestorePointOutcome> CreateDriverRestorePointAsync(CancellationToken cancellationToken);
+
+    /// <summary>Points de restauration de Windows et espace qu'ils occupent (lecture seule).</summary>
+    Task<RestorePointsReading> ReadRestorePointsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Point de restauration demandé par l'utilisateur, créé puis relu (comme avant une correction).</summary>
+    Task<RestorePointOutcome> CreateRestorePointAsync(CancellationToken cancellationToken);
 
     Task<ScheduleState> GetScheduleAsync(CancellationToken cancellationToken);
 

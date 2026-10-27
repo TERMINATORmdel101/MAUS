@@ -334,6 +334,47 @@ public sealed partial class LocalMausEngine
         }
     }, cancellationToken);
 
+    /// <summary>Espace des points de restauration : classe WMI Win32_ShadowStorage (UsedSpace, MaxSpace, en octets).</summary>
+    internal const string ShadowStorageQuery = "SELECT UsedSpace, MaxSpace FROM Win32_ShadowStorage";
+
+    public Task<RestorePointsReading> ReadRestorePointsAsync(CancellationToken cancellationToken) => Task.Run(() =>
+    {
+        var context = WorkshopContext();
+        var restore = _createFixContext(context).SystemRestore;
+        var drive = Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
+        long? used = null, max = null;
+        try
+        {
+            var rows = context.Cim.Query(ShadowStorageQuery);
+            if (rows.Count > 0)
+            {
+                used = rows.Sum(r => r.GetInt64("UsedSpace") ?? 0);
+                max = rows.Sum(r => r.GetInt64("MaxSpace") ?? 0);
+            }
+        }
+        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
+        {
+            // Espace illisible : la liste des points reste utile.
+        }
+
+        var points = restore.ListRestorePoints().OrderBy(p => p.CreatedAt ?? DateTimeOffset.MinValue).ToList();
+        return new RestorePointsReading(restore.GetProtectionState(drive), points, used, max);
+    }, cancellationToken);
+
+    public Task<RestorePointOutcome> CreateRestorePointAsync(CancellationToken cancellationToken) => Task.Run(() =>
+    {
+        try
+        {
+            var fix = _createFixContext(WorkshopContext());
+            return new RestorePointCreator(fix.SystemRestore, fix.Settings)
+                .Create(T("MAUS : point créé à la main"), enableProtectionIfNeeded: false);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return new RestorePointOutcome(RestorePointStatus.Failed, null, T("Le point de restauration n'a pas pu être créé : {0}", ex.Message));
+        }
+    }, cancellationToken);
+
     public async Task<ScheduleState> GetScheduleAsync(CancellationToken cancellationToken)
     {
         var (day, command) = await TaskSchedulerClient.GetAsync().ConfigureAwait(false);

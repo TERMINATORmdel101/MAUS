@@ -1563,6 +1563,7 @@
   "MAUS (audit en lecture seule)": "MAUS (auditoría de solo lectura)",
   "MAUS : avant corrections": "MAUS: antes de las correcciones",
   "MAUS : avant la suppression du pilote graphique": "MAUS: antes de eliminar el controlador gráfico",
+  "MAUS : point créé à la main": "MAUS: punto creado a mano",
   "MAUS Benchmark {0} : {1}": "MAUS Benchmark {0}: {1}",
   "MAUS a rencontré une erreur inattendue et doit s'arrêter. Les corrections déjà faites sont enregistrées : l'onglet Historique permet de les annuler au prochain lancement.": "MAUS encontró un error inesperado y debe cerrarse. Las correcciones ya realizadas están registradas: la pestaña Historial permite deshacerlas la próxima vez que abra MAUS.",
   "MAUS a trouvé un problème": "MAUS encontró un problema",

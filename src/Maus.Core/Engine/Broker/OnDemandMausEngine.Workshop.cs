@@ -68,6 +68,12 @@ public sealed partial class OnDemandMausEngine
     public Task<RestorePointOutcome> CreateDriverRestorePointAsync(CancellationToken cancellationToken) =>
         Elevated(e => e.CreateDriverRestorePointAsync(cancellationToken), cancellationToken);
 
+    public Task<RestorePointsReading> ReadRestorePointsAsync(CancellationToken cancellationToken) =>
+        Elevated(e => e.ReadRestorePointsAsync(cancellationToken), cancellationToken);
+
+    public Task<RestorePointOutcome> CreateRestorePointAsync(CancellationToken cancellationToken) =>
+        Elevated(e => e.CreateRestorePointAsync(cancellationToken), cancellationToken);
+
     public Task<string?> SetScheduleAsync(DayOfWeek? day, CancellationToken cancellationToken) =>
         Elevated(e => e.SetScheduleAsync(day, cancellationToken), cancellationToken);
 }

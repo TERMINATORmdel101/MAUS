@@ -50,6 +50,10 @@ public sealed partial class EngineServer
 
             case "console":
                 return EngineProtocol.ToElement(await engine.OpenConsoleAsync(Arg<ConsoleRequest>(args, "request"), cancellationToken).ConfigureAwait(false));
+            case "restorepoint.list":
+                return EngineProtocol.ToElement(await engine.ReadRestorePointsAsync(cancellationToken).ConfigureAwait(false));
+            case "restorepoint.create":
+                return EngineProtocol.ToElement(await engine.CreateRestorePointAsync(cancellationToken).ConfigureAwait(false));
             case "restorepoint.driver":
                 return EngineProtocol.ToElement(await engine.CreateDriverRestorePointAsync(cancellationToken).ConfigureAwait(false));
             case "schedule.get":
