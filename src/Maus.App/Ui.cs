@@ -364,6 +364,14 @@ public static class Ui
 
     public static string HelpSite => T("Site d'aide de MAUS");
 
+    public static string RestorePointsTitle => T("Points de restauration de Windows");
+
+    public static string ShowRestorePoints => T("Afficher les points");
+
+    public static string CreateRestorePointNow => T("Créer un point maintenant");
+
+    public static string OpenSystemRestore => T("Revenir à un point (outil de Windows)");
+
     public static string EnableAdvancedSensors => T("Activer les capteurs avancés");
 
     public static string UninstallPawnIo => T("Retirer PawnIO");
