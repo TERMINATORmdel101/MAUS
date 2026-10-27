@@ -166,8 +166,19 @@ public sealed class ComponentCardViewModel
             }
         }
 
+        // Œuf de Pâques (demande du porteur, 27/10/2026) : la Radeon VII (Vega 20, 2019) est sa carte préférée.
+        if (IsRadeonVii(gpu.Info.Name))
+        {
+            lines.Add(new(T("Le saviez-vous ?"), T("La Radeon VII est la carte graphique préférée du créateur de MAUS. Bon choix !")));
+        }
+
         return new ComponentCardViewModel("G", T("Carte graphique"), gpu.Info.Name, lines, gpu.Info.Name, search, gauge);
     }
+
+    /// <summary>AMD Radeon VII (« Radeon VII », « Radeon(TM) VII »), mais pas une Radeon Pro VII ni une autre carte.</summary>
+    internal static bool IsRadeonVii(string? name) =>
+        name is not null && System.Text.RegularExpressions.Regex.IsMatch(name, @"Radeon(\(TM\)|™)?\s+VII\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+        && !name.Contains("Pro", StringComparison.OrdinalIgnoreCase);
 
     private static ComponentCardViewModel DiskCard(DiskIdentity disk, Action<string> search)
     {
