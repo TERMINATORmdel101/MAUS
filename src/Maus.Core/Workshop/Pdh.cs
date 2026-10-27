@@ -50,7 +50,7 @@ internal sealed partial class PdhQuery : IDisposable
 
         uint size = 0;
         var status = PdhGetFormattedCounterArrayW(counter, FormatDouble | NoCap100, ref size, out _, 0);
-        if (status != MoreData || size == 0)
+        if (status != MoreData || size is 0 or > int.MaxValue)
         {
             return [];
         }

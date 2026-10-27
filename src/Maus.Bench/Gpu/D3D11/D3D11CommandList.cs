@@ -149,7 +149,7 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
     public void SetTransientVertices<T>(int slot, ReadOnlySpan<T> vertices)
         where T : unmanaged
     {
-        var bytes = vertices.Length * sizeof(T);
+        var bytes = checked(vertices.Length * sizeof(T));
         if (bytes > TransientBytes)
         {
             throw new ArgumentException("Trop de sommets temporaires.");
@@ -217,8 +217,8 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
     public void UpdateBuffer<T>(IBuffer buffer, ReadOnlySpan<T> data, int offsetBytes = 0)
         where T : unmanaged
     {
-        var bytes = data.Length * sizeof(T);
-        var box = new Box(offsetBytes, 0, 0, offsetBytes + bytes, 1, 1);
+        var bytes = checked(data.Length * sizeof(T));
+        var box = new Box(offsetBytes, 0, 0, checked(offsetBytes + bytes), 1, 1);
         _context.UpdateSubresource(data, ((D3D11Buffer)buffer).Buffer, 0, 0, 0, box);
     }
 

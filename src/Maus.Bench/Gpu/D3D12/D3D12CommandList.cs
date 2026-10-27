@@ -250,7 +250,7 @@ internal sealed unsafe class D3D12CommandList : ICommandList
     public void SetTransientVertices<T>(int slot, ReadOnlySpan<T> vertices)
         where T : unmanaged
     {
-        var bytes = vertices.Length * sizeof(T);
+        var bytes = checked(vertices.Length * sizeof(T));
         var block = _owner.Upload.Allocate(Math.Max(bytes, 16), 16);
         fixed (T* source = vertices)
         {
@@ -349,7 +349,7 @@ internal sealed unsafe class D3D12CommandList : ICommandList
         where T : unmanaged
     {
         var target = (D3D12Buffer)buffer;
-        var bytes = data.Length * sizeof(T);
+        var bytes = checked(data.Length * sizeof(T));
         var block = _owner.Upload.Allocate(bytes, 16);
         fixed (T* source = data)
         {

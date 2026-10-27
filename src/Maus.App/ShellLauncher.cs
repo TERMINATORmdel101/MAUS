@@ -26,7 +26,7 @@ public static class ShellLauncher
     {
         ArgumentNullException.ThrowIfNull(page);
 
-        if (page.StartsWith("ms-settings:", StringComparison.Ordinal))
+        if (Maus.Core.Platform.SettingsPages.IsValid(page))
         {
             Start(page);
         }

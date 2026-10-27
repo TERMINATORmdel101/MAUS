@@ -43,7 +43,8 @@ public sealed unsafe partial class WindowsCoreTopology : ICoreTopology
                     }
                 }
 
-                if (size == 0)
+                // Entrée vide ou qui déborderait du tampon (taille lue dans les données) : arrêt de la lecture.
+                if (size == 0 || size > length - offset)
                 {
                     break;
                 }

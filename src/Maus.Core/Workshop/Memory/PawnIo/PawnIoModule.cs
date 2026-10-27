@@ -74,8 +74,11 @@ public sealed partial class PawnIoModule : IDisposable
     public unsafe long[] Execute(string function, ReadOnlySpan<long> input, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(function);
+        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
 
-        var request = new byte[FunctionNameLength + (input.Length * sizeof(long))];
+        // Tailles calculées en arithmétique vérifiée : un débordement lève une erreur au lieu d'un tampon trop petit.
+        var request = new byte[checked(FunctionNameLength + (input.Length * sizeof(long)))];
+        var outputBytes = checked((uint)(outputLength * sizeof(long)));
         Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
         MemoryMarshal.AsBytes(input).CopyTo(request.AsSpan(FunctionNameLength));
         var output = new long[outputLength];
@@ -83,13 +86,13 @@ public sealed partial class PawnIoModule : IDisposable
         fixed (byte* pIn = request)
         fixed (long* pOut = output)
         {
-            if (!DeviceIoControl(_handle, ExecuteCode, pIn, (uint)request.Length, pOut, (uint)(outputLength * sizeof(long)), out var returned, 0))
+            if (!DeviceIoControl(_handle, ExecuteCode, pIn, (uint)request.Length, pOut, outputBytes, out var returned, 0))
             {
                 var error = Marshal.GetLastPInvokeError();
                 throw new PawnIoException($"{function} a échoué ({new Win32Exception(error).Message})", error);
             }
 
-            if (returned < outputLength * sizeof(long))
+            if (returned < outputBytes)
             {
                 throw new PawnIoException($"{function} : réponse incomplète ({returned} octets)", 0);
             }
@@ -110,7 +113,7 @@ public sealed partial class PawnIoModule : IDisposable
         var request = new byte[FunctionNameLength + (inputCount * sizeof(long))];
         Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
         MemoryMarshal.AsBytes(input.AsSpan(0, (int)inputCount)).CopyTo(request.AsSpan(FunctionNameLength));
-        var buffer = new byte[outputCount * sizeof(long)];
+        var buffer = new byte[checked(outputCount * sizeof(long))];
 
         fixed (byte* pIn = request)
         fixed (byte* pOut = buffer)
