@@ -6,7 +6,7 @@
 
 > MAUS est conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur.
 
-**Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha 0.8.1**
+**Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha 0.8.2**
 
 ```powershell
 winget install TERMINATORmdel101.MAUS
@@ -69,18 +69,18 @@ Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une li
 
 ## État du projet
 
-Version actuelle : **0.8.1** (22 octobre 2026), en **alpha** : à essayer d'abord sur un PC dont les données sont sauvegardées. Tout est testé avec plus de 1 500 tests automatiques, puis sur le PC Windows du porteur du projet ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application.
+Version actuelle : **0.8.2** (octobre 2026), en **alpha** : à essayer d'abord sur un PC dont les données sont sauvegardées. Tout est testé avec plus de 1 500 tests automatiques, puis sur le PC Windows du porteur du projet ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application.
 
 Dernières versions (le détail de toutes les versions est dans [CHANGELOG.md](CHANGELOG.md)) :
 
 | Version | Nouveautés |
 |---|---|
-| **0.8.1** | Plus de demande d'autorisation à l'ouverture : MAUS propose d'activer toutes les fonctionnalités, et Windows ne demande l'autorisation qu'au moment voulu ; droits refermés après 15 minutes sans utilisation ; onglet Mémoire des processeurs Intel corrigé (horloge, nanosecondes, tWR et tRTP) ; paquet pour le Microsoft Store |
+| **0.8.2** | « Pourquoi mon PC démarre lentement ? », « Pourquoi se réveille-t-il la nuit ? », écrans bleus expliqués, points de restauration, Wi-Fi voisin ; nouvelles corrections réversibles (tâches d'ouverture de session, Recall, valeurs Windows des effets visuels, fréquence maximale de l'écran avec retour automatique) ; bouton d'aide et « Quoi de neuf » |
+| 0.8.1 | Plus de demande d'autorisation à l'ouverture : MAUS propose d'activer toutes les fonctionnalités, et Windows ne demande l'autorisation qu'au moment voulu ; droits refermés après 15 minutes sans utilisation ; onglet Mémoire des processeurs Intel corrigé (horloge, nanosecondes, tWR et tRTP) ; paquet pour le Microsoft Store |
 | 0.8.0 | Fenêtre de MAUS sans droits administrateur, moteur séparé pour les lectures profondes et les corrections ; revue de sécurité (retours arrière ratés gardés visibles, arrêt de sécurité du benchmark, plus de faux « stable » dans les tests) |
 | 0.7.6 | Compteur d'images par seconde réactif (suivi en 1 à 2 secondes) |
-| 0.7.5 | Benchmark complet : lancer de rayons, cabinet de curiosités, image du résultat à partager |
 
-À venir : publication sur le **Microsoft Store** (en cours), signature du code, réglage de l'écran (fréquence, HDR), et des essais sur d'autres PC (processeurs AMD, mémoire DDR5, cartes graphiques AMD et Intel).
+À venir : publication sur le **Microsoft Store** (en cours), signature du code, et des essais sur d'autres PC (processeurs AMD, mémoire DDR5, cartes graphiques AMD et Intel).
 
 Configuration requise : Windows 11 23H2 (build 22631) ou plus récent, processeur x64.
 

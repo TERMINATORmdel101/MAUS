@@ -2,6 +2,32 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.8.2 — en préparation (27/10/2026) — nouvelles explications, nouvelles corrections, aide
+
+Améliorations (dernier chiffre, règle du porteur), suggestions acceptées par le porteur.
+
+**Aide et nouveautés**
+- **Bouton « ? »** en bas de la barre de navigation et dans « À propos » : ouvre le site d'aide de MAUS.
+- **« Quoi de neuf »** : à la première ouverture d'une nouvelle version, les nouveautés en quelques lignes (jamais à la toute première installation).
+- Catalogue des pilotes graphiques revérifié le 27/10/2026, avec un rappel mensuel automatique sur GitHub.
+
+**Nouvelles explications (lecture seule)**
+- **« Pourquoi mon PC démarre lentement ? »** (M12) : temps avant le bureau et après, 5 derniers démarrages, et tout ce que Windows accuse de ralentir le démarrage (programmes, pilotes, services, périphériques, stratégies ; événements 101 à 110 du journal Diagnostics-Performance). Vérifié sur le PC du porteur.
+- **« Pourquoi mon PC se réveille la nuit ? »** (M05) : réveils notés par Windows sur 30 jours, appareils autorisés à réveiller le PC, tâches planifiées réglées pour le réveiller. Le type de cause brut de Windows n'est pas interprété (aucune source publiée). Vérifié sur le PC du porteur.
+- **Écrans bleus** (M02) : les 5 derniers, avec code, nom officiel et paramètres, lien vers la référence de Microsoft ; MAUS rappelle que seul WinDbg (`!analyze -v`) désigne le pilote en cause. Défaut corrigé : le tableau des codes restait dans la langue du premier affichage.
+- **Batterie** (M16 et Atelier > Mon PC) : le seuil d'usure de 80 % est retiré (aucune source publiée, principe 7) ; cycles de charge ; bouton « Rapport de batterie de Windows » (`powercfg /batteryreport`).
+- **Wi-Fi autour de vous** (M18) : réseaux voisins comptés par bande et par canal, sans leur nom (vie privée), sans jugement d'encombrement (aucun seuil publié) ; bande d'après la fréquence (distingue enfin 2,4 et 6 GHz). Défaut corrigé : depuis Windows 11 24H2, Windows refuse ces informations sans l'accès à la position, et MAUS parlait d'un service arrêté ; il explique maintenant le refus et ouvre la page Localisation. **Pas encore vérifié sur un PC équipé du Wi-Fi.**
+- **Points de restauration de Windows** (Historique) : liste, état de la protection, espace utilisé ; créer un point (vérifié après création) ; ouvrir l'outil de Windows pour revenir à un point.
+
+**Nouvelles corrections (réversibles, jamais pré-cochées)**
+- **Tâches planifiées lancées à l'ouverture de session** (M12) : une correction par tâche d'un autre éditeur, jamais une tâche de Windows ; « Annuler » la réactive. Plan vérifié en lecture seule sur le PC du porteur ; **écriture réelle pas encore essayée.**
+- **Recall** (M04, Pro et plus) : bloquer les instantanés par la stratégie officielle `DisableAIDataAnalysis` ; avertissement renforcé (d'après Microsoft, les instantanés déjà enregistrés sont supprimés) ; « Annuler » retire la stratégie. Sur Famille : renvoi vers Paramètres.
+- **Copilot** (M04) : n'est plus annoncée comme corrigeable, car aucune correction n'existait ; Windows n'a pas de stratégie officielle pour la retirer sur Famille et Pro. Bouton vers Applications installées.
+- **« Valeurs Windows » des effets visuels** (M06, option avancée) : chaque case de « Options de performances » revient à la valeur que Windows déclare lui-même sur le PC (lue dans le registre, rien n'est codé en dur) ; la stratégie Widgets posée par MAUS est retirée. Plan vérifié en lecture seule sur le PC du porteur.
+- **Fréquence de l'écran** (M14) : bouton « Essayer la fréquence maximale » sur le constat, sans changer la résolution ; essai sans enregistrement, fenêtre « Garder ? » et retour automatique après 15 secondes sans réponse. HDR : toujours aucune bascule automatique, liens vers Paramètres. **Pas encore essayé sur un vrai écran.**
+
+**Petit mot** : une Radeon VII dans « Mon PC » reçoit un message, c'est la carte préférée du créateur de MAUS.
+
 ## 0.8.1 — 22/10/2026 — autorisation administrateur seulement quand il le faut, onglet Mémoire Intel
 
 Améliorations et corrections (dernier chiffre, règle du porteur).

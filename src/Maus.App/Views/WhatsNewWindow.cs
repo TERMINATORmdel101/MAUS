@@ -51,6 +51,12 @@ public sealed class WhatsNewWindow : Window
         "0.8.2" =>
         [
             T("Bouton « ? » en bas à gauche : le site d'aide de MAUS."),
+            T("Pourquoi mon PC démarre lentement ? Pourquoi se réveille-t-il la nuit ? Les réponses de Windows dans l'audit (démarrage, alimentation)."),
+            T("Écrans bleus : les 5 derniers, avec leur code et le lien vers l'explication de Microsoft."),
+            T("Historique : vos points de restauration de Windows, et un bouton pour en créer un."),
+            T("Corrections : désactiver une tâche planifiée lancée à l'ouverture de session, bloquer les instantanés de Recall, remettre les effets visuels aux valeurs de Windows."),
+            T("Écran sous sa fréquence maximale : bouton « Essayer la fréquence maximale », l'ancien réglage revient seul après 15 secondes."),
+            T("Batterie : cycles de charge et rapport de batterie de Windows ; Wi-Fi : réseaux voisins par canal."),
         ],
         _ => [],
     };
