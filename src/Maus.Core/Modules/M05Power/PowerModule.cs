@@ -95,6 +95,7 @@ public sealed class PowerModule : Fixes.IFixableModule
         findings.Add(DescribeOemUtilities(OemPowerUtilities.Detect(context)));
         findings.Add(DescribeEffectiveMode(effectiveMode));
         findings.Add(DescribeModernStandby(capabilities));
+        findings.Add(WakeReport.Detect(context, StartupCategory));
         if (isIntelHybrid)
         {
             findings.Add(DescribeHybridCpu(context.Hardware.Cpu));

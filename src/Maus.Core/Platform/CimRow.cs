@@ -54,6 +54,9 @@ public sealed class CimRow
     /// <summary>Tableau d'objets CIM imbriqués, vide si absent.</summary>
     public IReadOnlyList<CimRow> GetRows(string name) => this[name] as CimRow[] ?? [];
 
+    /// <summary>Objet imbriqué (par exemple « Settings » d'une tâche planifiée), ou null.</summary>
+    public CimRow? GetRow(string name) => this[name] as CimRow;
+
     private static long? ToInt64(object? value) => value switch
     {
         null => null,
