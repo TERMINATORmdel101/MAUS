@@ -78,6 +78,8 @@ public partial class App : Application
         // 0.8.1 : aucune autorisation demandée à l'ouverture ; le moteur administrateur attend la première action qui en a besoin.
         EngineHost.Configure();
         var preferences = LoadPreferences();
+        // Fichier des choix d'affichage absent : toute première ouverture (pas de « Quoi de neuf »).
+        s_firstOpening = (EngineHost.Preferences as SplitPreferencesStore)?.State == PreferencesFileState.Absent;
         UseLanguage(preferences.Language);
         AppearanceManager.DetectComponents();
         AppearanceManager.Apply(preferences);
@@ -265,17 +267,43 @@ public partial class App : Application
 
         window.Show();
 
-        // MAUS sans droits administrateur : une fois la fenêtre dessinée, il propose d'activer toutes ses fonctionnalités.
-        // La demande d'autorisation de Windows ne vient qu'après « Oui ».
-        if (EngineHost.OnDemand is not null && LoadPreferences().OfferAllFeatures)
+        // Une fois la fenêtre dessinée : les nouveautés d'une nouvelle version, puis (MAUS sans droits administrateur) la
+        // proposition d'activer toutes les fonctionnalités. La demande d'autorisation de Windows ne vient qu'après « Oui ».
+        void Dialogs(object? sender, EventArgs e)
         {
-            void Offer(object? sender, EventArgs e)
+            window.ContentRendered -= Dialogs;
+            window.Dispatcher.BeginInvoke(() => StartupDialogsAsync().Forget("fenêtres d'ouverture"));
+        }
+
+        window.ContentRendered += Dialogs;
+    }
+
+    /// <summary>Toute première ouverture de MAUS sur ce compte (fichier des choix d'affichage absent).</summary>
+    private static bool s_firstOpening;
+
+    private static async Task StartupDialogsAsync()
+    {
+        var preferences = LoadPreferences();
+        if (!string.Equals(preferences.LastSeenVersion, AppVersion.Display, StringComparison.Ordinal))
+        {
+            if (!s_firstOpening)
             {
-                window.ContentRendered -= Offer;
-                window.Dispatcher.BeginInvoke(() => OfferAllFeaturesAsync().Forget("proposition des droits administrateur"));
+                Views.WhatsNewWindow.ShowFor(AppVersion.Display);
             }
 
-            window.ContentRendered += Offer;
+            try
+            {
+                await Task.Run(() => EngineHost.Preferences.Update(p => p with { LastSeenVersion = AppVersion.Display }));
+            }
+            catch (Exception ex) when (ex is IOException or Maus.Core.Engine.Broker.EngineException or Maus.Core.Fixes.JournalUnsafeException)
+            {
+                // Non enregistré : les nouveautés reviendront à la prochaine ouverture.
+            }
+        }
+
+        if (EngineHost.OnDemand is not null && preferences.OfferAllFeatures)
+        {
+            await OfferAllFeaturesAsync();
         }
     }
 

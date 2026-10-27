@@ -72,6 +72,9 @@ public sealed record UserPreferences
     /// </summary>
     public bool OfferAllFeatures { get; init; } = true;
 
+    /// <summary>Dernière version dont les nouveautés ont été montrées (« Quoi de neuf ») ; <c>null</c> avant la 0.8.2.</summary>
+    public string? LastSeenVersion { get; init; }
+
     /// <summary>Compteur d'images par seconde affiché au-dessus du jeu pendant la mesure.</summary>
     public bool OverlayEnabled { get; init; } = true;
 

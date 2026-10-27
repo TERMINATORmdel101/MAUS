@@ -1,0 +1,67 @@
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using static Maus.Core.Localization.Texts;
+
+namespace Maus.App.Views;
+
+/// <summary>
+/// « Quoi de neuf » (demande du porteur, 27/10/2026) : à la première ouverture d'une nouvelle version, les nouveautés en
+/// quelques lignes. Jamais lors d'une toute première installation, ni pour une version sans texte prévu.
+/// </summary>
+public sealed class WhatsNewWindow : Window
+{
+    private WhatsNewWindow(string version, IReadOnlyList<string> lines)
+    {
+        Title = T("Quoi de neuf dans MAUS {0}", version);
+        Width = 560;
+        SizeToContent = SizeToContent.Height;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        ResizeMode = ResizeMode.NoResize;
+        ShowInTaskbar = false;
+        Owner = Application.Current?.MainWindow;
+        SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
+        SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
+
+        var panel = new StackPanel { Margin = new Thickness(20) };
+        var title = new TextBlock { Text = Title, FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10) };
+        panel.Children.Add(title);
+        foreach (var line in lines)
+        {
+            var text = new TextBlock { Text = "• " + line, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
+            AutomationProperties.SetName(text, line);
+            panel.Children.Add(text);
+        }
+
+        var all = new Button { Content = T("Toutes les nouveautés"), Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, 0, 8, 0) };
+        all.Click += (_, _) => ShellLauncher.OpenUrl(new Uri(Maus.Core.ProjectLinks.Repository + "/releases/tag/" + version));
+        var close = new Button { Content = T("Fermer"), IsDefault = true, IsCancel = true, Padding = new Thickness(16, 6, 16, 6) };
+        close.SetResourceReference(StyleProperty, "PrimaryButton");
+        close.Click += (_, _) => Close();
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        buttons.Children.Add(all);
+        buttons.Children.Add(close);
+        panel.Children.Add(buttons);
+        Content = panel;
+    }
+
+    /// <summary>Nouveautés de chaque version, en quelques lignes ; vide si rien n'est prévu pour cette version.</summary>
+    public static IReadOnlyList<string> For(string version) => version switch
+    {
+        "0.8.2" =>
+        [
+            T("Bouton « ? » en bas à gauche : le site d'aide de MAUS."),
+        ],
+        _ => [],
+    };
+
+    /// <summary>Montre les nouveautés de <paramref name="version"/> s'il y en a.</summary>
+    public static void ShowFor(string version)
+    {
+        var lines = For(version);
+        if (lines.Count > 0)
+        {
+            new WhatsNewWindow(version, lines).ShowDialog();
+        }
+    }
+}
