@@ -7,8 +7,11 @@ namespace Maus.Core.Modules.M02Repair;
 /// <summary>Lecture des données brutes des journaux et des fichiers de vidage, sans accès au système.</summary>
 internal static partial class HealthParsers
 {
-    /// <summary>Codes d'arrêt fréquents : nom officiel et piste à suivre pour un non-spécialiste.</summary>
-    private static readonly Dictionary<long, (string Name, string Hint)> KnownBugchecks = new()
+    /// <summary>
+    /// Codes d'arrêt fréquents : nom officiel (référence des codes d'arrêt de Microsoft) et piste à suivre pour un non-spécialiste.
+    /// Propriété calculée : les pistes sont traduites dans la langue du moment.
+    /// </summary>
+    private static Dictionary<long, (string Name, string Hint)> KnownBugchecks => new()
     {
         [0x0A] = ("IRQL_NOT_LESS_OR_EQUAL", T("souvent un pilote ou la mémoire vive")),
         [0x1A] = ("MEMORY_MANAGEMENT", T("souvent la mémoire vive : profil XMP/EXPO ou barrette défaillante (Module 10)")),
@@ -54,6 +57,28 @@ internal static partial class HealthParsers
     {
         var hex = "0x" + code.ToString("X8", CultureInfo.InvariantCulture);
         return KnownBugchecks.TryGetValue(code, out var known) ? $"{hex} ({known.Name})" : hex;
+    }
+
+    /// <summary>
+    /// Les quatre paramètres d'un événement WER 1001 (<c>param1</c> : « 0x0000009f (0x0000000000000003, …) »), réduits
+    /// (« 0x3, 0xffffe00012345678, … ») ; <c>null</c> s'ils sont absents.
+    /// </summary>
+    public static string? ParseBugcheckParameters(string? text)
+    {
+        var open = text?.IndexOf('(', StringComparison.Ordinal) ?? -1;
+        var close = text?.LastIndexOf(')') ?? -1;
+        if (text is null || open < 0 || close <= open)
+        {
+            return null;
+        }
+
+        var values = text[(open + 1)..close].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                && ulong.TryParse(p.AsSpan(2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value)
+                    ? "0x" + value.ToString("x", CultureInfo.InvariantCulture)
+                    : p)
+            .ToList();
+        return values.Count == 0 ? null : string.Join(", ", values);
     }
 
     /// <summary>Piste de diagnostic pour un code d'arrêt connu, sinon <c>null</c>.</summary>

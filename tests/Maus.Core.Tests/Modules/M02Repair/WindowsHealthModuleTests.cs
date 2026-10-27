@@ -121,6 +121,9 @@ public class WindowsHealthModuleTests
         Assert.Contains("0x0000003B (SYSTEM_SERVICE_EXCEPTION)", blueScreens.Current, StringComparison.Ordinal);
         Assert.Contains("pilote", blueScreens.Advice, StringComparison.Ordinal);
         Assert.Contains("Module 9", blueScreens.Advice, StringComparison.Ordinal);
+        Assert.Contains("0x0000003B (SYSTEM_SERVICE_EXCEPTION), paramètres 0xc0000005, 0xfffff801bdc0684b, 0xfffff98e385f6be0, 0x0", blueScreens.Explanation, StringComparison.Ordinal);
+        Assert.Contains(WindowsHealthModule.BugcheckReference, blueScreens.Advice, StringComparison.Ordinal);
+        Assert.Contains("WinDbg", blueScreens.Advice, StringComparison.Ordinal);
 
         // Kernel-Power 41 avec un code d'arrêt n'est pas compté comme une coupure.
         Assert.Equal(FindingStatus.Ok, Get(findings, "M02.unexpected-shutdowns").Status);
@@ -146,6 +149,11 @@ public class WindowsHealthModuleTests
         Assert.Contains("fichier d'échange", blueScreens.Advice, StringComparison.Ordinal);
         Assert.Contains("Module 15", blueScreens.Advice, StringComparison.Ordinal);
         Assert.NotNull(Get(findings, "M02.memory-test").Advice);
+
+        // Sans WER, l'historique vient de Kernel-Power, sans paramètres, du plus récent au plus ancien.
+        var history = blueScreens.Explanation[blueScreens.Explanation.IndexOf("Derniers écrans bleus", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("paramètres", history, StringComparison.Ordinal);
+        Assert.True(history.IndexOf("WHEA_UNCORRECTABLE_ERROR", StringComparison.Ordinal) < history.IndexOf("PAGE_FAULT_IN_NONPAGED_AREA", StringComparison.Ordinal));
     }
 
     [Fact]

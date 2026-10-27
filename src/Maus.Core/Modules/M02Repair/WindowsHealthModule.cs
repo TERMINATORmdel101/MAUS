@@ -253,6 +253,8 @@ public sealed class WindowsHealthModule : IAuditModule
 
         advice.Add(T("Si les écrans bleus ont commencé après un overclocking ou l'activation de XMP/EXPO, revenez aux réglages d'origine "
             + "(Modules 10 et 15) ; un pilote graphique récent peut aussi être en cause (Module 9)."));
+        advice.Add(T("Le sens exact de chaque code et de ses quatre paramètres est donné par Microsoft : {0} . Pour désigner le pilote en cause, "
+            + "il faut analyser le fichier de vidage avec WinDbg (commande !analyze -v) : MAUS ne le devine pas.", BugcheckReference));
         if (dumpFailures > 0)
         {
             advice.Add(T("Le fichier de vidage n'a pas pu être écrit : vérifiez que le fichier d'échange est actif sur le disque système."));
@@ -267,10 +269,20 @@ public sealed class WindowsHealthModule : IAuditModule
             Severity = severity,
             Current = current,
             Expected = T("aucun"),
-            Explanation = BlueScreenExplanation,
+            Explanation = crashes.Recent.Count == 0
+                ? BlueScreenExplanation
+                : BlueScreenExplanation + T(" Derniers écrans bleus : {0}.", string.Join(" ; ", crashes.Recent.Select(DescribeCrash))),
             Advice = string.Join(' ', advice),
         };
     }
+
+    /// <summary>Référence officielle des codes d'arrêt (Microsoft Learn, « Bug Check Code Reference »).</summary>
+    internal const string BugcheckReference = "https://learn.microsoft.com/windows-hardware/drivers/debugger/bug-check-code-reference2";
+
+    private static string DescribeCrash((DateTime Time, long Code, string? Parameters) crash) =>
+        crash.Parameters is null
+            ? T("{0} : {1}", crash.Time.ToString("g", Culture), HealthParsers.DescribeBugcheck(crash.Code))
+            : T("{0} : {1}, paramètres {2}", crash.Time.ToString("g", Culture), HealthParsers.DescribeBugcheck(crash.Code), crash.Parameters);
 
     private static string BlueScreenExplanation => T("Un écran bleu est un arrêt d'urgence de Windows face à une erreur grave, le plus souvent causée par un pilote "
         + "ou par un matériel instable. Windows note son code d'erreur, qui oriente la recherche de la cause.");
@@ -801,8 +813,10 @@ public sealed class WindowsHealthModule : IAuditModule
     private static string FormatGigabytes(long bytes) => T("{0:0.0} Go", bytes / 1024d / 1024 / 1024);
 
     /// <summary>Écrans bleus des 30 derniers jours, d'après Kernel-Power 41 (code non nul) et WER 1001.</summary>
-    private sealed record CrashSummary(int BlueScreens, long? LatestCode, DateTime LatestTime)
+    private sealed record CrashSummary(int BlueScreens, long? LatestCode, DateTime LatestTime, IReadOnlyList<(DateTime Time, long Code, string? Parameters)> Recent)
     {
+        private const int RecentShown = 5;
+
         public static bool HasBugcheck(EventRecordInfo e) =>
             HealthParsers.ParseBugcheckCode(e.Data.GetValueOrDefault("BugcheckCode")) is > 0;
 
@@ -822,7 +836,18 @@ public sealed class WindowsHealthModule : IAuditModule
                 .Where(c => c.Code is > 0)
                 .OrderByDescending(c => c.TimeCreated)
                 .FirstOrDefault();
-            return new CrashSummary(count, latest.Code, latest.TimeCreated);
+
+            // Les derniers plantages : ceux de WER (avec les quatre paramètres) s'il y en a, sinon ceux de Kernel-Power.
+            var recent = (fromWer.Count > 0
+                    ? wer.Events.Select(e => (e.TimeCreated, Code: HealthParsers.ParseBugcheckCode(e.Data.GetValueOrDefault("param1")),
+                        Parameters: HealthParsers.ParseBugcheckParameters(e.Data.GetValueOrDefault("param1"))))
+                    : fromKernel.Select(c => (c.TimeCreated, c.Code, Parameters: (string?)null)))
+                .Where(c => c.Code is > 0)
+                .OrderByDescending(c => c.TimeCreated)
+                .Take(RecentShown)
+                .Select(c => (c.TimeCreated, c.Code!.Value, c.Parameters))
+                .ToList();
+            return new CrashSummary(count, latest.Code, latest.TimeCreated, recent);
         }
     }
 }
