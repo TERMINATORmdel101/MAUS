@@ -1,3 +1,5 @@
+using System.IO.Pipes;
+using System.Text.Json;
 using Maus.Core.Engine;
 using Maus.Core.Engine.Broker;
 using Maus.Core.Fixes;
@@ -32,14 +34,15 @@ public sealed class EngineBrokerTests
         return (engine, registry, journal);
     }
 
-    private static async Task<T> WithServer<T>(IMausEngine engine, Func<RemoteMausEngine, Task<T>> use, int? clientProcessId = null)
+    private static async Task<T> WithServer<T>(IMausEngine engine, Func<RemoteMausEngine, Task<T>> use, int? clientProcessId = null, EngineKey? clientKey = null)
     {
         var name = "MAUS-essai-" + Guid.NewGuid().ToString("N");
+        var key = EngineKey.Create();
         using var stop = new CancellationTokenSource();
-        var server = new EngineServer(engine, name, clientProcessId ?? Environment.ProcessId).RunAsync(stop.Token);
+        var server = new EngineServer(engine, name, clientProcessId ?? Environment.ProcessId, key.Fingerprint()).RunAsync(stop.Token);
         try
         {
-            return await use(new RemoteMausEngine(name, Environment.ProcessId));
+            return await use(new RemoteMausEngine(name, Environment.ProcessId, clientKey ?? key));
         }
         finally
         {
@@ -135,14 +138,85 @@ public sealed class EngineBrokerTests
         using var _ = local;
         var name = "MAUS-essai-" + Guid.NewGuid().ToString("N");
         using var stop = new CancellationTokenSource();
-        var server = new EngineServer(local, name, Environment.ProcessId).RunAsync(stop.Token);
+        var key = EngineKey.Create();
+        var server = new EngineServer(local, name, Environment.ProcessId, key.Fingerprint()).RunAsync(stop.Token);
 
         // L'interface attend le moteur qu'elle a lancé (autre identifiant) : elle ne se sert pas de ce canal.
-        var remote = new RemoteMausEngine(name, serverProcessId: 4);
+        var remote = new RemoteMausEngine(name, serverProcessId: 4, key);
         await Assert.ThrowsAsync<EngineException>(() => remote.PingAsync(CancellationToken.None));
 
         await stop.CancelAsync();
         await server;
+    }
+
+    [Fact]
+    public async Task A_client_without_the_engine_key_is_refused()
+    {
+        var (local, _, _) = Local();
+        using var _ = local;
+
+        // Bon processus, mauvaise clé : son empreinte n'est pas celle que le moteur a reçue à son lancement.
+        await WithServer(local, async remote =>
+        {
+            await Assert.ThrowsAsync<EngineException>(() => remote.PingAsync(CancellationToken.None));
+            return true;
+        }, clientKey: EngineKey.Create());
+    }
+
+    [Fact]
+    public async Task A_replayed_or_modified_request_is_refused_and_answers_are_bound_to_their_request()
+    {
+        var (local, _, _) = Local();
+        using var _ = local;
+        var name = "MAUS-essai-" + Guid.NewGuid().ToString("N");
+        var key = EngineKey.Create();
+        using var stop = new CancellationTokenSource();
+        var server = new EngineServer(local, name, Environment.ProcessId, key.Fingerprint()).RunAsync(stop.Token);
+        try
+        {
+            var ping = key.SignRequest(JsonSerializer.Serialize(new EngineRequest("ping", "fr", Sequence: 1), EngineProtocol.Json));
+
+            // Avant la présentation de la clé, même une demande bien signée est refusée.
+            Assert.Null(await RawCallAsync(name, ping));
+
+            // Une autre clé que celle de l'empreinte reçue au lancement est refusée ; la bonne est acceptée.
+            Assert.Null(await RawCallAsync(name, EngineKey.Create().Introduction()));
+            var welcome = await RawCallAsync(name, key.Introduction());
+            Assert.NotNull(welcome);
+            Assert.True(key.VerifyResponse(0, welcome));
+
+            // Première fois : servie, et la réponse est signée pour la demande n° 1 seulement.
+            var answer = await RawCallAsync(name, ping);
+            Assert.NotNull(answer);
+            Assert.True(key.VerifyResponse(1, answer));
+            Assert.False(key.VerifyResponse(2, answer));
+
+            // Même message renvoyé tel quel : refusé sans réponse.
+            Assert.Null(await RawCallAsync(name, ping));
+
+            // Texte modifié après la signature (autre numéro) : refusé sans réponse.
+            var modified = ping with { Body = ping.Body.Replace("\"sequence\":1", "\"sequence\":2", StringComparison.Ordinal) };
+            Assert.NotEqual(ping.Body, modified.Body);
+            Assert.Null(await RawCallAsync(name, modified));
+
+            // Nouveau numéro, bien signé : servi.
+            var next = key.SignRequest(JsonSerializer.Serialize(new EngineRequest("ping", "fr", Sequence: 2), EngineProtocol.Json));
+            Assert.NotNull(await RawCallAsync(name, next));
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            await server;
+        }
+    }
+
+    /// <summary>Envoie un message brut au moteur et lit sa première réponse, ou <c>null</c> s'il ferme sans répondre.</summary>
+    private static async Task<SignedMessage?> RawCallAsync(string name, SignedMessage message)
+    {
+        await using var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+        await pipe.ConnectAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+        await EngineProtocol.WriteAsync(pipe, message, CancellationToken.None);
+        return await EngineProtocol.ReadAsync<SignedMessage>(pipe, CancellationToken.None);
     }
 
     private sealed class SyncProgress<T>(Action<T> report) : IProgress<T>

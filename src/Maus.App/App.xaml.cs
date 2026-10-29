@@ -29,11 +29,11 @@ public partial class App : Application
 
         base.OnStartup(e);
 
-        if (e.Args.Length >= 3 && e.Args[0].Equals(EngineArgument, StringComparison.OrdinalIgnoreCase))
+        if (e.Args.Length >= 4 && e.Args[0].Equals(EngineArgument, StringComparison.OrdinalIgnoreCase))
         {
             // Moteur administrateur (0.8.0) : aucune fenêtre ; il sert l'interface qui l'a lancé, puis s'arrête avec elle.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            RunEngineAsync(e.Args[1], e.Args[2]).Forget("moteur", _ => Shutdown(1));
+            RunEngineAsync(e.Args[1], e.Args[2], e.Args[3]).Forget("moteur", _ => Shutdown(1));
             return;
         }
 
@@ -105,7 +105,10 @@ public partial class App : Application
         UiWatchdog.Start(Dispatcher);
     }
 
-    /// <summary>Argument du processus « moteur » : <c>--engine &lt;canal&gt; &lt;processus de l'interface&gt;</c>.</summary>
+    /// <summary>
+    /// Argument du processus « moteur » : <c>--engine &lt;canal&gt; &lt;processus de l'interface&gt; &lt;empreinte&gt;</c>
+    /// (empreinte SHA-256 de la clé de signature des messages, <see cref="Maus.Core.Engine.Broker.EngineKey"/>).
+    /// </summary>
     internal const string EngineArgument = "--engine";
 
     private static UserPreferences LoadPreferences()
@@ -121,10 +124,11 @@ public partial class App : Application
     }
 
     /// <summary>Le processus moteur : sert le canal privé jusqu'à la fermeture de l'interface, puis rend tout à Windows.</summary>
-    private async Task RunEngineAsync(string pipe, string clientPid)
+    private async Task RunEngineAsync(string pipe, string clientPid, string keyFingerprint)
     {
         if (!System.Text.RegularExpressions.Regex.IsMatch(pipe, "^MAUS-[0-9a-f]{32}$")
-            || !int.TryParse(clientPid, NumberStyles.None, CultureInfo.InvariantCulture, out var pid))
+            || !int.TryParse(clientPid, NumberStyles.None, CultureInfo.InvariantCulture, out var pid)
+            || !Maus.Core.Engine.Broker.EngineKey.IsFingerprint(keyFingerprint))
         {
             Shutdown(2);
             return;
@@ -133,7 +137,7 @@ public partial class App : Application
         var engine = new Maus.Core.Engine.Broker.LocalMausEngine { ProtectedProcessId = pid };
         try
         {
-            await new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid).RunAsync(CancellationToken.None).ConfigureAwait(true);
+            await new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid, keyFingerprint).RunAsync(CancellationToken.None).ConfigureAwait(true);
         }
         finally
         {

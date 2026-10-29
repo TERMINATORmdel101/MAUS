@@ -65,7 +65,7 @@ Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATO
 
 MAUS s'ouvre **sans** les droits administrateur, et sans fenêtre d'autorisation de Windows. Un message vous propose d'activer toutes les fonctionnalités ; sinon, Windows vous demande l'autorisation seulement quand vous lancez une action qui en a besoin (audit complet, corrections, réparation, capteurs avancés, fiche mémoire…). Si vous refusez, seule cette action est annulée et MAUS reste utilisable en lecture seule.
 
-Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une liste fermée d'opérations, par un canal privé réservé à votre compte et à la fenêtre de MAUS, et s'arrête seul après 15 minutes sans demande (jamais pendant un test ou un benchmark) ou à la fermeture de MAUS.
+Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une liste fermée d'opérations, par un canal privé réservé à votre compte et à la fenêtre de MAUS (chaque demande est signée et ne peut servir qu'une fois), et s'arrête seul après 15 minutes sans demande (jamais pendant un test ou un benchmark) ou à la fermeture de MAUS.
 
 ## État du projet
 
@@ -75,7 +75,7 @@ Dernières versions (le détail de toutes les versions est dans [CHANGELOG.md](C
 
 | Version | Nouveautés |
 |---|---|
-| **0.8.3** | Sécurité du moteur administrateur : outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |
+| **0.8.3** | Sécurité du moteur administrateur : messages signés et protégés contre le rejeu, outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |
 | 0.8.2 | « Pourquoi mon PC démarre lentement ? », « Pourquoi se réveille-t-il la nuit ? », écrans bleus expliqués, points de restauration, Wi-Fi voisin ; nouvelles corrections réversibles (tâches d'ouverture de session, Recall, valeurs Windows des effets visuels, fréquence maximale de l'écran avec retour automatique) ; bouton d'aide et « Quoi de neuf » |
 | 0.8.1 | Plus de demande d'autorisation à l'ouverture : MAUS propose d'activer toutes les fonctionnalités, et Windows ne demande l'autorisation qu'au moment voulu ; droits refermés après 15 minutes sans utilisation ; onglet Mémoire des processeurs Intel corrigé (horloge, nanosecondes, tWR et tRTP) ; paquet pour le Microsoft Store |
 | 0.8.0 | Fenêtre de MAUS sans droits administrateur, moteur séparé pour les lectures profondes et les corrections ; revue de sécurité (retours arrière ratés gardés visibles, arrêt de sécurité du benchmark, plus de faux « stable » dans les tests) |

@@ -241,8 +241,9 @@ public sealed class OnDemandEngineTests
         var (slow, slowCalls) = Recorded(local);
         slowCalls.Delay = TimeSpan.FromMilliseconds(800);
         var name = "MAUS-essai-" + Guid.NewGuid().ToString("N");
-        var server = new EngineServer(slow, name, Environment.ProcessId) { IdleTimeout = TimeSpan.FromMilliseconds(300) }.RunAsync(CancellationToken.None);
-        var remote = new RemoteMausEngine(name, Environment.ProcessId);
+        var key = EngineKey.Create();
+        var server = new EngineServer(slow, name, Environment.ProcessId, key.Fingerprint()) { IdleTimeout = TimeSpan.FromMilliseconds(300) }.RunAsync(CancellationToken.None);
+        var remote = new RemoteMausEngine(name, Environment.ProcessId, key);
 
         // Demande plus longue que le délai d'inactivité : elle va jusqu'au bout.
         var run = await remote.RunAuditAsync(null, CancellationToken.None);

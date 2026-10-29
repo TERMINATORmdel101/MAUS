@@ -16,16 +16,25 @@ namespace Maus.Core.Engine.Broker;
 /// <item>canal nommé au nom aléatoire, réservé au compte de l'utilisateur (refusé au réseau), première instance obligatoire :
 /// un programme qui aurait créé un canal du même nom avant le moteur le fait échouer, au lieu d'être servi à sa place ;</item>
 /// <item>chaque connexion vient du processus de l'interface (identifiant vérifié par Windows), sinon elle est fermée ;</item>
+/// <item>l'interface présente d'abord la clé dont le moteur a reçu l'empreinte à son lancement ; ensuite chaque demande est
+/// signée avec cette clé et porte un numéro neuf (<see cref="EngineKey"/>, <see cref="ReplayWindow"/>) : une demande
+/// copiée, rejouée ou modifiée est fermée sans réponse ; chaque réponse est signée et liée au numéro de sa demande ;</item>
 /// <item>paramètres vérifiés (identifiants bornés), opération inconnue refusée ;</item>
 /// <item>le moteur s'arrête avec l'interface, ou après <see cref="IdleTimeout"/> sans demande : les droits administrateur ne
 /// restent pas ouverts plus longtemps que nécessaire (l'action suivante les redemande).</item>
 /// </list>
 /// </summary>
-public sealed partial class EngineServer(IMausEngine engine, string pipeName, int clientProcessId)
+public sealed partial class EngineServer(IMausEngine engine, string pipeName, int clientProcessId, string keyFingerprint)
 {
     private const int MaxIdLength = 200;
     private const int MaxIds = 500;
     private static readonly SecurityIdentifier Network = new(WellKnownSidType.NetworkSid, null);
+
+    /// <summary>Numéros de séquence déjà servis : une demande rejouée est refusée.</summary>
+    private readonly ReplayWindow _replay = new();
+
+    /// <summary>Clé présentée par l'interface (empreinte vérifiée) ; <c>null</c> tant qu'elle ne l'a pas présentée.</summary>
+    private EngineKey? _key;
 
     /// <summary>Demandes en cours : le moteur ne s'arrête jamais au milieu de l'une d'elles.</summary>
     private int _busy;
@@ -137,13 +146,43 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
                     return;
                 }
 
-                if (await EngineProtocol.ReadAsync<EngineRequest>(pipe, cancellationToken).ConfigureAwait(false) is not { } request)
+                if (await EngineProtocol.ReadAsync<SignedMessage>(pipe, cancellationToken).ConfigureAwait(false) is not { } signed)
                 {
                     return;
                 }
 
+                // Présentation de la clé (premier message d'une connexion) : acceptée seulement avec l'empreinte reçue au
+                // lancement, puis la demande suit sur la même connexion.
+                if (signed.Key is not null)
+                {
+                    if (Introduce(signed.Key) is not { } introduced)
+                    {
+                        Breadcrumbs.Add("moteur : clé refusée (empreinte différente de celle reçue au lancement)");
+                        return;
+                    }
+
+                    await EngineProtocol.WriteAsync(pipe, introduced.SignResponse(0, string.Empty), cancellationToken).ConfigureAwait(false);
+                    if (await EngineProtocol.ReadAsync<SignedMessage>(pipe, cancellationToken).ConfigureAwait(false) is not { } next)
+                    {
+                        return;
+                    }
+
+                    signed = next;
+                }
+
+                // Signature d'abord (le texte n'est lu qu'ensuite), puis numéro neuf : rien n'est exécuté sinon.
+                if (Volatile.Read(ref _key) is not { } key
+                    || signed.Key is not null
+                    || !key.VerifyRequest(signed)
+                    || JsonSerializer.Deserialize<EngineRequest>(signed.Body, EngineProtocol.Json) is not { } request
+                    || !_replay.TryAccept(request.Sequence))
+                {
+                    Breadcrumbs.Add("moteur : demande refusée (signature invalide, ou numéro de séquence déjà servi)");
+                    return;
+                }
+
                 Texts.Use(request.Language);
-                using var writer = new SerialWriter(pipe);
+                using var writer = new SerialWriter(pipe, key, request.Sequence);
                 try
                 {
                     var result = await DispatchAsync(request, writer, cancellationToken).ConfigureAwait(false);
@@ -160,6 +199,18 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
                 // Canal coupé, message mal formé ou arrêt : la connexion est fermée, le moteur continue pour les suivantes.
             }
         }
+    }
+
+    /// <summary>La clé présentée, si son empreinte est celle reçue au lancement ; une fois acceptée, elle ne change plus.</summary>
+    private EngineKey? Introduce(string text)
+    {
+        if (EngineKey.Parse(text) is not { } candidate || !candidate.HasFingerprint(keyFingerprint))
+        {
+            return null;
+        }
+
+        Interlocked.CompareExchange(ref _key, candidate, null);
+        return Volatile.Read(ref _key);
     }
 
     private async Task<JsonElement?> DispatchAsync(EngineRequest request, SerialWriter pipe, CancellationToken cancellationToken)
@@ -238,17 +289,21 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
             ? id
             : throw new EngineException("Identifiant refusé.");
 
-    /// <summary>Écritures d'une connexion, une à la fois : les modules qui finissent ensemble ne mélangent pas leurs messages.</summary>
-    private sealed class SerialWriter(Stream pipe) : IDisposable
+    /// <summary>
+    /// Écritures d'une connexion, une à la fois : les modules qui finissent ensemble ne mélangent pas leurs messages. Chaque
+    /// réponse est signée et liée au numéro de la demande.
+    /// </summary>
+    private sealed class SerialWriter(Stream pipe, EngineKey key, long sequence) : IDisposable
     {
         private readonly SemaphoreSlim _gate = new(1, 1);
 
         public async Task WriteAsync(EngineResponse response, CancellationToken cancellationToken)
         {
+            var signed = key.SignResponse(sequence, JsonSerializer.Serialize(response, EngineProtocol.Json));
             await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await EngineProtocol.WriteAsync(pipe, response, cancellationToken).ConfigureAwait(false);
+                await EngineProtocol.WriteAsync(pipe, signed, cancellationToken).ConfigureAwait(false);
             }
             finally
             {

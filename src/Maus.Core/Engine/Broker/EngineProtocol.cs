@@ -5,8 +5,11 @@ using System.Text.Json.Serialization;
 
 namespace Maus.Core.Engine.Broker;
 
-/// <summary>Une demande de l'interface au moteur : une opération de la liste fermée, ses paramètres, la langue de l'interface.</summary>
-public sealed record EngineRequest(string Op, string Language, JsonElement? Args = null);
+/// <summary>
+/// Une demande de l'interface au moteur : une opération de la liste fermée, ses paramètres, la langue de l'interface, et son
+/// numéro de séquence (unique, signé avec la demande : voir <see cref="EngineKey"/> et <see cref="ReplayWindow"/>).
+/// </summary>
+public sealed record EngineRequest(string Op, string Language, JsonElement? Args = null, long Sequence = 0);
 
 /// <summary>
 /// Une réponse du moteur : « progress » (un module de l'audit terminé), « result » (la réponse) ou « error » (l'opération
@@ -16,7 +19,7 @@ public sealed record EngineResponse(string Kind, JsonElement? Payload = null, st
 
 /// <summary>
 /// Format des messages du canal privé entre l'interface et le moteur : 4 octets de longueur (petit-boutiste), puis le JSON
-/// en UTF-8. Taille bornée (un message plus long est refusé, jamais lu en entier).
+/// en UTF-8 d'un <see cref="SignedMessage"/>. Taille bornée (un message plus long est refusé, jamais lu en entier).
 /// </summary>
 public static partial class EngineProtocol
 {

@@ -93,6 +93,10 @@ internal static class EngineLauncher
         // La demande d'autorisation bloque l'appel jusqu'à la réponse : elle se fait hors du fil de l'interface.
         var exe = Environment.ProcessPath ?? throw new EngineException("MAUS.exe introuvable.");
         var pipe = "MAUS-" + Guid.NewGuid().ToString("N");
+
+        // Clé de signature des messages, propre à ce moteur : seule son empreinte passe sur la ligne de commande (lisible par
+        // d'autres programmes) ; la clé elle-même est présentée par le canal privé à la première demande.
+        var key = EngineKey.Create();
         Process engine;
         try
         {
@@ -100,7 +104,7 @@ internal static class EngineLauncher
             {
                 UseShellExecute = true,
                 Verb = "runas",
-                Arguments = $"{App.EngineArgument} {pipe} {Environment.ProcessId.ToString(CultureInfo.InvariantCulture)}",
+                Arguments = $"{App.EngineArgument} {pipe} {Environment.ProcessId.ToString(CultureInfo.InvariantCulture)} {key.Fingerprint()}",
             }) ?? throw new EngineException(Maus.Core.Localization.Texts.T("Le moteur de MAUS n'a pas démarré."));
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == Cancelled)
@@ -113,7 +117,7 @@ internal static class EngineLauncher
             throw new EngineException(Maus.Core.Localization.Texts.T("Le moteur de MAUS n'a pas démarré : {0}", ex.Message), ex);
         }
 
-        var remote = new RemoteMausEngine(pipe, engine.Id);
+        var remote = new RemoteMausEngine(pipe, engine.Id, key);
         try
         {
             await remote.PingAsync(cancellationToken).ConfigureAwait(false);

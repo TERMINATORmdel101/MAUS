@@ -28,7 +28,7 @@ Seulement avec l'accord du porteur.
 
 - **Ne jamais** lancer MAUS en administrateur ni une commande qui modifie le PC du porteur **sans son accord explicite** ; ne jamais fermer un MAUS ouvert par le porteur. Les corrections, PawnIO, la tâche planifiée et les actions sur les pilotes se testent d'abord dans **Windows Sandbox** (pas activé sur le PC du porteur).
 - En lecture seule, sans accord particulier : `dotnet build`, `dotnet test`, `maus` (audit), `maus --plan`, `maus --summary`.
-- Le terminal de Claude Code tourne en administrateur sur le PC du porteur : une copie d'essai lancée depuis lui prend le chemin « interface déjà administrateur » (moteur dans le même processus, pas d'écran d'autorisation). Le vrai moteur séparé s'essaie par un petit client (`RemoteMausEngine` + `MAUS.exe --engine <canal> <pid>`).
+- Le terminal de Claude Code tourne en administrateur sur le PC du porteur : une copie d'essai lancée depuis lui prend le chemin « interface déjà administrateur » (moteur dans le même processus, pas d'écran d'autorisation). Le vrai moteur séparé s'essaie par un petit client (`RemoteMausEngine` avec une `EngineKey` + `MAUS.exe --engine <canal> <pid> <empreinte>`).
 
 ## 5. Encore à valider sur d'autres PC que celui du porteur
 

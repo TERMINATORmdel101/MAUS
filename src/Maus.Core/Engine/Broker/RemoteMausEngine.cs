@@ -9,13 +9,21 @@ namespace Maus.Core.Engine.Broker;
 
 /// <summary>
 /// Le moteur administrateur vu de l'interface : chaque opération ouvre le canal privé, vérifie que le processus en face est
-/// bien le moteur lancé par l'interface (identifiant donné par Windows), envoie la demande et lit la réponse.
+/// bien le moteur lancé par l'interface (identifiant donné par Windows), envoie la demande signée avec un numéro neuf et lit
+/// les réponses, refusées si elles ne sont pas signées par ce moteur pour cette demande.
 /// </summary>
 /// <param name="pipeName">Nom aléatoire du canal, choisi par l'interface au lancement du moteur.</param>
 /// <param name="serverProcessId">Processus du moteur lancé par l'interface.</param>
-public sealed partial class RemoteMausEngine(string pipeName, int serverProcessId) : IMausEngine
+/// <param name="key">Clé tirée par l'interface et passée au moteur à son lancement.</param>
+public sealed partial class RemoteMausEngine(string pipeName, int serverProcessId, EngineKey key) : IMausEngine
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>Dernier numéro de séquence utilisé : chaque demande prend le suivant.</summary>
+    private long _sequence;
+
+    /// <summary>1 quand le moteur a accepté la clé (présentée une fois, sur la première connexion).</summary>
+    private int _introduced;
 
     /// <summary>Vérifie que le moteur répond, avec les droits administrateur.</summary>
     public async Task<EnginePing> PingAsync(CancellationToken cancellationToken) =>
@@ -63,6 +71,20 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
         // Rien à libérer : chaque opération ouvre et referme sa propre connexion.
     }
 
+    /// <summary>Présente la clé au moteur, qui ne l'accepte que si elle a l'empreinte reçue à son lancement.</summary>
+    private async Task IntroduceAsync(Stream pipe, CancellationToken cancellationToken)
+    {
+        await EngineProtocol.WriteAsync(pipe, key.Introduction(), cancellationToken).ConfigureAwait(false);
+        var welcome = await EngineProtocol.ReadAsync<SignedMessage>(pipe, cancellationToken).ConfigureAwait(false)
+            ?? throw new EngineException(T("Le moteur de MAUS a refusé la clé de cette fenêtre. Relancez MAUS."));
+        if (!key.VerifyResponse(0, welcome))
+        {
+            throw new EngineException(T("Réponse refusée : elle n'est pas signée par le moteur de MAUS pour cette demande. Relancez MAUS."));
+        }
+
+        Volatile.Write(ref _introduced, 1);
+    }
+
     private static EngineException Empty() => new(T("Le moteur de MAUS a répondu sans résultat."));
 
     private async Task<TResult?> CallAsync<TResult>(string op, object? args, Action<JsonElement?>? onProgress, CancellationToken cancellationToken)
@@ -89,14 +111,27 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
                 throw new EngineException(T("Le canal du moteur de MAUS est tenu par un autre programme : MAUS refuse de s'en servir. Relancez MAUS."));
             }
 
-            var request = new EngineRequest(op, Texts.Language, args is null ? null : EngineProtocol.ToElement(args));
+            var sequence = Interlocked.Increment(ref _sequence);
+            var request = new EngineRequest(op, Texts.Language, args is null ? null : EngineProtocol.ToElement(args), sequence);
             try
             {
-                await EngineProtocol.WriteAsync(pipe, request, cancellationToken).ConfigureAwait(false);
+                if (Volatile.Read(ref _introduced) == 0)
+                {
+                    await IntroduceAsync(pipe, cancellationToken).ConfigureAwait(false);
+                }
+
+                await EngineProtocol.WriteAsync(pipe, key.SignRequest(JsonSerializer.Serialize(request, EngineProtocol.Json)), cancellationToken).ConfigureAwait(false);
                 while (true)
                 {
-                    var response = await EngineProtocol.ReadAsync<EngineResponse>(pipe, cancellationToken).ConfigureAwait(false)
+                    var signed = await EngineProtocol.ReadAsync<SignedMessage>(pipe, cancellationToken).ConfigureAwait(false)
                         ?? throw new EngineException(T("Le moteur de MAUS a coupé le canal sans répondre."));
+                    if (!key.VerifyResponse(sequence, signed))
+                    {
+                        throw new EngineException(T("Réponse refusée : elle n'est pas signée par le moteur de MAUS pour cette demande. Relancez MAUS."));
+                    }
+
+                    var response = JsonSerializer.Deserialize<EngineResponse>(signed.Body, EngineProtocol.Json)
+                        ?? throw new EngineException(T("Le moteur de MAUS a répondu sans résultat."));
                     switch (response.Kind)
                     {
                         case "progress":
