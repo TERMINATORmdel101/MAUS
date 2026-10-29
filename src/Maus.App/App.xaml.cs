@@ -61,6 +61,9 @@ public partial class App : Application
         if (e.Args.Length > 0 && e.Args[0].Equals("--benchmark", StringComparison.OrdinalIgnoreCase))
         {
             // Benchmark visuel : processus séparé lancé par l'Atelier, avec sa propre fenêtre plein écran (pas de WPF).
+            // Lancé par le moteur, il a les droits administrateur : mêmes protections de Windows que le moteur.
+            var hardening = ProcessElevation.IsElevated() ? ProcessHardening.HardenEngine() : ProcessHardening.HardenInterface();
+            Breadcrumbs.Add("benchmark : protections de Windows (" + string.Join(", ", hardening) + ")");
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Shutdown(Maus.Bench.BenchmarkProgram.Run(e.Args[1..]));
             return;
@@ -409,32 +412,19 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// « Ouvrir » après l'audit hebdomadaire : comme un lancement normal (une seule fenêtre de MAUS, avertissements acceptés),
-    /// puis l'audit est refait dans la fenêtre.
+    /// « Ouvrir » après l'audit hebdomadaire : l'audit tourne avec les droits administrateur de la tâche, mais la fenêtre de
+    /// MAUS ne doit jamais en hériter (principe de la 0.8.x). MAUS est relancé normalement, sans droits, par l'Explorateur
+    /// (comme un double-clic) ; ce processus administrateur s'arrête. L'utilisateur choisit ensuite « Toutes les
+    /// fonctionnalités » s'il veut corriger.
     /// </summary>
     private void OpenAfterScheduledAudit()
     {
-        s_interactive = true;
-        if (!AcquireSingleInstance())
+        if (Environment.ProcessPath is { } exe)
         {
-            // Un MAUS est déjà ouvert : sa fenêtre revient devant, celui-ci s'arrête.
-            Shutdown(0);
-            return;
+            ShellLauncher.OpenFile(exe);
         }
 
-        if (MustAskDisclaimer(LoadPreferences()) && !AskDisclaimer())
-        {
-            Shutdown(0);
-            return;
-        }
-
-        ShutdownMode = ShutdownMode.OnMainWindowClose;
-        ShowMainWindow();
-        UiWatchdog.Start(Dispatcher);
-        if (Current.MainWindow?.DataContext is ViewModels.MainViewModel model && model.RunAuditCommand.CanExecute(null))
-        {
-            model.RunAuditCommand.Execute(null);
-        }
+        Shutdown(0);
     }
 
     /// <summary>Active la langue choisie (ou celle de Windows), y compris pour les dates et les nombres.</summary>

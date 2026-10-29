@@ -158,6 +158,11 @@ public sealed class OnDemandEngineTests
         Assert.True(engine.IsElevatedRunning);
         Assert.Contains("ReadInventoryAsync", elevatedCalls.Calls);
         Assert.Empty(limitedCalls.Calls);
+
+        // Le rapport de batterie reste sans droits, même moteur lancé (powercfg écrit dans le profil).
+        await engine.CreateBatteryReportAsync(CancellationToken.None);
+        Assert.Equal(["CreateBatteryReportAsync"], limitedCalls.Calls);
+        Assert.DoesNotContain("CreateBatteryReportAsync", elevatedCalls.Calls);
     }
 
     [Fact]

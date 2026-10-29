@@ -10,17 +10,27 @@ namespace Maus.Bench.Gpu;
 /// Shaders HLSL embarqués, compilés par le compilateur de Windows (d3dcompiler_47.dll, modèle 5.0 : DXBC accepté par
 /// Direct3D 11 et 12), puis gardés en cache dans %LOCALAPPDATA%\MAUS\bench-shaders (clé = empreinte du source, du point
 /// d'entrée, du profil et des définitions). Les #include "x.hlsli" sont remplacés par le fichier embarqué.
+/// Avec les droits administrateur (benchmark lancé par le moteur), le cache n'est ni lu ni écrit : ce dossier du profil est
+/// modifiable par n'importe quel programme de l'utilisateur, et un processus administrateur ne doit pas donner au pilote
+/// graphique un fichier qu'un tel programme aurait pu remplacer. Les shaders sont alors compilés en mémoire.
 /// </summary>
 public sealed partial class ShaderLibrary
 {
     private static readonly Assembly Self = typeof(ShaderLibrary).Assembly;
     private readonly string _cacheFolder;
+    private readonly bool _useCache;
     private readonly Dictionary<string, ShaderCode> _compiled = new(StringComparer.Ordinal);
 
-    public ShaderLibrary(string? cacheFolder = null)
+    /// <param name="cacheFolder">Dossier du cache (par défaut %LOCALAPPDATA%\MAUSench-shaders).</param>
+    /// <param name="useCache">Par défaut : seulement sans droits administrateur.</param>
+    public ShaderLibrary(string? cacheFolder = null, bool? useCache = null)
     {
         _cacheFolder = cacheFolder ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "bench-shaders");
+        _useCache = useCache ?? !Maus.Core.Platform.ProcessElevation.IsElevated();
     }
+
+    /// <summary>Le cache sur disque est utilisé (faux pour un benchmark administrateur).</summary>
+    public bool UsesDiskCache => _useCache;
 
     /// <summary>Compile (ou reprend du cache) un point d'entrée d'un fichier HLSL embarqué.</summary>
     /// <param name="file">Nom du fichier embarqué (« terrain.hlsl »).</param>
@@ -39,7 +49,7 @@ public sealed partial class ShaderLibrary
         }
 
         var cachePath = Path.Combine(_cacheFolder, key + ".cso");
-        if (File.Exists(cachePath))
+        if (_useCache && File.Exists(cachePath))
         {
             try
             {
@@ -62,6 +72,11 @@ public sealed partial class ShaderLibrary
         }
 
         var code = Compiler.Compile(header + source, entry, file, profile, ShaderFlags.OptimizationLevel3 | ShaderFlags.PackMatrixRowMajor).ToArray();
+        if (!_useCache)
+        {
+            return _compiled[key] = new ShaderCode($"{file}:{entry}", code);
+        }
+
         try
         {
             Directory.CreateDirectory(_cacheFolder);

@@ -57,7 +57,10 @@ public sealed class PresentMonCapture : IDisposable
     public static PresentMonCapture? TryStart(TimeSpan? keep = null, string sessionName = SessionName)
     {
         var path = ExecutablePath;
-        if (!IsGenuine(path))
+
+        // Fichier gardé ouvert et verrouillé de la vérification jusqu'au lancement : il ne peut pas être échangé entre les deux.
+        using var locked = OpenVerified(path, ExpectedSha256);
+        if (locked is null)
         {
             Breadcrumbs.Add("PresentMon absent ou différent de la copie d'Intel : pas de mesure des images");
             return null;
@@ -185,7 +188,8 @@ public sealed class PresentMonCapture : IDisposable
     /// <summary>Une session d'écoute laissée ouverte par un arrêt brutal est refermée par PresentMon lui-même.</summary>
     private static void CloseSession(string sessionName)
     {
-        if (!IsGenuine(ExecutablePath))
+        using var locked = OpenVerified(ExecutablePath, ExpectedSha256);
+        if (locked is null)
         {
             return;
         }
@@ -205,16 +209,33 @@ public sealed class PresentMonCapture : IDisposable
         }
     }
 
-    private static bool IsGenuine(string path)
+    /// <summary>
+    /// Ouvre le fichier en refusant aux autres toute écriture, tout renommage et toute suppression (partage en lecture
+    /// seulement), puis vérifie son empreinte SHA-256. Tant que le flux rendu reste ouvert, le fichier lancé est celui qui a
+    /// été vérifié. <c>null</c> si le fichier est absent, illisible ou différent.
+    /// </summary>
+    internal static FileStream? OpenVerified(string path, string expectedSha256)
     {
+        FileStream? stream = null;
         try
         {
-            using var stream = File.OpenRead(path);
-            return Convert.ToHexStringLower(SHA256.HashData(stream)) == ExpectedSha256;
+            stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (Convert.ToHexStringLower(SHA256.HashData(stream)) != expectedSha256)
+            {
+                return null;
+            }
+
+            var verified = stream;
+            stream = null;
+            return verified;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return false;
+            return null;
+        }
+        finally
+        {
+            stream?.Dispose();
         }
     }
 }

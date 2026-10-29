@@ -33,8 +33,12 @@ public sealed partial class OnDemandMausEngine
     public Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken) =>
         Available(e => e.ListSoftwareUpdatesAsync(cancellationToken));
 
+    /// <summary>
+    /// Toujours sans droits, même si le moteur tourne : powercfg écrit dans le profil de l'utilisateur, un dossier que tout
+    /// programme de l'utilisateur peut modifier, et les protections de Windows du moteur ne valent pas pour powercfg.exe.
+    /// </summary>
     public Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken) =>
-        Available(e => e.CreateBatteryReportAsync(cancellationToken));
+        limited.CreateBatteryReportAsync(cancellationToken);
 
     public Task<int> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken) =>
         Available(e => e.RunBenchmarkAsync(launch, cancellationToken));
