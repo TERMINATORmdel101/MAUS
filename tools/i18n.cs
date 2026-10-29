@@ -1,3 +1,4 @@
+#:property RestorePackagesWithLockFile=false
 // Outil de traduction de MAUS : liste les textes à traduire, ou fusionne des traductions. Programme C# d'un seul fichier
 // (.NET 10), lancé depuis la racine du dépôt :
 //

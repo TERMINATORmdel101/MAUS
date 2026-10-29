@@ -2,6 +2,12 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.8.4 — en préparation (29/10/2026) — confirmations par le moteur, bibliothèques verrouillées
+
+Corrections (dernier chiffre, règle du porteur) : les deux derniers points du rapport de sécurité du 29/10, choisis par le porteur pour la 0.8.4.
+
+- **Bibliothèques verrouillées** : la version exacte et l'empreinte de chaque bibliothèque téléchargée pendant la fabrication de MAUS sont enregistrées (`packages.lock.json`) ; sur GitHub, la fabrication refuse une bibliothèque différente.
+
 ## 0.8.3 — en préparation (29/10/2026) — sécurité du moteur administrateur
 
 Corrections (dernier chiffre, règle du porteur), trouvées en vérifiant le document de sécurité demandé par le Microsoft Store.

@@ -8,10 +8,16 @@
     <Description>MAUS : audit, réparation et optimisation transparente de Windows 11.</Description>
     <Copyright>Contributeurs de MAUS. Licence GPL-3.0-only.</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-    <Version>0.8.3</Version>
+    <Version>0.8.4</Version>
     <NeutralLanguage>fr-FR</NeutralLanguage>
     <SatelliteResourceLanguages>fr;en</SatelliteResourceLanguages>
     <!-- Permet de compiler depuis Linux (sessions cloud) ; sans effet sous Windows. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- Verrouillage des bibliothèques (0.8.4) : packages.lock.json garde la version exacte et l'empreinte (SHA-512) de
+         chaque paquet NuGet, dépendances comprises. Sur GitHub Actions, la restauration refuse tout paquet différent du
+         fichier ; win-x64 y figure aussi pour la publication autonome (installateur, Microsoft Store). -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <RestoreLockedMode Condition="'$(GITHUB_ACTIONS)' == 'true'">true</RestoreLockedMode>
   </PropertyGroup>
 </Project>
