@@ -6,7 +6,7 @@
 
 > MAUS est conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur.
 
-**Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha 0.8.3**
+**Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha 0.8.4**
 
 ```powershell
 winget install TERMINATORmdel101.MAUS
@@ -72,16 +72,16 @@ Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une li
 
 ## État du projet
 
-Version actuelle : **0.8.3** (octobre 2026), en **alpha** : à essayer d'abord sur un PC dont les données sont sauvegardées. Tout est testé avec plus de 1 500 tests automatiques, puis sur le PC Windows du porteur du projet ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application.
+Version actuelle : **0.8.4** (octobre 2026), en **alpha** : à essayer d'abord sur un PC dont les données sont sauvegardées. Tout est testé avec plus de 1 500 tests automatiques, puis sur le PC Windows du porteur du projet ; ce qui n'a pas encore été vérifié sur un vrai matériel est signalé dans l'application.
 
 Dernières versions (le détail de toutes les versions est dans [CHANGELOG.md](CHANGELOG.md)) :
 
 | Version | Nouveautés |
 |---|---|
-| **0.8.3** | Mode limité clair (options grisées, bandeau « Toutes les fonctionnalités »), sécurité du moteur administrateur : messages signés et protégés contre le rejeu, coupure après 3 tentatives refusées, outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |
+| **0.8.4** | Confirmation affichée par le moteur administrateur lui-même pour les actions sensibles (fermer un programme, pilote graphique, PawnIO, constat « voulu ») ; benchmark administrateur protégé, « Ouvrir MAUS » après l'audit de la semaine sans droits, bibliothèques verrouillées par leur empreinte |
+| 0.8.3 | Mode limité clair (options grisées, bandeau « Toutes les fonctionnalités »), sécurité du moteur administrateur : messages signés et protégés contre le rejeu, coupure après 3 tentatives refusées, outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |
 | 0.8.2 | « Pourquoi mon PC démarre lentement ? », « Pourquoi se réveille-t-il la nuit ? », écrans bleus expliqués, points de restauration, Wi-Fi voisin ; nouvelles corrections réversibles (tâches d'ouverture de session, Recall, valeurs Windows des effets visuels, fréquence maximale de l'écran avec retour automatique) ; bouton d'aide et « Quoi de neuf » |
 | 0.8.1 | Plus de demande d'autorisation à l'ouverture : MAUS propose d'activer toutes les fonctionnalités, et Windows ne demande l'autorisation qu'au moment voulu ; droits refermés après 15 minutes sans utilisation ; onglet Mémoire des processeurs Intel corrigé (horloge, nanosecondes, tWR et tRTP) ; paquet pour le Microsoft Store |
-| 0.8.0 | Fenêtre de MAUS sans droits administrateur, moteur séparé pour les lectures profondes et les corrections ; revue de sécurité (retours arrière ratés gardés visibles, arrêt de sécurité du benchmark, plus de faux « stable » dans les tests) |
 
 À venir : publication sur le **Microsoft Store** (en cours), signature du code, et des essais sur d'autres PC (processeurs AMD, mémoire DDR5, cartes graphiques AMD et Intel).
 

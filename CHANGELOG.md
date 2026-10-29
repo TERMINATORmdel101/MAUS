@@ -6,6 +6,7 @@ Les versions sont testées avec des simulations (faux registre, faux WMI, faux r
 
 Corrections (dernier chiffre, règle du porteur) : les deux derniers points du rapport de sécurité du 29/10, choisis par le porteur pour la 0.8.4.
 
+- **Confirmation affichée par le moteur administrateur lui-même** pour les actions les plus sensibles : fermer un programme, supprimer ou retirer le pilote graphique, réinstaller une sauvegarde de pilote, installer ou retirer PawnIO, marquer un nouveau constat « voulu ». Elle s'ajoute à celle de la fenêtre (une confirmation de plus) : la fenêtre de MAUS tourne sans droits, et un programme malveillant pourrait s'y glisser ; il ne peut pas, en revanche, cliquer dans une fenêtre d'un programme administrateur (Windows l'en empêche). « Non » est le choix par défaut. MAUS lancé lui-même « en tant qu'administrateur » ne la montre pas (il n'y a alors pas de moteur séparé).
 - **Bibliothèques verrouillées** : la version exacte et l'empreinte de chaque bibliothèque téléchargée pendant la fabrication de MAUS sont enregistrées (`packages.lock.json`) ; sur GitHub, la fabrication refuse une bibliothèque différente.
 
 ## 0.8.3 — en préparation (29/10/2026) — sécurité du moteur administrateur

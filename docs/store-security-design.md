@@ -1,6 +1,6 @@
 # MAUS — Security design of the elevated engine (Microsoft Store review)
 
-This document answers the ten points requested by Microsoft Store certification for the restricted capability `allowElevation` (policy 10.6.3). It describes MAUS **0.8.3**, the version submitted with this document (source: https://github.com/TERMINATORmdel101/MAUS). Every statement below was checked against the source code, and file paths are given so a reviewer can verify them. Where a protection does **not** exist, this document says so.
+This document answers the ten points requested by Microsoft Store certification for the restricted capability `allowElevation` (policy 10.6.3). It describes MAUS **0.8.4**, the version submitted with this document (source: https://github.com/TERMINATORmdel101/MAUS). Every statement below was checked against the source code, and file paths are given so a reviewer can verify them. Where a protection does **not** exist, this document says so.
 
 MAUS is a free, open-source (GPL-3.0) Windows 11 maintenance utility. It has no telemetry and no network service. It uses the network only when the user asks for it: winget, a web search opened in the browser, or the ping test.
 
@@ -399,6 +399,14 @@ General behaviour:
 - **Software upgrades:** an explicit checklist of packages, then a console where winget itself asks the user to accept licence terms.
 - **Refresh-rate trial:** confirmation first, then a "Keep?" window that rolls back automatically after 15 seconds.
 - Marking a finding as "wanted" and choosing a Game Bar profile on a Ryzen X3D also ask for confirmation.
+
+**Second confirmation shown by the elevated engine itself** (since 0.8.4, `src/Maus.Core/Engine/Broker/EngineConfirmation.cs`): the interface runs without administrator rights, so a malicious program running under the same account could in theory inject into it and send signed requests while the engine is running. For the most sensitive operations, the engine therefore asks again in a Windows message box of its own (`MessageBoxW`, topmost, default button **No**), before doing anything:
+- terminating a process (`process.terminate`);
+- removing a graphics driver, removing and re-detecting the graphics card, or reinstalling a driver backup (`console`, driver tasks);
+- installing or removing PawnIO (`console`);
+- marking a new finding as "wanted" (`prefs.save`, only when a finding is added to the list).
+
+A program without administrator rights cannot click or type in a window of the elevated engine: Windows User Interface Privilege Isolation (UIPI, Microsoft "Windows Integrity Mechanism Design") blocks it. A "No" returns a message to the interface and nothing is done. The interface calls `AllowSetForegroundWindow` for the engine process before each request so that this box can come to the front. When MAUS itself was started with "Run as administrator", there is no separate engine and only the interface dialog is shown.
 
 Admin actions that only **read** (audit, sensors, memory sheet, latency, frame counter, journal) have no MAUS dialog: they are only available after the user explicitly clicked "All features" and accepted the UAC prompt, which is the consent.
 

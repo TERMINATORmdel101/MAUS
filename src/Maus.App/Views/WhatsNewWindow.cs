@@ -48,6 +48,14 @@ public sealed class WhatsNewWindow : Window
     /// <summary>Nouveautés de chaque version, en quelques lignes ; vide si rien n'est prévu pour cette version.</summary>
     public static IReadOnlyList<string> For(string version) => version switch
     {
+        // 0.8.3 n'a pas été publiée : ses nouveautés sont annoncées avec la 0.8.4.
+        "0.8.4" or "0.8.3" =>
+        [
+            T("Nouvelle fenêtre d'ouverture « Comment utiliser MAUS ? » : le mode limité, sans droits administrateur, ou toutes les fonctionnalités."),
+            T("Mode limité plus clair : les options qui demandent les droits administrateur sont grisées, et le bandeau « Toutes les fonctionnalités » les active."),
+            T("Plus de sécurité : messages signés entre la fenêtre et le moteur administrateur, protections de Windows sur MAUS, avertissement si MAUS n'est pas installé dans un dossier protégé."),
+            T("Pour les actions sensibles (fermer un programme, pilote graphique, PawnIO, constat « voulu »), le moteur administrateur demande lui-même confirmation dans sa propre fenêtre."),
+        ],
         "0.8.2" =>
         [
             T("Bouton « ? » en bas à gauche : le site d'aide de MAUS."),
