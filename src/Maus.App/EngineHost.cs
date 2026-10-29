@@ -116,6 +116,16 @@ internal static class EngineLauncher
     {
         // La demande d'autorisation bloque l'appel jusqu'à la réponse : elle se fait hors du fil de l'interface.
         var exe = Environment.ProcessPath ?? throw new EngineException("MAUS.exe introuvable.");
+
+        // MAUS lancé depuis un dossier modifiable sans droits (Téléchargements, Bureau, clé USB…) : un autre programme pourrait
+        // y avoir remplacé MAUS.exe, et c'est lui que Windows lancerait avec les droits administrateur. L'utilisateur décide,
+        // prévenu (demande du porteur du 29/10/2026 : « une sécurité de plus »).
+        if (!Maus.Core.Engine.ScheduledAudit.IsInProtectedFolder(exe, Maus.Core.Engine.ScheduledAudit.ProtectedRoots()) && !ConfirmUnprotectedLocation(exe))
+        {
+            Breadcrumbs.Add("moteur : droits administrateur non demandés (MAUS hors d'un dossier protégé)");
+            throw new EngineDeclinedException(Maus.Core.Localization.Texts.T("Droits administrateur non demandés. Pour les utiliser sans risque, installez MAUS avec son installateur, par winget ou par le Microsoft Store. MAUS reste en mode limité."));
+        }
+
         var pipe = "MAUS-" + Guid.NewGuid().ToString("N");
 
         // Clé de signature des messages, propre à ce moteur : seule son empreinte passe sur la ligne de commande (lisible par
@@ -169,6 +179,35 @@ internal static class EngineLauncher
             }
         });
     }, cancellationToken);
+
+    /// <summary>L'utilisateur a déjà accepté, pendant cette séance, de donner les droits à un MAUS hors d'un dossier protégé.</summary>
+    private static volatile bool s_unprotectedAccepted;
+
+    /// <summary>
+    /// Avertit que MAUS n'est pas dans un dossier protégé et demande s'il faut quand même lui donner les droits administrateur
+    /// (réponse par défaut : non). Posée une fois par séance ; appelée hors du fil de l'interface.
+    /// </summary>
+    private static bool ConfirmUnprotectedLocation(string exe)
+    {
+        if (s_unprotectedAccepted)
+        {
+            return true;
+        }
+
+        var folder = Path.GetDirectoryName(exe) ?? exe;
+        var accepted = System.Windows.Application.Current?.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(
+            Maus.Core.Localization.Texts.T("Ce MAUS est lancé depuis {0}, un dossier que d'autres programmes peuvent modifier sans droits administrateur. Un virus pourrait y avoir remplacé MAUS.exe : c'est alors à lui que Windows donnerait les droits administrateur.", folder)
+                + Environment.NewLine + Environment.NewLine
+                + Maus.Core.Localization.Texts.T("Pour être protégé, installez MAUS avec son installateur (dossier Program Files), par winget ou par le Microsoft Store.")
+                + Environment.NewLine + Environment.NewLine
+                + Maus.Core.Localization.Texts.T("Donner quand même les droits administrateur à ce MAUS ?"),
+            Maus.Core.Localization.Texts.T("MAUS n'est pas dans un dossier protégé"),
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning,
+            System.Windows.MessageBoxResult.No) == System.Windows.MessageBoxResult.Yes) == true;
+        s_unprotectedAccepted = accepted;
+        return accepted;
+    }
 
     /// <summary>Code de sortie du moteur, ou <c>null</c> si Windows ne le donne pas.</summary>
     private static int? ExitCodeOf(Process engine)

@@ -88,13 +88,27 @@ public static class ScheduledAudit
     {
         ArgumentNullException.ThrowIfNull(executable);
 
-        var isProtected = Path.IsPathFullyQualified(executable)
-            && !executable.Contains("..", StringComparison.Ordinal)
-            && protectedRoots.Any(root => root.Length > 0 && executable.StartsWith(root.TrimEnd('\\') + @"\", StringComparison.OrdinalIgnoreCase));
-        return isProtected
+        return IsInProtectedFolder(executable, protectedRoots)
             ? null
             : T("L'audit automatique n'est proposé que si MAUS est installé dans un dossier protégé (Program Files, ou par le Microsoft Store). Depuis {0}, un autre programme pourrait remplacer MAUS.exe et profiter des droits administrateur de la tâche.",
                 Path.GetDirectoryName(executable) ?? executable);
+    }
+
+    /// <summary>
+    /// Vrai si <paramref name="executable"/> est dans un dossier que seuls les administrateurs peuvent modifier (Program Files,
+    /// WindowsApps compris) : un programme sans droits ne peut pas y remplacer MAUS.exe. Sert à la tâche hebdomadaire et à la
+    /// demande des droits administrateur (le moteur est le même MAUS.exe, lancé avec ces droits).
+    /// </summary>
+    /// <param name="executable">Chemin complet de MAUS.exe.</param>
+    /// <param name="protectedRoots">Dossiers réservés aux administrateurs (voir <see cref="ProtectedRoots"/>).</param>
+    public static bool IsInProtectedFolder(string executable, IReadOnlyList<string> protectedRoots)
+    {
+        ArgumentNullException.ThrowIfNull(executable);
+        ArgumentNullException.ThrowIfNull(protectedRoots);
+
+        return Path.IsPathFullyQualified(executable)
+            && !executable.Contains("..", StringComparison.Ordinal)
+            && protectedRoots.Any(root => root.Length > 0 && executable.StartsWith(root.TrimEnd('\\') + @"\", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

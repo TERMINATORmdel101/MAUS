@@ -40,6 +40,8 @@ public class ScheduledAuditTests
 
         var refusal = ScheduledAudit.Refusal(executable, roots);
 
+        // Même règle pour la demande des droits administrateur (le moteur est ce même MAUS.exe).
+        Assert.Equal(allowed, ScheduledAudit.IsInProtectedFolder(executable, roots));
         Assert.Equal(allowed, refusal is null);
         if (!allowed)
         {
