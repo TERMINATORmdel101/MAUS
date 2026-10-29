@@ -138,6 +138,12 @@ public sealed partial class LocalMausEngine
             return T("C'est MAUS lui-même.");
         }
 
+        if (!Confirmed(T("fermer un programme"), T("Fermer le programme {0} (processus {1}) ? Ce qui n'est pas enregistré dans ce programme sera perdu.", found.Name, pid)
+                + (string.IsNullOrEmpty(found.Path) ? string.Empty : Environment.NewLine + T("Emplacement : {0}", found.Path))))
+        {
+            return T("Fermeture annulée : le programme continue.");
+        }
+
         var sample = new ProcessSample(found.Pid, found.Name, found.Path, 0, found.WorkingSetBytes, found.PrivateBytes, 0, null, found.SessionId, found.StartTime);
         try
         {
@@ -287,6 +293,13 @@ public sealed partial class LocalMausEngine
             }
 
             case ConsoleKind.PawnIoInstall or ConsoleKind.PawnIoUninstall:
+                if (!Confirmed("PawnIO", request.Kind == ConsoleKind.PawnIoInstall
+                        ? T("Installer le pilote PawnIO par winget ? Il permet à MAUS de lire la température du processeur et la fiche mémoire.")
+                        : T("Retirer le pilote PawnIO par winget ?")))
+                {
+                    return new ConsoleOutcome(false, T("Action annulée : rien n'a changé."));
+                }
+
                 return Winget.Locate(context.Packages, context.Files) is { } path
                     ? new ConsoleOutcome(VisibleConsole.Run(request.Kind == ConsoleKind.PawnIoInstall ? PawnIo.InstallConsoleArguments(path) : PawnIo.UninstallConsoleArguments(path)))
                     : new ConsoleOutcome(false, WingetMissing);
@@ -301,6 +314,14 @@ public sealed partial class LocalMausEngine
                 if (action is GraphicsDriverAction.Backup or GraphicsDriverAction.Remove && ProtectDriverBackups() is { } unsafeFolder)
                 {
                     return new ConsoleOutcome(false, unsafeFolder);
+                }
+
+                if (action is GraphicsDriverAction.Remove or GraphicsDriverAction.Reinstall
+                    && !Confirmed(T("pilote graphique"), action == GraphicsDriverAction.Remove
+                        ? T("Sauvegarder puis supprimer le pilote de {0} ? L'écran peut devenir noir quelques secondes.", gpu.Device)
+                        : T("Retirer {0} puis la laisser redétecter par Windows ? L'écran peut devenir noir quelques secondes.", gpu.Device)))
+                {
+                    return new ConsoleOutcome(false, T("Action annulée : rien n'a changé."));
                 }
 
                 var folder = GraphicsDriverActions.BackupFolder(gpu.InfName ?? "pilote", DateTimeOffset.Now);
@@ -324,6 +345,11 @@ public sealed partial class LocalMausEngine
                 if (!valid || GraphicsDriverActions.RestoreArguments(full) is not { } arguments)
                 {
                     return new ConsoleOutcome(false, T("Choisissez un dossier de sauvegarde créé par MAUS (il contient un fichier .inf)."));
+                }
+
+                if (!Confirmed(T("pilote graphique"), T("Réinstaller le pilote sauvegardé par MAUS dans {0} ? L'écran peut devenir noir quelques secondes.", name)))
+                {
+                    return new ConsoleOutcome(false, T("Action annulée : rien n'a changé."));
                 }
 
                 return new ConsoleOutcome(VisibleConsole.Run(arguments), full);

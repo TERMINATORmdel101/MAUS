@@ -148,7 +148,11 @@ public partial class App : Application
 
         // Protections de Windows sur le moteur, avant toute demande (Maus.Core.Platform.ProcessHardening).
         Breadcrumbs.Add("moteur : protections de Windows (" + string.Join(", ", ProcessHardening.HardenEngine()) + ")");
-        var engine = new Maus.Core.Engine.Broker.LocalMausEngine { ProtectedProcessId = pid };
+        var engine = new Maus.Core.Engine.Broker.LocalMausEngine
+        {
+            ProtectedProcessId = pid,
+            Confirmation = new Maus.Core.Engine.Broker.WindowsEngineConfirmation(),
+        };
         var server = new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid, keyFingerprint);
         try
         {

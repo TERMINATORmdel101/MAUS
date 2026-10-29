@@ -89,6 +89,8 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
 
     private async Task<TResult?> CallAsync<TResult>(string op, object? args, Action<JsonElement?>? onProgress, CancellationToken cancellationToken)
     {
+        // Le moteur peut afficher sa propre confirmation (actions sensibles) : elle doit pouvoir passer au premier plan.
+        EngineForeground.Allow(serverProcessId);
         var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         await using (pipe.ConfigureAwait(false))
         {

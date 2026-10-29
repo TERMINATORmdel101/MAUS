@@ -34,6 +34,16 @@ public sealed partial class LocalMausEngine : IMausEngine
         _journal = journal ?? FileJournalStore.CreateDefault();
     }
 
+    /// <summary>
+    /// Confirmation affichée par le moteur lui-même avant une action sensible (<see cref="IEngineConfirmation"/>) ; posée
+    /// seulement pour le moteur séparé (<c>MAUS.exe --engine</c>). <c>null</c> : MAUS administrateur dans un seul processus,
+    /// où la confirmation de la fenêtre suffit (rien ne sépare alors la fenêtre du moteur).
+    /// </summary>
+    public IEngineConfirmation? Confirmation { get; init; }
+
+    /// <summary>Vrai si aucune confirmation n'est demandée ici, ou si l'utilisateur répond « Oui » dans celle du moteur.</summary>
+    private bool Confirmed(string title, string message) => Confirmation?.Confirm(title, message) ?? true;
+
     public async Task<AuditRun> RunAuditAsync(IProgress<ModuleResult>? progress, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -138,6 +148,16 @@ public sealed partial class LocalMausEngine : IMausEngine
         {
             try
             {
+                // Nouveau constat marqué « voulu » : l'audit de la semaine ne le signalera plus, confirmation du moteur.
+                var current = _preferences.Load();
+                var added = preferences.Acknowledged.Select(a => a.FindingId)
+                    .Except(current.Acknowledged.Select(a => a.FindingId), StringComparer.Ordinal).ToList();
+                if (added.Count > 0 && !Confirmed(T("constat « voulu »"),
+                        T("Marquer comme « voulu » : {0} ? MAUS ne le signalera plus, ni dans l'audit ni dans celui de la semaine, tant que la situation ne change pas.", string.Join(", ", added))))
+                {
+                    return State(current) with { NotSaved = T("Marquage « voulu » annulé : rien n'a changé.") };
+                }
+
                 _preferences.Save(preferences);
                 return State(preferences);
             }
