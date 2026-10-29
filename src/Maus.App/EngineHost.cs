@@ -32,6 +32,29 @@ public static class EngineHost
     /// </summary>
     public static bool IsElevated => OnDemand?.IsElevatedRunning ?? Environment.IsPrivilegedProcess;
 
+    /// <summary>
+    /// Les droits administrateur viennent de s'ouvrir (moteur lancé) ou de se refermer (moteur arrêté : 15 minutes sans
+    /// demande, arrêt par sécurité, fermeture). Appelé sur n'importe quel fil.
+    /// </summary>
+    public static event EventHandler? ElevationChanged;
+
+    /// <summary>
+    /// Le moteur s'est arrêté par sécurité : un programme a essayé de le commander (<see cref="EngineServer.MaxRefusals"/>
+    /// connexions refusées). Appelé sur n'importe quel fil.
+    /// </summary>
+    public static event EventHandler? StoppedForSecurity;
+
+    /// <summary>Le processus moteur s'est terminé avec ce code de sortie (<c>null</c> si Windows ne l'a pas donné).</summary>
+    internal static void OnEngineExited(int? exitCode)
+    {
+        Breadcrumbs.Add("moteur administrateur terminé (code " + (exitCode?.ToString(CultureInfo.InvariantCulture) ?? "?") + ")");
+        ElevationChanged?.Invoke(null, EventArgs.Empty);
+        if (exitCode == EngineServer.SecurityStopExitCode)
+        {
+            StoppedForSecurity?.Invoke(null, EventArgs.Empty);
+        }
+    }
+
     /// <summary>Choix de l'utilisateur : affichage dans son propre fichier, choix protégés par le moteur.</summary>
     public static IPreferencesStore Preferences
     {
@@ -56,6 +79,7 @@ public static class EngineHost
         if (OnDemand is { } onDemand)
         {
             // Le moteur vient de démarrer : les choix protégés (constats « voulus », profil Game Bar) deviennent lisibles.
+            onDemand.ElevatedStarted += (_, _) => ElevationChanged?.Invoke(null, EventArgs.Empty);
             onDemand.ElevatedStarted += (_, _) => Task.Run(() =>
             {
                 try
@@ -129,6 +153,10 @@ internal static class EngineLauncher
         }
 
         Breadcrumbs.Add("moteur administrateur relié (processus " + engine.Id.ToString(CultureInfo.InvariantCulture) + ")");
+
+        // Fin du moteur : l'interface repasse en mode limité, et prévient l'utilisateur s'il s'est arrêté par sécurité.
+        engine.Exited += (_, _) => EngineHost.OnEngineExited(ExitCodeOf(engine));
+        engine.EnableRaisingEvents = true;
         return new ElevatedEngineSession(remote, () =>
         {
             try
@@ -141,4 +169,17 @@ internal static class EngineLauncher
             }
         });
     }, cancellationToken);
+
+    /// <summary>Code de sortie du moteur, ou <c>null</c> si Windows ne le donne pas.</summary>
+    private static int? ExitCodeOf(Process engine)
+    {
+        try
+        {
+            return engine.ExitCode;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or NotSupportedException)
+        {
+            return null;
+        }
+    }
 }

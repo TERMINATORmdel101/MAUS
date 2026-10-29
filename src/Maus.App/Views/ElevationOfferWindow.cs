@@ -37,10 +37,10 @@ public sealed class ElevationOfferWindow : Window
 
         var limited = Choice("Grey",
             T("Mode limité, sans droits administrateur"),
-            T("Vous voyez votre matériel, les mesures en direct, les processus et l'espace disque. Pour le reste, Windows vous demandera l'autorisation au moment où vous en aurez besoin."));
+            T("Vous voyez votre matériel, les mesures en direct, les processus et l'espace disque. Les options qui ont besoin des droits administrateur sont grisées : le bouton « Toutes les fonctionnalités », en haut de la fenêtre, les active à tout moment."));
         var full = Choice("Mint",
             T("Toutes les fonctionnalités, avec les droits administrateur"),
-            T("Toute l'application est disponible : audit complet, corrections (toujours annulables), réparation de Windows, capteurs avancés, fiche mémoire… Windows vous demande votre autorisation, puis les droits se referment seuls après 15 minutes sans utilisation."));
+            T("Toute l'application est disponible : audit complet, corrections (toujours annulables), réparation de Windows, capteurs avancés, fiche mémoire… Windows vous demande votre autorisation ; après 15 minutes sans utilisation, les droits se referment seuls et les options redeviennent grises."));
 
         var yes = new Button { Content = T("Toutes les fonctionnalités"), IsDefault = true, Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, 0, 8, 0) };
         yes.SetResourceReference(StyleProperty, "PrimaryButton");

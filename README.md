@@ -65,10 +65,10 @@ Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATO
 
 MAUS s'ouvre **sans** les droits administrateur, et sans fenêtre d'autorisation de Windows. À l'ouverture, il vous laisse choisir :
 
-- **Mode limité**, sans droits administrateur : votre matériel, les mesures en direct, les processus et l'espace disque. Pour le reste, Windows vous demande l'autorisation seulement quand vous lancez une action qui en a besoin (audit complet, corrections, réparation, capteurs avancés, fiche mémoire…). Si vous refusez, seule cette action est annulée.
-- **Toutes les fonctionnalités**, avec les droits administrateur : toute l'application est disponible, après l'autorisation de Windows.
+- **Mode limité**, sans droits administrateur : votre matériel, les mesures en direct, les processus et l'espace disque. Les options qui ont besoin des droits administrateur (audit complet, corrections, réparation, capteurs avancés, fiche mémoire…) sont grisées, et un bandeau en haut de la fenêtre propose « Toutes les fonctionnalités ».
+- **Toutes les fonctionnalités**, avec les droits administrateur : toute l'application est disponible, après l'autorisation de Windows. Après 15 minutes sans utilisation, les droits se referment seuls et les options redeviennent grises.
 
-Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une liste fermée d'opérations, par un canal privé réservé à votre compte et à la fenêtre de MAUS (chaque demande est signée et ne peut servir qu'une fois), et s'arrête seul après 15 minutes sans demande (jamais pendant un test ou un benchmark) ou à la fermeture de MAUS.
+Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une liste fermée d'opérations, par un canal privé réservé à votre compte et à la fenêtre de MAUS (chaque demande est signée et ne peut servir qu'une fois ; au bout de 3 tentatives refusées, il se coupe lui-même et vous prévient), et s'arrête seul après 15 minutes sans demande (jamais pendant un test ou un benchmark) ou à la fermeture de MAUS.
 
 ## État du projet
 
@@ -78,7 +78,7 @@ Dernières versions (le détail de toutes les versions est dans [CHANGELOG.md](C
 
 | Version | Nouveautés |
 |---|---|
-| **0.8.3** | Sécurité du moteur administrateur : messages signés et protégés contre le rejeu, outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |
+| **0.8.3** | Mode limité clair (options grisées, bandeau « Toutes les fonctionnalités »), sécurité du moteur administrateur : messages signés et protégés contre le rejeu, coupure après 3 tentatives refusées, outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |
 | 0.8.2 | « Pourquoi mon PC démarre lentement ? », « Pourquoi se réveille-t-il la nuit ? », écrans bleus expliqués, points de restauration, Wi-Fi voisin ; nouvelles corrections réversibles (tâches d'ouverture de session, Recall, valeurs Windows des effets visuels, fréquence maximale de l'écran avec retour automatique) ; bouton d'aide et « Quoi de neuf » |
 | 0.8.1 | Plus de demande d'autorisation à l'ouverture : MAUS propose d'activer toutes les fonctionnalités, et Windows ne demande l'autorisation qu'au moment voulu ; droits refermés après 15 minutes sans utilisation ; onglet Mémoire des processeurs Intel corrigé (horloge, nanosecondes, tWR et tRTP) ; paquet pour le Microsoft Store |
 | 0.8.0 | Fenêtre de MAUS sans droits administrateur, moteur séparé pour les lectures profondes et les corrections ; revue de sécurité (retours arrière ratés gardés visibles, arrêt de sécurité du benchmark, plus de faux « stable » dans les tests) |

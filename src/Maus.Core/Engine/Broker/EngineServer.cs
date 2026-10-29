@@ -20,12 +20,20 @@ namespace Maus.Core.Engine.Broker;
 /// signée avec cette clé et porte un numéro neuf (<see cref="EngineKey"/>, <see cref="ReplayWindow"/>) : une demande
 /// copiée, rejouée ou modifiée est fermée sans réponse ; chaque réponse est signée et liée au numéro de sa demande ;</item>
 /// <item>paramètres vérifiés (identifiants bornés), opération inconnue refusée ;</item>
+/// <item>au bout de <see cref="MaxRefusals"/> connexions refusées (autre processus, mauvaise clé, demande rejouée ou
+/// modifiée), le moteur s'arrête de lui-même : ses droits administrateur se referment (<see cref="StoppedForSecurity"/>) ;</item>
 /// <item>le moteur s'arrête avec l'interface, ou après <see cref="IdleTimeout"/> sans demande : les droits administrateur ne
 /// restent pas ouverts plus longtemps que nécessaire (l'action suivante les redemande).</item>
 /// </list>
 /// </summary>
 public sealed partial class EngineServer(IMausEngine engine, string pipeName, int clientProcessId, string keyFingerprint)
 {
+    /// <summary>Connexions refusées tolérées avant l'arrêt du moteur par sécurité (demande du porteur, 29/10/2026).</summary>
+    public const int MaxRefusals = 3;
+
+    /// <summary>Code de sortie du processus moteur arrêté par sécurité (lu par l'interface pour prévenir l'utilisateur).</summary>
+    public const int SecurityStopExitCode = 10;
+
     private const int MaxIdLength = 200;
     private const int MaxIds = 500;
     private static readonly SecurityIdentifier Network = new(WellKnownSidType.NetworkSid, null);
@@ -39,6 +47,18 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
     /// <summary>Demandes en cours : le moteur ne s'arrête jamais au milieu de l'une d'elles.</summary>
     private int _busy;
 
+    /// <summary>Connexions refusées depuis le lancement.</summary>
+    private int _refusals;
+
+    /// <summary>Arrêt du moteur (fin de l'interface, inactivité, ou sécurité).</summary>
+    private CancellationTokenSource? _stop;
+
+    /// <summary>
+    /// Vrai si le moteur s'est arrêté parce qu'un programme a essayé de le commander (<see cref="MaxRefusals"/> connexions
+    /// refusées) : il ne punit personne, il referme seulement ses droits administrateur, et l'interface prévient l'utilisateur.
+    /// </summary>
+    public bool StoppedForSecurity { get; private set; }
+
     /// <summary>Fin de la dernière demande (ou démarrage), en millisecondes depuis le démarrage de Windows.</summary>
     private long _lastActivity = Environment.TickCount64;
 
@@ -49,6 +69,7 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _stop = stop;
         _ = WatchClientAsync(stop);
         _ = WatchIdleAsync(stop);
         var first = true;
@@ -142,7 +163,7 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
             {
                 if (EngineProtocol.ClientProcessId(pipe.SafePipeHandle) != clientProcessId)
                 {
-                    Breadcrumbs.Add("moteur : connexion refusée (autre processus que l'interface)");
+                    Refuse("moteur : connexion refusée (autre processus que l'interface)");
                     return;
                 }
 
@@ -157,7 +178,7 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
                 {
                     if (Introduce(signed.Key) is not { } introduced)
                     {
-                        Breadcrumbs.Add("moteur : clé refusée (empreinte différente de celle reçue au lancement)");
+                        Refuse("moteur : clé refusée (empreinte différente de celle reçue au lancement)");
                         return;
                     }
 
@@ -177,7 +198,7 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
                     || JsonSerializer.Deserialize<EngineRequest>(signed.Body, EngineProtocol.Json) is not { } request
                     || !_replay.TryAccept(request.Sequence))
                 {
-                    Breadcrumbs.Add("moteur : demande refusée (signature invalide, ou numéro de séquence déjà servi)");
+                    Refuse("moteur : demande refusée (signature invalide, ou numéro de séquence déjà servi)");
                     return;
                 }
 
@@ -198,6 +219,30 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
             {
                 // Canal coupé, message mal formé ou arrêt : la connexion est fermée, le moteur continue pour les suivantes.
             }
+        }
+    }
+
+    /// <summary>
+    /// Note une connexion refusée ; à la <see cref="MaxRefusals"/>e, le moteur s'arrête par sécurité. Rien d'autre n'est fait :
+    /// pas d'action sur le PC, qui pourrait servir d'arme à un programme malveillant.
+    /// </summary>
+    private void Refuse(string reason)
+    {
+        Breadcrumbs.Add(reason);
+        if (Interlocked.Increment(ref _refusals) < MaxRefusals)
+        {
+            return;
+        }
+
+        StoppedForSecurity = true;
+        Breadcrumbs.Add("moteur : arrêt par sécurité après " + MaxRefusals.ToString(System.Globalization.CultureInfo.InvariantCulture) + " connexions refusées");
+        try
+        {
+            _stop?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Moteur déjà arrêté.
         }
     }
 

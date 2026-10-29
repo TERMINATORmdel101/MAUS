@@ -12,7 +12,7 @@ MAUS is a free, open-source (GPL-3.0) Windows 11 maintenance utility. It has no 
 
 `MAUS.exe` (the user interface) runs **without administrator rights** (manifest `asInvoker`), and nothing is elevated at start.
 
-When the user starts an action that needs administrator rights, the interface starts a second copy of the **same executable**, `MAUS.exe --engine <pipe-name> <ui-pid> <key-fingerprint>`. It uses `ShellExecute` with the verb `runas`, so Windows shows its UAC prompt.
+MAUS opens in **limited mode**: every control that needs administrator rights is greyed out. When the user explicitly clicks **"All features"**, the interface starts a second copy of the **same executable**, `MAUS.exe --engine <pipe-name> <ui-pid> <key-fingerprint>`. It uses `ShellExecute` with the verb `runas`, so Windows shows its UAC prompt.
 
 The elevated copy (the "engine") behaves as follows:
 - It first validates its own command line. The pipe name must match `^MAUS-[0-9a-f]{32}$`, the PID must be a decimal number and the key fingerprint must be 64 lowercase hexadecimal digits; otherwise it exits with code 2 without doing anything (`src/Maus.App/App.xaml.cs`, `RunEngineAsync`).
@@ -31,9 +31,9 @@ Code:
 
 The engine dispatcher (`EngineServer.cs`, `EngineServer.Workshop.cs`) recognises exactly the 32 operation names below. Any other name returns the error "Opération inconnue" (unknown operation), and nothing is executed.
 
-**Starts the engine (UAC)** column. "Yes" means the operation needs administrator rights: if the engine is not running, the interface starts it, which shows UAC. "No" means the operation also works without rights: it goes through the engine only if the engine is already running (it then runs with administrator rights), otherwise it runs in the non-elevated interface. A "No" operation never starts the engine and never shows UAC (`OnDemandMausEngine.cs`, methods `Elevated` and `Available`).
+**Needs administrator rights** column. "Yes" means the operation needs administrator rights. In limited mode (engine not running), every control that leads to such an operation is **greyed out**, and the only ways to start the engine are the "All features" button of the banner at the top of the window, the startup window, or the "Enable advanced sensors" button (§7); the operation itself then runs in the engine. "No" means the operation also works without rights: it goes through the engine only if the engine is already running (it then runs with administrator rights), otherwise it runs in the non-elevated interface. A "No" operation never starts the engine and never shows UAC (`OnDemandMausEngine.cs`, methods `Elevated` and `Available`).
 
-| # | Operation | Purpose | Starts the engine (UAC) | Changes the system? |
+| # | Operation | Purpose | Needs administrator rights | Changes the system? |
 |---|---|---|---|---|
 | 1 | `ping` | Check that the engine answers | — (sent once by the launcher) | No |
 | 2 | `audit` | Full read-only audit (20 modules) | Yes | No |
@@ -324,6 +324,7 @@ General rules (`EngineServer.cs`, `EngineProtocol.cs`):
 | Authorization | The engine runs only operations from the closed list (§1), with the validation of §4. There is no "generic" operation |
 | Message bounds | 32 MiB maximum, one request per connection (after the one-time key presentation), JSON into fixed types |
 | Lifetime binding | The engine watches the interface process and exits when it exits |
+| Security stop | After **3** refused connections (another process, a wrong key, a replayed or modified request), the engine stops by itself (`EngineServer.MaxRefusals`, exit code `SecurityStopExitCode`); the interface warns the user and returns to limited mode. The engine takes no other action, so this cannot be abused to harm the PC |
 
 These controls are layered: a request is executed only if it arrives on a local connection, from the exact interface process that started this engine, on a pipe that only that account can open, signed with the key of this engine start, with a sequence number never used before. Even then, the engine only runs operations from its closed list, recomputed from its own audit and catalogs. Tests: `tests/Maus.Core.Tests/Engine/EngineKeyTests.cs` (signature, fingerprint, replay window) and `EngineBrokerTests.cs` (a real pipe: a request before the key presentation, a wrong key, a replayed request and a modified request are all refused; a response is valid only for its own request).
 
@@ -350,21 +351,23 @@ These controls are layered: a request is executed only if it arrives on a local 
 
 General behaviour:
 - **At start**, there is no UAC prompt. The interface runs as a standard user. MAUS may show, in its own window, the disclaimer (first start, and again if its text changes), "What's new", and a window "How do you want to use MAUS?" that explains the two modes side by side: "Limited mode, without administrator rights" and "All features, with administrator rights". That window appears at each start until the user ticks "Don't ask me again" or turns it off in Settings > Administrator rights. UAC appears **only if** the user clicks "All features"; "Limited mode" keeps MAUS without rights.
-- **First admin action:** the interface starts `MAUS.exe --engine` with `runas`, and UAC appears at that moment. If two actions start together, only one prompt is shown.
+- **Limited mode:** while the engine is not running, every control that needs administrator rights is greyed out (audit, fixes, undo, repair, software upgrades, PawnIO, driver actions and backups, restore points, weekly audit, protected choices, memory sheet, latency test, frame counter), and a banner at the top of the window says "Limited mode: greyed-out options need administrator rights" with an **"All features"** button (`src/Maus.App/ViewModels/ElevationState.cs`, `MainWindow.xaml`). No greyed-out control can be clicked, so no action starts a UAC prompt by surprise.
+- **Switching to all features:** only an explicit click on "All features" (banner or startup window) or on "Enable advanced sensors" starts `MAUS.exe --engine` with `runas`; UAC appears at that moment. If two clicks happen together, only one prompt is shown. When the engine is ready, the greyed-out controls become available and the banner disappears.
 - **Following actions** reuse the running engine, with no new prompt.
-- **15 minutes without any request:** the engine exits (`EngineServer.IdleTimeout`), but never while a request is in progress. For example, a running latency measurement or benchmark counts as a request. The next admin action asks UAC again. If the engine restarted since the last audit, it audits again before any plan or apply, so it never acts on stale data.
+- **15 minutes without any request:** the engine exits (`EngineServer.IdleTimeout`), but never while a request is in progress. For example, a running latency measurement or benchmark counts as a request. The interface is notified when the engine process exits (`Process.Exited`): the controls are greyed out again and the banner comes back. If the engine restarted since the last audit, it audits again before any plan or apply, so it never acts on stale data.
+- **Security stop:** after 3 refused connections (another process, a wrong key, a replayed or modified request; §5), the engine stops by itself with a dedicated exit code; the interface goes back to limited mode and warns the user that a program tried to control the engine, and advises a scan with Windows Security. Nothing else is done (no action on the PC that a malicious program could abuse).
 - **Interface closed or crashed:** the engine detects that the interface process has exited and stops. If a fix was being written at that moment, the journal keeps it as `Pending` and "Undo" handles it (§9). Closing MAUS during a write asks for confirmation first.
 - **MAUS started with "Run as administrator" by the user:** there is no separate engine; the same operations run in-process (`LocalMausEngine`).
 
 | Workflow | Elevation | Engine runs until |
 |---|---|---|
-| Audit, re-run a module, view fixes | UAC at the first click | Idle timeout or interface exit |
-| Apply fixes / Undo | UAC if the engine is not running | Same |
-| History (journal), protected preferences | UAC if the engine is not running | Same |
-| Repair Windows files, software upgrades, PawnIO install/remove, driver actions and driver restore | UAC if the engine is not running; the console then runs on its own | The console window stays open until the user closes it, even after the engine stops |
-| Restore points (list, create), weekly audit (enable/disable) | UAC if the engine is not running | Idle timeout or interface exit |
-| "Enable advanced sensors" button, memory sheet, latency test, frame counter | UAC at the click | Same; frame captures stop with the engine |
-| Benchmark | No UAC, except when PawnIO is installed: MAUS then asks for the engine first so that the CPU temperature is watched (if declined, the benchmark still runs, without that reading). It runs with administrator rights only if the engine is running | Benchmark exit |
+| "All features" (banner or startup window), "Enable advanced sensors" | UAC at the click: these are the only controls that start the engine | Idle timeout, security stop or interface exit |
+| Audit, re-run a module, view and apply fixes, undo, history (journal), protected choices ("wanted" findings, Game Bar profile, laptop power) | Greyed out in limited mode; available with all features | Same |
+| Repair Windows files, software upgrades, PawnIO install/remove, driver actions, driver backups and restore | Greyed out in limited mode; with all features, the console then runs on its own | The console window stays open until the user closes it, even after the engine stops |
+| Restore points (list, create), weekly audit (enable/disable) | Greyed out in limited mode | Idle timeout, security stop or interface exit |
+| Memory sheet, latency test, frame counter | Greyed out in limited mode | Same; frame captures stop with the engine |
+| Game session recording | Never asks. In limited mode it records without frames per second (they need the engine) | — |
+| Benchmark | Never asks. With all features, it is started by the engine so that the CPU temperature can be watched through PawnIO; in limited mode it runs without that reading (the graphics card safety stop stays active) | Benchmark exit |
 | Process list, process termination, disk-space analysis, drivers list, inventory, software list, battery report | Never asks. They run with administrator rights only if the engine is already running | — |
 | Refresh-rate trial, Explorer restart, opening web pages, folders and Settings pages, CPU/RAM/VRAM/disk tests, ping test | Never elevated: they run in the interface process (web pages and folders are opened through `explorer.exe`) | — |
 
@@ -391,11 +394,11 @@ General behaviour:
 - **Refresh-rate trial:** confirmation first, then a "Keep?" window that rolls back automatically after 15 seconds.
 - Marking a finding as "wanted" and choosing a Game Bar profile on a Ryzen X3D also ask for confirmation.
 
-Admin actions that only **read** (audit, sensors, memory sheet, latency, frame counter, journal) have no MAUS dialog: the UAC prompt itself is the consent.
+Admin actions that only **read** (audit, sensors, memory sheet, latency, frame counter, journal) have no MAUS dialog: they are only available after the user explicitly clicked "All features" and accepted the UAC prompt, which is the consent.
 
-**UAC declined:** Windows returns error 1223 (`ERROR_CANCELLED`). MAUS throws `EngineDeclinedException` and shows: "Autorisation administrateur refusée : cette action est annulée. MAUS reste utilisable sans droits (lecture seule)." (Administrator permission refused: this action is cancelled. MAUS remains usable without rights, read-only.)
-- **Only that action** is cancelled, and nothing is written.
-- MAUS keeps running in standard mode; the next admin action asks again.
+**UAC declined:** Windows returns error 1223 (`ERROR_CANCELLED`). MAUS throws `EngineDeclinedException` and shows: "Autorisation administrateur refusée : rien n'a été lancé. MAUS reste en mode limité, sans droits administrateur." (Administrator permission refused: nothing was started. MAUS stays in limited mode, without administrator rights.)
+- Nothing is started and nothing is written.
+- MAUS stays in limited mode: the controls that need administrator rights stay greyed out, and the "All features" button can be clicked again later.
 - There is no retry loop, and no fallback that performs the action without elevation.
 
 ---

@@ -82,18 +82,23 @@ public sealed partial class WorkshopViewModel
         _recording = new SessionRecording(DateTimeOffset.Now);
         _recordLimit = SessionDuration.Value;
         SessionSummary = string.Empty;
+        // Images par seconde : seulement avec toutes les fonctionnalités (PresentMon passe par le moteur). En mode limité, le
+        // relevé se fait sans elles, sans demande d'autorisation.
+        var full = EngineHost.IsElevated;
         try
         {
-            _frameCapture = await EngineHost.Current.StartFramesAsync(RecordingSession, null, CancellationToken.None);
+            _frameCapture = full && await EngineHost.Current.StartFramesAsync(RecordingSession, null, CancellationToken.None);
         }
         catch (Maus.Core.Engine.Broker.EngineException)
         {
             _frameCapture = false;
         }
 
-        SessionStatus = !_frameCapture
-            ? T("Enregistrement en cours… lancez votre jeu. (Images par seconde non mesurées : PresentMon indisponible.)")
-            : T("Enregistrement en cours… lancez votre jeu.");
+        SessionStatus = _frameCapture
+            ? T("Enregistrement en cours… lancez votre jeu.")
+            : full
+                ? T("Enregistrement en cours… lancez votre jeu. (Images par seconde non mesurées : PresentMon indisponible.)")
+                : T("Enregistrement en cours… lancez votre jeu. (Images par seconde non mesurées en mode limité : elles demandent toutes les fonctionnalités.)");
         IsRecording = true;
     });
 

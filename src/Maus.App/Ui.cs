@@ -644,9 +644,16 @@ public static class Ui
 
     public static string OfferAllFeaturesTitle => T("Droits administrateur");
 
-    public static string OfferAllFeaturesIntro => T("Sans droits administrateur, MAUS fonctionne en mode limité. Avec les droits administrateur, toute l'application est disponible : Windows vous demande votre autorisation au moment voulu, et les droits se referment seuls après 15 minutes sans utilisation.");
+    public static string OfferAllFeaturesIntro => T("Sans droits administrateur, MAUS fonctionne en mode limité : les options qui en ont besoin sont grisées. Le bouton « Toutes les fonctionnalités », en haut de la fenêtre, demande l'autorisation de Windows ; après 15 minutes sans utilisation, les droits se referment seuls.");
 
     public static string OfferAllFeatures => T("À l'ouverture, me demander : mode limité ou toutes les fonctionnalités");
+
+    public static string LimitedModeBanner => T("Mode limité : les options grisées ont besoin des droits administrateur.");
+
+    public static string EnableAllFeatures => T("Toutes les fonctionnalités");
+
+    public static string EngineSecurityStop => T("Un programme a essayé de commander le moteur administrateur de MAUS. Par sécurité, le moteur s'est arrêté : ses droits administrateur sont refermés et rien n'a été exécuté pour ce programme.") + Environment.NewLine + Environment.NewLine
+        + T("Faites une analyse avec Sécurité Windows (Protection contre les virus et menaces). MAUS reste utilisable en mode limité.");
 
     public static string OpenMonitor => T("Ouvrir la fenêtre de surveillance");
 

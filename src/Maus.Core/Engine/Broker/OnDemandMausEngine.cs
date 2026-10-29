@@ -12,7 +12,7 @@ public sealed record ElevatedEngineSession(IMausEngine Engine, Func<bool> HasExi
 /// <summary>L'utilisateur a refusé l'autorisation administrateur : seule l'action demandée est annulée.</summary>
 public sealed class EngineDeclinedException(string message, Exception? inner = null) : EngineException(message, inner)
 {
-    public static string DefaultMessage => T("Autorisation administrateur refusée : cette action est annulée. MAUS reste utilisable sans droits (lecture seule).");
+    public static string DefaultMessage => T("Autorisation administrateur refusée : rien n'a été lancé. MAUS reste en mode limité, sans droits administrateur.");
 }
 
 /// <summary>

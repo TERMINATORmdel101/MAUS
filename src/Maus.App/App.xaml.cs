@@ -77,6 +77,10 @@ public partial class App : Application
 
         // 0.8.1 : aucune autorisation demandée à l'ouverture ; le moteur administrateur attend la première action qui en a besoin.
         EngineHost.Configure();
+
+        // Le moteur s'est coupé lui-même après des connexions refusées : l'utilisateur est prévenu (rien d'autre n'est fait).
+        EngineHost.StoppedForSecurity += (_, _) => Dispatcher.InvokeAsync(() =>
+            MessageBox.Show(Ui.EngineSecurityStop, "MAUS", MessageBoxButton.OK, MessageBoxImage.Warning));
         var preferences = LoadPreferences();
         // Fichier des choix d'affichage absent : toute première ouverture (pas de « Quoi de neuf »).
         s_firstOpening = (EngineHost.Preferences as SplitPreferencesStore)?.State == PreferencesFileState.Absent;
@@ -135,14 +139,17 @@ public partial class App : Application
         }
 
         var engine = new Maus.Core.Engine.Broker.LocalMausEngine { ProtectedProcessId = pid };
+        var server = new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid, keyFingerprint);
         try
         {
-            await new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid, keyFingerprint).RunAsync(CancellationToken.None).ConfigureAwait(true);
+            await server.RunAsync(CancellationToken.None).ConfigureAwait(true);
         }
         finally
         {
             await Task.Run(engine.Dispose).ConfigureAwait(true);
-            Shutdown(0);
+
+            // Arrêt par sécurité : le code de sortie permet à l'interface de prévenir l'utilisateur.
+            Shutdown(server.StoppedForSecurity ? Maus.Core.Engine.Broker.EngineServer.SecurityStopExitCode : 0);
         }
     }
 

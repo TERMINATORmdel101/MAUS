@@ -164,7 +164,7 @@ public sealed class EngineBrokerTests
     }
 
     [Fact]
-    public async Task A_replayed_or_modified_request_is_refused_and_answers_are_bound_to_their_request()
+    public async Task The_engine_accepts_only_the_key_whose_fingerprint_it_received_at_launch()
     {
         var (local, _, _) = Local();
         using var _ = local;
@@ -184,6 +184,28 @@ public sealed class EngineBrokerTests
             var welcome = await RawCallAsync(name, key.Introduction());
             Assert.NotNull(welcome);
             Assert.True(key.VerifyResponse(0, welcome));
+            Assert.NotNull(await RawCallAsync(name, ping));
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            await server;
+        }
+    }
+
+    [Fact]
+    public async Task A_replayed_or_modified_request_is_refused_and_answers_are_bound_to_their_request()
+    {
+        var (local, _, _) = Local();
+        using var _ = local;
+        var name = "MAUS-essai-" + Guid.NewGuid().ToString("N");
+        var key = EngineKey.Create();
+        using var stop = new CancellationTokenSource();
+        var server = new EngineServer(local, name, Environment.ProcessId, key.Fingerprint()).RunAsync(stop.Token);
+        try
+        {
+            Assert.NotNull(await RawCallAsync(name, key.Introduction()));
+            var ping = key.SignRequest(JsonSerializer.Serialize(new EngineRequest("ping", "fr", Sequence: 1), EngineProtocol.Json));
 
             // Première fois : servie, et la réponse est signée pour la demande n° 1 seulement.
             var answer = await RawCallAsync(name, ping);
@@ -199,7 +221,7 @@ public sealed class EngineBrokerTests
             Assert.NotEqual(ping.Body, modified.Body);
             Assert.Null(await RawCallAsync(name, modified));
 
-            // Nouveau numéro, bien signé : servi.
+            // Nouveau numéro, bien signé : servi (deux refus seulement, sous le seuil d'arrêt par sécurité).
             var next = key.SignRequest(JsonSerializer.Serialize(new EngineRequest("ping", "fr", Sequence: 2), EngineProtocol.Json));
             Assert.NotNull(await RawCallAsync(name, next));
         }
@@ -210,13 +232,43 @@ public sealed class EngineBrokerTests
         }
     }
 
+    [Fact]
+    public async Task After_three_refused_connections_the_engine_stops_by_itself_and_says_why()
+    {
+        var (local, _, _) = Local();
+        using var _ = local;
+        var name = "MAUS-essai-" + Guid.NewGuid().ToString("N");
+        var key = EngineKey.Create();
+
+        // Le moteur attend un autre processus que celui des tests : chaque connexion est refusée.
+        var engine = new EngineServer(local, name, clientProcessId: 4, key.Fingerprint());
+        var server = engine.RunAsync(CancellationToken.None);
+        for (var attempt = 1; attempt <= EngineServer.MaxRefusals; attempt++)
+        {
+            Assert.False(engine.StoppedForSecurity);
+            Assert.Null(await RawCallAsync(name, key.Introduction()));
+        }
+
+        var stopped = await Task.WhenAny(server, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.Same(server, stopped);
+        Assert.True(engine.StoppedForSecurity);
+    }
+
     /// <summary>Envoie un message brut au moteur et lit sa première réponse, ou <c>null</c> s'il ferme sans répondre.</summary>
     private static async Task<SignedMessage?> RawCallAsync(string name, SignedMessage message)
     {
         await using var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
         await pipe.ConnectAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
-        await EngineProtocol.WriteAsync(pipe, message, CancellationToken.None);
-        return await EngineProtocol.ReadAsync<SignedMessage>(pipe, CancellationToken.None);
+        try
+        {
+            await EngineProtocol.WriteAsync(pipe, message, CancellationToken.None);
+            return await EngineProtocol.ReadAsync<SignedMessage>(pipe, CancellationToken.None);
+        }
+        catch (IOException)
+        {
+            // Le moteur a déjà fermé la connexion (refus avant même de lire) : aucune réponse.
+            return null;
+        }
     }
 
     private sealed class SyncProgress<T>(Action<T> report) : IProgress<T>

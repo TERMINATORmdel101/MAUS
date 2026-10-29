@@ -54,10 +54,10 @@
                                 Visibility="{Binding HasSettingsPage, Converter={StaticResource BoolToVisibility}}" />
                         <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Wanted}" Padding="12,3" FontSize="12"
                                 ToolTip="{x:Static app:Ui.WantedTip}"
-                                Command="{Binding AcknowledgeCommand}"
+                                Command="{Binding AcknowledgeCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}"
                                 Visibility="{Binding CanAcknowledge, Converter={StaticResource BoolToVisibility}}" />
                         <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ReportAgain}" Padding="12,3" FontSize="12"
-                                Command="{Binding UnacknowledgeCommand}"
+                                Command="{Binding UnacknowledgeCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}"
                                 Visibility="{Binding IsAcknowledged, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </StackPanel>
@@ -112,6 +112,18 @@
                     </Border>
                     <DockPanel Grid.Column="1" Margin="28,22,28,12">
                         <TextBlock DockPanel.Dock="Bottom" Text="{Binding About}" FontSize="11" Opacity="{DynamicResource MutedOpacity}" Margin="0,12,0,0" TextWrapping="Wrap" />
+                        <!-- Mode limité (demande du porteur, 29/10/2026) : les options qui ont besoin des droits administrateur sont
+                             grisées ; « Toutes les fonctionnalités » lance le moteur, avec la demande d'autorisation de Windows. -->
+                        <Border DockPanel.Dock="Top" Margin="0,0,0,14" Padding="14,10" CornerRadius="12" BorderThickness="1"
+                                Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}"
+                                Visibility="{Binding Source={x:Static vm:ElevationState.Current}, Path=ShowLimitedBanner, Converter={StaticResource BoolToVisibility}}">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.EnableAllFeatures}" Padding="14,4"
+                                        Margin="12,0,0,0" VerticalAlignment="Center" AutomationProperties.Name="{x:Static app:Ui.EnableAllFeatures}"
+                                        Command="{Binding Source={x:Static vm:ElevationState.Current}, Path=EnableAllCommand}" />
+                                <TextBlock Text="{x:Static app:Ui.LimitedModeBanner}" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource PastelSandInk}" />
+                            </DockPanel>
+                        </Border>
                         <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" />
                     </DockPanel>
                 </Grid>
@@ -228,11 +240,11 @@
                                     <WrapPanel>
                                         <Button Style="{StaticResource PrimaryButton}" Content="{Binding FixNowLabel}" Command="{Binding GoToCommand}" CommandParameter="2" Margin="0,0,10,6"
                                                 Visibility="{Binding HasProposedChanges, Converter={StaticResource BoolToVisibility}}" />
-                                        <Button Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" Margin="0,0,10,6"
+                                        <Button Style="{StaticResource PrimaryButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" Margin="0,0,10,6" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}"
                                                 Visibility="{Binding IsFirstAudit, Converter={StaticResource BoolToVisibility}}" />
                                         <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.SeeFindings}" Command="{Binding GoToCommand}" CommandParameter="1" Margin="0,0,10,6"
                                                 Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}" />
-                                        <Button Style="{StaticResource SoftButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" Margin="0,0,10,6"
+                                        <Button Style="{StaticResource SoftButton}" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" Margin="0,0,10,6" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}"
                                                 Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}" />
                                     </WrapPanel>
                                     <ProgressBar Height="4" Margin="0,8,0,0" Maximum="{Binding ModuleCount, Mode=OneWay}" Value="{Binding Completed, Mode=OneWay}"
@@ -370,7 +382,7 @@
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12" LastChildFill="True">
                 <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="{Binding FixNowLabel}" Command="{Binding GoToCommand}" CommandParameter="2" Margin="12,0,0,0"
                         Visibility="{Binding HasProposedChanges, Converter={StaticResource BoolToVisibility}}" />
-                <Button DockPanel.Dock="Left" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}">
+                <Button DockPanel.Dock="Left" Content="{Binding HomeAuditLabel}" Command="{Binding RunAuditCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource SoftButton}">
                             <Style.Triggers>
@@ -499,7 +511,7 @@
                 <Border DockPanel.Dock="Bottom" Style="{StaticResource SoftCard}" Margin="0,12,0,0" Padding="16,12"
                         Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}">
                     <StackPanel>
-                        <DockPanel>
+                        <DockPanel IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
                             <Button DockPanel.Dock="Left" Style="{StaticResource PrimaryButton}" Content="{Binding ApplyLabel}" VerticalAlignment="Center"
                                     Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply, Mode=OneWay}" />
                             <StackPanel Margin="18,0,0,0" VerticalAlignment="Center">
@@ -602,10 +614,10 @@
                                     IsEnabled="{Binding HasAudit, Mode=OneWay}" ToolTip="{x:Static app:Ui.SaveReportTip}"
                                     Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}" />
                             <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.RepairWindows}" Margin="0,0,8,6" Command="{Binding RepairWindowsCommand}"
-                                    ToolTip="{x:Static app:Ui.RepairWindowsTip}"
+                                    ToolTip="{x:Static app:Ui.RepairWindowsTip}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}"
                                     Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}" />
                             <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.UpdateSoftware}" Margin="0,0,8,6" Command="{Binding UpdateSoftwareCommand}"
-                                    ToolTip="{x:Static app:Ui.UpdateSoftwareTip}"
+                                    ToolTip="{x:Static app:Ui.UpdateSoftwareTip}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}"
                                     Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}" />
                             <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.DriverUpdates}" Margin="0,0,8,6" Command="{Binding Workshop.OpenDriverUpdatesCommand}"
                                     ToolTip="{x:Static app:Ui.DriverUpdatesTip}"
@@ -618,7 +630,7 @@
                         <StackPanel Visibility="{Binding HasAudit, Converter={StaticResource BoolToVisibility}}">
                             <Border Style="{StaticResource Divider}" />
                             <TextBlock Text="{x:Static app:Ui.YourChoices}" Style="{StaticResource ZoneTitle}" Foreground="{DynamicResource PastelAquaInk}" />
-                            <Grid>
+                            <Grid IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
@@ -855,9 +867,9 @@
                                             <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.EnableAdvancedSensors}"
                                                     Command="{Binding Workshop.EnableAdvancedSensorsCommand}" Visibility="{Binding Workshop.CanEnableAdvancedSensors, Converter={StaticResource BoolToVisibility}}" />
                                             <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.InstallPawnIo}"
-                                                    Command="{Binding Workshop.InstallPawnIoCommand}" Visibility="{Binding Workshop.IsPawnIoMissing, Converter={StaticResource BoolToVisibility}}" />
+                                                    Command="{Binding Workshop.InstallPawnIoCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}" Visibility="{Binding Workshop.IsPawnIoMissing, Converter={StaticResource BoolToVisibility}}" />
                                             <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.UninstallPawnIo}"
-                                                    Command="{Binding Workshop.UninstallPawnIoCommand}" Visibility="{Binding Workshop.IsPawnIoInstalled, Converter={StaticResource BoolToVisibility}}" />
+                                                    Command="{Binding Workshop.UninstallPawnIoCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}" Visibility="{Binding Workshop.IsPawnIoInstalled, Converter={StaticResource BoolToVisibility}}" />
                                         </WrapPanel>
                                         <Expander Style="{StaticResource QuietExpander}" Header="{x:Static app:Ui.AllSensors}" Margin="0,10,0,0"
                                                   Visibility="{Binding Workshop.Live.HasReadings, Converter={StaticResource BoolToVisibility}}">
@@ -1252,7 +1264,7 @@
                                             <TextBlock Text="{x:Static app:Ui.LatencyTitle}" Style="{StaticResource CardTitle}" Margin="0" VerticalAlignment="Center" Foreground="{DynamicResource PastelBlueInk}" />
                                         </DockPanel>
                                         <TextBlock Text="{x:Static app:Ui.LatencyIntro}" FontSize="12" Style="{StaticResource Muted}" />
-                                        <WrapPanel Margin="0,12,0,0">
+                                        <WrapPanel Margin="0,12,0,0" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
                                             <TextBlock Text="{x:Static app:Ui.DurationLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
                                             <ComboBox AutomationProperties.Name="{x:Static app:Ui.DurationLabel}" MinWidth="200" Margin="0,0,12,4" ItemsSource="{Binding Workshop.LatencyDurations, Mode=OneWay}" SelectedItem="{Binding Workshop.LatencyDuration}"
                                                       DisplayMemberPath="Label" IsEnabled="{Binding Workshop.IsNotLatencyRunning, Mode=OneWay}" />
@@ -1374,12 +1386,14 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <WrapPanel Margin="0,0,0,8">
-                                    <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.ReadMemory}"
-                                            Command="{Binding Workshop.ReadMemoryCommand}" IsEnabled="{Binding Workshop.IsNotReadingMemory, Mode=OneWay}" />
+                                    <Border IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
+                                        <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.ReadMemory}"
+                                                Command="{Binding Workshop.ReadMemoryCommand}" IsEnabled="{Binding Workshop.IsNotReadingMemory, Mode=OneWay}" />
+                                    </Border>
                                     <Button Padding="12,5" Margin="0,0,8,4" Content="{x:Static app:Ui.CopyMemory}" Command="{Binding Workshop.CopyMemoryCommand}"
                                             IsEnabled="{Binding Workshop.HasMemoryReport, Mode=OneWay}" />
                                     <Button Style="{StaticResource PrimaryButton}" Padding="16,6" Margin="0,0,8,4" Content="{x:Static app:Ui.InstallPawnIo}"
-                                            Command="{Binding Workshop.InstallPawnIoCommand}" Visibility="{Binding Workshop.IsMemoryDriverMissing, Converter={StaticResource BoolToVisibility}}" />
+                                            Command="{Binding Workshop.InstallPawnIoCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}" Visibility="{Binding Workshop.IsMemoryDriverMissing, Converter={StaticResource BoolToVisibility}}" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding Workshop.MemoryStatus}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,8" />
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding Workshop.HasMemoryConfiguration, Converter={StaticResource BoolToVisibility}}">
@@ -1542,6 +1556,7 @@
                                                             </ItemsControl>
                                                             <TextBlock Text="{Binding PackageNote}" FontSize="12" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,8" />
                                                             <WrapPanel>
+                                                                <WrapPanel IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
                                                                 <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RestartDriver}"
                                                                         ToolTip="{x:Static app:Ui.RestartDriverTip}" Command="{Binding RestartCommand}" />
                                                                 <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.ReinstallDevice}" ToolTip="{x:Static app:Ui.ReinstallDeviceTip}" Command="{Binding ReinstallCommand}"
@@ -1550,6 +1565,7 @@
                                                                         IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
                                                                 <Button Style="{StaticResource DangerButton}" Padding="14,6" Margin="0,0,8,4" Content="{x:Static app:Ui.RemoveDriver}"
                                                                         ToolTip="{x:Static app:Ui.RemoveDriverTip}" Command="{Binding RemoveCommand}" IsEnabled="{Binding CanBackupOrRemove, Mode=OneWay}" />
+                                                                </WrapPanel>
                                                                 <Button Style="{StaticResource SoftButton}" Margin="0,0,8,4" Content="{x:Static app:Ui.DriverPage}" Command="{Binding DownloadCommand}"
                                                                         Visibility="{Binding HasDownloadPage, Converter={StaticResource BoolToVisibility}}" />
                                                             </WrapPanel>
@@ -1625,7 +1641,7 @@
                                                 <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.CopyList}" ToolTip="{x:Static app:Ui.CopySheetTip}" Command="{Binding Workshop.CopyDriversCommand}" />
                                             </WrapPanel>
                                             <TextBlock Grid.Row="1" Text="{x:Static app:Ui.DriversBackupsLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,14,6" />
-                                            <WrapPanel Grid.Row="1" Grid.Column="1">
+                                            <WrapPanel Grid.Row="1" Grid.Column="1" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
                                                 <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.DriverBackupsFolder}" Command="{Binding Workshop.OpenDriverBackupsCommand}" />
                                                 <Button Style="{StaticResource SoftButton}" Margin="0,0,8,6" Content="{x:Static app:Ui.RestoreDriverBackup}" Command="{Binding Workshop.RestoreDriverBackupCommand}" />
                                             </WrapPanel>
@@ -1658,7 +1674,7 @@
                 <Border DockPanel.Dock="Top" Style="{StaticResource SoftCard}" Margin="0,0,0,14" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">
                     <DockPanel>
                         <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Refresh}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                Command="{Binding RefreshJournalCommand}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelLilacStroke}" />
+                                Command="{Binding RefreshJournalCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelLilacStroke}" />
                         <TextBlock DockPanel.Dock="Left" Style="{StaticResource CardIcon}" Text="&#xE81C;" Margin="0,0,14,0" VerticalAlignment="Center" Foreground="{DynamicResource PastelLilacInk}" />
                         <TextBlock Text="{Binding JournalSummary}" TextWrapping="Wrap" VerticalAlignment="Center" />
                     </DockPanel>
@@ -1669,8 +1685,8 @@
                         <TextBlock Text="{x:Static app:Ui.RestorePointsTitle}" Style="{StaticResource CardTitle}" Foreground="{DynamicResource PastelMintInk}" />
                         <TextBlock Text="{Binding RestorePointsText}" TextWrapping="Wrap" Margin="0,6,0,10" />
                         <WrapPanel>
-                            <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ShowRestorePoints}" Margin="0,0,8,4" Command="{Binding ShowRestorePointsCommand}" />
-                            <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CreateRestorePointNow}" Margin="0,0,8,4" Command="{Binding CreateManualRestorePointCommand}" />
+                            <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ShowRestorePoints}" Margin="0,0,8,4" Command="{Binding ShowRestorePointsCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}" />
+                            <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CreateRestorePointNow}" Margin="0,0,8,4" Command="{Binding CreateManualRestorePointCommand}" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}" />
                             <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.OpenSystemRestore}" Margin="0,0,8,4" Command="{Binding OpenSystemRestoreCommand}" />
                         </WrapPanel>
                     </StackPanel>
@@ -1682,9 +1698,11 @@
                                 <Border Margin="0,0,0,10" Style="{StaticResource SoftCard}" Padding="16,12" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
                                     <StackPanel>
                                         <DockPanel>
-                                            <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.RevertSession}"
-                                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelBlueStroke}"
-                                                    Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                            <Border DockPanel.Dock="Right" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
+                                                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.RevertSession}"
+                                                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource PastelBlueStroke}"
+                                                        Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                            </Border>
                                             <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
                                         </DockPanel>
                                         <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" Margin="0,4,0,0" TextWrapping="Wrap" />
@@ -1693,8 +1711,10 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate DataType="{x:Type vm:SessionChangeViewModel}">
                                                         <DockPanel Margin="0,0,0,8">
-                                                            <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.Revert}" Padding="10,2" FontSize="12" VerticalAlignment="Top"
-                                                                    Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                                            <Border DockPanel.Dock="Right" VerticalAlignment="Top" IsEnabled="{Binding Source={x:Static vm:ElevationState.Current}, Path=IsFull, Mode=OneWay}">
+                                                                <Button Content="{x:Static app:Ui.Revert}" Padding="10,2" FontSize="12"
+                                                                        Command="{Binding RevertCommand}" IsEnabled="{Binding CanRevert, Mode=OneWay}" />
+                                                            </Border>
                                                             <StackPanel Margin="0,0,10,0">
                                                                 <TextBlock TextWrapping="Wrap">
                                                                     <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" />
