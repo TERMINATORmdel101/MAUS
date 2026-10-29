@@ -16,6 +16,7 @@ internal static class Backdrop
     public static void Attach(Window window)
     {
         Color? original = null;
+        var transparent = false;
         void Update()
         {
             var handle = new WindowInteropHelper(window).Handle;
@@ -26,21 +27,32 @@ internal static class Backdrop
 
             original ??= target.BackgroundColor;
             var wanted = Wanted();
+            if (!wanted && !transparent)
+            {
+                // Jamais posé : on ne touche à rien (le fond vient du thème de Windows).
+                return;
+            }
+
             var applied = WindowBackdrop.Apply(handle, wanted, AppearanceManager.IsDark) && wanted;
             if (applied)
             {
                 window.Background = Brushes.Transparent;
                 target.BackgroundColor = Colors.Transparent;
+                transparent = true;
             }
             else
             {
-                window.ClearValue(Window.BackgroundProperty);
+                // Retour au fond plein du thème (clé de ressource de WPF Fluent, suivie en cas de changement de thème).
+                window.SetResourceReference(Window.BackgroundProperty, "ApplicationBackgroundBrush");
                 target.BackgroundColor = original.Value;
+                transparent = false;
             }
         }
 
         void OnChanged(object? sender, EventArgs e) => window.Dispatcher.BeginInvoke(Update);
+        // Le thème Fluent de WPF repose le fond de la fenêtre en la chargeant : Mica est donc revu après le chargement.
         window.SourceInitialized += (_, _) => Update();
+        window.Loaded += (_, _) => window.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, Update);
         AppearanceManager.Changed += OnChanged;
         window.Closed += (_, _) => AppearanceManager.Changed -= OnChanged;
     }

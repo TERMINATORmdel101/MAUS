@@ -51,6 +51,8 @@ public sealed class WhatsNewWindow : Window
         // 0.8.3 n'a pas été publiée : ses nouveautés sont annoncées avec la 0.8.4.
         "0.8.4" or "0.8.3" =>
         [
+            T("Accueil plus simple : le score, la prochaine étape et trois outils ; le reste est dans « Plus d'outils » (l'accueil complet reste au choix dans les Paramètres)."),
+            T("Plus joli : score qui se remplit, « Votre PC en un coup d'œil », fond Mica de Windows 11 au choix, raccourcis Ctrl+1 à Ctrl+6."),
             T("Nouvelle fenêtre d'ouverture « Comment utiliser MAUS ? » : le mode limité, sans droits administrateur, ou toutes les fonctionnalités."),
             T("Mode limité plus clair : les options qui demandent les droits administrateur sont grisées, et le bandeau « Toutes les fonctionnalités » les active."),
             T("Plus de sécurité : messages signés entre la fenêtre et le moteur administrateur, protections de Windows sur MAUS, avertissement si MAUS n'est pas installé dans un dossier protégé."),

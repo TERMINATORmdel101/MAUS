@@ -2,14 +2,28 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
-## 0.8.4 — en préparation (29/10/2026) — confirmations par le moteur, bibliothèques verrouillées
+## 0.8.4 — 29/10/2026 — nouvel accueil, confirmations par le moteur, bibliothèques verrouillées
 
-Corrections (dernier chiffre, règle du porteur) : les deux derniers points du rapport de sécurité du 29/10, choisis par le porteur pour la 0.8.4.
+Améliorations (dernier chiffre, règle du porteur ; le porteur a choisi de rester en 0.8.4). Contient aussi la 0.8.3, jamais publiée.
+
+**Accueil plus léger et plus joli** (demande du porteur : « moins chargé, on garde le plus utile, plus joli, très protégé »)
+- **Accueil simple par défaut** : le score, « Pourquoi ce score ? », la prochaine étape avec un seul bouton principal (« Lancer l'audit » ou « Corriger maintenant »), les familles M·A·U·S en une ligne (lettre et nombre de points à voir ; un clic ouvre les Constats) et trois outils (PC lent, Tester mon PC, Mon matériel). Le reste est dans « Plus d'outils », replié (l'état est gardé). L'ancien accueil reste au choix : Paramètres > « Accueil complet ». Rien n'est retiré.
+- **« Votre PC en un coup d'œil »** : processeur, carte graphique, mémoire et disques, chacun avec la couleur des constats qui le concernent ; seulement ce que l'audit a déjà lu, aucun logo de marque.
+- **Score qui se remplit** et compte jusqu'à sa valeur à la fin de l'audit (coupé si les animations sont désactivées dans MAUS ou dans Windows).
+- **« Quoi de neuf » en carte** sur l'accueil (« Compris » la ferme), au lieu d'une fenêtre de plus à l'ouverture.
+- **Fond Mica de Windows 11** (fond légèrement teinté par le fond d'écran), au choix dans les Paramètres. Il se coupe de lui-même si la transparence est désactivée dans Windows, en contraste élevé, en rendu logiciel ou avant Windows 11 22H2 (`DwmSetWindowAttribute`, Microsoft Learn ; seulement sur la fenêtre de MAUS).
+- **Petits dessins** pour les écrans vides des Constats (« aucun audit », « tout va bien »), dessinés par MAUS lui-même : aucune image téléchargée.
+- **Raccourcis clavier** Ctrl+1 à Ctrl+6 pour les six parties, et un contour bien visible autour de l'élément choisi au clavier.
+- Le sens du nom (Maintenance · Audit · Updates · Sécurité) quitte la barre de gauche ; il reste dans « À propos ».
+- Déjà présents, inchangés : couleur d'accentuation de Windows (Paramètres > Couleurs) et style pastel des fenêtres annexes.
+- Sécurité : aucune nouvelle opération du moteur administrateur ; aucune fonction d'apparence ne demande les droits, le réseau ni ne lance de programme ; le garde-fou automatique vérifie en plus qu'aucun XAML n'est lu depuis le disque et qu'aucune image ou ressource ne vient de l'extérieur.
+
+**Sécurité** (les deux derniers points du rapport de sécurité du 29/10, choisis par le porteur pour la 0.8.4)
 
 - **Confirmation affichée par le moteur administrateur lui-même** pour les actions les plus sensibles : fermer un programme, supprimer ou retirer le pilote graphique, réinstaller une sauvegarde de pilote, installer ou retirer PawnIO, marquer un nouveau constat « voulu ». Elle s'ajoute à celle de la fenêtre (une confirmation de plus) : la fenêtre de MAUS tourne sans droits, et un programme malveillant pourrait s'y glisser ; il ne peut pas, en revanche, cliquer dans une fenêtre d'un programme administrateur (Windows l'en empêche). « Non » est le choix par défaut. MAUS lancé lui-même « en tant qu'administrateur » ne la montre pas (il n'y a alors pas de moteur séparé).
 - **Bibliothèques verrouillées** : la version exacte et l'empreinte de chaque bibliothèque téléchargée pendant la fabrication de MAUS sont enregistrées (`packages.lock.json`) ; sur GitHub, la fabrication refuse une bibliothèque différente.
 
-## 0.8.3 — en préparation (29/10/2026) — sécurité du moteur administrateur
+## 0.8.3 — 29/10/2026 (jamais publiée seule, comprise dans la 0.8.4) — sécurité du moteur administrateur
 
 Corrections (dernier chiffre, règle du porteur), trouvées en vérifiant le document de sécurité demandé par le Microsoft Store.
 
