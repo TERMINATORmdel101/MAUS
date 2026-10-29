@@ -644,9 +644,9 @@ public static class Ui
 
     public static string OfferAllFeaturesTitle => T("Droits administrateur");
 
-    public static string OfferAllFeaturesIntro => T("MAUS s'ouvre sans les droits administrateur. Les actions qui en ont besoin (audit, corrections, réparation, capteurs avancés…) demandent votre autorisation à Windows au moment voulu ; les droits se referment seuls après 15 minutes sans utilisation.");
+    public static string OfferAllFeaturesIntro => T("Sans droits administrateur, MAUS fonctionne en mode limité. Avec les droits administrateur, toute l'application est disponible : Windows vous demande votre autorisation au moment voulu, et les droits se referment seuls après 15 minutes sans utilisation.");
 
-    public static string OfferAllFeatures => T("À l'ouverture, me proposer d'activer toutes les fonctionnalités");
+    public static string OfferAllFeatures => T("À l'ouverture, me demander : mode limité ou toutes les fonctionnalités");
 
     public static string OpenMonitor => T("Ouvrir la fenêtre de surveillance");
 

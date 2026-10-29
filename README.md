@@ -63,7 +63,10 @@ Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATO
 
 ## Droits administrateur
 
-MAUS s'ouvre **sans** les droits administrateur, et sans fenêtre d'autorisation de Windows. Un message vous propose d'activer toutes les fonctionnalités ; sinon, Windows vous demande l'autorisation seulement quand vous lancez une action qui en a besoin (audit complet, corrections, réparation, capteurs avancés, fiche mémoire…). Si vous refusez, seule cette action est annulée et MAUS reste utilisable en lecture seule.
+MAUS s'ouvre **sans** les droits administrateur, et sans fenêtre d'autorisation de Windows. À l'ouverture, il vous laisse choisir :
+
+- **Mode limité**, sans droits administrateur : votre matériel, les mesures en direct, les processus et l'espace disque. Pour le reste, Windows vous demande l'autorisation seulement quand vous lancez une action qui en a besoin (audit complet, corrections, réparation, capteurs avancés, fiche mémoire…). Si vous refusez, seule cette action est annulée.
+- **Toutes les fonctionnalités**, avec les droits administrateur : toute l'application est disponible, après l'autorisation de Windows.
 
 Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une liste fermée d'opérations, par un canal privé réservé à votre compte et à la fenêtre de MAUS (chaque demande est signée et ne peut servir qu'une fois), et s'arrête seul après 15 minutes sans demande (jamais pendant un test ou un benchmark) ou à la fermeture de MAUS.
 
