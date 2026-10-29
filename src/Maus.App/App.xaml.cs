@@ -7,6 +7,7 @@ using Maus.Core;
 using Maus.Core.Diagnostics;
 using Maus.Core.Engine;
 using Maus.Core.Localization;
+using Maus.Core.Platform;
 using Maus.Core.Preferences;
 using Maus.Core.Workshop;
 
@@ -40,6 +41,7 @@ public partial class App : Application
         if (e.Args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase))
         {
             // Audit planifié : lancé avec les droits administrateur, il lit les choix lui-même (le benchmark reçoit sa langue).
+            Breadcrumbs.Add("audit hebdomadaire : protections de Windows (" + string.Join(", ", ProcessHardening.HardenEngine()) + ")");
             var own = FilePreferencesStore.CreateDefault().Load();
             UseLanguage(own.Language);
             AppearanceManager.DetectComponents();
@@ -65,6 +67,9 @@ public partial class App : Application
         }
 
         s_interactive = true;
+
+        // Protections de Windows sur la fenêtre de MAUS (bibliothèques venues du réseau ou d'intégrité basse refusées).
+        Breadcrumbs.Add("fenêtre : protections de Windows (" + string.Join(", ", ProcessHardening.HardenInterface()) + ")");
 
         // MAUS s'arrête quand sa fenêtre principale se ferme, même si une fenêtre annexe traîne encore.
         ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -138,6 +143,8 @@ public partial class App : Application
             return;
         }
 
+        // Protections de Windows sur le moteur, avant toute demande (Maus.Core.Platform.ProcessHardening).
+        Breadcrumbs.Add("moteur : protections de Windows (" + string.Join(", ", ProcessHardening.HardenEngine()) + ")");
         var engine = new Maus.Core.Engine.Broker.LocalMausEngine { ProtectedProcessId = pid };
         var server = new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid, keyFingerprint);
         try

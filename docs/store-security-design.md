@@ -344,6 +344,7 @@ These controls are layered: a request is executed only if it arrives on a local 
 - No PowerShell, no script host and no `cmd /c` with user text. `ShellExecute` is used only once: to start the engine itself with `runas`.
 - Registry writes come only from the plan computed by the engine (§3.1). There is no "write this value" operation.
 - These rules are enforced by an automated test that fails the build (`SecurityGuardTests`, §2), and every push is analysed by GitHub CodeQL (`security-extended`).
+- **Process hardening** (`src/Maus.Core/Platform/ProcessHardening.cs`, `SetProcessMitigationPolicy`, applied at start before any request): every MAUS process refuses to load DLLs from a remote share or from a file with a low mandatory label (`NoRemoteImages`, `NoLowMandatoryLabelImages`). The elevated engine and the scheduled audit also search Windows DLLs in System32 first (`PreferSystem32Images`), disable legacy extension point DLLs (`ProcessExtensionPointDisablePolicy`), and enable RedirectionGuard (`EnforceRedirectionTrust`): they do not follow a filesystem junction created by a non-administrator account, which blocks the classic trick of redirecting an elevated write. These policies only restrict MAUS's own processes; a policy Windows refuses is logged and skipped. Microsoft notes that such policies are most effective when applied at process initialization: they are applied at the very start of each process, but do not cover what Windows loaded before that point.
 
 ---
 
