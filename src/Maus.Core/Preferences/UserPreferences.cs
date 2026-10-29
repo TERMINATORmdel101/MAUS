@@ -72,6 +72,18 @@ public sealed record UserPreferences
     /// </summary>
     public bool OfferAllFeatures { get; init; } = true;
 
+    /// <summary>
+    /// Accueil complet (toutes les cartes, comme avant la 0.8.4) au lieu de l'accueil simple recommandé. Choix d'affichage
+    /// seulement : rien n'est retiré, ce qui quitte l'accueil simple reste dans « Plus d'outils » et dans l'Atelier.
+    /// </summary>
+    public bool HomeComplete { get; init; }
+
+    /// <summary>Zone « Plus d'outils » de l'accueil simple ouverte (état gardé d'une ouverture à l'autre).</summary>
+    public bool HomeMoreToolsOpen { get; init; }
+
+    /// <summary>Fond « Mica » de Windows 11 derrière la fenêtre (coupé de lui-même si Windows a désactivé la transparence).</summary>
+    public bool MicaBackdrop { get; init; } = true;
+
     /// <summary>Dernière version dont les nouveautés ont été montrées (« Quoi de neuf ») ; <c>null</c> avant la 0.8.2.</summary>
     public string? LastSeenVersion { get; init; }
 

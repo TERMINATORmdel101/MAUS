@@ -94,6 +94,8 @@ public sealed class SettingsViewModel : ObservableObject
         _refresh = RefreshOptions.FirstOrDefault(o => o.Value == (int)current.RefreshInterval.TotalMilliseconds) ?? RefreshOptions[1];
         _monitorOnTop = current.MonitorOnTop;
         _offerAllFeatures = current.OfferAllFeatures;
+        _homeComplete = current.HomeComplete;
+        _micaBackdrop = current.MicaBackdrop;
         OpenMonitorCommand = new AsyncCommand(() =>
         {
             openMonitor();
@@ -170,6 +172,36 @@ public sealed class SettingsViewModel : ObservableObject
             if (SetProperty(ref _offerAllFeatures, value))
             {
                 Change(p => p with { OfferAllFeatures = value });
+            }
+        }
+    }
+
+    private bool _homeComplete;
+
+    /// <summary>Accueil complet (toutes les cartes) au lieu de l'accueil simple recommandé.</summary>
+    public bool HomeComplete
+    {
+        get => _homeComplete;
+        set
+        {
+            if (SetProperty(ref _homeComplete, value))
+            {
+                Change(p => p with { HomeComplete = value });
+            }
+        }
+    }
+
+    private bool _micaBackdrop;
+
+    /// <summary>Fond « Mica » de Windows 11 derrière la fenêtre principale.</summary>
+    public bool MicaBackdrop
+    {
+        get => _micaBackdrop;
+        set
+        {
+            if (SetProperty(ref _micaBackdrop, value))
+            {
+                Change(p => p with { MicaBackdrop = value });
             }
         }
     }

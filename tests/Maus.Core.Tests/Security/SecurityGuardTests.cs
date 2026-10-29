@@ -121,6 +121,24 @@ public partial class SecurityGuardTests
     public void Format_templates_are_only_formatted_where_they_are_written_in_the_code() =>
         OnlyIn(FormatCall(), FormatCallers, "string.Format");
 
+    /// <summary>
+    /// Apparence (0.8.4) : aucun XAML, thème ou « skin » lu depuis le disque ou téléchargé (XamlReader peut exécuter du code
+    /// d'un fichier), aucune image ni ressource prise sur Internet ou à côté de l'exécutable (pack://siteoforigin).
+    /// </summary>
+    [Fact]
+    public void Interface_never_loads_xaml_or_images_from_outside_maus()
+    {
+        Assert.Empty(FilesMatching(XamlLoader()));
+        var root = SourceFolder();
+        var xaml = Directory.EnumerateFiles(root, "*.xaml", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .ToList();
+        Assert.NotEmpty(xaml);
+        var outside = xaml.Where(f => RemoteResource().IsMatch(File.ReadAllText(f))).Select(f => Path.GetRelativePath(root, f)).ToList();
+        Assert.True(outside.Count == 0, "Ressource venue de l'extérieur : " + string.Join(", ", outside));
+    }
+
     [Fact]
     public void Every_settings_page_written_in_maus_is_accepted_by_the_launcher()
     {
@@ -172,6 +190,12 @@ public partial class SecurityGuardTests
 
     [GeneratedRegex(@"\b[Ss]tring\.Format\(")]
     private static partial Regex FormatCall();
+
+    [GeneratedRegex(@"XamlReader\.(Load|Parse)|XamlServices\.(Load|Parse)")]
+    private static partial Regex XamlLoader();
+
+    [GeneratedRegex(@"(Source|ImageSource|UriSource)\s*=\s*""(https?:|file:|pack://siteoforigin)", RegexOptions.IgnoreCase)]
+    private static partial Regex RemoteResource();
 
     [GeneratedRegex("\"(ms-settings:[^\"]*)\"")]
     private static partial Regex SettingsPageLiteral();

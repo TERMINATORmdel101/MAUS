@@ -57,7 +57,19 @@
     </Style>
 
     <!-- Navigation latérale : une entrée par onglet, surlignée quand elle est choisie. -->
+    <!-- Contour de focus bien visible au clavier (0.8.4) : trait de 2 px de la couleur d'accentuation, à 3 px du contrôle. -->
+    <Style x:Key="MausFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-3" CornerRadius="10" BorderThickness="2" BorderBrush="{DynamicResource MausAccentStrong}" SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="NavTab" TargetType="TabItem">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource MausFocusVisual}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -107,6 +119,7 @@
 
     <!-- Carte cliquable (actions rapides de l'accueil) : fond et contour pastel donnés par Background / BorderBrush. -->
     <Style x:Key="ActionCard" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource MausFocusVisual}" />
         <Setter Property="Cursor" Value="Hand" />
         <!-- Se soulève au survol et s'enfonce à l'appui (coupé avec les animations). -->
         <Setter Property="appearance:Motion.HoverLift" Value="True" />
@@ -139,6 +152,7 @@
 
     <!-- Choix entre deux vues, en pastilles (« Par importance » / « Par module ») : la vue choisie prend la couleur d'accentuation. -->
     <Style x:Key="Segment" TargetType="RadioButton">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource MausFocusVisual}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
@@ -242,6 +256,7 @@
 
     <!-- Bouton secondaire arrondi, fond pastel (Background / BorderBrush / Foreground donnés par la page). -->
     <Style x:Key="SoftButton" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource MausFocusVisual}" />
         <Setter Property="appearance:Motion.Press" Value="True" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -284,6 +299,7 @@
 
     <!-- Bouton principal (bleu du logo) et bouton d'arrêt (rouge). -->
     <Style x:Key="PrimaryButton" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource MausFocusVisual}" />
         <Setter Property="appearance:Motion.Press" Value="True" />
         <Setter Property="Foreground" Value="White" />
         <Setter Property="Background" Value="{DynamicResource MausAccentStrong}" />
@@ -385,4 +401,77 @@
         <Setter Property="Padding" Value="14,10" />
         <Setter Property="Margin" Value="0,0,0,12" />
     </Style>
+    <!-- Petites illustrations des écrans vides (0.8.4), dessinées ici en vecteurs : aucune image téléchargée. -->
+    <DrawingImage x:Key="IllustrationNoAudit">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 L96,0 L96,96 L0,96 Z" />
+                <GeometryDrawing Brush="#265B7FD6">
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#5B7FD6" Thickness="4" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="8,14,62,42" RadiusX="6" RadiusY="6" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#5B7FD6" Geometry="M33,56 L45,56 L48,67 L30,67 Z" />
+                <GeometryDrawing Brush="#5B7FD6">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="22,67,34,5" RadiusX="2.5" RadiusY="2.5" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#5B7FD6" Geometry="M18,26 L44,26 L44,30 L18,30 Z M18,35 L36,35 L36,39 L18,39 Z" />
+                <GeometryDrawing Brush="#33D9A93A">
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#D9A93A" Thickness="5" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="64,58" RadiusX="15" RadiusY="15" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="#D9A93A" Thickness="8" StartLineCap="Round" EndLineCap="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <LineGeometry StartPoint="75,69" EndPoint="87,81" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IllustrationAllGood">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 L96,0 L96,96 L0,96 Z" />
+                <GeometryDrawing Geometry="M48,8 L80,19 L80,44 C80,65 66,79 48,88 C30,79 16,65 16,44 L16,19 Z">
+                    <GeometryDrawing.Brush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#4CC48C" Offset="0" />
+                            <GradientStop Color="#2A9A68" Offset="1" />
+                        </LinearGradientBrush>
+                    </GeometryDrawing.Brush>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="White" Thickness="8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <PathGeometry Figures="M33,47 L44,58 L64,37" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#D9A93A">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="85,12" RadiusX="4" RadiusY="4" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#5B7FD6">
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="10,72" RadiusX="3" RadiusY="3" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
 </ResourceDictionary>

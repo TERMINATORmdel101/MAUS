@@ -311,9 +311,10 @@ public partial class App : Application
         var preferences = LoadPreferences();
         if (!string.Equals(preferences.LastSeenVersion, AppVersion.Display, StringComparison.Ordinal))
         {
-            if (!s_firstOpening)
+            // 0.8.4 : les nouveautés s'affichent en carte sur l'accueil (fermée par « Compris »), plus en fenêtre.
+            if (!s_firstOpening && Current.MainWindow?.DataContext is ViewModels.MainViewModel home)
             {
-                Views.WhatsNewWindow.ShowFor(AppVersion.Display);
+                home.ShowWhatsNewFor(AppVersion.Display);
             }
 
             try

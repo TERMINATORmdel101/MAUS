@@ -41,6 +41,7 @@ public sealed partial class MainViewModel : ObservableObject
         _gameBarChoice = GameBarOptions[0];
         _laptopChoice = LaptopOptions[0];
         LoadHealthTrend();
+        HookAppearance();
 
         // Mode limité ou fichier des choix illisible au démarrage : l'utilisateur le sait dès l'ouverture.
         if (PreferencesStore.Notice is { } notice)

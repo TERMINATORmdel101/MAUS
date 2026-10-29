@@ -147,6 +147,32 @@ public static class Ui
 
     public static string TryMaxRefresh => T("Essayer la fréquence maximale");
 
+    public static string HomeLayoutTitle => T("Accueil et fond de la fenêtre");
+
+    public static string HomeCompleteOption => T("Accueil complet (toutes les cartes)");
+
+    public static string HomeLayoutNote => T("Par défaut, l'accueil est simple : le score, la prochaine étape et trois outils. Les autres outils restent dans « Plus d'outils » et dans l'Atelier : rien n'est retiré.");
+
+    public static string MicaOption => T("Fond Mica de Windows 11 (légèrement teinté par le fond d'écran)");
+
+    public static string MicaNote => T("Coupé de lui-même si la transparence est désactivée dans Windows, en contraste élevé, ou avant Windows 11 22H2.");
+
+    public static string MoreTools => T("Plus d'outils");
+
+    public static string GlanceTitle => T("Votre PC en un coup d'œil");
+
+    public static string WhatsNewClose => T("Compris");
+
+    public static string WhatsNewAll => T("Toutes les nouveautés");
+
+    public static string FamiliesLine => T("Points à voir par famille (cliquez pour ouvrir les Constats)");
+
+    public static string NoAuditIllustration => T("Aucun audit pour l'instant");
+
+    public static string AllGoodIllustration => T("Tout va bien");
+
+    public static string ShortcutsHint => T("Raccourcis : Ctrl+1 à Ctrl+6 pour changer de partie.");
+
     public static string TryMaxRefreshTip => T("Essai sans enregistrement : vous gardez la nouvelle fréquence d'un clic, sinon l'ancienne revient seule après 15 secondes.");
 
     public static string TestsStability => T("Stabilité");

@@ -211,6 +211,13 @@ public static class AppearanceManager
         Changed?.Invoke(null, EventArgs.Empty);
     }
 
+    /// <summary>Retient un choix d'affichage qui ne change pas l'apparence (zone repliée de l'accueil), sans tout réappliquer.</summary>
+    public static void Remember(UserPreferences preferences)
+    {
+        ArgumentNullException.ThrowIfNull(preferences);
+        Current = preferences;
+    }
+
     /// <summary>Teinte principale et secondaire d'un choix, pour l'aperçu dans les paramètres.</summary>
     public static (Color Primary, Color? Secondary) Colors(AccentChoice choice)
     {

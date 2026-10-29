@@ -20,6 +20,22 @@ public sealed class FamilyViewModel(FamilySummary summary, bool audited = true)
 
     public IReadOnlyList<ChipViewModel> Chips { get; } = audited ? BuildChips(summary) : [new(T("pas encore audité"), Tone.Grey)];
 
+    /// <summary>Accueil simple : nombre de points à voir (« 3 à voir », « en ordre », « — » avant l'audit).</summary>
+    public string CompactText { get; } = !audited ? "—"
+        : summary.Problems + summary.Warnings + summary.Improvements is var n and > 0 ? T("{0} à voir", n)
+        : summary.Unchecked > 0 ? T("non vérifié")
+        : summary.AllClear ? T("en ordre") : T("indéterminé");
+
+    /// <summary>Couleur du plus grave : rouge (problème), sable (à surveiller), bleu (optimisation), menthe (en ordre).</summary>
+    public Tone CompactTone { get; } = !audited ? Tone.Grey
+        : summary.Problems > 0 ? Tone.Rose
+        : summary.Warnings > 0 ? Tone.Sand
+        : summary.Improvements > 0 ? Tone.Blue
+        : summary.AllClear && summary.Unchecked == 0 ? Tone.Mint : Tone.Grey;
+
+    /// <summary>Nom lu par les lecteurs d'écran (« Maintenance : 3 à voir »).</summary>
+    public string CompactLabel => T("{0} : {1}", Name, CompactText);
+
     private static List<ChipViewModel> BuildChips(FamilySummary s)
     {
         var chips = new List<ChipViewModel>();
@@ -92,7 +108,7 @@ public sealed partial class MainViewModel
 
     public bool HasScore => Score >= 0;
 
-    public string ScoreText => HasScore ? Score.ToString(Culture) : "—";
+    public string ScoreText => HasScore ? Math.Round(Math.Max(0, _displayedScore)).ToString(Culture) : "—";
 
     public string ScoreWord => HasScore ? HealthScore.Describe(Score) : T("lancez l'audit");
 
@@ -202,6 +218,7 @@ public sealed partial class MainViewModel
     public void Shutdown()
     {
         CloseSideWindows();
+        UnhookAppearance();
         _workshop?.Stop();
     }
 
@@ -299,6 +316,8 @@ public sealed partial class MainViewModel
     {
         _breakdown = HealthScore.Explain(_results);
         Score = _breakdown.Score;
+        AnimateScore(Score);
+        RefreshGlance();
         var findings = _results.SelectMany(r => r.Findings).ToList();
         ScoreDetail = CountsText(findings);
         ScorePartialNote = HealthScore.PartialNote(_breakdown) ?? string.Empty;
@@ -323,5 +342,7 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(NextStepTone));
         OnPropertyChanged(nameof(HasProposedChanges));
         OnPropertyChanged(nameof(FixNowLabel));
+        OnPropertyChanged(nameof(ShowSeeFindingsButton));
+        OnPropertyChanged(nameof(ShowRerunButton));
     }
 }

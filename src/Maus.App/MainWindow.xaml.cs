@@ -9,6 +9,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Appearance.Backdrop.Attach(this);
         Closed += (_, _) => (DataContext as ViewModels.MainViewModel)?.Shutdown();
     }
 
