@@ -361,6 +361,7 @@ General behaviour:
 - **Security stop:** after 3 refused connections (another process, a wrong key, a replayed or modified request; §5), the engine stops by itself with a dedicated exit code; the interface goes back to limited mode and warns the user that a program tried to control the engine, and advises a scan with Windows Security. Nothing else is done (no action on the PC that a malicious program could abuse).
 - **Interface closed or crashed:** the engine detects that the interface process has exited and stops. If a fix was being written at that moment, the journal keeps it as `Pending` and "Undo" handles it (§9). Closing MAUS during a write asks for confirmation first.
 - **MAUS started with "Run as administrator" by the user:** there is no separate engine; the same operations run in-process (`LocalMausEngine`).
+- **Weekly audit (only if the user enabled it):** the task `\MAUS\WeeklyAudit` (§2.3) starts `MAUS.exe --scheduled-audit` with highest rights and **without a UAC prompt**: the user gave that consent once, when creating the task, which itself requires the engine. That process applies the engine's process hardening (§6), only reads, and exits unless a red problem is found. In that case it shows a notification; if the user clicks "Open MAUS", the MAUS window opens **in that same process, with administrator rights**, like "Run as administrator" (operations in-process, every change still behind the confirmations of §8).
 
 | Workflow | Elevation | Engine runs until |
 |---|---|---|
@@ -368,6 +369,7 @@ General behaviour:
 | Audit, re-run a module, view and apply fixes, undo, history (journal), protected choices ("wanted" findings, Game Bar profile, laptop power) | Greyed out in limited mode; available with all features | Same |
 | Repair Windows files, software upgrades, PawnIO install/remove, driver actions, driver backups and restore | Greyed out in limited mode; with all features, the console then runs on its own | The console window stays open until the user closes it, even after the engine stops |
 | Restore points (list, create), weekly audit (enable/disable) | Greyed out in limited mode | Idle timeout, security stop or interface exit |
+| Weekly audit run (if enabled), and "Open MAUS" from its notification | Highest rights from the task, no UAC prompt (consent given when the task was created) | Exit after the audit, or when the notification or the opened window is closed |
 | Memory sheet, latency test, frame counter | Greyed out in limited mode | Same; frame captures stop with the engine |
 | Game session recording | Never asks. In limited mode it records without frames per second (they need the engine) | — |
 | Benchmark | Never asks. With all features, it is started by the engine so that the CPU temperature can be watched through PawnIO; in limited mode it runs without that reading (the graphics card safety stop stays active) | Benchmark exit |
