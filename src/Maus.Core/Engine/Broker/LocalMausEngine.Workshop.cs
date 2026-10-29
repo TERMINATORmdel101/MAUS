@@ -81,7 +81,7 @@ public sealed partial class LocalMausEngine
     public Task<IReadOnlyList<string>> DriverBackupsAsync(CancellationToken cancellationToken) => Task.Run<IReadOnlyList<string>>(() =>
     {
         var root = GraphicsDriverActions.BackupRoot;
-        if (!Directory.Exists(root))
+        if (!Directory.Exists(root) || ProtectDriverBackups() is not null)
         {
             return [];
         }
@@ -267,7 +267,13 @@ public sealed partial class LocalMausEngine
                 return new ConsoleOutcome(VisibleConsole.Run(RepairConsole.Arguments()));
             case ConsoleKind.WingetUpgrade:
             {
-                // Seulement des logiciels de la dernière liste lue par le moteur lui-même.
+                // Seulement des logiciels de la dernière liste lue par le moteur lui-même. Liste lue sans droits avant le
+                // démarrage du moteur (ou moteur relancé après 15 minutes) : le moteur la relit, jamais celle de l'interface.
+                if (_software.Count == 0)
+                {
+                    await ListSoftwareUpdatesAsync(cancellationToken).ConfigureAwait(false);
+                }
+
                 var wanted = new HashSet<string>(request.PackageIds ?? [], StringComparer.OrdinalIgnoreCase);
                 var chosen = _software.Where(u => wanted.Contains(u.Id) && u.CanTarget).ToList();
                 if (chosen.Count == 0)
@@ -292,6 +298,11 @@ public sealed partial class LocalMausEngine
                     return new ConsoleOutcome(false, T("Carte graphique introuvable : actualisez la liste des pilotes."));
                 }
 
+                if (action is GraphicsDriverAction.Backup or GraphicsDriverAction.Remove && ProtectDriverBackups() is { } unsafeFolder)
+                {
+                    return new ConsoleOutcome(false, unsafeFolder);
+                }
+
                 var folder = GraphicsDriverActions.BackupFolder(gpu.InfName ?? "pilote", DateTimeOffset.Now);
                 return GraphicsDriverActions.ConsoleArguments(action, gpu, folder) is { } arguments
                     ? new ConsoleOutcome(VisibleConsole.Run(arguments), folder)
@@ -300,6 +311,11 @@ public sealed partial class LocalMausEngine
 
             case ConsoleKind.DriverRestore:
             {
+                if (ProtectDriverBackups() is { } unsafeRoot)
+                {
+                    return new ConsoleOutcome(false, unsafeRoot);
+                }
+
                 var name = request.Backup ?? string.Empty;
                 var root = GraphicsDriverActions.BackupRoot;
                 var full = Path.Combine(root, name);
@@ -319,6 +335,24 @@ public sealed partial class LocalMausEngine
     }, cancellationToken);
 
     private static string WingetMissing => T("winget est absent : réinstallez « Programme d'installation d'application » depuis le Microsoft Store.");
+
+    /// <summary>
+    /// Dossier des sauvegardes de pilotes réservé à SYSTEM et aux Administrateurs, comme le journal (ACL protégée, lien
+    /// refusé) : pnputil n'exporte ni ne réinstalle jamais dans un dossier qu'un utilisateur standard pourrait modifier.
+    /// </summary>
+    /// <returns>Le message à afficher si le dossier ne peut pas être protégé, sinon <c>null</c>.</returns>
+    private static string? ProtectDriverBackups()
+    {
+        try
+        {
+            new WindowsDirectoryProtector().EnsureProtected(GraphicsDriverActions.BackupRoot);
+            return null;
+        }
+        catch (JournalUnsafeException ex)
+        {
+            return T("Le dossier des sauvegardes de pilotes ({0}) ne peut pas être protégé : {1}", GraphicsDriverActions.BackupRoot, ex.Message);
+        }
+    }
 
     public Task<RestorePointOutcome> CreateDriverRestorePointAsync(CancellationToken cancellationToken) => Task.Run(() =>
     {

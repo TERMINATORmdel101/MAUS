@@ -1405,6 +1405,7 @@
   "Le disque est saturé ({0:0} % d'activité)": "The disk is saturated ({0:0}% active)",
   "Le disque renvoie des compteurs de fiabilité vides.": "The disk returns empty reliability counters.",
   "Le disque signale une température hors de ses seuils : vérifiez sa ventilation (dissipateur de la carte mère, flux d'air du boîtier).": "The drive reports a temperature outside its thresholds: check its cooling (motherboard heatsink, case airflow).",
+  "Le dossier des sauvegardes de pilotes ({0}) ne peut pas être protégé : {1}": "The driver backup folder ({0}) cannot be protected: {1}",
   "Le dossier {0} est un lien : MAUS refuse de s'en servir. Supprimez-le puis relancez MAUS.": "The folder {0} is a link: MAUS refuses to use it. Delete it, then start MAUS again.",
   "Le défilement doux ralentit la navigation dans les longues listes.": "Smooth scrolling slows down navigation in long lists.",
   "Le démarrage sécurisé vérifie qu'un chargeur signé se lance à l'allumage : il bloque les « bootkits », des logiciels malveillants qui s'installent avant Windows. Windows 11 et plusieurs jeux protégés par un anti-triche l'exigent.": "Secure Boot checks that a signed loader starts at power-on: it blocks \"bootkits\", malware that installs itself before Windows. Windows 11 and several games protected by an anti-cheat require it.",

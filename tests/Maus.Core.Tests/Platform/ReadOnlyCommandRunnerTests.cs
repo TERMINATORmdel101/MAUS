@@ -52,6 +52,13 @@ public class ReadOnlyCommandRunnerTests
     public void Winget_runs_only_from_the_protected_apps_folder(string path, bool expected) =>
         Assert.Equal(expected, ReadOnlyCommandRunner.IsInProtectedAppsFolder(path, @"C:\Program Files"));
 
+    [Theory]
+    [InlineData("nvidia-smi", "nvidia-smi.exe")]
+    [InlineData("powercfg.exe", "powercfg.exe")]
+    [InlineData("a-tool-that-does-not-exist", "a-tool-that-does-not-exist.exe")]
+    public void Tools_named_without_a_folder_come_only_from_System32_never_from_the_PATH(string executable, string file) =>
+        Assert.Equal(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), file), ReadOnlyCommandRunner.ResolveSystemExecutable(executable));
+
     [Fact]
     public async Task Winget_from_the_user_profile_is_refused_before_starting()
     {

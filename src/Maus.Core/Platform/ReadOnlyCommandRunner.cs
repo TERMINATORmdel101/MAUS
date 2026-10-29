@@ -208,8 +208,12 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         }
     }
 
-    /// <summary>Les outils système sont cherchés dans System32 pour éviter un exécutable homonyme placé ailleurs.</summary>
-    private static string ResolveSystemExecutable(string executable)
+    /// <summary>
+    /// Les outils désignés par leur seul nom sont pris dans System32, et nulle part ailleurs : absents de System32, ils sont
+    /// « introuvables ». Jamais de recherche dans le PATH, dont certains dossiers (WindowsApps du profil…) sont modifiables
+    /// sans droits administrateur : un nvidia-smi.exe déposé là serait lancé avec les droits du moteur.
+    /// </summary>
+    internal static string ResolveSystemExecutable(string executable)
     {
         if (Path.IsPathRooted(executable))
         {
@@ -217,7 +221,6 @@ public sealed class ReadOnlyCommandRunner : ICommandRunner
         }
 
         var name = executable.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? executable : executable + ".exe";
-        var system32 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), name);
-        return File.Exists(system32) ? system32 : name;
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), name);
     }
 }

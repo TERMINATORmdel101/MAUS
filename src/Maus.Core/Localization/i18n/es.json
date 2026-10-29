@@ -1405,6 +1405,7 @@
   "Le disque est saturé ({0:0} % d'activité)": "El disco está saturado ({0:0} % de actividad)",
   "Le disque renvoie des compteurs de fiabilité vides.": "El disco devuelve contadores de fiabilidad vacíos.",
   "Le disque signale une température hors de ses seuils : vérifiez sa ventilation (dissipateur de la carte mère, flux d'air du boîtier).": "El disco indica una temperatura fuera de sus umbrales: compruebe su ventilación (disipador de la placa base, flujo de aire de la caja).",
+  "Le dossier des sauvegardes de pilotes ({0}) ne peut pas être protégé : {1}": "No se puede proteger la carpeta de copias de seguridad de controladores ({0}): {1}",
   "Le dossier {0} est un lien : MAUS refuse de s'en servir. Supprimez-le puis relancez MAUS.": "La carpeta {0} es un enlace: MAUS se niega a usarla. Elimínela y vuelva a iniciar MAUS.",
   "Le défilement doux ralentit la navigation dans les longues listes.": "El desplazamiento suave ralentiza la navegación en las listas largas.",
   "Le démarrage sécurisé vérifie qu'un chargeur signé se lance à l'allumage : il bloque les « bootkits », des logiciels malveillants qui s'installent avant Windows. Windows 11 et plusieurs jeux protégés par un anti-triche l'exigent.": "El arranque seguro comprueba que se inicia un cargador firmado al encender: bloquea los «bootkits», programas maliciosos que se instalan antes que Windows. Windows 11 y varios juegos protegidos por un anti-trampas lo exigen.",

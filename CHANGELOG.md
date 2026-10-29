@@ -2,7 +2,17 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
-## 0.8.2 — en préparation (27/10/2026) — nouvelles explications, nouvelles corrections, aide
+## 0.8.3 — en préparation (29/10/2026) — sécurité du moteur administrateur
+
+Corrections (dernier chiffre, règle du porteur), trouvées en vérifiant le document de sécurité demandé par le Microsoft Store.
+
+- **Outils de Windows pris dans System32 et nulle part ailleurs** : un outil absent de System32 (par exemple `nvidia-smi.exe` d'un ancien pilote NVIDIA) était cherché dans les dossiers du PATH, dont certains sont modifiables sans droits administrateur ; un programme du même nom déposé là aurait été lancé avec les droits du moteur. Il est maintenant « introuvable » (l'audit le dit, comme sans carte NVIDIA).
+- **Mise à jour des logiciels par winget** : si la liste avait été lue avant le démarrage du moteur (ou plus de 15 minutes avant), la mise à jour répondait « aucun logiciel choisi ». Le moteur relit maintenant la liste lui-même avant d'ouvrir la fenêtre (il ne reprend jamais celle de l'interface).
+- **Dossier des sauvegardes de pilotes** (`%ProgramData%\MAUS\pilotes`) : le moteur le réserve lui-même à SYSTEM et aux Administrateurs (et refuse un lien) avant de lister, de sauvegarder ou de réinstaller un pilote ; avant, il comptait sur la protection posée par le journal.
+- Directives de sécurité du porteur (27/10) : tailles calculées en arithmétique vérifiée (benchmark, PawnIO, topologie des cœurs, compteurs PDH), garde-fou automatique `SecurityGuardTests` (lancement de programmes, `cmd.exe`, mémoire réservée à la main, code `unsafe` permis seulement dans les fichiers relus), adresses des pages des Paramètres vérifiées avant ouverture, analyse CodeQL sur GitHub.
+- Document `docs/store-security-design.md` : réponse aux dix points de la certification du Microsoft Store (opérations du moteur, commandes, périmètre des modifications, contrôles du canal privé, retour arrière).
+
+## 0.8.2 — 27/10/2026 — nouvelles explications, nouvelles corrections, aide
 
 Améliorations (dernier chiffre, règle du porteur), suggestions acceptées par le porteur.
 
