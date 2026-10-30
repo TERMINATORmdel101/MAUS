@@ -103,7 +103,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         foreach (var entry in entries)
         {
             var described = Describe(context.Files, entry, windowsDirectory, used);
-            if (entry.ApprovalKey is null || !entry.Approval.Enabled || entry.RunOnce
+            if (entry.ApprovalKey is null || !entry.Approval.Enabled || entry.RunOnce || !IsSafeValueName(entry.Name)
                 || !byId.TryGetValue(described.Id, out var finding) || !finding.Fixable || finding.Status == FindingStatus.Ok)
             {
                 continue;
@@ -189,6 +189,12 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         ReadStoreTasks(context, entries, findings);
         return entries;
     }
+
+    /// <summary>
+    /// Le nom de valeur écrit sous StartupApproved est celui de l'entrée Run, lu sur le système : un nom démesuré ou contenant
+    /// des caractères de contrôle est signalé mais jamais corrigé.
+    /// </summary>
+    private static bool IsSafeValueName(string name) => name.Length <= 255 && !name.Any(char.IsControl);
 
     private void ReadRegistrySource(IRegistryReader registry, RegistrySource source, List<StartupEntry> entries, List<Finding> findings)
     {

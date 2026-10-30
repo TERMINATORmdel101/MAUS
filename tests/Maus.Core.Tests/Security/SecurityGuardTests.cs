@@ -163,7 +163,7 @@ public partial class SecurityGuardTests
     public void Settings_pages_with_spaces_quotes_or_other_characters_are_refused(string? page, bool valid) =>
         Assert.Equal(valid, SettingsPages.IsValid(page));
 
-    [GeneratedRegex(@"Process\.Start\(|new ProcessStartInfo")]
+    [GeneratedRegex(@"Process\.Start\(|new ProcessStartInfo|new Process\b|CreateProcess\w*\(|ShellExecute\w*\(")]
     private static partial Regex ProcessStart();
 
     [GeneratedRegex(@"UseShellExecute\s*=\s*true")]

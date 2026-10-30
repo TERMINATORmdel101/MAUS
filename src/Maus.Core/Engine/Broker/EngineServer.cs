@@ -44,7 +44,9 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
     /// <summary>Clé présentée par l'interface (empreinte vérifiée) ; <c>null</c> tant qu'elle ne l'a pas présentée.</summary>
     private EngineKey? _key;
 
-    /// <summary>Demandes en cours : le moteur ne s'arrête jamais au milieu de l'une d'elles.</summary>
+    /// <summary>
+    /// Demandes en cours : l'arrêt pour inactivité attend leur fin ; l'arrêt de sécurité et la fin de l'interface, eux, les annulent.
+    /// </summary>
     private int _busy;
 
     /// <summary>Connexions refusées depuis le lancement.</summary>
@@ -283,12 +285,14 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
             case "plan":
                 return EngineProtocol.ToElement(await engine.PlanAsync(cancellationToken).ConfigureAwait(false));
             case "apply":
-                return EngineProtocol.ToElement(await engine.ApplyAsync(Ids(args, "changeIds"), Arg<ApplyOptions>(args, "options"), cancellationToken).ConfigureAwait(false));
+                return EngineProtocol.ToElement(await engine.ApplyAsync(Ids(args, "changeIds"), Options(args), cancellationToken).ConfigureAwait(false));
             case "verify":
-                await engine.RecordVerificationAsync(Id(args, "sessionId"), Arg<IReadOnlyList<VerifiedOutcome>>(args, "verified"), cancellationToken).ConfigureAwait(false);
+                await engine.RecordVerificationAsync(Id(args, "sessionId"), Verified(args), cancellationToken).ConfigureAwait(false);
                 return null;
             case "revert":
-                return EngineProtocol.ToElement(await engine.RevertAsync(Id(args, "sessionId"), OptionalId(args, "changeId"), Arg<bool>(args, "force"), cancellationToken).ConfigureAwait(false));
+                // Jamais de « force » par le canal : une valeur changée depuis la correction est laissée telle quelle. Seul
+                // l'outil en ligne de commande, lancé par un administrateur, offre --force.
+                return EngineProtocol.ToElement(await engine.RevertAsync(Id(args, "sessionId"), OptionalId(args, "changeId"), force: false, cancellationToken).ConfigureAwait(false));
             case "journal":
                 return EngineProtocol.ToElement(await engine.BrowseJournalAsync(cancellationToken).ConfigureAwait(false));
             case "session":
@@ -326,6 +330,24 @@ public sealed partial class EngineServer(IMausEngine engine, string pipeName, in
     {
         var ids = Arg<List<string>>(args, name);
         return ids.Count > MaxIds ? throw new EngineException("Trop d'identifiants.") : [.. ids.Select(Checked)];
+    }
+
+    /// <summary>Options d'application : la description du point de restauration est un texte libre, borné comme un identifiant.</summary>
+    private static ApplyOptions Options(JsonElement? args)
+    {
+        var options = Arg<ApplyOptions>(args, "options");
+        return options.RestorePointDescription.Length is > 0 and <= MaxIdLength && !options.RestorePointDescription.Any(char.IsControl)
+            ? options
+            : throw new EngineException("Description refusée.");
+    }
+
+    /// <summary>Résultats de vérification : pas plus d'entrées que de corrections possibles, messages bornés.</summary>
+    private static IReadOnlyList<VerifiedOutcome> Verified(JsonElement? args)
+    {
+        var verified = Arg<IReadOnlyList<VerifiedOutcome>>(args, "verified");
+        return verified.Count <= MaxIds && verified.All(v => (v.Message?.Length ?? 0) <= 2000)
+            ? verified
+            : throw new EngineException("Vérification refusée.");
     }
 
     /// <summary>Identifiant de correction, de module ou de séance : court, sans caractère de contrôle ni chemin.</summary>

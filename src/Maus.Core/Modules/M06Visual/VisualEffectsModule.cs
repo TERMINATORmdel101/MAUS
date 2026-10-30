@@ -18,7 +18,7 @@ public sealed class VisualEffectsModule : IFixableModule
     private static string Category => T("Effets désactivés");
 
     /// <summary>Effets pilotés par SystemParametersInfo : code GET, libellé Windows, valeur attendue.</summary>
-    private static readonly (string Id, uint Action, string Title, bool Expected, string Explanation)[] SpiEffects =
+    private static (string Id, uint Action, string Title, bool Expected, string Explanation)[] SpiEffects =>
     [
         ("M06.keep.drag", SpiGet.DragFullWindows, T("Contenu des fenêtres pendant leur déplacement (à conserver)"), true,
             T("Voir le contenu d'une fenêtre qu'on déplace est plus confortable ; cet effet fait partie des 4 conservés.")),

@@ -689,6 +689,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             _inventoryLoaded = false;
+            Maus.Core.Diagnostics.CrashLog.Write(ex, "atelier : matériel");
             InventoryStatus = T("La lecture du matériel a échoué : {0}", ex.Message);
         }
         finally
@@ -927,6 +928,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            Maus.Core.Diagnostics.CrashLog.Write(ex, "atelier : test du processeur");
             CpuStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
         }
         finally

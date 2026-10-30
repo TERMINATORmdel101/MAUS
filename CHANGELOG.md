@@ -2,6 +2,18 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
 
+## 0.8.5 — 30/10/2026 — relecture complète du code, moteur plus strict, document du Store exact
+
+Corrections (dernier chiffre, règle du porteur), à la suite d'une relecture complète du code (douze cartes par sous-système, quatre angles d'attaque) : aucune faille critique ni haute trouvée ; le moteur administrateur et le document de sécurité du Microsoft Store sont rendus exacts l'un par rapport à l'autre.
+
+- **Moteur administrateur** : le rapport de batterie n'est plus une opération du moteur (il est toujours fait sans droits par la fenêtre) ; une annulation « forcée » venue du canal est ignorée (une valeur changée depuis la correction est toujours laissée telle quelle ; seul l'outil en ligne de commande, lancé par un administrateur, offre `--force`) ; chaque action sur le pilote graphique est confirmée par le moteur lui-même (redémarrage et sauvegarde compris) ; la description du point de restauration et les notes de vérification sont bornées ; un jour de la semaine hors définition est refusé ; l'annulation et la vérification passent par le même verrou que l'application des corrections ; `schtasks` est arrêté s'il ne répond pas en une minute.
+- **Fenêtre** : installer ou retirer PawnIO ne fige plus la fenêtre pendant la confirmation du moteur ; « Lancer l'audit » est inactif pendant les corrections, et un audit ne peut plus en doubler un autre ; la fiche mémoire ne redemande plus l'autorisation administrateur si le moteur s'est arrêté entre-temps (elle le dit) ; les erreurs imprévues de l'audit, des corrections, de l'annulation, de la fiche matériel et du test du processeur sont journalisées dans `%LOCALAPPDATA%\MAUS\logs`.
+- **Démarrage (M12)** : une entrée `Run` au nom démesuré ou contenant des caractères de contrôle est signalée mais n'est plus proposée à la correction.
+- **Langues** : profils de corrections traduits à chaque affichage (et « Joueur » enfin traduit) ; mode d'alimentation actif retrouvé en espagnol ; titres des effets visuels dans la langue courante ; atténuation « domaine seul » du pare-feu dans les trois langues.
+- **Point de restauration** : la protection du système est jugée sur le lecteur demandé, et non sur n'importe quel volume protégé.
+- **Garde-fous** : le test qui relit les lancements de programme reconnaît aussi `new Process`, `CreateProcess*` et `ShellExecute*`.
+- **Documents** : `docs/store-security-design.md` corrigé sur une trentaine de points (réseau pendant l'audit, 31 opérations, cinq valeurs de confidentialité manquantes, essai de fréquence, confirmations, bornes, ce qui ne passe pas par le moteur) ; commentaires périmés du manifeste du Store, de l'installateur et du code corrigés.
+
 ## 0.8.4 — 29/10/2026 — nouvel accueil, confirmations par le moteur, bibliothèques verrouillées
 
 Améliorations (dernier chiffre, règle du porteur ; le porteur a choisi de rester en 0.8.4). Contient aussi la 0.8.3, jamais publiée.

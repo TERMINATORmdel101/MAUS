@@ -62,8 +62,7 @@ public sealed partial class EngineServer
                 return EngineProtocol.ToElement(await engine.SetScheduleAsync(OptionalArg<DayOfWeek?>(args, "day"), cancellationToken).ConfigureAwait(false));
             case "software":
                 return EngineProtocol.ToElement(await engine.ListSoftwareUpdatesAsync(cancellationToken).ConfigureAwait(false));
-            case "battery.report":
-                return EngineProtocol.ToElement(await engine.CreateBatteryReportAsync(cancellationToken).ConfigureAwait(false));
+            // battery.report n'est pas servi : le rapport de batterie se fait toujours sans droits, par l'interface (0.8.5).
             case "benchmark":
                 return EngineProtocol.ToElement(await engine.RunBenchmarkAsync(Arg<BenchmarkLaunch>(args, "launch"), cancellationToken).ConfigureAwait(false));
             default:

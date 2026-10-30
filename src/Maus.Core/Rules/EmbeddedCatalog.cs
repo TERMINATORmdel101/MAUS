@@ -5,8 +5,8 @@ using Maus.Core.Localization;
 namespace Maus.Core.Rules;
 
 /// <summary>
-/// Catalogues JSON embarqués dans l'assemblage (dossier <c>Catalog</c>).
-/// Ils seront plus tard remplacés par la version signée téléchargée chaque mois, avec repli sur ceux-ci.
+/// Catalogues JSON embarqués dans l'assemblage (dossier <c>Catalog</c>). Aucun catalogue n'est téléchargé : ils sont mis à
+/// jour avec MAUS (le catalogue des pilotes graphiques est revérifié chaque mois avant chaque version).
 /// </summary>
 public static class EmbeddedCatalog
 {

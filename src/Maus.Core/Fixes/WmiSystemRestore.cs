@@ -37,7 +37,18 @@ public sealed class WmiSystemRestore(IRegistryReader registry) : ISystemRestore
                 string value => [value],
                 _ => [],
             };
-            return volumes.Any(v => !string.IsNullOrWhiteSpace(v)) ? ProtectionState.Enabled : ProtectionState.Disabled;
+            // Chaque volume protégé est noté « \\?\Volume{…}\:(C%3A) » : on cherche le lecteur demandé. Si la liste n'a pas
+            // cette forme, une liste non vide vaut « activée », comme avant.
+            var named = volumes.Where(v => !string.IsNullOrWhiteSpace(v)).ToList();
+            if (named.Count == 0)
+            {
+                return ProtectionState.Disabled;
+            }
+
+            var wanted = "(" + Uri.EscapeDataString(drive.TrimEnd('\\')) + ")";
+            return named.Any(v => v.Contains(wanted, StringComparison.OrdinalIgnoreCase)) || !named.Any(v => v.Contains('('))
+                ? ProtectionState.Enabled
+                : ProtectionState.Disabled;
         }
         catch (MausAccessDeniedException)
         {

@@ -116,7 +116,7 @@ public sealed partial class RiskyChangesAuditModule
         var advice = T("Supprimer les stratégies EnableFirewall éventuelles, puis réactiver le pare-feu pour tous les profils dans Sécurité Windows > Pare-feu et protection du réseau.");
 
         // Le profil « domaine » ne sert que sur un réseau d'entreprise : coupé seul sur un PC personnel, le risque est limité.
-        var onlyDomain = off.Count == 1 && off.Contains("domaine");
+        var onlyDomain = off.Count == 1 && off.Contains(T("domaine"));
         return onlyDomain && !context.Hardware.IsManaged
             ? FirewallCheck.Deviation(current, expected, T("Le profil « domaine » ne sert que sur un réseau d'entreprise, mais sa désactivation trahit souvent un script de « nettoyage ». ") + explanation, advice, Severity.Medium)
             : FirewallCheck.Deviation(current, expected, explanation, advice);

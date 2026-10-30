@@ -1,8 +1,8 @@
 # MAUS — Security design of the elevated engine (Microsoft Store review)
 
-This document answers the ten points requested by Microsoft Store certification for the restricted capability `allowElevation` (policy 10.6.3). It describes MAUS **0.8.4**, the version submitted with this document (source: https://github.com/TERMINATORmdel101/MAUS). Every statement below was checked against the source code, and file paths are given so a reviewer can verify them. Where a protection does **not** exist, this document says so.
+This document answers the ten points requested by Microsoft Store certification for the restricted capability `allowElevation` (policy 10.6.3). It describes MAUS **0.8.5**, the version submitted with this document (source: https://github.com/TERMINATORmdel101/MAUS). Every statement below was checked against the source code, and file paths are given so a reviewer can verify them. Where a protection does **not** exist, this document says so. Version 0.8.5 follows a complete review of the code against this document (30 October 2026): the engine was changed where the document promised more than the code did (battery report never served by the engine, forced undo refused from the channel, every driver action confirmed by the engine, bounded free texts, bounded `schtasks` wait), and the document was corrected where the code is the intended behaviour.
 
-MAUS is a free, open-source (GPL-3.0) Windows 11 maintenance utility. It has no telemetry and no network service. It uses the network only when the user asks for it: winget, a web search opened in the browser, or the ping test.
+MAUS is a free, open-source (GPL-3.0) Windows 11 maintenance utility. It has no telemetry and no network service. The audit itself uses the network in two read-only ways: the Windows Update module asks the Windows Update Agent for pending updates (M03), and the software module lists available upgrades with `winget upgrade` (M20); both also run during the optional weekly scheduled audit. Everything else that uses the network is started by the user: software upgrades through winget, a web search opened in the browser, the ping test. Nothing about the PC is sent anywhere.
 
 **Contents.** §0 Architecture · §1 Allowlist of operations · §2 Commands, APIs, executables, arguments and targets · §3 Complete scope of system changes · §4 Inputs and validation · §5 Pipe authentication, authorization, process verification and anti-replay · §6 No arbitrary commands, scripts, paths, arguments or executables · §7 Elevation timing and engine termination per workflow · §8 Confirmation before changes, and declined UAC · §9 Restore point, partial failure, cancellation, logging and undo · §10 Separation of read-only and privileged functions.
 
@@ -19,7 +19,7 @@ The elevated copy (the "engine") behaves as follows:
 - It accepts a **closed list of operations** over a named pipe, only from the process that started it, and only requests signed with that process's secret key, each with a sequence number that can be used once (§5).
 - It stops when the interface exits, or after 15 minutes without any request.
 
-The interface never sends a command line, a script, a registry path, a value to write or an executable path. It sends an operation name and identifiers. The engine recomputes everything it does from its own audit, its own lists and its built-in catalogs.
+The interface never sends a command line, a script, a registry path, a registry value to write or an executable path. It sends an operation name, identifiers and options from closed sets, plus three bounded free texts that are never executed and never written to Windows settings: the restore-point description (passed to Windows as the name of the point), the verification notes stored in the MAUS journal, and the protected preferences object (§4). The engine recomputes everything it does from its own audit, its own lists and its built-in catalogs.
 
 Code:
 - `src/Maus.App/EngineHost.cs`: launch.
@@ -29,7 +29,7 @@ Code:
 
 ## 1. Exact allowlist of engine operations
 
-The engine dispatcher (`EngineServer.cs`, `EngineServer.Workshop.cs`) recognises exactly the 32 operation names below. Any other name returns the error "Opération inconnue" (unknown operation), and nothing is executed.
+The engine dispatcher (`EngineServer.cs`, `EngineServer.Workshop.cs`) recognises exactly the 31 operation names below. Any other name returns the error "Opération inconnue" (unknown operation), and nothing is executed.
 
 **Needs administrator rights** column. "Yes" means the operation needs administrator rights. In limited mode (engine not running), every control that leads to such an operation is **greyed out**, and the only ways to start the engine are the "All features" button of the banner at the top of the window, the startup window, or the "Enable advanced sensors" button (§7); the operation itself then runs in the engine. "No" means the operation also works without rights: it goes through the engine only if the engine is already running (it then runs with administrator rights), otherwise it runs in the non-elevated interface. A "No" operation never starts the engine and never shows UAC (`OnDemandMausEngine.cs`, methods `Elevated` and `Available`).
 
@@ -62,11 +62,12 @@ The engine dispatcher (`EngineServer.cs`, `EngineServer.Workshop.cs`) recognises
 | 25 | `restorepoint.list` | List restore points and shadow-storage space | Yes | No |
 | 26 | `restorepoint.create` | Create a restore point | Yes | **Yes**: restore point |
 | 27 | `restorepoint.driver` | Restore point before a driver action | Yes | **Yes**: restore point |
-| 28 | `schedule.get` | Read the MAUS weekly-audit task | No | Only re-points the MAUS task after a Store update (§2.3) |
+| 28 | `schedule.get` | Read the MAUS weekly-audit task | No (the re-creation below only succeeds in the engine) | **Yes** in one case: after a Store update, it re-creates the MAUS task on the new folder (§2.3) |
 | 29 | `schedule.set` | Create or remove the MAUS weekly-audit task | Yes | **Yes**: task `\MAUS\WeeklyAudit` only |
 | 30 | `software` | List winget upgrades (`winget upgrade`, read-only) | No | No |
-| 31 | `battery.report` | `powercfg /batteryreport` to a fixed MAUS path, always run without administrator rights (never by the engine) | No | One report file |
-| 32 | `benchmark` | Start the MAUS benchmark (same executable) | No | No |
+| 31 | `benchmark` | Start the MAUS benchmark (same executable) | No | No |
+
+The battery report (`powercfg /batteryreport /output <fixed MAUS path>`) is not an engine operation since 0.8.5: the non-elevated interface runs it itself (§2.3), and the engine dispatcher does not recognise the name.
 
 
 ---
@@ -84,10 +85,10 @@ Writes are done only by `FixEngine` (`src/Maus.Core/Fixes/FixEngine.cs`) through
 
 | Kind | API | Target |
 |---|---|---|
-| `Registry` | `RegistryKey.SetValue` / `DeleteValue` (Win32 registry API through .NET) | Only the values listed in §3.1 |
+| `Registry` | `RegistryKey.SetValue` / `DeleteValue` (Win32 registry API through .NET) | Only the values of the plan that the engine computes from its own audit and catalogs: those listed in §3.1. The accessor itself has no key allowlist; the plan is the barrier, and the channel carries no registry path or value |
 | `SystemParameter` | `SystemParametersInfoW` with `SPIF_UPDATEINIFILE \| SPIF_SENDCHANGE` | 10 visual-effect flags of the current user (§3.1, M06) |
 | `MinimizeAnimation` | `SystemParametersInfoW(SPI_SETANIMATION)` | Minimize/maximize animation of the current user |
-| `ActivePowerScheme` | `PowerSetActiveScheme` (powrprof.dll, documented API) | Active power plan: only the built-in Windows plans "High performance" or "Balanced" (fixed GUIDs), chosen by the engine from the audit; undo restores the previous plan's GUID read before the change |
+| `ActivePowerScheme` | `PowerSetActiveScheme` (powrprof.dll, documented API) | Active power plan: only the built-in Windows plans "High performance" or "Balanced" (fixed GUIDs), chosen by the engine from the audit (the accessor accepts any parsable GUID, but the GUID comes from the engine's plan, never from the channel); undo restores the previous plan's GUID read before the change |
 | `ScheduledTask` | `%SystemRoot%\System32\schtasks.exe /Change /TN <path\name> /DISABLE` (undo: `/ENABLE`), arguments passed separately (`ArgumentList`) | Third-party logon tasks found by the M12 audit. Tasks under `\Microsoft\` and disabled tasks are never listed |
 
 After an apply or undo that changed something, the engine broadcasts `WM_SETTINGCHANGE` (`SendMessageTimeoutW`, `SMTO_ABORTIFHUNG`, 2 s) so that Windows picks up the change.
@@ -127,10 +128,10 @@ Exit codes of `pnputil` are interpreted in the console (0 = success, 3010 = rest
 | `process.terminate` | `Process.Kill(entireProcessTree: false)` | The engine re-reads the process list itself and finds the PID. If the interface gave a start time and it differs, nothing is done (reused PID). Just before killing, it compares the start time reported by Windows with its own reading. It refuses MAUS itself, the interface process, PID 0 and 4, and critical processes (`ProcessRules.CanTerminate`, `src/Maus.Core/Workshop/Processes.cs`: System, Idle, Registry, Memory Compression, Secure System, smss, csrss, wininit, winlogon, services, lsass, lsaiso, svchost, fontdrvhost, dwm, MsMpEng, NisSrv, SecurityHealthService) |
 | `restorepoint.create`, `restorepoint.driver` | WMI `root\default:SystemRestore.CreateRestorePoint` (type `MODIFY_SETTINGS`, event `BEGIN_SYSTEM_CHANGE`). Just before the call, HKLM `SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore\SystemRestorePointCreationFrequency` is set to `0`, and its previous value is restored right after (Windows otherwise silently skips a point if another is less than 24 h old). The new point is then **verified** by re-reading the list of points | Description fixed by MAUS ("MAUS : point créé à la main", "MAUS : avant la suppression du pilote graphique"). These two operations **never** enable system protection |
 | `schedule.set` | `%SystemRoot%\System32\schtasks.exe /Create /TN MAUS\WeeklyAudit /XML <file> /F`, or `/Delete /TN MAUS\WeeklyAudit /F` | Input is a day of the week, or none to delete. MAUS generates the XML (`ScheduledAudit.TaskXml`): weekly at noon, `LogonType InteractiveToken`, `RunLevel HighestAvailable`, action `MAUS.exe --scheduled-audit` (read-only audit; a notification only if a red problem is found; nothing is applied). The XML file is written in `%ProgramData%\MAUS\tasks` (SYSTEM + Administrators only) and deleted after use. Creation is **refused** unless `MAUS.exe` is under `Program Files` or `Program Files (x86)` (WindowsApps included), because a task with highest rights must not start an executable that a standard user could replace |
-| `schedule.get` | `schtasks.exe /Query /TN MAUS\WeeklyAudit /XML` | Read. Only exception: if the existing MAUS task points to an **older version folder of the same Store package** (the WindowsApps folder name changes at each update), the engine re-creates the same task pointing to the current `MAUS.exe`, with the same rules as `schedule.set` |
+| `schedule.get` | `schtasks.exe /Query /TN MAUS\WeeklyAudit /XML` | Read. Only exception: if the existing MAUS task points to an **older version folder of the same Store package** (the WindowsApps folder name changes at each update), the engine re-creates the same task pointing to the current `MAUS.exe`, with the same rules as `schedule.set`. This re-creation keeps the day of the existing task, names the account of the engine process as the task's user, checks the existing task only by its action path, and does not ask the user again |
+| `battery.report` (interface only) | `%SystemRoot%\System32\powercfg.exe /batteryreport /output <path>` | Not an engine operation since 0.8.5. Path fixed by MAUS and enforced by the command allowlist: `%LOCALAPPDATA%\MAUS\rapports\rapport-batterie.html` (the previous report is deleted first). Run by the interface without administrator rights, even when the separate engine is running; it runs with those rights only when MAUS itself was started with "Run as administrator" (the whole interface is elevated then) |
 | `latency` | ETW real-time session `NT Kernel Logger` (DPC/ISR events) | Duration: 0 < d ≤ 5 min; the session is stopped at the end |
 | `frames.start` / `frames.stop` | Bundled `<MAUS folder>\PresentMon\PresentMon.exe` (Intel PresentMon 2.6.0). Its SHA-256 `b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af` is checked before **each** start; a different file is never started. The file is opened with read-only sharing for the check and kept open until the process has started, so it cannot be replaced, renamed or deleted in between (`PresentMonCapture.OpenVerified`). Fixed arguments, passed separately: `--output_stdout --v1_metrics --no_console_stats --stop_existing_session --session_name <name> --exclude dwm.exe --exclude MAUS.exe`. Cleanup: `--terminate_existing_session --session_name <name>` | Session name must be `MAUS_Compteur` or `MAUS_Releve`. All captures are stopped when the engine stops |
-| `battery.report` | `%SystemRoot%\System32\powercfg.exe /batteryreport /output <path>` | Path fixed by MAUS and enforced by the command allowlist: `%LOCALAPPDATA%\MAUS\rapports\rapport-batterie.html` (the previous report is deleted first). Always run by the interface without administrator rights, even when the engine is running: `powercfg.exe` writes into the user profile and does not inherit MAUS's process hardening |
 | `benchmark` | The same `MAUS.exe` with `--benchmark --api <api> --resolution <res> --lang <lang>` [`--only <scope>`] [`--raytracing off`], arguments passed separately, no shell | Each value from a closed set: api {d3d11, d3d12}, resolution {720p, 1080p, 1440p, 4k}, scope {all, gpu, cpu}, language {fr, en, es}, ray tracing on/off. When the engine runs, the benchmark is started by it (so with administrator rights) so that the CPU temperature can be read through PawnIO for the safety stop. The benchmark process then applies the engine's process hardening (§6) and does not use its compiled-shader cache: shaders are compiled in memory |
 | `prefs.save` | Atomic file write | `%ProgramData%\MAUS\settings\preferences.json` only |
 
@@ -143,7 +144,7 @@ The audit runs external tools only through `ReadOnlyCommandRunner` (`src/Maus.Co
 - anything else is refused before starting.
 
 Allowed commands:
-- `powercfg /getactivescheme | /list | /a | /availablesleepstates | /query`
+- `powercfg /getactivescheme | /list | /a | /availablesleepstates | /query` (the documented aliases `/l` and `/q` are accepted too)
 - `powercfg /batteryreport /output <fixed MAUS path>`
 - `bcdedit /enum`
 - `fsutil behavior query …`
@@ -163,7 +164,7 @@ The audit also reads the registry, WMI/CIM, event logs, the package list and fil
 
 ### 3.1 Registry values that a fix can write or delete
 
-Fixes are built only from code and embedded catalogs (`src/Maus.Core/Catalog/*.json`, `src/Maus.Core/Modules/*`), and only for a value that the audit found different from the target. "Delete" means the fix removes a policy value so that Windows returns to its own default; MAUS never writes the "enabled" value of a policy to restore it. "(Pro+)" means the value is only written on Pro, Enterprise and Education editions. Values marked "optional" are never pre-checked.
+Fixes are built only from code and embedded catalogs (`src/Maus.Core/Catalog/*.json`, `src/Maus.Core/Modules/*`), and only for a value that the audit found different from the target. "Delete" means the fix removes a policy value so that Windows returns to its own default; MAUS restores a policy by deleting it, and the only values written to a secure default are the three UAC values of M01 (`EnableLUA` = 1, `ConsentPromptBehaviorAdmin` = 5, `PromptOnSecureDesktop` = 1). "(Pro+)" means the value is only written on Pro, Enterprise and Education editions. Values marked "optional" are never pre-checked.
 
 **M01 — security defaults restored (HKLM)**
 
@@ -204,10 +205,13 @@ Fixes are built only from code and embedded catalogs (`src/Maus.Core/Catalog/*.j
 | HKCU `Software\Microsoft\Windows\CurrentVersion\Privacy` | `TailoredExperiencesWithDiagnosticDataEnabled` = 0 |
 | HKCU `Software\Policies\Microsoft\Windows\CloudContent` | `DisableTailoredExperiencesWithDiagnosticData` = 1 (Pro+) |
 | HKCU `Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo` | `Enabled` = 0 |
-| HKCU `Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced` | `Start_IrisRecommendations` = 0 |
+| HKCU `Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced` | `Start_IrisRecommendations` = 0, `Start_TrackProgs` = 0 |
 | HKCU `Software\Policies\Microsoft\Windows\Explorer` | `DisableSearchBoxSuggestions` = 1 |
 | HKCU `Software\Microsoft\Windows\CurrentVersion\SearchSettings` | `IsDynamicSearchBoxEnabled` = 0 |
 | HKCU `Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager` | `RotatingLockScreenOverlayEnabled`, `SubscribedContent-338387Enabled`, `SubscribedContent-338389Enabled`, `SoftLandingEnabled`, `SilentInstalledAppsEnabled`, `SubscribedContent-338393Enabled`, `SubscribedContent-353694Enabled`, `SubscribedContent-353696Enabled` = 0 |
+| HKCU `Control Panel\International\User Profile` | `HttpAcceptLanguageOptOut` = 1 |
+| HKCU `Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy` | `HasAccepted` = 0 |
+| HKCU `Software\Microsoft\InputPersonalization` | `RestrictImplicitTextCollection` = 1, `RestrictImplicitInkCollection` = 1 |
 
 **M05 — power**
 - HKLM `SYSTEM\CurrentControlSet\Control\Session Manager\Power\HiberbootEnabled` = 0 (fast startup).
@@ -254,7 +258,7 @@ If the engine was elevated with a **different** administrator account than the s
 | `%ProgramData%\MAUS\tasks\maus-task-<guid>.xml` | Temporary XML of the weekly task, deleted after use (if an antivirus holds it, it stays in that protected folder) | Engine | Same |
 | `%ProgramData%\MAUS\pilotes\<folder>` | Driver backups (`pnputil /export-driver`) | Engine (console) | Same: the engine re-applies this protection (and refuses a link) before listing, backing up or restoring |
 | `%LOCALAPPDATA%\MAUS\rapports\rapport-batterie.html` | Windows battery report | Interface (`powercfg.exe` without administrator rights) | User profile |
-| `%LOCALAPPDATA%\MAUS\` (settings, history, logs) | Display settings, score history, crash logs | Interface; also the engine (its own crash log) and the weekly audit (score history, crash log), both with RedirectionGuard (§6) | User profile |
+| `%LOCALAPPDATA%\MAUS\` (settings, history, logs) | Display settings, score history, crash logs | Interface; also the engine (its own crash log) and the weekly audit (score history, crash log), both with RedirectionGuard (§6) once it is applied at process start; the crash-log writer itself does not check for reparse points | User profile |
 | `%LOCALAPPDATA%\MAUS\benchmark-history.json`, `benchmark\`, `bench-shaders\` | Benchmark results, result images (older ones deleted), compiled-shader cache | Benchmark process: with administrator rights when the engine started it (§2.3), then with the engine's process hardening of §6 (RedirectionGuard included) and **without** reading or writing the shader cache; without rights, it uses the cache | User profile |
 | `%TEMP%` | Temporary test files (disk speed test; benchmark thumbnails in `MAUS-benchmark-<pid>`), deleted after use | Interface; benchmark process for the thumbnails | User profile |
 
@@ -262,17 +266,17 @@ If the engine was elevated with a **different** administrator account than the s
 
 - **Services:** no service is started, stopped, created or deleted. Only the `Start` value of the 10 services listed in §3.1 can be restored to the Windows default, and only when that service is disabled.
 - **Scheduled tasks:** `\MAUS\WeeklyAudit` can be created, deleted or re-pointed (§2.3). Third-party logon tasks can be disabled and re-enabled (§2.1). Tasks under `\Microsoft\` are never changed.
-- **Drivers:** only the display adapter, only through `pnputil` (§2.2), with each action confirmed by the user. A verified restore point is created before a driver is deleted (if it fails, the user decides whether to continue; the driver is backed up first in any case). MAUS ships no kernel driver.
+- **Drivers:** only the display adapter, only through `pnputil` (§2.2). Every action is confirmed in the interface and, since 0.8.5, confirmed a second time by the engine itself (restart, remove and re-detect, back up, back up then delete, restore; §8). Before a driver is deleted, the interface requests a verified restore point first (`restorepoint.driver`; if it fails, the user decides whether to continue; the driver is backed up first in any case). MAUS ships no kernel driver.
 - **PawnIO:** PawnIO, a signed third-party driver, is installed or removed only through winget, at the user's request, in a visible console. When PawnIO is installed and MAUS has administrator rights, MAUS uses it **only to read** (`src/Maus.Core/Workshop/Memory/PawnIo/SpdBusDriver.cs`, `PawnIoMemorySources.cs`):
   - sensors, through LibreHardwareMonitorLib;
   - memory SPD chips;
   - memory-controller registers (Intel `IntelMCHBAR` / `IntelMSR` modules, AMD SMN register reads);
   - the AMD power-management table (an SMU command that refreshes the table, then a read).
 
-  A software guard in front of the SMBus module refuses every SMBus write, except the page-selection writes that reading an SPD chip requires (addresses 0x36/0x37 for DDR4; register MR11 at addresses 0x50–0x57 for DDR5). MAUS therefore cannot modify an SPD chip or a DDR5 power-management IC.
+  A software guard in front of the SMBus module examines every transfer call (`ioctl_smbus_xfer`) and refuses writes, except the page-selection writes that reading an SPD chip requires (addresses 0x36/0x37 for DDR4; register MR11 at addresses 0x50–0x57 for DDR5). The module's other entry points (identification, port selection, write-protection query) are not filtered by MAUS; the SPD library calls them for detection only. MAUS therefore cannot modify an SPD chip or a DDR5 power-management IC through the transfer function. On AMD, refreshing the power-management table is a mailbox command sent to the SMU (a hardware write that only asks for the table to be updated), followed by reads.
 - **System protection:** WMI `SystemRestore.Enable("C:\")` is called only during `apply`, only if system protection is off **and** the user ticked the option to allow it (`ApplyOptions.EnableProtectionIfNeeded`).
 - **Temporary ETW sessions:** `NT Kernel Logger` (latency, at most 5 minutes) and `MAUS_Compteur` / `MAUS_Releve` (PresentMon), stopped at the end and when the engine stops.
-- **Display:** the refresh-rate trial (`ChangeDisplaySettingsExW`) runs in the **non-elevated** interface, never in the engine. It is applied to the current session only and rolled back automatically after 15 seconds unless the user keeps it.
+- **Display:** the refresh-rate trial (`ChangeDisplaySettingsExW`) runs in the **non-elevated** interface, never in the engine. The trial mode is applied dynamically (not saved) and rolled back automatically after 15 seconds unless the user clicks "Keep"; "Keep" then saves the mode through the same API (`CDS_UPDATEREGISTRY`). This is the one setting changed outside the FixEngine journal: it is undone by choosing the previous mode again (in MAUS or in Windows settings), not by the "Undo" button.
 - **Never touched:** BIOS/UEFI, BCD and boot configuration, Defender exclusions, firewall rules, hosts file, proxy, page file, user accounts, credentials, CPU mitigations (MAUS only re-enables them).
 
 ---
@@ -284,16 +288,17 @@ General rules (`EngineServer.cs`, `EngineProtocol.cs`):
 - Every request is signed (HMAC-SHA256) and carries a sequence number that can be used only once (§5). A request with a wrong signature or a used number closes the connection without an answer, before its content is read.
 - One request per connection. A malformed message closes that connection; nothing is executed.
 - JSON is deserialized into fixed record types. Unknown fields are ignored. A missing or wrongly typed field returns an error, and nothing is executed.
-- Identifiers (`Checked`) must have 1–200 characters, with no control characters and no `\`, `/` or `:`. At most **500** identifiers per request.
+- Identifiers (`Checked`) must have 1–200 characters, with no control characters and no `\`, `/` or `:`. At most **500** identifiers per request. The free texts are bounded too (0.8.5): the restore-point description (1–200 characters, no control characters) and the verification notes (at most 500 entries of at most 2,000 characters); the list of acknowledged findings in `prefs.save` is bounded only by the message size.
+- Enumerations travel by name. An integer outside an enumeration's definition is refused by the operation that would act on it (`schedule.set` since 0.8.5; `console` already refused an unknown kind).
 - Language: if it is not one of fr, en, es, the engine uses the language of Windows. It only selects message texts.
 
 | Operation | Inputs | Validation |
 |---|---|---|
-| `ping`, `audit`, `plan`, `journal`, `prefs.load`, `inventory`, `drivers`, `drivers.backups`, `sensors`, `processes`, `memory`, `restorepoint.list`, `restorepoint.create`, `restorepoint.driver`, `schedule.get`, `software`, `battery.report` | None | — |
+| `ping`, `audit`, `plan`, `journal`, `prefs.load`, `inventory`, `drivers`, `drivers.backups`, `sensors`, `processes`, `memory`, `restorepoint.list`, `restorepoint.create`, `restorepoint.driver`, `schedule.get`, `software` | None | — |
 | `module` | Module id | Checked id; an id that is not one of the 20 built-in modules returns nothing |
 | `apply` | List of fix ids; options `CreateRestorePoint` (bool, pre-checked in the interface), `EnableProtectionIfNeeded` (bool), `ProceedWithoutRestorePoint` (bool), `RestorePointDescription` (text) | The engine **recomputes the plan** from its own audit and keeps only the ids found in it. An unknown id is ignored. The interface cannot supply a registry path, a value or a task name. If the engine restarted since its last audit, it audits again before planning. The description is only passed as the restore point name to WMI; the interface always sends the default "MAUS : avant corrections" |
 | `verify` | Session id; list of check results (fix id, effect, message) | Only results "no effect" and "pending restart" are kept, as a display note on entries that are already applied. A value to write or to restore can never be changed this way |
-| `revert` | Session id, optional change id, `force` (bool) | Session and change must exist in the protected journal. The values written back are the ones the engine journaled itself. The interface always sends `force = false`; only the command-line tool, started by an administrator, offers `--force` |
+| `revert` | Session id, optional change id, `force` (bool, ignored) | Session and change must exist in the protected journal. The values written back are the ones the engine journaled itself. Since 0.8.5 the engine ignores any `force` sent through the channel: a value changed since the fix is always left as it is. Only the command-line tool, started by an administrator and running the FixEngine in-process, offers `--force` |
 | `session` | Session id | Checked id; must exist in the journal |
 | `prefs.save` | Preferences object | Deserialized into the fixed `UserPreferences` record. Preferences only choose between options built into MAUS (for example the Game Bar profile, or findings marked as wanted) |
 | `process.terminate` | PID (int), optional start time | §2.3 |
@@ -303,7 +308,7 @@ General rules (`EngineServer.cs`, `EngineProtocol.cs`):
 | `frames.stop` | Session name | Same session check |
 | `space` | Folder path | Fully qualified local path; UNC and device paths (`\\…`, `\\?\`, `\\.\`) refused; must exist. Read-only enumeration (depth ≤ 256) |
 | `console` | Kind + ids (§2.2) | Kind ∈ the six values of §2.2; each id validated as described there |
-| `schedule.set` | Day of week, or none | Enum only |
+| `schedule.set` | Day of week, or none | Enumeration by name; an undefined value is refused |
 | `benchmark` | api, resolution, scope, language, ray tracing (bool) | Closed sets (§2.3); anything else refused |
 
 ---
@@ -314,7 +319,7 @@ General rules (`EngineServer.cs`, `EngineProtocol.cs`):
 |---|---|
 | Engine command line | The pipe name must match `^MAUS-[0-9a-f]{32}$`, the client PID must be a number, and the key fingerprint must be 64 lowercase hexadecimal digits; otherwise the engine exits (code 2) |
 | Unpredictable name | `MAUS-<random GUID>` (`Guid.NewGuid`, 122 random bits), generated by the interface for each engine start |
-| Pipe squatting | The first instance is created with `PipeOptions.FirstPipeInstance`: if another process already owns the name, the engine fails to start instead of serving it |
+| Pipe squatting | The first instance is created with `PipeOptions.FirstPipeInstance`: if another process already owns the name, the engine fails to start instead of serving it. Later instances do not use that flag, and the ACL grants `CreateNewInstance` to the user's account, so another process of the same account could create an instance of the same name once the engine runs: the interface then refuses that instance (the server process id does not match, see below) and sends nothing; at worst the engine stops after 3 refused connections. Denial of service only |
 | Access control list | Explicit `PipeSecurity` with two entries only: **Deny** `NETWORK` (S-1-5-2) full control, and **Allow** the account the engine runs under (`ReadWrite \| CreateNewInstance`). Remote clients are refused |
 | Client verification (engine side) | For **every** connection, `GetNamedPipeClientProcessId` must equal the PID of the interface that started the engine (passed on the command line and validated). Any other process is disconnected without an answer, and the attempt is recorded in the engine's diagnostic breadcrumbs |
 | Server verification (interface side) | For every connection, `GetNamedPipeServerProcessId` must equal the PID of the engine process that the interface started itself (`Process.Start` result). Otherwise the interface refuses to use the pipe and tells the user |
@@ -323,7 +328,7 @@ General rules (`EngineServer.cs`, `EngineProtocol.cs`):
 | Anti-replay | Each request carries a sequence number that the interface increments. The engine accepts each number **once only**; it also refuses a number older than a window of 4,096 (`ReplayWindow`, same principle as the IPsec anti-replay window, RFC 4303 §3.4.3). The window allows several requests in parallel to arrive out of order. A recorded request sent again, or a request modified after signing, is refused without an answer |
 | Response authentication | Every response (progress messages included) is signed with the key and bound to the sequence number of its request (domain `MAUS-RES`). The interface refuses a response that is not signed for its own request, so an old response cannot be replayed to it either |
 | Authorization | The engine runs only operations from the closed list (§1), with the validation of §4. There is no "generic" operation |
-| Message bounds | 32 MiB maximum, one request per connection (after the one-time key presentation), JSON into fixed types |
+| Message bounds | 32 MiB maximum (the length is checked before the body is read; a body within the limit is then read into memory before its signature is checked), one request per connection (after the one-time key presentation), JSON into fixed types |
 | Lifetime binding | The engine watches the interface process and exits when it exits |
 | Security stop | After **3** refused connections (another process, a wrong key, a replayed or modified request), the engine stops by itself (`EngineServer.MaxRefusals`, exit code `SecurityStopExitCode`); the interface warns the user and returns to limited mode. The engine takes no other action, so this cannot be abused to harm the PC |
 
@@ -333,9 +338,9 @@ These controls are layered: a request is executed only if it arrives on a local 
 
 ## 6. No arbitrary commands, scripts, paths, arguments or executables
 
-- The protocol has no field for a command, script, executable path, registry path, value to write or argument list, and every request must be signed with the key of this engine start (§5). The interface sends an operation name from §1, plus identifiers and values from closed sets (§4).
+- The protocol has no field for a command, script, executable path, registry path, registry value to write or argument list, and every request must be signed with the key of this engine start (§5). The interface sends an operation name from §1, plus identifiers, values from closed sets and the three bounded free texts of §0 (§4).
 - Every executable that the engine starts is fixed in code:
-  - `cmd.exe`, `schtasks.exe`, `pnputil.exe` and `powercfg.exe` from `%SystemRoot%\System32` (the non-elevated interface also starts `%windir%\explorer.exe`, only to open a web page, a folder, a file or a Settings page with standard rights);
+  - `cmd.exe`, `schtasks.exe` and `pnputil.exe` from `%SystemRoot%\System32` (the non-elevated interface also starts `powercfg.exe` for the battery report, and `%windir%\explorer.exe`, only to open a web page, a folder, a file or a Settings page with standard rights; the elevated weekly-audit process starts `explorer.exe` once, to open MAUS without rights when the user clicks "Open MAUS", §7);
   - `DISM.exe` and `sfc.exe` started by that `cmd.exe`, whose working directory is System32;
   - the read-only tools of §2.4 from System32 only, never from the `PATH`;
   - `winget.exe` only from `%ProgramFiles%\WindowsApps`;
@@ -345,7 +350,7 @@ These controls are layered: a request is executed only if it arrives on a local 
 - No PowerShell, no script host and no `cmd /c` with user text. `ShellExecute` is used only once: to start the engine itself with `runas`.
 - Registry writes come only from the plan computed by the engine (§3.1). There is no "write this value" operation.
 - These rules are enforced by an automated test that fails the build (`SecurityGuardTests`, §2), and every push is analysed by GitHub CodeQL (`security-extended`).
-- **Process hardening** (`src/Maus.Core/Platform/ProcessHardening.cs`, `SetProcessMitigationPolicy`, applied at start before any request): the interface, the engine and the weekly audit refuse to load DLLs from a remote share or from a file with a low mandatory label (`NoRemoteImages`, `NoLowMandatoryLabelImages`). The elevated engine and the scheduled audit also search Windows DLLs in System32 first (`PreferSystem32Images`), disable legacy extension point DLLs (`ProcessExtensionPointDisablePolicy`), and enable RedirectionGuard (`EnforceRedirectionTrust`): they do not follow a filesystem junction created by a non-administrator account, which blocks the classic trick of redirecting an elevated write. These policies only restrict MAUS's own processes; a policy Windows refuses is logged and skipped. Microsoft notes that such policies are most effective when applied at process initialization: they are applied at the very start of each process, but do not cover what Windows loaded before that point. The benchmark process (`MAUS.exe --benchmark`) applies the engine's policies when it has administrator rights (started by the engine), and the interface's policies otherwise.
+- **Process hardening** (`src/Maus.Core/Platform/ProcessHardening.cs`, `SetProcessMitigationPolicy`, applied at start before any request): the interface, the engine and the weekly audit refuse to load DLLs from a remote share or from a file with a low mandatory label (`NoRemoteImages`, `NoLowMandatoryLabelImages`). The elevated engine and the scheduled audit also search Windows DLLs in System32 first (`PreferSystem32Images`), disable legacy extension point DLLs (`ProcessExtensionPointDisablePolicy`), and enable RedirectionGuard (`EnforceRedirectionTrust`): they do not follow a filesystem junction created by a non-administrator account, which blocks the classic trick of redirecting an elevated write. These policies only restrict MAUS's own processes; a policy Windows refuses is logged and skipped, and MAUS does not re-check afterwards that it was applied. Programs started by the engine (the `cmd.exe` consoles and the tools they run, `schtasks`, `pnputil`) do not inherit them: a mitigation policy is per process. Microsoft notes that such policies are most effective when applied at process initialization: they are applied at the very start of each process, but do not cover what Windows loaded before that point. The benchmark process (`MAUS.exe --benchmark`) applies the engine's policies when it has administrator rights (started by the engine), and the interface's policies otherwise.
 
 ---
 
@@ -353,20 +358,20 @@ These controls are layered: a request is executed only if it arrives on a local 
 
 General behaviour:
 - **At start**, there is no UAC prompt. The interface runs as a standard user. MAUS may show, in its own window, the disclaimer (first start, and again if its text changes) and a window "How do you want to use MAUS?" that explains the two modes side by side: "Limited mode, without administrator rights" and "All features, with administrator rights". That window appears at each start until the user ticks "Don't ask me again" or turns it off in Settings > Administrator rights. UAC appears **only if** the user clicks "All features"; "Limited mode" keeps MAUS without rights. After an update, "What's new" is a card on the home page (since 0.8.4), not a window. The 0.8.4 home page changes (simple layout, Mica background through `DwmSetWindowAttribute` on MAUS's own window, keyboard shortcuts) add no engine operation, no network access, no program start and no file loaded from outside MAUS.
-- **Limited mode:** while the engine is not running, every control that needs administrator rights is greyed out (audit, fixes, undo, repair, software upgrades, PawnIO, driver actions and backups, restore points, weekly audit, protected choices, memory sheet, latency test, frame counter), and a banner at the top of the window says "Limited mode: greyed-out options need administrator rights" with an **"All features"** button (`src/Maus.App/ViewModels/ElevationState.cs`, `MainWindow.xaml`). No greyed-out control can be clicked, so no action starts a UAC prompt by surprise.
-- **Switching to all features:** only an explicit click on "All features" (banner or startup window) or on "Enable advanced sensors" starts `MAUS.exe --engine` with `runas`; UAC appears at that moment. If two clicks happen together, only one prompt is shown. When the engine is ready, the greyed-out controls become available and the banner disappears.
+- **Limited mode:** while the engine is not running, every control that needs administrator rights is greyed out (audit, fixes and their restore-point options, undo, repair, software upgrades, PawnIO, driver actions and backups, restore points, weekly audit, protected choices, memory sheet, latency test and its duration, frame counter), and a banner at the top of the window says "Limited mode: greyed-out options need administrator rights" with an **"All features"** button (`src/Maus.App/ViewModels/ElevationState.cs`, `MainWindow.xaml`). No greyed-out control can be clicked, so no action starts a UAC prompt by surprise.
+- **Switching to all features:** only an explicit click on "All features" (banner or startup window) or on "Enable advanced sensors" starts `MAUS.exe --engine` with `runas`; UAC appears at that moment. If two clicks happen together, only one prompt is shown. When the engine is ready, the greyed-out controls become available and the banner disappears. No other control starts the engine: since 0.8.5, the memory sheet no longer does it either (if the engine stopped between the moment its button became available and the click, the sheet says so instead of prompting).
 - **Location check before elevation:** before starting the engine, the interface checks that `MAUS.exe` is in a folder that only administrators can modify (`Program Files`, `Program Files (x86)`, `WindowsApps`; `ScheduledAudit.IsInProtectedFolder`). If it is not (for example a copy in Downloads or on a USB stick), another program could have replaced `MAUS.exe`, and Windows would give administrator rights to it. MAUS then warns the user and asks whether to continue (default: No); on No, no UAC prompt is shown and MAUS stays in limited mode. Installed through the Microsoft Store, the installer or winget, MAUS is always in a protected folder, so this warning never appears.
 - **Following actions** reuse the running engine, with no new prompt.
 - **15 minutes without any request:** the engine exits (`EngineServer.IdleTimeout`), but never while a request is in progress. For example, a running latency measurement or benchmark counts as a request. The interface is notified when the engine process exits (`Process.Exited`): the controls are greyed out again and the banner comes back. If the engine restarted since the last audit, it audits again before any plan or apply, so it never acts on stale data.
 - **Security stop:** after 3 refused connections (another process, a wrong key, a replayed or modified request; §5), the engine stops by itself with a dedicated exit code; the interface goes back to limited mode and warns the user that a program tried to control the engine, and advises a scan with Windows Security. Nothing else is done (no action on the PC that a malicious program could abuse).
 - **Interface closed or crashed:** the engine detects that the interface process has exited and stops. If a fix was being written at that moment, the journal keeps it as `Pending` and "Undo" handles it (§9). Closing MAUS during a write asks for confirmation first.
-- **MAUS started with "Run as administrator" by the user:** there is no separate engine; the same operations run in-process (`LocalMausEngine`).
+- **MAUS started with "Run as administrator" by the user:** there is no separate engine; the same operations run in-process (`LocalMausEngine`). In that mode there is no second confirmation by the engine (§8), because there is no second process: the interface dialogs are the only confirmation, and everything the interface does, battery report included, runs with the rights the user gave it.
 - **Weekly audit (only if the user enabled it):** the task `\MAUS\WeeklyAudit` (§2.3) starts `MAUS.exe --scheduled-audit` with highest rights and **without a UAC prompt**: the user gave that consent once, when creating the task, which itself requires the engine. That process applies the engine's process hardening (§6), only reads, and exits unless a red problem is found. In that case it shows a notification; if the user clicks "Open MAUS", MAUS is started again **as a normal process, without administrator rights** (through Explorer, like a double-click), and the elevated audit process exits. The window never runs with the task's rights; to fix something, the user chooses "All features" and the usual UAC prompt appears.
 
 | Workflow | Elevation | Engine runs until |
 |---|---|---|
 | "All features" (banner or startup window), "Enable advanced sensors" | UAC at the click: these are the only controls that start the engine | Idle timeout, security stop or interface exit |
-| Audit, re-run a module, view and apply fixes, undo, history (journal), protected choices ("wanted" findings, Game Bar profile, laptop power) | Greyed out in limited mode; available with all features | Same |
+| Audit, view and apply fixes, undo, history (journal), protected choices ("wanted" findings, Game Bar profile, laptop power) | Greyed out in limited mode; available with all features | Same |
 | Repair Windows files, software upgrades, PawnIO install/remove, driver actions, driver backups and restore | Greyed out in limited mode; with all features, the console then runs on its own | The console window stays open until the user closes it, even after the engine stops |
 | Restore points (list, create), weekly audit (enable/disable) | Greyed out in limited mode | Idle timeout, security stop or interface exit |
 | Weekly audit run (if enabled) | Highest rights from the task, no UAC prompt (consent given when the task was created); "Open MAUS" starts a new window without rights | Exit after the audit, or when the notification is closed or "Open MAUS" is clicked |
@@ -374,7 +379,7 @@ General behaviour:
 | Game session recording | Never asks. In limited mode it records without frames per second (they need the engine) | — |
 | Benchmark | Never asks. With all features, it is started by the engine so that the CPU temperature can be watched through PawnIO; in limited mode it runs without that reading (the graphics card safety stop stays active) | Benchmark exit |
 | Process list, process termination, disk-space analysis, drivers list, inventory, software list | Never asks. They run with administrator rights only if the engine is already running | — |
-| Battery report | Never asks, never with administrator rights | — |
+| Battery report | Never asks; run by the interface without administrator rights (not an engine operation) | — |
 | Refresh-rate trial, Explorer restart, opening web pages, folders and Settings pages, CPU/RAM/VRAM/disk tests, ping test | Never elevated: they run in the interface process (web pages and folders are opened through `explorer.exe`) | — |
 
 ---
@@ -383,7 +388,7 @@ General behaviour:
 
 **First start:** the user must accept a disclaimer (what MAUS does, the risks, and that the user decides); otherwise MAUS closes.
 
-**Before every modifying action**, the interface shows a Yes/No dialog whose default button is **No**. It describes what will change and how to undo it:
+**Before every modifying action**, the interface shows a Yes/No dialog whose default button is **No**. It describes what will change and how to undo it. Two actions have no dialog: removing a "wanted" mark (it only changes a MAUS preference) and starting the benchmark (it changes nothing). This dialog is the user's consent step; it lives in the non-elevated process, so it is not a barrier against code already running in the user's session: that barrier is the engine's own confirmation below, which covers the most sensitive operations.
 - **Apply fixes:**
   - the dialog shows the list of chosen changes, their warnings, whether a restore point will be created, and a reminder that the user decides;
   - fixes are chosen one by one in a checklist: "recommended" ones are pre-checked, "advanced" ones never are, and "warning" ones show a reinforced warning;
@@ -402,11 +407,11 @@ General behaviour:
 
 **Second confirmation shown by the elevated engine itself** (since 0.8.4, `src/Maus.Core/Engine/Broker/EngineConfirmation.cs`): the interface runs without administrator rights, so a malicious program running under the same account could in theory inject into it and send signed requests while the engine is running. For the most sensitive operations, the engine therefore asks again in a Windows message box of its own (`MessageBoxW`, topmost, default button **No**), before doing anything:
 - terminating a process (`process.terminate`);
-- removing a graphics driver, removing and re-detecting the graphics card, or reinstalling a driver backup (`console`, driver tasks);
+- every graphics-driver action: restart, remove and re-detect, back up, back up then delete, and reinstalling a driver backup (`console`, driver tasks; restart and back up since 0.8.5);
 - installing or removing PawnIO (`console`);
 - marking a new finding as "wanted" (`prefs.save`, only when a finding is added to the list).
 
-A program without administrator rights cannot click or type in a window of the elevated engine: Windows User Interface Privilege Isolation (UIPI, Microsoft "Windows Integrity Mechanism Design") blocks it. A "No" returns a message to the interface and nothing is done. The interface calls `AllowSetForegroundWindow` for the engine process before each request so that this box can come to the front. When MAUS itself was started with "Run as administrator", there is no separate engine and only the interface dialog is shown.
+The other modifying operations (apply, undo, restore points, the weekly-audit task, the repair and software-upgrade consoles, the latency test, the benchmark) rely on the interface dialog and on the closed list: they can only do what the engine's own plan, lists and catalogs allow. A program without administrator rights cannot click or type in a window of the elevated engine: Windows User Interface Privilege Isolation (UIPI, Microsoft "Windows Integrity Mechanism Design") blocks it. A "No" returns a message to the interface and nothing is done. The interface calls `AllowSetForegroundWindow` for the engine process before each request so that this box can come to the front. When MAUS itself was started with "Run as administrator", there is no separate engine and only the interface dialog is shown.
 
 Admin actions that only **read** (audit, sensors, memory sheet, latency, frame counter, journal) have no MAUS dialog: they are only available after the user explicitly clicked "All features" and accepted the UAC prompt, which is the consent.
 
@@ -421,7 +426,7 @@ Admin actions that only **read** (audit, sensors, memory sheet, latency, frame c
 
 Implemented in `src/Maus.Core/Fixes/FixEngine.cs`, `RestorePoints.cs`, `JournalStore.cs` and `AtomicFile.cs`.
 
-1. **Blocked cases.** No change is made in these cases:
+1. **Blocked cases.** No fix is written in these cases (a restore point, when requested, is created before the journal folder is checked, so it can exist when the apply then stops):
    - the PC is managed (domain or MDM enrolment);
    - the engine is not elevated;
    - the journal folder cannot be secured (`JournalUnsafeException`).
@@ -440,7 +445,7 @@ Implemented in `src/Maus.Core/Fixes/FixEngine.cs`, `RestorePoints.cs`, `JournalS
    - if the original value is still in place, nothing had been written;
    - if the new value is in place, it is restored like an applied fix.
 8. **Effect check.** After the apply, the interface runs a fresh audit and tells the user which fixes were written but have no visible effect (for example a policy ignored on the Home edition). This note is stored in the journal (`verify`). If that audit fails, the fixes are shown as "not verified", never as "no effect".
-9. **Undo.** Undo works by session or by single change (History page, or CLI `--revert`), and each restored value is re-read. If a value was changed by something else since MAUS wrote it, MAUS **leaves it as it is** and reports "changed since". The interface never overwrites such a value; only the command-line tool, started by an administrator, offers `--force`.
+9. **Undo.** Undo works by session or by single change (History page, or CLI `--revert`), and each restored value is re-read. If a value was changed by something else since MAUS wrote it, MAUS **leaves it as it is** and reports "changed since". Neither the interface nor the engine's channel can overwrite such a value (the engine ignores `force` from the channel, §4); only the command-line tool, started by an administrator, offers `--force`.
 10. **Logging.** The journal is one JSON file per session in `%ProgramData%\MAUS\journal` (SYSTEM + Administrators), written atomically. A session file whose owner is not SYSTEM or Administrators, or that is a link, is ignored and never replayed. Crash logs are written to `%LOCALAPPDATA%\MAUS\logs`. Nothing is sent anywhere.
 
 ---
@@ -452,7 +457,9 @@ Implemented in `src/Maus.Core/Fixes/FixEngine.cs`, `RestorePoints.cs`, `JournalS
 | Audit modules (`IAuditModule.Detect`, `IFixableModule.Plan`) | Read-only by contract | They receive only `AuditContext`: registry **reader**, WMI/CIM reader, event-log reader, package and file readers, and `ReadOnlyCommandRunner` (§2.4). They have no access to any writer. Unit tests run every module with fakes, and an apply/undo round-trip test checks each fixable module |
 | `FixEngine` (`Apply`, `RecordVerification`, `Revert`) | The only writer of settings | It receives `FixContext` (writers + journal), which is separate from `AuditContext`, and writes only `PlannedChange` objects produced by the engine's own `Plan` |
 | Engine Workshop operations (§2.2, §2.3) | Engine | Fixed executables, validated inputs, and a confirmation in the interface |
-| Interface | Standard user | Displays results and sends operation names and ids. It never accesses the protected journal, the protected preferences or the privileged tools directly; everything goes through `EngineHost.Current` |
+| Interface | Standard user | Displays results and sends operation names and ids. It never accesses the protected journal, the protected preferences or the privileged tools directly; everything that needs the engine goes through `EngineHost.Current`. It does act on its own, without the engine and without rights, for the Explorer restart, the refresh-rate trial (§3.3), the CPU/RAM/VRAM stability tests, the ping test, the battery report, and its own files in the user profile (display settings, score history, benchmark history, including the path of the benchmark result image that it decodes and can open) |
+
+The audit modules do read, in the elevated process, inputs that a standard user can influence: the `Run` values of HKCU (M01 checks the signature of the program they point to with `WinVerifyTrust`), the shortcuts of the Startup folders (M12 parses them with MAUS's own bounded parser; a file above a fixed size is skipped), and the outputs of the read-only commands of §2.4. These inputs are parsed into typed values; a parser failure turns the module grey (no result) and never into an action.
 
 The audit can be run as many times as the user wants without changing anything. Nothing is ever applied automatically, including by the weekly scheduled audit, which only reads and notifies.
 

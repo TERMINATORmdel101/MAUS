@@ -75,7 +75,8 @@ Name: "{autoprograms}\MAUS"; Filename: "{app}\MAUS.exe"; Comment: "Audit, répar
 Name: "{autodesktop}\MAUS"; Filename: "{app}\MAUS.exe"; Tasks: desktopicon
 
 [Run]
-; MAUS demande les droits administrateur : l'installateur, déjà administrateur, peut le lancer à la fin.
+; MAUS s'ouvre sans droits administrateur (le moteur est lancé plus tard, à la demande, avec l'invite de Windows) : l'entrée
+; postinstall est lancée avec les droits de l'utilisateur d'origine (comportement par défaut d'Inno Setup, runasoriginaluser).
 Filename: "{app}\MAUS.exe"; Description: "{cm:LaunchProgram,MAUS}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]

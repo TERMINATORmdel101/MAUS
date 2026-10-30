@@ -52,9 +52,9 @@ public sealed partial class WorkshopViewModel
         }
     });
 
-    public ICommand InstallPawnIoCommand => _installPawnIo ??= new AsyncCommand(() => Run(() => RunPawnIoConsole(install: true)));
+    public ICommand InstallPawnIoCommand => _installPawnIo ??= new AsyncCommand(() => RunPawnIoConsoleAsync(install: true));
 
-    public ICommand UninstallPawnIoCommand => _uninstallPawnIo ??= new AsyncCommand(() => Run(() => RunPawnIoConsole(install: false)));
+    public ICommand UninstallPawnIoCommand => _uninstallPawnIo ??= new AsyncCommand(() => RunPawnIoConsoleAsync(install: false));
 
     /// <summary>
     /// Mesures lues par le moteur : sans pilote, complétées par PawnIO s'il est installé (le moteur a les droits
@@ -87,7 +87,7 @@ public sealed partial class WorkshopViewModel
                         : T("PawnIO {0} installé : température, tension et puissance du processeur, sondes et ventilateurs de la carte mère lus par LibreHardwareMonitor (bibliothèque libre, MPL-2.0).", state.PawnIoVersion ?? "?");
     }
 
-    private void RunPawnIoConsole(bool install)
+    private async Task RunPawnIoConsoleAsync(bool install)
     {
         var title = install ? T("Installer le pilote PawnIO ?") : T("Retirer le pilote PawnIO ?");
         var message = install
@@ -101,9 +101,9 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        var outcome = EngineHost.Current.OpenConsoleAsync(new Maus.Core.Engine.Broker.ConsoleRequest(
-            install ? Maus.Core.Engine.Broker.ConsoleKind.PawnIoInstall : Maus.Core.Engine.Broker.ConsoleKind.PawnIoUninstall), CancellationToken.None)
-            .ConfigureAwait(false).GetAwaiter().GetResult();
+        // Attente asynchrone : le moteur affiche sa propre confirmation pendant ce temps, la fenêtre de MAUS reste vivante.
+        var outcome = await EngineHost.Current.OpenConsoleAsync(new Maus.Core.Engine.Broker.ConsoleRequest(
+            install ? Maus.Core.Engine.Broker.ConsoleKind.PawnIoInstall : Maus.Core.Engine.Broker.ConsoleKind.PawnIoUninstall), CancellationToken.None);
         if (!outcome.Opened)
         {
             PawnIoStatus = outcome.Message ?? T("La fenêtre de commande n'a pas pu s'ouvrir.");

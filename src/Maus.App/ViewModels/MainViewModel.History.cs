@@ -88,6 +88,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            Maus.Core.Diagnostics.CrashLog.Write(ex, "annulation");
             FixReport = T("L'annulation a échoué : {0}", ex.Message);
         }
     }

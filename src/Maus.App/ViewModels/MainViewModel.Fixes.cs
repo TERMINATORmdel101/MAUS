@@ -263,6 +263,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex)
         {
+            Maus.Core.Diagnostics.CrashLog.Write(ex, "corrections");
             FixReport = T("Les corrections ont été interrompues : {0}. Consultez l'onglet « Historique » pour annuler ce qui a été fait.", ex.Message);
         }
         finally

@@ -128,11 +128,32 @@ public sealed partial class LocalMausEngine : IMausEngine
         }
     }
 
-    public Task RecordVerificationAsync(string sessionId, IReadOnlyList<VerifiedOutcome> verified, CancellationToken cancellationToken) =>
-        Task.Run(() => new FixEngine(_createFixContext(_context ?? _createContext())).RecordVerification(sessionId, verified), cancellationToken);
+    public async Task RecordVerificationAsync(string sessionId, IReadOnlyList<VerifiedOutcome> verified, CancellationToken cancellationToken)
+    {
+        // Même verrou que l'application : le journal n'est jamais touché par deux demandes à la fois.
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await Task.Run(() => new FixEngine(_createFixContext(_context ?? _createContext())).RecordVerification(sessionId, verified), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 
-    public Task<RevertResult> RevertAsync(string sessionId, string? changeId, bool force, CancellationToken cancellationToken) =>
-        Task.Run(() => new FixEngine(_createFixContext(_context ?? _createContext())).Revert(sessionId, force, changeId), cancellationToken);
+    public async Task<RevertResult> RevertAsync(string sessionId, string? changeId, bool force, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(() => new FixEngine(_createFixContext(_context ?? _createContext())).Revert(sessionId, force, changeId), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 
     public Task<JournalListing> BrowseJournalAsync(CancellationToken cancellationToken) =>
         Task.Run(() => _journal is FileJournalStore files ? files.Browse() : new JournalListing(_journal.List(), 0), cancellationToken);

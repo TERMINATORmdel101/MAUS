@@ -316,10 +316,15 @@ public sealed partial class LocalMausEngine
                     return new ConsoleOutcome(false, unsafeFolder);
                 }
 
-                if (action is GraphicsDriverAction.Remove or GraphicsDriverAction.Reinstall
-                    && !Confirmed(T("pilote graphique"), action == GraphicsDriverAction.Remove
-                        ? T("Sauvegarder puis supprimer le pilote de {0} ? L'écran peut devenir noir quelques secondes.", gpu.Device)
-                        : T("Retirer {0} puis la laisser redétecter par Windows ? L'écran peut devenir noir quelques secondes.", gpu.Device)))
+                // Chaque action sur le pilote est confirmée par le moteur lui-même (0.8.5 : redémarrage et sauvegarde compris).
+                var question = action switch
+                {
+                    GraphicsDriverAction.Remove => T("Sauvegarder puis supprimer le pilote de {0} ? L'écran peut devenir noir quelques secondes.", gpu.Device),
+                    GraphicsDriverAction.Reinstall => T("Retirer {0} puis la laisser redétecter par Windows ? L'écran peut devenir noir quelques secondes.", gpu.Device),
+                    GraphicsDriverAction.Restart => T("Redémarrer {0} ? L'écran peut devenir noir quelques secondes.", gpu.Device),
+                    _ => T("Sauvegarder le pilote de {0} dans le dossier protégé de MAUS ?", gpu.Device),
+                };
+                if (!Confirmed(T("pilote graphique"), question))
                 {
                     return new ConsoleOutcome(false, T("Action annulée : rien n'a changé."));
                 }
@@ -458,6 +463,12 @@ public sealed partial class LocalMausEngine
         if (day is not { } chosen)
         {
             return await TaskSchedulerClient.DeleteAsync().ConfigureAwait(false);
+        }
+
+        if (!Enum.IsDefined(chosen))
+        {
+            // Le canal transporte l'énumération par son nom ; un nombre hors définition n'a rien à faire dans une tâche.
+            throw new ArgumentOutOfRangeException(nameof(day), day, "Jour inconnu.");
         }
 
         return TaskSchedulerClient.Refusal() ?? await TaskSchedulerClient.CreateAsync(chosen).ConfigureAwait(false);

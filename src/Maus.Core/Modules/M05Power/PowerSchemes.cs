@@ -121,7 +121,7 @@ internal static partial class PowerSchemes
             var match = ListLinePattern().Match(line.TrimEnd('\r', ' ', '\t'));
             if (match.Success && Guid.TryParse(match.Groups["guid"].Value, out var guid))
             {
-                schemes.Add(new ListedScheme(guid, match.Groups["name"].Value.Trim(), match.Groups[T("active")].Success));
+                schemes.Add(new ListedScheme(guid, match.Groups["name"].Value.Trim(), match.Groups["active"].Success));
             }
         }
 

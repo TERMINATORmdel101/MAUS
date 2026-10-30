@@ -6,7 +6,8 @@
 
   Capacités restreintes, justifiées à la soumission (texte dans installer/msix/README.md) :
   - runFullTrust : application de bureau WPF ;
-  - allowElevation : MAUS demande l'administrateur à l'ouverture (audit et corrections) ;
+  - allowElevation : MAUS s'ouvre sans droits ; le moteur (MAUS.exe --engine) est lancé par runas, avec l'invite UAC, au
+    premier clic sur « Toutes les fonctionnalités » (audit complet, corrections), puis s'arrête après 15 minutes sans demande ;
   - unvirtualizedResources + écriture du registre et des fichiers non virtualisée : les corrections modifient les vrais
     réglages de Windows (HKCU), et non une copie privée au paquet.
 -->

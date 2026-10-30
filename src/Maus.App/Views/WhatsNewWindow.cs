@@ -48,6 +48,12 @@ public sealed class WhatsNewWindow : Window
     /// <summary>Nouveautés de chaque version, en quelques lignes ; vide si rien n'est prévu pour cette version.</summary>
     public static IReadOnlyList<string> For(string version) => version switch
     {
+        "0.8.5" =>
+        [
+            T("Le code de MAUS a été relu en entier : aucune faille grave trouvée, et le moteur administrateur est plus strict (chaque action sur le pilote graphique confirmée par lui, annulation forcée refusée, entrées bornées)."),
+            T("La fenêtre ne se fige plus pendant l'installation de PawnIO, et un audit ne peut plus en doubler un autre."),
+            T("Profils de corrections et mode d'alimentation traduits dans les trois langues ; les erreurs imprévues sont journalisées dans le dossier des journaux de MAUS."),
+        ],
         // 0.8.3 n'a pas été publiée : ses nouveautés sont annoncées avec la 0.8.4.
         "0.8.4" or "0.8.3" =>
         [

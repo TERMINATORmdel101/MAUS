@@ -32,7 +32,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Modules = new ObservableCollection<ModuleViewModel>(_engine.Modules.Select(m => new ModuleViewModel(m, this)));
         SelectedModule = Modules.FirstOrDefault();
-        RunAuditCommand = new AsyncCommand(RunAuditAsync);
+        // Pas d'audit lancé par le bouton pendant les corrections : elles relancent elles-mêmes l'audit de vérification.
+        RunAuditCommand = new AsyncCommand(() => IsApplying ? Task.CompletedTask : RunAuditAsync());
         ApplyCommand = new AsyncCommand(ApplyAsync);
         RefreshJournalCommand = new AsyncCommand(RefreshJournalAsync);
         SaveReportCommand = new AsyncCommand(SaveReportAsync);
@@ -140,6 +141,12 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task<bool> RunAuditAsync()
     {
         var fresh = false;
+        if (IsRunning)
+        {
+            // Un audit tourne déjà : deux audits en parallèle écraseraient les résultats l'un de l'autre.
+            return false;
+        }
+
         IsRunning = true;
         Completed = 0;
         StatusText = T("Lecture de la configuration…");
@@ -192,6 +199,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            Maus.Core.Diagnostics.CrashLog.Write(ex, "audit");
             StatusText = T("L'audit a échoué : {0}", ex.Message);
         }
         finally

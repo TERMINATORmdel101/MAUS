@@ -13,9 +13,12 @@ public sealed class PawnIoException(string message, int win32Error) : Exception(
 
 /// <summary>
 /// Client minimal du pilote PawnIO : charge un module officiel embarqué dans MAUS (PawnIO.Modules 0.2.11, LGPL-2.1)
-/// et appelle ses fonctions. MAUS n'appelle que des fonctions de lecture : IntelMCHBAR ne sait que lire ; IntelMSR sait
-/// aussi écrire quelques MSR de puissance, fonction que MAUS n'appelle jamais. Le module vérifie lui-même chaque adresse
-/// demandée. Même protocole que LibreHardwareMonitor (<c>PawnIo.cs</c>, MPL-2.0).
+/// et appelle ses fonctions. Côté Intel, MAUS n'appelle que des fonctions de lecture : IntelMCHBAR ne sait que lire ;
+/// IntelMSR sait aussi écrire quelques MSR de puissance, fonction que MAUS n'appelle jamais. Côté AMD, la table PM se lit
+/// après une commande SMU qui la rafraîchit (une écriture dans la boîte aux lettres du SMU, documentée dans
+/// <c>docs/store-security-design.md</c> §3.3), et la lecture d'une puce SPD DDR4/DDR5 passe par une sélection de page, qui
+/// est une écriture SMBus encadrée (<c>SpdBusDriver</c>). Le module vérifie lui-même chaque adresse demandée. Même
+/// protocole que LibreHardwareMonitor (<c>PawnIo.cs</c>, MPL-2.0).
 /// </summary>
 public sealed partial class PawnIoModule : IDisposable
 {

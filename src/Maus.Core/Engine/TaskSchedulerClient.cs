@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Principal;
 using System.Text;
 using System.Xml.Linq;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Engine;
 
@@ -83,7 +84,7 @@ public static class TaskSchedulerClient
         }
     }
 
-    /// <summary>Retire le fichier XML temporaire ; s'il résiste (antivirus qui l'analyse), il reste dans le dossier temporaire.</summary>
+    /// <summary>Retire le fichier XML temporaire ; s'il résiste (antivirus qui l'analyse), il reste dans le dossier protégé <c>%ProgramData%\MAUS\tasks</c>.</summary>
     private static void DeleteQuietly(string path)
     {
         try
@@ -124,10 +125,29 @@ public static class TaskSchedulerClient
         try
         {
             using var process = Process.Start(info)!;
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            return (process.ExitCode, output + error);
+            // schtasks répond en moins d'une seconde ; au-delà d'une minute (outil bloqué par un antivirus ou un verrou),
+            // il est arrêté et le moteur le dit, au lieu d'attendre sans fin.
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            try
+            {
+                var output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
+                var error = await process.StandardError.ReadToEndAsync(timeout.Token);
+                await process.WaitForExitAsync(timeout.Token);
+                return (process.ExitCode, output + error);
+            }
+            catch (OperationCanceledException)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    // Déjà terminé.
+                }
+
+                return (-1, T("schtasks n'a pas répondu en une minute : la tâche n'a pas été modifiée."));
+            }
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {

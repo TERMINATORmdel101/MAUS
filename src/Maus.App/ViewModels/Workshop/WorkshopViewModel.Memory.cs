@@ -206,19 +206,12 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        // Les puces des barrettes se lisent avec les droits administrateur : le moteur est lancé ici au besoin, avec la
-        // demande d'autorisation de Windows, avant la tension (lue elle aussi par le pilote).
-        if (EngineHost.OnDemand is { } onDemand)
+        // Les puces des barrettes se lisent avec les droits administrateur : le bouton n'est actif qu'avec le moteur. S'il
+        // s'est arrêté entre-temps (15 minutes sans demande), on le dit au lieu de redemander l'autorisation par surprise.
+        if (EngineHost.OnDemand is { IsElevatedRunning: false })
         {
-            try
-            {
-                await onDemand.EnsureElevatedAsync(CancellationToken.None);
-            }
-            catch (Maus.Core.Engine.Broker.EngineException ex)
-            {
-                MemoryStatus = ex.Message;
-                return;
-            }
+            MemoryStatus = T("Le moteur administrateur ne tourne plus : cliquez sur « Toutes les fonctionnalités », puis relancez la lecture.");
+            return;
         }
 
         Maus.Core.Diagnostics.Breadcrumbs.Add("Mémoire : tension mesurée par la carte mère");
