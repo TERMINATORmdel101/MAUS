@@ -104,6 +104,7 @@ SDK : `apt-get install -y dotnet-sdk-10.0` (dépôt Ubuntu ; `dot.net/v1/dotnet-
 - **0.8.4 publiée** (préversion, 29/10) : GitHub https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.8.4, winget #465525 **fusionnée le 30/10**. Contient le nouvel accueil et la sécurité du moteur. 1 621 tests, 0 avertissement.
 - **Microsoft Store** : paquet prêt, `publish/store-0.8.4` ; c'est le porteur qui l'envoie. Voir `REPRISE.md` (« À faire en premier »).
 - Tout ce qui n'est pas sur GitHub : `Documents\MAUS-sauvegarde-20261030` (`LISEZMOI.txt`), dont le rapport de failles **privé, à ne jamais écrire dans ce dépôt public**.
+- Analyse privée de Claude (qualités, défauts, sécurité, écarts documents ↔ code, plan de relecture du code) : `Documents\MAUS-sauvegarde-20261030\analyse-claude\00-synthese.md`, à lire après ce fichier pour toute session sur la sécurité ou l'architecture. Elle nomme des faiblesses : **jamais dans ce dépôt**.
 - Suite, procédure de publication, ce qui reste à vérifier : [`REPRISE.md`](REPRISE.md). Passé détaillé : `docs/historique-claude.md`.
 
 ## Pièges encore utiles
@@ -121,4 +122,3 @@ Code :
 - WPF : un pinceau rangé dans `Application.Resources` est figé (`Pastel.Apply` y met des copies). Le thème Fluent pose lui-même le fond de la fenêtre : ne pas faire `ClearValue` dessus. Fluent pose aussi l'attribut Mica sans rendre le fond transparent.
 - Ne jamais mettre `ThrowIfNull` sur un paramètre `T?` (`SettingsAccessor.Write(key, null)` = supprimer). `RoundTrip.AssertAsync` applique tout le plan : une correction qui défait les autres se teste à part. Depuis Windows 11 24H2, l'API Wlan répond ERROR_ACCESS_DENIED sans accès à la position. L'API DISM échoue dans un paquet MSIX (`dism.exe /CheckHealth` à la place).
 - Benchmark : le porteur voit les passes en plein écran, préférer `--capture` (hors écran) ; une scène prépare ses données dans `Load`, à l'intérieur d'une image ; en HLSL 2018, `a ? b : c` évalue b et c ; ne jamais libérer un `GlyphRun` (il libère la police).
-- Analyse privée de Claude (qualités, défauts, sécurité, écarts documents ↔ code, plan de relecture du code) : `Documents\MAUS-sauvegarde-20261030\analyse-claude\00-synthese.md`, à lire après ce fichier pour toute session sur la sécurité ou l'architecture. Elle nomme des faiblesses : **jamais dans ce dépôt**.
