@@ -1,14 +1,38 @@
 # Reprise — aide-mémoire de Claude
 
-À lire après `CLAUDE.md` (mémoire complète du projet). Ce fichier ne garde que ce qui sert encore pour reprendre le travail ; l'historique des reprises de septembre et d'octobre 2026 (sessions cloud, ancien PC `C:\Users\CARO`, branches des agents de la 0.5.3) est dans l'historique Git de ce fichier (`git log -p REPRISE.md`).
+À lire après `CLAUDE.md`. Ce fichier ne garde que ce qui sert encore pour reprendre le travail ; l'historique des reprises de septembre et d'octobre 2026 (sessions cloud, ancien PC `C:\Users\CARO`, branches des agents de la 0.5.3) est dans l'historique Git de ce fichier (`git log -p REPRISE.md`), le reste dans `docs/historique-claude.md`.
 
-## 1. Où en est le projet (29/10/2026)
+## 1. Où en est le projet (30/10/2026)
 
-- **0.8.2 publiée le 27/10** (accord du porteur « 3 oui », « tu peux le faire ») : https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.8.2 (préversion, commit `a2c1f58`, installateur du workflow, SHA-256 `b4f6be09…4a29`, provenance vérifiée, téléchargement public vérifié), demande winget **microsoft/winget-pkgs#463072** (en attente). Le système d'autorisations de Claude Code bloque `gh release create` tant que le porteur n'a pas confirmé une seconde fois dans la conversation. Contenu : suggestions 1, 4, 5, 7 à 16 acceptées par le porteur (6 refusée : pas de vérification de mise à jour, à cause du Store), toutes faites, 1 583 tests, 0 avertissement. Vérifié à l'écran (copie `_smoke`, script `v082.ps1`, sans droits) : « Quoi de neuf », bouton « ? », carte des points de restauration. **Pas vérifié** : Wi-Fi sur un PC équipé (le PC du porteur n'en a pas), désactivation réelle d'une tâche planifiée (`schtasks /Change`), essai réel de la fréquence d'écran (le PC du porteur est déjà au maximum), Recall (pas de PC Copilot+), « Valeurs Windows » appliquées pour de vrai, création réelle d'un point de restauration depuis la carte. **Question posée au porteur** : retirer le seuil « signal faible sous 50 % » du Wi-Fi (M18), sans source publiée. Publication (fusion dans `main`, GitHub, winget) : seulement avec son accord.
-- Version **0.8.1**, publiée sur GitHub (préversion, 22/10) et acceptée dans **winget** (demande #458592 ; versions dans le catalogue : 0.8.1, 0.8.0, 0.7.6, 0.7.5). Contenu de chaque version : `CHANGELOG.md`.
+- **0.8.4 publiée** le 29/10 : https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.8.4 (préversion, commit `15b19fe`, SHA-256 `2bde6f39…d399`, provenance et téléchargement public vérifiés). Elle contient la 0.8.3, jamais publiée seule.
+- **winget** : #465525 (0.8.4) **fusionnée le 30/10** ; le catalogue affichait encore 0.8.2 ce matin (quelques heures de délai). #463072 (0.8.2) fusionnée et publiée.
+- **Microsoft Store** : paquet 0.8.4 prêt dans `publish/store-0.8.4` (MSIX SHA-256 `d8470c1f…3d5a`, textes, nouveautés, document de sécurité). **Envoi non confirmé** par le porteur au 30/10. 4e refus le 29/10 (10.6.3, liste de 10 points) : réponse = `docs/store-security-design.md`, qui doit être **en ligne avant l'envoi** sur https://sites.google.com/view/maus-help/security-design (le mettre dans un Google Doc, puis Google Sites « Insérer → Docs » : la page suit les mises à jour ; dossier Drive « MAUS Support »). C'est le porteur qui soumet : **ne pas** le faire à sa place. Textes à jour : `installer/msix/README.md`.
 - Branche de travail : `claude/youthful-ride-ivazlw` ; `main` = ligne de publication (un envoi sur `main` lance les workflows « Tests » et « Installateur »).
-- **0.8.4 publiée le 29/10** sur GitHub (https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.8.4, commit `15b19fe`, SHA-256 `2bde6f39…d399`) et demandée à winget (**microsoft/winget-pkgs#465525**, en attente) ; paquet du Store prêt dans `publish/store-0.8.4` (envoi par le porteur). Contenu : contient la 0.8.3 (jamais publiée, commit `7b4177b`) + les 6 points du rapport de failles privé (benchmark administrateur protégé et sans cache de shaders, « Ouvrir MAUS » sans droits, rapport de batterie sans droits, PresentMon verrouillé, **confirmation affichée par le moteur** `IEngineConfirmation`, `packages.lock.json` + `RestoreLockedMode` sur GitHub). 1 620 tests. Le document du Store décrit la **0.8.4**. Version d'essai et paquet du Store fabriqués sur le PC du porteur le 29/10 (voir `CLAUDE.md`, journal). **À vérifier à l'écran** : confirmation du moteur (fermer un processus, PawnIO, « voulu »), bandeau et options grisées de la 0.8.3, « Ouvrir MAUS » après l'audit de la semaine, nouvel accueil après un audit (score qui monte, « Votre PC en un coup d'œil », ligne M·A·U·S comptée), fond Mica sur un PC où la transparence de Windows est activée. Script d'interface : `.worktrees\_smoke\accueil2.ps1` (`-Screen` pour Mica ; `bin-mica` = copie sans rendu logiciel). Publication (GitHub, winget) : avec l'accord du porteur ; Store : envoyé par le porteur.
-- Microsoft Store : soumis par le porteur lui-même. 4e refus le 29/10 (10.6.3, liste de 10 points) : réponse = `docs/store-security-design.md`, à publier sur le site d'aide (page `security-design`) et à citer dans les notes de certification. La 0.8.0 a été refusée (motif 10.6.3, `allowElevation` : demande d'autorisation dès l'ouverture) ; la 0.8.1 ne demande plus rien à l'ouverture, son paquet et ses textes sont dans `publish/store-0.8.1` (site web et assistance = https://sites.google.com/view/maus-help/accueil). **Ne pas** soumettre à sa place.
+- **Sauvegarde hors dépôt** : `Documents\MAUS-sauvegarde-20261030` (paquets, scripts d'essai, rapport de failles privé). Historique détaillé : `docs/historique-claude.md`.
+- Rapport de failles (privé, 10 points) : 6 corrigés ; 4 faibles ou voulus laissés tels quels, au choix du porteur. **Ne rien faire sans lui, ne rien en écrire dans le dépôt.** Pour Microsoft, l'UAC est une défense en profondeur, pas une frontière de sécurité (Windows Security Servicing Criteria, https://www.microsoft.com/en-us/msrc/windows-security-servicing-criteria).
+
+### À faire en premier
+
+1. **Demander au porteur** si le paquet 0.8.4 est envoyé au Store, et si la page `security-design` est en ligne (sinon, l'aider à la publier avant l'envoi).
+2. **Vérifier winget** : `winget show TERMINATORmdel101.MAUS --versions --source winget` doit montrer 0.8.4.
+3. **Résultat de l'essai du porteur** (`publish/MAUS-0.8.4-essai`) : accueil après un audit (score qui monte, « Votre PC en un coup d'œil », ligne M·A·U·S comptée), confirmation du moteur (fermer un programme, PawnIO, « voulu »), options grisées et retour au gris après 15 minutes, « Ouvrir MAUS » après l'audit de la semaine. Non vus à l'écran par Claude, faute de droits administrateur. Aussi : Mica sur un PC où la transparence est activée.
+4. **Questions au porteur** : retirer le seuil Wi-Fi « signal faible sous 50 % », sans source publiée (M18) ? Essai réel de désactivation d'une tâche planifiée puis « Annuler » ? « Le plus CC++ possible » a été compris comme « le plus C# possible, aucun nouveau langage » : à confirmer.
+5. **Idées proposées, à choisir** (il répond souvent « 1 ok, 3 ok ») ; ordre conseillé 1, 2, 3 :
+   1. Essai automatique de la fenêtre à chaque envoi (GitHub Actions, UI Automation, aucun journal de plantage attendu).
+   2. Tests « données abîmées » sur tout ce qui lit l'extérieur (SPD, winget, powercfg, préférences, journal, canal).
+   3. Pannes au pire moment (disque plein, moteur tué, registre qui refuse, à chaque étape du `FixEngine`) : « Annuler » doit tout remettre.
+   4. Endurance 24 h, mesures en direct ouvertes (sur son PC, avec son accord).
+   5. Stryker.NET (« tester les tests »).
+   8. Badge OpenSSF Scorecard (gratuit, aide pour SignPath).
+   9. SBOM jointe à chaque version.
+   11. Passage dans Accessibility Insights.
+   12. Messages d'erreur tous utiles.
+   13. Discipline : GitHub = bêta, Store = stable après quelques jours sans problème signalé.
+
+### Conseils déjà donnés au porteur (rester cohérent)
+
+- Lancement, dans l'ordre : acceptation au Store ; essais sur des PC variés (AMD, portables, autres cartes graphiques) ; visibilité (**c'est lui qui écrit sur les forums**, Claude ne rédige pas ses messages à la communauté ; textes pour Microsoft = oui) ; étoiles GitHub, nouvelle demande à SignPath. Garder l'honnêteté au centre.
+- Abonnement : une session = un sujet ; grouper les demandes dans un message ; pas deux sessions en même temps sur le même travail ; workflows à plusieurs agents et effort maximal seulement pour les grosses vérifications et la sécurité.
 
 ## 2. Publier une version (procédure suivie pour la 0.7.6, la 0.8.0 et la 0.8.1)
 
@@ -36,7 +60,7 @@ Le PC du porteur (i7-8700K, MSI Z390, DDR4, RTX 2080 Ti, Windows 11) a servi à 
 1. Corrections réelles (`--apply-recommended`, point de restauration, journal, `--revert`) dans Windows Sandbox.
 2. Processeurs AMD (fiche mémoire : registres UMC, table PM, à comparer avec ZenTimings), DDR5, autres familles Intel (comparer avec CPU-Z puis passer `verifiedOnHardware` à `true`), cartes graphiques AMD et Intel (benchmark, lancer de rayons absent).
 3. Actions sur le pilote graphique (redémarrer, retirer, supprimer, réinstaller une sauvegarde) dans Windows Sandbox.
-4. Points « à vérifier » de `CLAUDE.md` et de `docs/fiche-technique/`.
+4. Points « à vérifier » de `docs/historique-claude.md` et de `docs/fiche-technique/`.
 
 ## 6. Demandes du porteur non terminées
 
@@ -49,6 +73,6 @@ Le PC du porteur (i7-8700K, MSI Z390, DDR4, RTX 2080 Ti, Windows 11) a servi à 
 - Traductions : `dotnet run tools/i18n.cs -- missing en` (et `es`) ; écrire un fichier JSON `{ "texte français": "traduction" }` puis `dotnet run tools/i18n.cs -- merge en fichier.json` ; `prune en|es` retire les traductions inutiles. Les `{0}` et les espaces en début / fin doivent être identiques.
 - Seuils de sécurité : `src/Maus.Core/Catalog/hw-safety-limits.json`. **Pas de source = pas de seuil.**
 - Sources des emplacements SPD et des registres mémoire AMD : `THIRD-PARTY-NOTICES.md` et l'en-tête de `src/Maus.Core/Workshop/Memory/SpdDecoder.cs`.
-- Copie d'interface jetable : `.worktrees\_smoke` (`sync.sh`, `tour.ps1`, `atelier.ps1`, `constats.ps1`, `fps2.ps1`, `fps3.ps1`, `v082.ps1` qui sauve et remet les préférences du porteur ; captures dans `shots-light` / `shots-dark`).
+- Copie d'interface jetable : `.worktrees\_smoke` (`sync.sh`, `tour.ps1`, `atelier.ps1`, `constats.ps1`, `fps2.ps1`, `fps3.ps1`, `v082.ps1`, `accueil2.ps1` (`-Screen` pour Mica ; `bin-mica` = sans rendu logiciel), qui sauvent et remettent les préférences du porteur ; copie des scripts dans `Documents\MAUS-sauvegarde-20261030\worktrees-smoke` ; captures dans `shots-light` / `shots-dark`).
 - Benchmark : éviter les passes accélérées en plein écran (le porteur les voit défiler) ; préférer `maus --benchmark --capture DOSSIER --scene ID --times 5,30` (hors écran). Pièges HLSL notés dans le journal de `CLAUDE.md` (06/10).
 - Code mort : construire avec `-p:EnforceCodeStyleInBuild=true` et, le temps de la mesure, `IDE0051`, `IDE0052`, `IDE0005`, `CA1823` en `warning` dans `.editorconfig` (à remettre ensuite). Nettoyé le 13/10.
