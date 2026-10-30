@@ -6,14 +6,14 @@
 
 - **0.8.4 publiée** le 29/10 : https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.8.4 (préversion, commit `15b19fe`, SHA-256 `2bde6f39…d399`, provenance et téléchargement public vérifiés). Elle contient la 0.8.3, jamais publiée seule.
 - **winget** : #465525 (0.8.4) **fusionnée le 30/10** ; le catalogue affichait encore 0.8.2 ce matin (quelques heures de délai). #463072 (0.8.2) fusionnée et publiée.
-- **Microsoft Store** : paquet 0.8.4 prêt dans `publish/store-0.8.4` (MSIX SHA-256 `d8470c1f…3d5a`, textes, nouveautés, document de sécurité). **Envoi non confirmé** par le porteur au 30/10. 4e refus le 29/10 (10.6.3, liste de 10 points) : réponse = `docs/store-security-design.md`, qui doit être **en ligne avant l'envoi** sur https://sites.google.com/view/maus-help/security-design (le mettre dans un Google Doc, puis Google Sites « Insérer → Docs » : la page suit les mises à jour ; dossier Drive « MAUS Support »). C'est le porteur qui soumet : **ne pas** le faire à sa place. Textes à jour : `installer/msix/README.md`.
+- **Microsoft Store** : paquet 0.8.4 prêt dans `publish/store-0.8.4` (MSIX SHA-256 `d8470c1f…3d5a`, textes, nouveautés, document de sécurité). **Envoi non confirmé** par le porteur au 30/10. 4e refus le 29/10 (10.6.3, liste de 10 points) : réponse = `docs/store-security-design.md`, qui doit être **en ligne avant l'envoi** sur https://sites.google.com/view/maus-help/security-design (le mettre dans un Google Doc, puis Google Sites « Insérer → Docs » : la page suit les mises à jour ; dossier Drive « MAUS Support », avec le document « MAUS Support – contenu du site » ; le connecteur Google Drive y a accès, vérifié le 30/10). C'est le porteur qui soumet : **ne pas** le faire à sa place. Textes à jour : `installer/msix/README.md`.
 - Branche de travail : `claude/youthful-ride-ivazlw` ; `main` = ligne de publication (un envoi sur `main` lance les workflows « Tests » et « Installateur »).
 - **Sauvegarde hors dépôt** : `Documents\MAUS-sauvegarde-20261030` (paquets, scripts d'essai, rapport de failles privé). Historique détaillé : `docs/historique-claude.md`.
 - Rapport de failles (privé, 10 points) : 6 corrigés ; 4 faibles ou voulus laissés tels quels, au choix du porteur. **Ne rien faire sans lui, ne rien en écrire dans le dépôt.** Pour Microsoft, l'UAC est une défense en profondeur, pas une frontière de sécurité (Windows Security Servicing Criteria, https://www.microsoft.com/en-us/msrc/windows-security-servicing-criteria).
 
 ### À faire en premier
 
-1. **Demander au porteur** si le paquet 0.8.4 est envoyé au Store, et si la page `security-design` est en ligne (sinon, l'aider à la publier avant l'envoi).
+1. **Demander au porteur** si le paquet 0.8.4 est envoyé au Store. La page `security-design` **n'était pas en ligne le 30/10 au matin** (erreur 404) : l'aider à la publier avant l'envoi.
 2. **Vérifier winget** : `winget show TERMINATORmdel101.MAUS --versions --source winget` doit montrer 0.8.4.
 3. **Résultat de l'essai du porteur** (`publish/MAUS-0.8.4-essai`) : accueil après un audit (score qui monte, « Votre PC en un coup d'œil », ligne M·A·U·S comptée), confirmation du moteur (fermer un programme, PawnIO, « voulu »), options grisées et retour au gris après 15 minutes, « Ouvrir MAUS » après l'audit de la semaine. Non vus à l'écran par Claude, faute de droits administrateur. Aussi : Mica sur un PC où la transparence est activée.
 4. **Questions au porteur** : retirer le seuil Wi-Fi « signal faible sous 50 % », sans source publiée (M18) ? Essai réel de désactivation d'une tâche planifiée puis « Annuler » ? « Le plus CC++ possible » a été compris comme « le plus C# possible, aucun nouveau langage » : à confirmer.
@@ -32,7 +32,7 @@
 ### Conseils déjà donnés au porteur (rester cohérent)
 
 - Lancement, dans l'ordre : acceptation au Store ; essais sur des PC variés (AMD, portables, autres cartes graphiques) ; visibilité (**c'est lui qui écrit sur les forums**, Claude ne rédige pas ses messages à la communauté ; textes pour Microsoft = oui) ; étoiles GitHub, nouvelle demande à SignPath. Garder l'honnêteté au centre.
-- Abonnement : une session = un sujet ; grouper les demandes dans un message ; pas deux sessions en même temps sur le même travail ; workflows à plusieurs agents et effort maximal seulement pour les grosses vérifications et la sécurité.
+- Abonnement (il envisage l'offre supérieure) : une session = un sujet ; grouper les demandes dans un message ; pas deux sessions en même temps sur le même travail ; workflows à plusieurs agents et effort maximal seulement pour les grosses vérifications et la sécurité.
 
 ## 2. Publier une version (procédure suivie pour la 0.7.6, la 0.8.0 et la 0.8.1)
 
@@ -74,5 +74,5 @@ Le PC du porteur (i7-8700K, MSI Z390, DDR4, RTX 2080 Ti, Windows 11) a servi à 
 - Seuils de sécurité : `src/Maus.Core/Catalog/hw-safety-limits.json`. **Pas de source = pas de seuil.**
 - Sources des emplacements SPD et des registres mémoire AMD : `THIRD-PARTY-NOTICES.md` et l'en-tête de `src/Maus.Core/Workshop/Memory/SpdDecoder.cs`.
 - Copie d'interface jetable : `.worktrees\_smoke` (`sync.sh`, `tour.ps1`, `atelier.ps1`, `constats.ps1`, `fps2.ps1`, `fps3.ps1`, `v082.ps1`, `accueil2.ps1` (`-Screen` pour Mica ; `bin-mica` = sans rendu logiciel), qui sauvent et remettent les préférences du porteur ; copie des scripts dans `Documents\MAUS-sauvegarde-20261030\worktrees-smoke` ; captures dans `shots-light` / `shots-dark`).
-- Benchmark : éviter les passes accélérées en plein écran (le porteur les voit défiler) ; préférer `maus --benchmark --capture DOSSIER --scene ID --times 5,30` (hors écran). Pièges HLSL notés dans le journal de `CLAUDE.md` (06/10).
+- Benchmark : éviter les passes accélérées en plein écran (le porteur les voit défiler) ; préférer `maus --benchmark --capture DOSSIER --scene ID --times 5,30` (hors écran). Pièges HLSL notés dans le journal de `docs/historique-claude.md` (06/10).
 - Code mort : construire avec `-p:EnforceCodeStyleInBuild=true` et, le temps de la mesure, `IDE0051`, `IDE0052`, `IDE0005`, `CA1823` en `warning` dans `.editorconfig` (à remettre ensuite). Nettoyé le 13/10.
