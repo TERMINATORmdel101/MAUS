@@ -2,6 +2,16 @@ MAUS Privacy Policy
 
 MAUS has no telemetry and no user account. It does not collect personal data and sends nothing to its developers.
 
-Data kept on your PC only: your settings, score history, test results and the log of changes made by MAUS (so they can be undone), in %ProgramData%\MAUS and %LocalAppData%\MAUS. You can delete these folders at any time.
+Data kept on your PC only: your settings, score history, test results, error logs and the log of changes made by MAUS (so they can be undone), in %ProgramData%\MAUS and %LocalAppData%\MAUS. You can delete these folders at any time.
 
-Network: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Network access only happens for actions you start: Windows Update search during an audit (Microsoft), software update list (winget), web search about a process (search engine of your choice), connection test, and links to the MAUS help site (https://sites.google.com/view/maus-help/accueil) and to GitHub.
+Network: this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Network access happens only in these cases. During an audit, and during the optional weekly audit if you enable it: Windows Update search (Microsoft) and software update list (winget). For actions you start: Windows repair (DISM can use Windows Update), software upgrades and the optional PawnIO driver through winget, connection test, web searches (search engine of your choice), and links that open in your browser (MAUS help site, GitHub, vendor sites, YouTube). Some of these links carry a hardware model in their address; nothing is sent unless you open the link.
+
+---
+
+Politique de confidentialité de MAUS
+
+MAUS n'a ni télémétrie ni compte utilisateur. Il ne collecte aucune donnée personnelle et n'envoie rien à ses développeurs.
+
+Données gardées uniquement sur votre PC : vos réglages, l'historique des scores, les résultats des tests, les journaux d'erreurs et le journal des modifications faites par MAUS (pour pouvoir les annuler), dans %ProgramData%\MAUS et %LocalAppData%\MAUS. Vous pouvez supprimer ces dossiers à tout moment.
+
+Réseau : ce programme ne transmet aucune information à d'autres systèmes en réseau, sauf à la demande expresse de l'utilisateur ou de la personne qui l'installe ou l'utilise. Le réseau n'est utilisé que dans les cas suivants. Pendant un audit, et pendant l'audit de la semaine si vous l'activez : recherche Windows Update (Microsoft) et liste des logiciels à mettre à jour (winget). Pour des actions que vous lancez : réparation de Windows (DISM peut utiliser Windows Update), mises à jour de logiciels et pilote PawnIO facultatif par winget, test de connexion, recherches web (moteur de recherche de votre choix) et liens ouverts dans votre navigateur (site d'aide de MAUS, GitHub, sites des fabricants, YouTube). Certains de ces liens contiennent un modèle de matériel dans leur adresse ; rien n'est envoyé tant que vous n'ouvrez pas le lien.
