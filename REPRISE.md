@@ -1,6 +1,6 @@
 # Reprise — aide-mémoire de Claude
 
-À lire après `CLAUDE.md`. Ce fichier ne garde que ce qui sert encore pour reprendre le travail ; l'historique des reprises de septembre et d'octobre 2026 (sessions cloud, ancien PC `C:\Users\CARO`, branches des agents de la 0.5.3) est dans l'historique Git de ce fichier (`git log -p REPRISE.md`), le reste dans `docs/historique-claude.md`.
+À lire après `CLAUDE.md`. Ce fichier ne garde que ce qui sert encore pour reprendre le travail ; l'historique des reprises de septembre et d'octobre 2026 (sessions cloud, ancien PC, branches des agents de la 0.5.3) est dans l'historique Git de ce fichier (`git log -p REPRISE.md`), le reste dans `docs/historique-claude.md`.
 
 ## 1. Où en est le projet (30/10/2026)
 
@@ -9,7 +9,7 @@
 - **Microsoft Store** : 5e refus de `allowElevation` reçu le 30/10 (même liste de 10 points que le 29/10). Paquet **0.8.5** prêt dans `publish/store-0.8.5` (MSIX SHA-256 `d7eb1a33…20c4`, textes, nouveautés fr/en/es, document de sécurité en .md et .html). Textes de soumission enrichis dans `installer/msix/README.md` (paragraphe « New in this submission (0.8.5) », lien GitHub du document). Document de sécurité : https://github.com/TERMINATORmdel101/MAUS/blob/main/docs/store-security-design.md, et Google Doc « MAUS – Security design of the elevated engine (Microsoft Store, 0.8.5) » créé le 30/10 dans le dossier Drive « MAUS Support » (https://docs.google.com/document/d/1Cnp1OoTvAcZBMT-uBmJiibfN-cRLaN8Swy1Ui4Yj8qw/edit). **Reste à faire par le porteur** : partager ce Doc « Tous les utilisateurs disposant du lien » (lecture), l'insérer dans Google Sites (Insérer → Docs) sur la page existante « Full technical details » (https://sites.google.com/view/maus-help/full-technical-details ; le chemin `security-design` n'a jamais existé, d'où le 404 du 30/10), puis publier le site ; puis soumettre. C'est le porteur qui soumet : **ne pas** le faire à sa place.
 - Branche de travail : `claude/youthful-ride-ivazlw` ; `main` = ligne de publication (un envoi sur `main` lance les workflows « Tests » et « Installateur »).
 - **Sauvegarde hors dépôt** : `Documents\MAUS-sauvegarde-20261030` (paquets, scripts d'essai, rapport de failles privé). Historique détaillé : `docs/historique-claude.md`.
-- Rapport de failles (privé, 10 points) : 6 corrigés ; 4 faibles ou voulus laissés tels quels, au choix du porteur. **Ne rien faire sans lui, ne rien en écrire dans le dépôt.** Pour Microsoft, l'UAC est une défense en profondeur, pas une frontière de sécurité (Windows Security Servicing Criteria, https://www.microsoft.com/en-us/msrc/windows-security-servicing-criteria).
+- Notes de sécurité privées : dans la sauvegarde. **Ne rien faire sans le porteur, ne rien en écrire dans le dépôt.** Pour Microsoft, l'UAC est une défense en profondeur, pas une frontière de sécurité (Windows Security Servicing Criteria, https://www.microsoft.com/en-us/msrc/windows-security-servicing-criteria).
 
 ### À faire en premier
 
@@ -33,7 +33,6 @@
 ### Conseils déjà donnés au porteur (rester cohérent)
 
 - Lancement, dans l'ordre : acceptation au Store ; essais sur des PC variés (AMD, portables, autres cartes graphiques) ; visibilité (**c'est lui qui écrit sur les forums**, Claude ne rédige pas ses messages à la communauté ; textes pour Microsoft = oui) ; étoiles GitHub, nouvelle demande à SignPath. Garder l'honnêteté au centre.
-- Abonnement (il envisage l'offre supérieure) : une session = un sujet ; grouper les demandes dans un message ; pas deux sessions en même temps sur le même travail ; workflows à plusieurs agents et effort maximal seulement pour les grosses vérifications et la sécurité.
 
 ## 2. Publier une version (procédure suivie pour la 0.7.6, la 0.8.0 et la 0.8.1)
 
