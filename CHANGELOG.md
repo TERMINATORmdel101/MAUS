@@ -208,7 +208,7 @@ Nouvelles fonctions pour les joueurs et les connaisseurs (améliorations : derni
   - Atelier > Pilotes est organisé en trois zones numérotées et colorées : la carte graphique, tous les pilotes, puis les outils rangés par usage (liste, sauvegardes, Windows Update). La note sur les dates anciennes passe dans un dépliant.
   - Atelier > En direct a trois zones séparées : les mesures, le relevé de partie et les capteurs avancés.
   - Dans la fenêtre de surveillance, les réglages du compteur sont repliés.
-- Recherche « ce qui manque pour les experts » : `docs/pistes-experts.md`. Une seule piste reste en attente : nommer le pilote en cause d'un écran bleu. Elle ne peut pas être vérifiée sans un vrai vidage d'écran bleu, et il n'y en a aucun sur le PC du porteur.
+- Recherche « ce qui manque pour les experts ». Une seule piste reste en attente : nommer le pilote en cause d'un écran bleu. Elle ne peut pas être vérifiée sans un vrai vidage d'écran bleu, et il n'y en a aucun sur le PC du porteur.
 
 ## 0.6.1 — 05/10/2026
 
@@ -418,7 +418,7 @@ Numérotation choisie par le porteur : la 0.3.3-alpha est suivie de la 3.9.1.
 - winget : l'encodage de la sortie n'est plus supposé (UTF-16, UTF-8 ou page de code OEM, choisi d'après les octets).
 - Textes corrigés d'après la documentation : réinstallation par Windows Update (M02), pause de Windows Update (M01), recherche web du menu Démarrer (M04), versions des pilotes graphiques (M09).
 - Version affichée dans « À propos », les rapports et `maus --version`.
-- Nettoyage : suppression des questions initiales (toutes tranchées dans `docs/fiche-technique/00-decisions.md`) et du fichier source de la maquette (l'interface réelle existe ; l'image de la maquette reste).
+- Nettoyage : suppression des questions initiales (toutes tranchées) et du fichier source de la maquette (l'interface réelle existe ; l'image de la maquette reste).
 
 ## Avant la 0.3.2-alpha (25/09/2026)
 

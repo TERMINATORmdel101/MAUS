@@ -10,6 +10,12 @@ Identité réservée par le porteur dans le Partner Center (07/10/2026) :
 | PublisherDisplayName | `TERMINATEURmdel101` |
 | Store ID | `9NXNPZX2LFQF` (https://apps.microsoft.com/detail/9NXNPZX2LFQF) |
 
+## Pourquoi un paquet MSIX
+
+Un installateur .exe ou .msi n'entre au Store que signé par un certificat reconnu par Microsoft : impossible tant que MAUS n'est pas signé. Un paquet MSIX est signé gratuitement par le Store, mais l'élévation demande la capacité restreinte `allowElevation` (accordée sous conditions strictes) et les écritures dans HKCU n'atteignent les vrais réglages qu'avec `unvirtualizedResources`. Vérifié le 22/10/2026 avec le paquet installé : le moteur s'élève depuis `WindowsApps` ; l'API DISM y échoue (remplacée par `dism.exe /CheckHealth`). Pas vérifié : le fonctionnement sans `allowElevation`.
+
+C'est le porteur qui soumet. Seule une information nouvelle ou élargie change l'issue d'une demande déjà refusée : les textes ci-dessous renvoient donc au document de sécurité, `docs/store-security-design.md`.
+
 ## Fabriquer le paquet
 
 ```powershell
@@ -19,7 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File installer\msix\build-msix.ps
 
 Résultat : `artifacts\msix\MAUS-<version>.msix`, non signé (le Store le signe après la certification). Les outils
 `makeappx` et `makepri` viennent du paquet NuGet officiel `Microsoft.Windows.SDK.BuildTools` (`msix-tools.csproj`) ;
-ils ne sont pas livrés avec MAUS.
+ils ne sont pas livrés avec MAUS. Images de la fiche du Store (zone 1:1, affiche 9:16) : `make-listing-images.ps1 -Out publish\store-<version>`.
 
 Différences avec l'installateur classique :
 - le dossier de MAUS change à chaque mise à jour (le numéro de version en fait partie) : au démarrage, MAUS remet la
@@ -68,29 +74,7 @@ Différences avec l'installateur classique :
 >
 > **Español** — Revisión completa del código de MAUS. El motor de administrador es más estricto: confirma él mismo cada acción sobre el controlador gráfico, rechaza una anulación forzada procedente de la ventana, limita todo lo que acepta y ya no genera nunca el informe de batería (lo hace la ventana, sin derechos). La ventana ya no se bloquea durante la instalación de PawnIO, una auditoría ya no puede solaparse con otra y los perfiles de correcciones están traducidos a los tres idiomas. El documento de seguridad publicado con MAUS describe exactamente esta versión.
 
-#### 0.8.4 (pour mémoire)
-
-> **Français** — Accueil plus simple et plus joli : le score, la prochaine étape et trois outils, le reste dans « Plus d'outils » ; score qui se remplit, « Votre PC en un coup d'œil », fond Mica de Windows 11 au choix, raccourcis Ctrl+1 à Ctrl+6. Nouvelle fenêtre d'ouverture « Comment utiliser MAUS ? » : mode limité, sans droits administrateur, ou toutes les fonctionnalités. En mode limité, les options qui demandent les droits sont grisées et un bandeau les active. Plus de sécurité : messages signés entre la fenêtre et le moteur administrateur, protections de Windows sur MAUS, et confirmation affichée par le moteur lui-même avant les actions sensibles (fermer un programme, pilote graphique, PawnIO).
->
-> **English** — Simpler, prettier home page: the score, the next step and three tools, the rest in "More tools"; a score that fills up, "Your PC at a glance", optional Windows 11 Mica background, Ctrl+1 to Ctrl+6 shortcuts. New opening window "How do you want to use MAUS?": limited mode, without administrator rights, or all features. In limited mode, options that need administrator rights are greyed out and a banner enables them. More security: signed messages between the window and the administrator engine, Windows protections on MAUS, and a confirmation shown by the engine itself before sensitive actions (closing a program, graphics driver, PawnIO).
->
-> **Español** — Inicio más sencillo y más bonito: la puntuación, el siguiente paso y tres herramientas, el resto en «Más herramientas»; puntuación que se llena, «Tu PC de un vistazo», fondo Mica de Windows 11 opcional, atajos Ctrl+1 a Ctrl+6. Nueva ventana de inicio «¿Cómo quiere usar MAUS?»: modo limitado, sin derechos de administrador, o todas las funciones. En modo limitado, las opciones que necesitan derechos aparecen en gris y una banda las activa. Más seguridad: mensajes firmados entre la ventana y el motor administrador, protecciones de Windows en MAUS, y confirmación mostrada por el propio motor antes de las acciones sensibles (cerrar un programa, controlador gráfico, PawnIO).
-
-#### 0.8.1 (pour mémoire)
-
-> **Français** — MAUS s'ouvre sans demander l'autorisation administrateur : Windows la demande seulement quand vous lancez une action qui en a besoin (audit, corrections, réparation, capteurs avancés…). Un refus n'annule que cette action. Les droits administrateur se referment seuls après 15 minutes sans utilisation. Onglet Mémoire des processeurs Intel : horloge contrôlée avec la vitesse déclarée par Windows, durées en nanosecondes corrigées, tWR et tRTP affichés.
->
-> **English** — MAUS opens without asking for administrator permission: Windows asks only when you start an action that needs it (audit, fixes, repair, advanced sensors…). Declining cancels only that action. Administrator rights close by themselves after 15 minutes without use. Memory tab for Intel processors: clock checked against the speed reported by Windows, corrected durations in nanoseconds, tWR and tRTP shown.
->
-> **Español** — MAUS se abre sin pedir la autorización de administrador: Windows la pide solo cuando inicias una acción que la necesita (auditoría, correcciones, reparación, sensores avanzados…). Rechazarla solo cancela esa acción. Los derechos de administrador se cierran solos tras 15 minutos sin uso. Pestaña Memoria de los procesadores Intel: reloj comprobado con la velocidad que declara Windows, duraciones en nanosegundos corregidas, tWR y tRTP visibles.
-
-#### 0.8.0 (pour mémoire)
-
-> **Français** — Version de sécurité et de stabilité. La fenêtre de MAUS ne tourne plus avec les droits administrateur : seul un moteur séparé, lancé avec l'autorisation de Windows, lit le système en profondeur et applique les corrections. Corrections dont le retour arrière a échoué gardées visibles, recherche Windows Update vraiment interrompue à l'annulation, arrêt de sécurité du benchmark en cas de surchauffe, plus de faux résultat « stable » dans les tests, comparaisons de benchmark plus justes.
->
-> **English** — Security and stability release. The MAUS window no longer runs with administrator rights: only a separate engine, started with the Windows permission prompt, reads the system in depth and applies fixes. Fixes whose rollback failed now stay visible, the Windows Update search is really stopped on cancel, the benchmark stops on overheating, no more false "stable" test results, fairer benchmark comparisons.
->
-> **Español** — Versión de seguridad y estabilidad. La ventana de MAUS ya no se ejecuta con derechos de administrador: solo un motor separado, iniciado con la autorización de Windows, lee el sistema en profundidad y aplica las correcciones. Las correcciones cuya restauración falló siguen visibles, la búsqueda de Windows Update se detiene de verdad al cancelar, el benchmark se detiene en caso de sobrecalentamiento, ya no hay falsos resultados «estable» en las pruebas, comparaciones de benchmark más justas.
+Nouveautés des versions précédentes : `CHANGELOG.md`.
 
 ## Fiche du Store
 

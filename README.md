@@ -156,7 +156,7 @@ L'application graphique (`src/Maus.App`) s'ouvre sans droits administrateur et l
 | `src/Maus.Core/Fixes` | Corrections réversibles : journal, point de restauration vérifié, Apply / Verify / Revert, profils |
 | `src/Maus.Core/Hardware` | Profil matériel commun (fixe ou portable, CPU, GPU) |
 | `src/Maus.Core/Rules` et `Catalog` | Règles de registre et catalogues en JSON, chaque seuil avec sa source |
-| `src/Maus.Core/Modules` | Un dossier par module de la fiche technique (M01 à M20) |
+| `src/Maus.Core/Modules` | Un dossier par module d'audit (M01 à M20) |
 | `src/Maus.Core/Workshop` | Atelier matériel : inventaire, capteurs, processus, mémoire, tests |
 | `src/Maus.Core/Localization` | Traductions (le français est la langue source) |
 | `src/Maus.Core/Reporting` | Score de santé, rapports texte, JSON et HTML |

@@ -1,74 +1,80 @@
 # CLAUDE.md — mémoire du projet MAUS
 
-Ce fichier est la mémoire de Claude entre les sessions (sur le PC du porteur du projet comme dans le cloud). Lis-le en entier avant de travailler. À la fin de chaque session importante, mets à jour la section « État » ici, **en quelques lignes**, et écris le détail dans [`docs/historique-claude.md`](docs/historique-claude.md) (état détaillé de chaque version et journal des sessions, à ne lire qu'au besoin). Ce fichier est relu en entier à chaque session : garde-le sous 20 Ko.
+Ce fichier est la mémoire de Claude entre les sessions. Lis-le en entier avant de travailler. Garde-le court (moins de 20 Ko) et juste : à la fin d'une session importante, mets à jour « État » en quelques lignes ; le contenu des versions va dans `CHANGELOG.md`.
 
-**Lis aussi [`REPRISE.md`](REPRISE.md)** (état court, procédure de publication GitHub + winget, Microsoft Store, ce qui reste à valider et à faire).
+**Ce dépôt est public** : n'y écris ni faille, ni contenu privé, ni détail personnel. Le privé reste hors dépôt (`Documents\MAUS-sauvegarde-20261030` sur le PC du porteur, `LISEZMOI.txt`, à lire pour toute session sur la sécurité ou l'architecture).
 
 ## Le porteur du projet
 
-- Francophone, **non-développeur**, dicte souvent à la voix (fautes de frappe fréquentes : « lesse le chois » = « laisse le choix »). Réponds **en français**, simplement, sans jargon inutile, en expliquant le « pourquoi ».
-- Il veut garder la main : partout où c'est possible, **le choix revient à l'utilisateur final**, avec une valeur recommandée pré-sélectionnée.
-- **Budget : zéro euro.** Gratuit, open source, publication sur le Microsoft Store.
-- Le logiciel **assume d'être fabriqué par une IA** (mention dans « À propos », le README, la fiche du Store).
-- Il a une limite d'utilisation Claude : **commite souvent** pour ne jamais perdre de travail.
+- Réponds **en français**, simplement, sans jargon inutile, en expliquant le « pourquoi ». Il dicte souvent : comprends les fautes de frappe. Il répond souvent par numéros.
+- Il veut garder la main : partout où c'est possible, **le choix revient à l'utilisateur final**, avec une valeur recommandée pré-cochée.
+- **Budget : zéro euro.** Gratuit, open source. Le logiciel **assume d'être fabriqué par une IA**.
+- **Commite souvent**.
+- C'est lui qui écrit à la communauté (forums, messages) ; textes pour Microsoft = oui. C'est lui qui soumet au Store : **ne jamais soumettre à sa place**. Publication GitHub et winget : seulement avec son accord.
 
 ## Le projet
 
-**MAUS** (Maintenance · Audit · Updates · Sécurité) : utilitaire Windows 11 qui audite, répare, met à jour et optimise le PC en toute transparence. Fiche technique complète : `docs/fiche-technique/` (un fichier par module ; `00-decisions.md` prime sur le reste). Version vivante de la fiche : document Claude privé du porteur (claude.ai, « Fiche technique — MAUS »).
+**MAUS** (Maintenance · Audit · Updates · Sécurité) : utilitaire Windows 11 qui audite, répare, met à jour et optimise le PC en toute transparence.
 
 Principes non négociables :
 1. **Audit d'abord, action ensuite** : lecture seule, rapport vert / bleu / orange / rouge / gris, puis corrections choisies.
-2. **Tout est réversible** : point de restauration vérifié + journal des valeurs d'origine + bouton « Annuler » (à partir de la V0.2).
+2. **Tout est réversible** : point de restauration vérifié + journal des valeurs d'origine + bouton « Annuler ».
 3. **Tout est expliqué** en français clair : ce que fait le réglage, le gain, le risque, le retour arrière.
 4. **Rien de dangereux en automatique** : BIOS, XMP/EXPO, overclocking sont guidés (liens officiels, tutoriels), jamais exécutés.
-5. **Aucune télémétrie** de l'outil.
-6. **Honnêteté sur les gains** (demande du porteur, 25/09/2026) : n'annoncer que des optimisations reconnues comme utiles, avec des gains réalistes (« quelques pour cent », « gain faible », « aucun gain de performance »), jamais +10 % ; ne jamais retirer une fonction importante de Windows ni une protection pour un gain de performance.
-7. **Aucune donnée inventée** (demande du porteur, 25/09/2026, version 0.3.2-alpha) : chaque seuil, limite, décalage de registre ou affirmation technique vient d'une source publiée (citée dans le catalogue, le commentaire ou la fiche). **Pas de source = pas de seuil ni d'alarme** ; une valeur non vérifiée s'affiche comme telle, jamais comme un fait.
+5. **Aucune télémétrie** de l'outil. Donc pas de comparaison en ligne avec d'autres PC (le code de partage du benchmark se passe à la main).
+6. **Honnêteté sur les gains** : n'annoncer que des optimisations reconnues comme utiles, avec des gains réalistes (« quelques pour cent », « gain faible », « aucun gain de performance »), jamais +10 % ; ne jamais retirer une fonction importante de Windows ni une protection pour un gain de performance.
+7. **Aucune donnée inventée** : chaque seuil, limite, décalage de registre ou affirmation technique vient d'une source publiée (citée dans le catalogue, le commentaire ou l'ancienne fiche). **Pas de source = pas de seuil ni d'alarme** ; une valeur non vérifiée s'affiche comme telle, jamais comme un fait. Registres mémoire (`intel-memory-controller.json`) : un champ n'entre qu'avec ses sources ; une seule = `"confidence": "single"` ; sources en désaccord = champ écarté.
 
-Décisions prises (24-25/09/2026) :
+Décisions prises :
 - Windows 11 uniquement, à partir de 23H2 (build 22631). Windows 10 hors périmètre.
-- Licence **GPL-3.0-only** + conditions additionnelles article 7(c) et 7(e) : le nom « MAUS » et son logo ne sont pas cédés (voir `TRADEMARKS.md`). Pas de dépôt de marque payant pour l'instant (INPI ~190 € plus tard si le projet décolle).
-- Distribution : Microsoft Store (canal officiel), GitHub, winget. Signature gratuite envisagée via SignPath Foundation (conditions à vérifier). Compatibilité Store + élévation administrateur **à vérifier**.
-- Choix de produit détaillés dans `docs/fiche-technique/00-decisions.md` (portable, Ryzen X3D, pilotes via Windows Update jamais bloqués par défaut, anti-triche, profils en un clic). Les atténuations CPU (Spectre…) ne sont **jamais** proposées à la désactivation.
-- **Numéros de version** (règle du porteur, 29/09/2026, **précisée le 05/10/2026**) : corrections et améliorations (même nombreuses : boutons, présentation, nouvelles fonctions de l'Atelier) = **dernier chiffre** (0.6.0 → 0.6.1) ; **seulement les modifications majeures** = chiffre du milieu (0.6.x → 0.7.0), et en cas de doute **demander au porteur** ; le premier chiffre reste **0** tant que MAUS est une alpha. Changer `Directory.Build.props`, `AppVersionTests`, `CHANGELOG.md`, `README.md`.
+- Licence **GPL-3.0-only** + conditions additionnelles article 7(c) et 7(e) : le nom « MAUS » et son logo ne sont pas cédés (voir `TRADEMARKS.md`).
+- Distribution : Microsoft Store (en cours), GitHub, winget. Signature gratuite SignPath Foundation refusée le 03/10 (projet trop peu connu) : à redemander plus tard ; aucun abonnement payant.
+- **Choix laissés à l'utilisateur** : portable = question au premier lancement ; Ryzen X3D à deux CCD = Utilisation normale + Game Bar recommandées ; pilotes par Windows Update jamais bloqués par défaut (blocage au choix, M09) ; anti-triche (Vanguard, FACEIT) = avertissement renforcé en M13, pas de blocage ; Copilot, Recall, OneDrive au choix ; profils en un clic + chaque réglage modifiable ligne par ligne.
+- **MAUS ne propose jamais** : nettoyeur de registre, « libérer la RAM », supprimer le fichier d'échange, réglages TCP « gaming », résolution du minuteur, options `bcdedit` de débogage, couper les atténuations CPU, Defender, SmartScreen, UAC ou Windows Update, désinstaller Edge, WebView2 ou le Store, forcer le mode MSI, supprimer dans WinSxS, couper des services en masse, bloquer la télémétrie par `hosts`, images allégées, « driver updaters », overclocking automatique. M01 signale ce qu'il en trouve.
+- Écartés : vérification de mise à jour dans MAUS (à cause du Store) ; arrêt du PC en cas d'attaque sur le moteur (une arme pour un programme malveillant).
+- **Numéros de version** : corrections et améliorations (même nombreuses) = **dernier chiffre** (0.6.0 → 0.6.1) ; **seulement les modifications majeures** = chiffre du milieu (0.6.x → 0.7.0), et en cas de doute **demander au porteur** ; le premier chiffre reste **0** tant que MAUS est une alpha.
+- Légal : une clause ne peut pas retirer ses droits à un consommateur (Code de la consommation, R212-1, 6°) ; marques de tiers en texte seul, sans logo.
+
 ## Architecture (C# / .NET 10, WPF)
 
 | Dossier | Rôle |
 |---|---|
-| `src/Maus.Core/Abstractions` | `IAuditModule` (Detect), `Finding`, `FindingStatus` (Ok, Info, Improvable = bleu, Warning = orange, Problem = rouge, Unknown = gris), `Severity`, `AuditContext` |
-| `src/Maus.Core/Platform` | Lecteurs **en lecture seule** (registre, WMI/CIM (`ICimReader`), commandes (`ReadOnlyCommandRunner` avec liste blanche stricte), journaux d'événements, paquets Store, fichiers, SystemParametersInfo) et, depuis la V0.2, ce qui agit pour le moteur (`VisibleConsole`, `ProcessHardening`, `ScheduledAudit`, tâches planifiées, pilotes graphiques, winget) |
-| `src/Maus.Core/Hardware` | Profil matériel commun (fixe/portable 2 indices sur 3, CPU X3D / Raptor Lake, GPU intégré/dédié, PC géré) |
+| `src/Maus.Core/Abstractions` | `IAuditModule` (Detect), `Finding`, `FindingStatus`, `Severity`, `AuditContext` |
+| `src/Maus.Core/Platform` | Lecteurs **en lecture seule** (registre, WMI, commandes par `ReadOnlyCommandRunner` et sa liste blanche, journaux, fichiers) et ce qui agit pour le moteur (`VisibleConsole`, `ProcessHardening`, tâches planifiées, pilotes graphiques, winget) |
+| `src/Maus.Core/Hardware` | Profil matériel commun (fixe ou portable, CPU, GPU, PC géré) |
 | `src/Maus.Core/Rules` + `Catalog/*.json` | Règles de registre déclaratives, catalogues embarqués (`mXX-*.json`) |
-| `src/Maus.Core/Engine` | `AuditEngine` : découverte des modules par réflexion, exécution parallèle avec délai |
-| `src/Maus.Core/Modules/MxxNom/` | Un dossier par module (M01 à M20 ; M16 = Atelier matériel, M17 = périphériques et pilotes, M18 = réseau, M19 = sauvegardes, M20 = logiciels à mettre à jour par winget) |
-| `src/Maus.Core/Fixes` | V0.2 : `IFixableModule.Plan`, `PlannedChange` / `SettingWrite` / `SettingKey` / `SettingValue`, `FixEngine` (Apply, Verify, Revert), `FixContext`, journal (`FileJournalStore` + `WindowsDirectoryProtector`), `RestorePointCreator` + `WmiSystemRestore`, `FixProfile` |
-| `src/Maus.Core/Localization` | `Texts` : français = langue source, `T("…")` / `T("… {0}", args)`, `Optional(texte?)` pour les catalogues ; traductions `i18n/en.json` et `i18n/es.json` (embarquées) |
-| `src/Maus.Core/Preferences` | Choix de l'utilisateur (`preferences.json` protégé sous `%ProgramData%\MAUS\settings`) : profil Game Bar, alimentation du portable, constats « voulus » (liés à la valeur et à la langue), langue, moteur de recherche |
-| `src/Maus.Core/Reporting` | Rapports texte / JSON / HTML avant-après (`HtmlReport`), libellés, `HealthScore` (score sur 100, familles M·A·U·S) |
-| `src/Maus.Core/Workshop` | Atelier sans pilote noyau embarqué (PawnIO en option, lecture seule sauf la commande SMU qui rafraîchit la table PM sur AMD) : `HardwareInventory` (CPUID, WMI, registre, NVML), `SafetyLimits` (`Catalog/hw-safety-limits.json`), capteurs (`WindowsSensorSource` : PDH, D3DKMT, NVML, zones thermiques), processus (`ProcessMonitor`, `ProcessCatalog` = `Catalog/processes.json`, `ProcessRules`, `WebSearch`), `SlownessDiagnosis`, `CpuTest`, `MemoryTest`, `BenchmarkHistory` |
-| `src/Maus.Cli` | `maus` : audit en ligne de commande (`--module Mxx`, `--json`, `--html`, `--lang fr|en|es`), corrections et choix (voir `--help`) |
-| `src/Maus.Core/Engine/Broker` | **0.8.0** (signature et anti-rejeu en 0.8.3 : `EngineKey`, `ReplayWindow`) : `IMausEngine` (liste fermée d'opérations : audit, plan, application par identifiants, annulation, journal, choix, et Atelier), `LocalMausEngine` (garde son propre audit), `EngineServer` / `RemoteMausEngine` (canal nommé `MAUS-<guid>`, réservé à l'utilisateur, refusé au réseau, première instance, processus vérifié des deux côtés, messages bornés), `EngineSensorSource` / `EngineProcessSource`, `EnginePreferencesStore` |
-| `src/Maus.App` | Interface WPF (thème Fluent + `Themes/Maus.xaml` aux couleurs du logo), manifeste **`asInvoker`** depuis la 0.8.0 ; depuis la 0.8.1, **rien au démarrage** : `EngineHost.Configure` installe `OnDemandMausEngine` (moteur sans droits dans le processus + `EngineLauncher` qui lance `MAUS.exe --engine <canal> <pid> <empreinte de la clé>` par `runas` à la première action administrateur ; refus = `EngineDeclinedException`, cette action seulement) et `SplitPreferencesStore` (affichage dans `%LOCALAPPDATA%\MAUS\settings`, choix protégés par le moteur) ; MAUS lancé en administrateur = `LocalMausEngine` dans le processus, filet de sécurité qui journalise les plantages dans `%LOCALAPPDATA%\MAUS\logs`. Navigation à gauche : Accueil (score, M·A·U·S, actions rapides), Constats, Corrections, Atelier (Mon PC, En direct, Processus, Tests, Stockage, Mémoire, Pilotes), Historique, Benchmark. Contrôles dessinés dans `Controls/` (anneau, courbe, jauge de sécurité, tuile lettre) ; textes fixes dans `Ui.cs` |
-| `tests/Maus.Core.Tests` | xUnit avec faux (`Fakes.cs` : FakeRegistry, FakeCim, FakeCommands, FakeEventLogs, FakePackages, FakeFiles, `TestContext.Create`) ; `App/XamlConsistencyTests` (garde-fou de l'interface, qui ne peut pas tourner sous Linux) ; `Localization/*` (couverture des traductions, bascule de langue) |
-| `assets/logo/` | Logo fourni par le porteur (ne pas le redessiner) ; `tools/make-app-images.ps1` génère l'icône et les images de l'application |
+| `src/Maus.Core/Engine` | `AuditEngine` : découverte des modules par réflexion, exécution parallèle avec délai ; `ScheduledAudit` |
+| `src/Maus.Core/Engine/Broker` | `IMausEngine` (liste fermée d'opérations), `LocalMausEngine`, `EngineServer` / `RemoteMausEngine` (canal nommé signé, `EngineKey`, `ReplayWindow`), `OnDemandMausEngine` ; description complète : `docs/store-security-design.md` |
+| `src/Maus.Core/Modules/MxxNom/` | Un dossier par module (M01 à M20 ; M16 = Atelier matériel) |
+| `src/Maus.Core/Fixes` | `IFixableModule.Plan`, `PlannedChange` / `SettingWrite`, `FixEngine` (Apply, Verify, Revert), `FixContext`, journal (`FileJournalStore`), `RestorePointCreator`, `FixProfile` |
+| `src/Maus.Core/Localization` | `Texts` : français = langue source ; traductions `i18n/en.json` et `i18n/es.json` (embarquées) |
+| `src/Maus.Core/Preferences` | Choix de l'utilisateur (`preferences.json` protégé sous `%ProgramData%\MAUS\settings`) |
+| `src/Maus.Core/Reporting` | Rapports texte / JSON / HTML (`HtmlReport`), `HealthScore` (score sur 100, familles M·A·U·S) |
+| `src/Maus.Core/Workshop` | Atelier sans pilote noyau embarqué (PawnIO en option) : inventaire, `SafetyLimits` (`Catalog/hw-safety-limits.json`), capteurs, processus (`Catalog/processes.json`), tests, mémoire, benchmark |
+| `src/Maus.Bench` | Benchmark visuel Direct3D 11 et 12, lancé par `MAUS.exe --benchmark` |
+| `src/Maus.Cli` | `maus` : audit en ligne de commande (`--module Mxx`, `--json`, `--html`, `--lang fr\|en\|es`), corrections et choix (voir `--help`) |
+| `src/Maus.App` | Interface WPF (thème Fluent + `Themes/Maus.xaml`), manifeste **`asInvoker`**, **rien au démarrage** : `EngineHost.Configure` installe `OnDemandMausEngine` (`EngineLauncher` lance `MAUS.exe --engine` par `runas` à la première action administrateur ; refus = `EngineDeclinedException`, cette action seulement) et `SplitPreferencesStore` ; lancé en administrateur = `LocalMausEngine` dans le processus. Plantages : `%LOCALAPPDATA%\MAUS\logs`. Textes fixes dans `Ui.cs` |
+| `tests/Maus.Core.Tests` | xUnit avec faux (`Fakes.cs`, `TestContext.Create`) ; `App/XamlConsistencyTests` (garde-fou de l'interface, pas sous Linux) ; `Localization/*` |
+| `assets/logo/` | `maus-logo.jpg` : logo du porteur (2048 × 2048, hors GPL, ne pas le redessiner). `tools/make-app-images.ps1` en tire les images de l'application et `maus-logo-800.jpg`, par recadrage et redimensionnement seulement |
 
 Règles de code :
 - **Detect et Plan = lecture seule absolue** : jamais de clé de registre ouverte en écriture, jamais de `Process.Start` hors `context.Commands`, jamais d'appel qui modifie un réglage. Tout accès système passe par `AuditContext` ou par une interface interne au module (P/Invoke, COM) avec un faux dans les tests.
-- **Écrire (V0.2)** : uniquement par le `FixEngine`, via `FixContext` (jamais dans `AuditContext`). Un module corrigeable implémente `IFixableModule.Plan` et décrit ses corrections comme des écritures élémentaires (`SettingWrite` : registre, SPI, mode de gestion) ; le moteur journalise la valeur d'origine avant d'écrire, relit, défait la correction entière si une écriture échoue, et sait tout annuler. Nouveau type de réglage = nouveau `SettingKind` + lecture/écriture dans `SettingsAccessor` + faux.
-- Stratégies (`Policies`) : restaurer = **supprimer** la valeur, jamais écrire la valeur « activée ». Stratégies posées sur Pro et plus (M04 en écrit quelques-unes sur Famille aussi : à trancher, synthèse privée §11.3). Pré-coché (`Recommended`) = sans risque connu ; `Advanced` = jamais dans un profil hors de son domaine ; `Warning` = avertissement renforcé.
-- Test de chaque module corrigeable : `RoundTrip.AssertAsync` (critère d'acceptation de la fiche : après Apply les constats sont conformes, après Revert un nouveau Detect est identique à l'état initial).
+- **Écrire** : uniquement par le `FixEngine`, via `FixContext`. Un module corrigeable implémente `IFixableModule.Plan` et décrit ses corrections en `SettingWrite` ; le moteur journalise la valeur d'origine, relit, défait la correction entière si une écriture échoue, et sait tout annuler. Nouveau type de réglage = nouveau `SettingKind` + `SettingsAccessor` + faux.
+- Stratégies (`Policies`) : restaurer = **supprimer** la valeur, jamais écrire la valeur « activée ». Sur Windows Famille, leur effet n'est pas garanti : l'audit juge l'état effectif et le plan le dit. Pré-coché (`Recommended`) = sans risque connu ; `Advanced` = jamais dans un profil hors de son domaine ; `Warning` = avertissement renforcé.
+- Test de chaque module corrigeable : `RoundTrip.AssertAsync` (après Apply les constats sont conformes, après Revert un nouveau Detect est identique à l'état initial). Il applique tout le plan : une correction qui défait les autres se teste à part.
 - Données illisibles → `Finding.Unknown` / `Finding.AdminRequired`, **jamais** un faux Problem.
 - Écart → `FindingStatusExtensions.ForDeviation(severity)` : Critical/High = rouge, Medium = orange, Low = bleu (optimisation).
 - Textes utilisateur en français clair ; identifiants `Mxx.nom-en-kebab`.
-- **Trois langues (fr, en, es)** : tout texte affiché s'écrit en français dans `T("…")` (ou `T("… {0}", valeur)` pour un texte à trous, jamais d'interpolation `$"…"` affichée) ; la traduction se fait au moment où le texte est produit. Puis `dotnet run tools/i18n.cs -- missing en` (et `es`) liste ce qui manque ; ajouter les traductions dans `src/Maus.Core/Localization/i18n/*.json` (`merge`, `prune`). Le test `TranslationCoverageTests` échoue tant qu'un texte manque, ou si les `{0}` diffèrent.
+- **Trois langues (fr, en, es)** : tout texte affiché s'écrit en français dans `T("…")` (ou `T("… {0}", valeur)` pour un texte à trous, jamais d'interpolation `$"…"` affichée) ; la traduction se fait au moment où le texte est produit. Puis `dotnet run tools/i18n.cs -- missing en` (et `es`) liste ce qui manque ; ajouter les traductions dans `src/Maus.Core/Localization/i18n/*.json` (`merge <langue> fichier.json`, `prune <langue>`). Le test `TranslationCoverageTests` échoue tant qu'un texte manque, ou si les `{0}` diffèrent.
   - Un champ `static readonly` qui contient `T(…)` doit être une propriété calculée (`=>`), sinon il resterait dans la langue du premier accès.
   - Catalogues JSON : traduire au moment de l'usage (`T(rule.Title)`, `Optional(rule.Advice)`) et déclarer les champs dans `tools/i18n.cs` (`CatalogTexts`) **et** dans `TranslationCoverageTests.Catalogs`.
-  - Ne **jamais** passer par `T` un texte qui sert à reconnaître une sortie de Windows (`bcdedit`, `netsh`… en français ou en anglais), et ne jamais faire dépendre une logique d'un texte affiché (comparer à l'objet, au code, ou au même `T(…)`).
+  - Ne **jamais** passer par `T` un texte qui sert à reconnaître une sortie de Windows (`bcdedit`, `netsh`… en français ou en anglais), et ne jamais faire dépendre une logique d'un texte affiché.
   - Dans une méthode générique `<T>`, écrire `Texts.T(…)` (le paramètre de type masque la fonction).
 - Interface WPF : toute liaison bidirectionnelle (`IsChecked`, `SelectedItem`, `Value`, colonnes de `DataGrid`…) vers une propriété sans `set` doit porter `Mode=OneWay`, sinon la fenêtre plante au chargement ; `StaticResource` seulement pour des clés définies dans nos dictionnaires, `DynamicResource` pour les pinceaux Fluent. `XamlConsistencyTests` vérifie tout cela.
-- Style : espaces de noms `file-scoped`, accolades toujours, **0 avertissement** (analyseurs `latest-recommended`), pas de trait de soulignement dans les espaces de noms.
-- **Sécurité** (directives du porteur du 27/10/2026, inspirées du C++ et transposées au C#) : lancement de programme, `UseShellExecute = true`, `cmd.exe`, mémoire réservée à la main (rendue dans un `finally`), copie de mémoire brute, code `unsafe` et `string.Format` ne sont permis que dans les fichiers listés par `tests/…/Security/SecurityGuardTests.cs` ; un nouveau fichier qui en a besoin est relu (tailles en `checked(…)`, données externes bornées, arguments construits par MAUS et filtrés) avant d'être ajouté à la liste. Jamais de fonction C sans limite (msvcrt, `lstrcpy`…). Pages des Paramètres : `SettingsPages.IsValid`. CodeQL (`.github/workflows/codeql.yml`, `security-extended`) analyse chaque envoi : 0 alerte le 27/10.
+- Style : espaces de noms `file-scoped`, accolades toujours, **0 avertissement** (analyseurs `latest-recommended`).
+- **Sécurité** : lancement de programme, `UseShellExecute = true`, `cmd.exe`, mémoire réservée à la main, copie de mémoire brute, code `unsafe` et `string.Format` ne sont permis que dans les fichiers listés par `tests/Maus.Core.Tests/Security/SecurityGuardTests.cs` ; un nouveau fichier est relu avant d'y être ajouté. Pages des Paramètres : `SettingsPages.IsValid`. CodeQL analyse chaque envoi sur `main` et les branches `claude/**`.
 - Nouveau module : classe `public sealed` avec constructeur sans paramètre (découverte automatique), `Order = N*10`.
+- Changement de scène ou de référence du benchmark : compléter `BenchmarkScoring.EditionOf`.
 
 ## Commandes
 
@@ -79,41 +85,64 @@ dotnet run --project src/Maus.Cli -- --module M06
 dotnet publish src/Maus.App -c Release -o publish/MAUS
 ```
 
-- Dépôt : https://github.com/TERMINATORmdel101/MAUS (**public** depuis le 02/10/2026). Branche `main` = publication ; travail sur `claude/youthful-ride-ivazlw`.
-- Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@users.noreply.github.com>`. Ne jamais utiliser l'adresse e-mail personnelle du porteur : GitHub refuse le push (adresse privée protégée).
-- `nuget.config` du dépôt force nuget.org (la config NuGet globale du PC est vide).
-- Sur le PC Windows : PowerShell 5.1 (pas de `&&`) ; chemins longs du dossier temporaire > 260 caractères = erreurs, travailler dans le dépôt.
-- Tester l'interface : depuis la 0.8.0 le manifeste est déjà `asInvoker` ; lancée depuis le terminal de Claude Code (administrateur), une copie d'essai garde son moteur dans le même processus, sans écran d'autorisation. Copie jetable `.worktrees\_smoke`, clics par UI Automation, puis vérifier `%LOCALAPPDATA%\MAUS\logs` et le journal « .NET Runtime ».
-- Ne jamais lancer MAUS élevé ni une commande qui modifie le PC du porteur sans son accord explicite. Les corrections (V0.2) se testent dans **Windows Sandbox**.
+- Dépôt : https://github.com/TERMINATORmdel101/MAUS (**public**). `main` = publication (un envoi qui touche `src/`, `installer/` ou `Directory.Build.props` lance le workflow « Installateur », après tous les tests) ; travail sur une branche à part (`claude/youthful-ride-ivazlw`), fusionnée dans `main` à la publication. Le porteur modifie parfois `main` sur GitHub : `git fetch` d'abord.
+- Identité Git des commits : `TERMINATORmdel101 <213405999+TERMINATORmdel101@users.noreply.github.com>`. Jamais d'adresse personnelle : GitHub refuse le push.
+- Sur le PC Windows : PowerShell 5.1 (pas de `&&`) ; chemins de plus de 260 caractères = erreurs.
+- **Ne jamais lancer MAUS élevé ni une commande qui modifie le PC du porteur sans son accord explicite** ; ne jamais fermer un MAUS qu'il a ouvert. Corrections, PawnIO, tâche planifiée et actions sur les pilotes se testent d'abord dans **Windows Sandbox**. En lecture seule, sans accord particulier : `dotnet build`, `dotnet test`, `maus` (audit), `maus --plan`, `maus --summary`.
+- Tester l'interface : copie jetable `.worktrees\_smoke` (scripts hors dépôt), puis vérifier `%LOCALAPPDATA%\MAUS\logs` et le journal « .NET Runtime ». Depuis un terminal administrateur, une copie garde son moteur dans le même processus : pour l'essayer sans droits, passer par `explorer.exe`. Une copie d'essai écrit dans les vraies préférences (`LastSeenVersion`…) : les sauver et les remettre.
+- Benchmark : préférer `maus --benchmark --capture DOSSIER --scene ID --times 5,30` (hors écran) aux passes en plein écran.
 
 ### Dans le cloud (Linux)
 
-SDK : `apt-get install -y dotnet-sdk-10.0` (dépôt Ubuntu ; `dot.net/v1/dotnet-install.sh` est bloqué par le proxy). Les sessions cloud tournent sous Linux : l'application WPF et les API Windows (registre, WMI, P/Invoke) n'y fonctionnent pas. `EnableWindowsTargeting` est activé dans `Directory.Build.props` pour permettre la **compilation**. Les tests qui appellent de vraies API Windows échoueront sous Linux : écrire le code et les tests avec les faux, puis faire valider sur le PC Windows (build, tests, `maus` en lecture seule).
+SDK : `apt-get install -y dotnet-sdk-10.0` (`dotnet-install.sh` est bloqué par le proxy). WPF et API Windows n'y fonctionnent pas ; `EnableWindowsTargeting` permet la **compilation**. Écrire le code et les tests avec les faux, puis faire valider sur le PC Windows.
 
-**Fichier de verrouillage sous Linux** : la compilation réécrit `src/Maus.App/packages.lock.json` (elle y ajoute `System.CodeDom` et `System.Diagnostics.EventLog`, que Windows fournit déjà). **Ne jamais commiter ce changement** : l'annuler avec `git checkout -- src/Maus.App/packages.lock.json`, sinon la restauration verrouillée de GitHub Actions risque d'échouer.
+**Fichier de verrouillage sous Linux** : la compilation réécrit `src/Maus.App/packages.lock.json` : **ne jamais commiter ce changement** (`git checkout -- src/Maus.App/packages.lock.json`), la restauration verrouillée de GitHub Actions risquerait d'échouer.
 
-Échecs normaux sous Linux (27 sur 1 621 le 30/10, à comparer avant de croire à un défaut ; liste par classe dans `docs/historique-claude.md`). Un seul avertissement, sous Linux seulement (CA1859, `WorkshopViewModel.cs:56`) ; 0 sous Windows.
+Échecs normaux sous Linux : 27 sur 1 621 le 30/10, tests qui appellent de vraies API Windows (`EngineBrokerTests` 9, `StartupAppsModuleTests` 4, `ScheduledAuditTests` 3, `RiskyChangesAuditModuleTests` 3…). 0 avertissement sous Windows.
 
-## État (30/10/2026)
+## Publier une version
 
-- **0.8.5 publiée** (préversion, 30/10) : GitHub https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.8.5 (commit `f0106f8`), winget #466403 en attente. Relecture complète du code le 30/10 (aucune faille critique ni haute), moteur plus strict, document du Store rendu exact. 1 621 tests, 0 avertissement.
-- **Microsoft Store** : 5e refus d'`allowElevation` le 30/10 ; paquet 0.8.5 et textes enrichis prêts (`publish/store-0.8.5`, `installer/msix/README.md`), Google Doc du document de sécurité créé : le porteur le met en ligne sur le site, puis soumet. Voir `REPRISE.md`.
-- Tout ce qui n'est pas sur GitHub : `Documents\MAUS-sauvegarde-20261030` (`LISEZMOI.txt`), dont le rapport de failles **privé, à ne jamais écrire dans ce dépôt public**.
-- Analyse privée de Claude (qualités, défauts, sécurité, écarts documents ↔ code, plan de relecture du code) : `Documents\MAUS-sauvegarde-20261030\analyse-claude\00-synthese.md`, à lire après ce fichier pour toute session sur la sécurité ou l'architecture. Elle nomme des faiblesses : **jamais dans ce dépôt**.
-- Suite, procédure de publication, ce qui reste à vérifier : [`REPRISE.md`](REPRISE.md). Passé détaillé : `docs/historique-claude.md`.
+Seulement avec l'accord du porteur.
+
+1. Numéro : `Directory.Build.props`, `AppVersionTests`, `CHANGELOG.md`, `README.md`, « Quoi de neuf » (`Views/WhatsNewWindow.cs`).
+2. Fusion dans `main`. Attendre que le workflow « Installateur » réussisse (il lance d'abord tous les tests ; à la main si l'envoi ne touche ni `src/` ni `installer/`). Test fragile sur GitHub : `CurveOptimizerProgramTests.Silent_core_in_phase_1…` (relancer).
+3. `gh` s'utilise avec `GH_TOKEN` tiré de `git credential fill` (ne jamais l'afficher) ; `gh pr edit` échoue, passer par `gh api`. `gh release create` demande une confirmation du porteur dans la conversation.
+4. Télécharger l'installateur du workflow (`gh run download`), vérifier SHA-256 et provenance (`gh attestation verify … -R TERMINATORmdel101/MAUS`), notes en anglais (mention « non signé » exigée), `gh release create X.Y.Z --prerelease`, puis retélécharger depuis la page publique et comparer le SHA-256.
+5. winget : copier le dossier de la version précédente dans `installer/winget/manifests/t/TERMINATORmdel101/MAUS/`, changer version, date, adresse et SHA-256, `winget validate --manifest`, puis dans le clone `.worktrees\_winget` : branche partie de `upstream/master`, commit « New version: TERMINATORmdel101.MAUS version X.Y.Z », envoi sur le fork, `gh pr create -R microsoft/winget-pkgs`.
+6. Store : voir `installer/msix/README.md` ; garder `docs/store-security-design.md` exact pour la version soumise, et ne pas le déplacer (le Store le cite à ce chemin).
+
+## État (02/11/2026)
+
+- **0.8.5 publiée** (préversion, 30/10) : https://github.com/TERMINATORmdel101/MAUS/releases/tag/0.8.5 et winget.
+- **Microsoft Store** : 0.8.5 soumise par le porteur, réponse attendue. `docs/store-security-design.md` décrit cette version.
+- Catalogue `m09-gpu-drivers.json` : **à revérifier chaque mois** (un ticket GitHub le rappelle ; `checkedOn` ; passé 45 jours, MAUS ne dit plus « à jour »).
+
+À valider :
+- Windows Sandbox : corrections réelles (`--apply-recommended`, point de restauration, journal, `--revert`) ; actions sur le pilote graphique (redémarrer, retirer, supprimer, réinstaller une sauvegarde).
+- Autre matériel : processeurs AMD (fiche mémoire, à comparer avec ZenTimings), DDR5, autres familles Intel (comparer avec CPU-Z puis passer `verifiedOnHardware` à `true`), cartes graphiques AMD et Intel, Wi-Fi, Recall.
+- À l'écran : score après un audit, « Votre PC en un coup d'œil », retour au gris après 15 minutes, « Ouvrir MAUS » après l'audit de la semaine, Mica.
+
+Non terminé :
+- **Écrans bleus, nommer le pilote probablement en cause** : lire `C:\Windows\Minidump` avec le moteur de débogage de Windows (dbgeng), en lecture seule, comme WinDbg `!analyze -v`. Point dur : les symboles de Microsoft (réseau). Dire « probable », jamais une certitude. Invérifiable sans un vrai vidage.
+- **Vraies tensions VDD / VDDQ des barrettes DDR5** : lire le PMIC par le SMBus, **en lecture seule**. Rien n'est codé. D'abord trouver une **source vérifiable** de la carte des registres (JEDEC PMIC5100 / PMIC5010, ou code libre).
+- Relecture des traductions anglaises et espagnoles par des locuteurs natifs ; relecture juridique de `TRADEMARKS.md`.
+- Idées proposées, à choisir : 1 essai automatique de la fenêtre à chaque envoi ; 2 tests « données abîmées » ; 3 pannes au pire moment ; 4 endurance 24 h ; 5 Stryker.NET ; 8 OpenSSF Scorecard ; 9 SBOM ; 11 Accessibility Insights ; 12 messages d'erreur utiles ; 13 GitHub = bêta, Store = stable.
+
+## Documents
+
+- Pour tous : `README.md`, `CHANGELOG.md`, `SECURITY.md`, `PRIVACY`, `TRADEMARKS.md`, `THIRD-PARTY-NOTICES.md`. Microsoft : `docs/store-security-design.md`, `installer/msix/README.md`.
+- Dans l'historique Git seulement (retirés le 02/11/2026, périmés) : `git show 3899236:docs/fiche-technique/m11-sante-materiel.md` (fiche de départ par module, avec ses sources ; les commentaires « fiche technique, Module 11 » du code y renvoient ; le code et ses tests font foi), `git show 3899236:docs/historique-claude.md` (journal des sessions), `docs/pistes-experts.md` et `REPRISE.md` au même commit.
 
 ## Pièges encore utiles
 
 Windows et outils :
-- **Terminal de Claude Code = administrateur** : pour essayer MAUS sans droits, le lancer par `explorer.exe`. Vérifier `asInvoker` dans l'exe d'une copie d'essai ; une publication incrémentale peut ignorer `-p:ApplicationManifest`.
-- **Git Bash** : un heredoc Python casse les `\` et les longs scripts → écrire le script avec l'outil d'écriture, chaînes brutes `r"…"`. `perl -pi` abîme les chaînes C# contenant `\` suivi d'un chiffre. Un script Python à guillemets triples casse les `\"` : éditer ces lignes avec l'outil d'édition. `export MSYS_NO_PATHCONV=1` si un argument contient « / ». Jamais de `cat > fichier` sans entrée : la commande reste bloquée.
-- **PowerShell 5.1** lit un `.ps1` en UTF-8 sans BOM comme de l'ANSI : pas d'accents dans les motifs de recherche d'un script. `$button` et `$Button` sont la même variable.
-- **Copies d'essai** (`.worktrees\_smoke`, `accueil2.ps1`) : elles écrivent dans les vraies préférences du porteur (`LastSeenVersion`…), à sauver et remettre (ces scripts le font). Ne jamais tuer un MAUS ouvert par le porteur.
-- `PrintWindow` ne voit pas le fond Mica (capture d'écran : `-Screen`). **Chez le porteur, la transparence de Windows est coupée** : Mica ne s'y affiche pas, c'est voulu.
-- **Publication** : `gh release create` est bloqué par les autorisations de Claude Code tant que le porteur n'a pas confirmé dans la conversation. `GH_TOKEN` par `git credential fill`, ne jamais l'afficher. Le porteur modifie parfois `main` sur GitHub : `git fetch` d'abord. Un envoi qui ne touche qu'un test ne déclenche pas le workflow « Installateur ». Inno Setup n'est pas installé sur ce PC.
-- Les agents échouent quand la limite de 5 h de l'abonnement est atteinte. La machine de GitHub est plus lente : pas de test dépendant du temps sans marge.
+- Une publication incrémentale peut ignorer `-p:ApplicationManifest` : vérifier `asInvoker` dans l'exe d'une copie d'essai.
+- **Git Bash** : un heredoc Python casse les `\` et les longs scripts → écrire le script avec l'outil d'écriture, chaînes brutes `r"…"`. `perl -pi` abîme les chaînes C# contenant `\` suivi d'un chiffre. `export MSYS_NO_PATHCONV=1` si un argument contient « / ».
+- **PowerShell 5.1** lit un `.ps1` en UTF-8 sans BOM comme de l'ANSI : pas d'accents dans les motifs de recherche d'un script.
+- Mica ne s'affiche pas si la transparence de Windows est coupée : c'est voulu. `PrintWindow` ne le voit pas.
+- La machine de GitHub est plus lente : pas de test dépendant du temps sans marge.
 
 Code :
-- WPF : un pinceau rangé dans `Application.Resources` est figé (`Pastel.Apply` y met des copies). Le thème Fluent pose lui-même le fond de la fenêtre : ne pas faire `ClearValue` dessus. Fluent pose aussi l'attribut Mica sans rendre le fond transparent.
-- Ne jamais mettre `ThrowIfNull` sur un paramètre `T?` (`SettingsAccessor.Write(key, null)` = supprimer). `RoundTrip.AssertAsync` applique tout le plan : une correction qui défait les autres se teste à part. Depuis Windows 11 24H2, l'API Wlan répond ERROR_ACCESS_DENIED sans accès à la position. L'API DISM échoue dans un paquet MSIX (`dism.exe /CheckHealth` à la place).
-- Benchmark : le porteur voit les passes en plein écran, préférer `--capture` (hors écran) ; une scène prépare ses données dans `Load`, à l'intérieur d'une image ; en HLSL 2018, `a ? b : c` évalue b et c ; ne jamais libérer un `GlyphRun` (il libère la police).
+- WPF : un pinceau rangé dans `Application.Resources` est figé (`Pastel.Apply` y met des copies). Le thème Fluent pose lui-même le fond de la fenêtre : ne pas faire `ClearValue` dessus.
+- Ne jamais mettre `ThrowIfNull` sur un paramètre `T?` (`SettingsAccessor.Write(key, null)` = supprimer). Depuis Windows 11 24H2, l'API Wlan répond ERROR_ACCESS_DENIED sans accès à la position. L'API DISM échoue dans un paquet MSIX (`dism.exe /CheckHealth` à la place). `Win32_PnPSignedDriver` peut inverser jour et mois (dates des pilotes par `DEVPKEY_Device_DriverDate`).
+- Benchmark : une scène prépare ses données dans `Load`, à l'intérieur d'une image ; en HLSL 2018, `a ? b : c` évalue b et c.
