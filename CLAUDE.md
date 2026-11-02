@@ -106,7 +106,7 @@ Seulement avec l'accord du porteur.
 
 1. Numéro : `Directory.Build.props`, `AppVersionTests`, `CHANGELOG.md`, `README.md`, « Quoi de neuf » (`Views/WhatsNewWindow.cs`).
 2. Fusion dans `main`. Attendre que le workflow « Installateur » réussisse (il lance d'abord tous les tests ; à la main si l'envoi ne touche ni `src/` ni `installer/`). Test fragile sur GitHub : `CurveOptimizerProgramTests.Silent_core_in_phase_1…` (relancer).
-3. `gh` s'utilise avec `GH_TOKEN` tiré de `git credential fill` (ne jamais l'afficher) ; `gh pr edit` échoue, passer par `gh api`. `gh release create` demande une confirmation du porteur dans la conversation.
+3. `gh pr edit` échoue, passer par `gh api`. `gh release create` demande une confirmation du porteur dans la conversation.
 4. Télécharger l'installateur du workflow (`gh run download`), vérifier SHA-256 et provenance (`gh attestation verify … -R TERMINATORmdel101/MAUS`), notes en anglais (mention « non signé » exigée), `gh release create X.Y.Z --prerelease`, puis retélécharger depuis la page publique et comparer le SHA-256.
 5. winget : copier le dossier de la version précédente dans `installer/winget/manifests/t/TERMINATORmdel101/MAUS/`, changer version, date, adresse et SHA-256, `winget validate --manifest`, puis dans le clone `.worktrees\_winget` : branche partie de `upstream/master`, commit « New version: TERMINATORmdel101.MAUS version X.Y.Z », envoi sur le fork, `gh pr create -R microsoft/winget-pkgs`.
 6. Store : voir `installer/msix/README.md` ; garder `docs/store-security-design.md` exact pour la version soumise, et ne pas le déplacer (le Store le cite à ce chemin).

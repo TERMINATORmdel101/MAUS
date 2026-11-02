@@ -1,6 +1,6 @@
 # Nom, logo et versions modifiées de MAUS
 
-Le code de MAUS est libre (GPL-3.0). Le **nom** « MAUS », son logo et sa mascotte ne le sont pas : ils désignent uniquement la version officielle, publiée sur le Microsoft Store et dans ce dépôt.
+Le code de MAUS est libre (GPL-3.0). Le **nom** « MAUS », son logo et sa mascotte ne le sont pas : ils désignent uniquement la version officielle, publiée dans ce dépôt et, lorsqu'elle y est disponible, sur le Microsoft Store.
 
 ## Ce que vous pouvez faire
 
@@ -20,4 +20,4 @@ Ces conditions complètent la licence GPL-3.0, comme le permet son article 7 :
 1. **Article 7(e).** La licence n'accorde aucun droit d'utiliser le nom « MAUS », son logo ou sa mascotte, au titre du droit des marques.
 2. **Article 7(c).** Toute version modifiée distribuée doit porter un nom différent de « MAUS » et indiquer clairement qu'elle diffère de la version d'origine.
 
-*Ces textes restent à faire relire par un juriste avant la première publication.*
+*Ces textes restent à faire relire par un juriste.*

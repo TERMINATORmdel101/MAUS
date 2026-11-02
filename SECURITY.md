@@ -6,7 +6,7 @@ Le moteur de MAUS fonctionne avec les droits administrateur : une faille peut av
 
 Signalez-la en privé par GitHub : onglet **Security** du dépôt, puis **Report a vulnerability** (https://github.com/TERMINATORmdel101/MAUS/security/advisories/new). Seul le responsable du projet voit le signalement.
 
-Merci d'indiquer : la version de MAUS (« À propos » ou `maus --version`), la version de Windows, ce qu'il faut faire pour reproduire le problème et ce qu'un attaquant pourrait obtenir.
+Merci d'indiquer : la version de MAUS (fenêtre « À propos »), la version de Windows, ce qu'il faut faire pour reproduire le problème et ce qu'un attaquant pourrait obtenir.
 
 MAUS est un projet bénévole en version alpha : nous répondons dès que possible, sans délai garanti. Une correction est publiée dans une nouvelle version, et le signalement est rendu public une fois la correction disponible, avec vos remerciements si vous le souhaitez.
 
@@ -18,7 +18,7 @@ The MAUS engine runs with administrator rights, so a vulnerability can have seri
 
 Report it privately through GitHub: **Security** tab of the repository, then **Report a vulnerability** (https://github.com/TERMINATORmdel101/MAUS/security/advisories/new). Only the project maintainer can see the report.
 
-Please include: the MAUS version ("About" or `maus --version`), the Windows version, the steps to reproduce the problem and what an attacker could achieve.
+Please include: the MAUS version ("About" window), the Windows version, the steps to reproduce the problem and what an attacker could achieve.
 
 MAUS is a volunteer alpha project: we answer as soon as we can, without a guaranteed delay. A fix is released in a new version, and the report is made public once the fix is available, with credit to you if you wish.
 

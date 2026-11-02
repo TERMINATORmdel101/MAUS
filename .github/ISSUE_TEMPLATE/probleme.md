@@ -2,7 +2,7 @@
 name: Signaler un problème
 about: Un plantage, un résultat faux, un texte incompréhensible… Collez ici le résumé copié par MAUS.
 title: "[Problème] "
-labels: ["problème"]
+labels: ["bug"]
 ---
 
 <!--
