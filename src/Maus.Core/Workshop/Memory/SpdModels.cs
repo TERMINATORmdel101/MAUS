@@ -34,7 +34,6 @@ public sealed record SpdProfile(
     string? Name,
     int SpeedMts,
     double TckNs,
-    IReadOnlyList<int> SupportedCl,
     IReadOnlyList<MemoryTiming> Timings,
     double? Vdd,
     double? Vddq,
@@ -53,8 +52,11 @@ public sealed record SpdProfile(
         .Select(key => Timings.FirstOrDefault(t => t.Key == key)?.Clocks?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"));
 }
 
-/// <summary>Contenu brut d'une puce SPD, lu par le pilote PawnIO, avec les noms de fabricants résolus par la bibliothèque de lecture.</summary>
-public sealed record SpdImage(int Slot, byte[] Bytes, string? ModuleManufacturer = null, string? DramManufacturer = null);
+/// <summary>
+/// Contenu brut d'une puce SPD, lu par le pilote PawnIO, avec les noms de fabricants résolus par la bibliothèque de lecture.
+/// <paramref name="FirstPageOnly"/> : seule la première page a pu être lue (DDR5, protection d'écriture du BIOS).
+/// </summary>
+public sealed record SpdImage(int Slot, byte[] Bytes, string? ModuleManufacturer = null, string? DramManufacturer = null, bool FirstPageOnly = false);
 
 /// <summary>Tout ce que la puce SPD d'une barrette dit d'elle-même.</summary>
 public sealed record SpdModule
@@ -75,8 +77,6 @@ public sealed record SpdModule
     public int DeviceWidth { get; init; }
 
     public int DieDensityGbit { get; init; }
-
-    public int DiesPerPackage { get; init; } = 1;
 
     public int BankGroups { get; init; }
 
@@ -105,6 +105,14 @@ public sealed record SpdModule
 
     public string SpdRevision { get; init; } = string.Empty;
 
+    /// <summary>Seul le début de la puce a pu être lu : capacité, rangs, référence et profils XMP ou EXPO sont inconnus.</summary>
+    public bool FirstPageOnly { get; init; }
+
+    /// <summary>Capacité à afficher.</summary>
+    public string CapacityText => FirstPageOnly
+        ? Localization.Texts.T("capacité inconnue")
+        : Localization.Texts.T("{0:0.#} Go", CapacityBytes / (1024.0 * 1024 * 1024));
+
     /// <summary>Somme de contrôle de la zone de base : faux = lecture abîmée ou SPD modifiée, les valeurs sont alors douteuses.</summary>
     public bool ChecksumOk { get; init; }
 
@@ -117,5 +125,7 @@ public sealed record SpdModule
     public IReadOnlyList<SpdProfile> Profiles { get; init; } = [];
 
     /// <summary>Organisation lisible, par exemple « 2 rangs, puces x8 de 16 Gbit ».</summary>
-    public string Organization => Localization.Texts.T("{0} rang(s), puces x{1} de {2} Gbit", Ranks, DeviceWidth, DieDensityGbit);
+    public string Organization => FirstPageOnly
+        ? Localization.Texts.T("puces x{0} de {1} Gbit", DeviceWidth, DieDensityGbit)
+        : Localization.Texts.T("{0} rang(s), puces x{1} de {2} Gbit", Ranks, DeviceWidth, DieDensityGbit);
 }

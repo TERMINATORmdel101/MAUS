@@ -27,7 +27,8 @@ public sealed record ScoreLine(string FindingId, string Title, Severity Gravity,
 
 /// <summary>Module qui n'a pas pu être vérifié (erreur ou délai dépassé) : ses constats manquent au score.</summary>
 /// <param name="Reason">Message d'erreur du moteur d'audit (déjà dans la langue de l'utilisateur).</param>
-public sealed record UncheckedModule(string ModuleId, string Title, string Reason);
+/// <param name="NotChosen">Pas une panne : l'utilisateur ne l'a pas choisi pour cet audit.</param>
+public sealed record UncheckedModule(string ModuleId, string Title, string Reason, bool NotChosen = false);
 
 /// <summary>Détail du score : ce qui a coûté des points, et pourquoi le score est ce qu'il est.</summary>
 /// <param name="Lines">Constats de gravité critique, importante ou moyenne, du plus coûteux au moins coûteux.</param>
@@ -42,6 +43,9 @@ public sealed record ScoreBreakdown(int Score, double Points, IReadOnlyList<Scor
     /// <summary>Score partiel : au moins un module n'a pas pu être vérifié. Il n'est pas gardé dans l'historique.</summary>
     public bool IsPartial => Unchecked.Count > 0;
 }
+
+/// <summary>Une correction possible et les points qu'elle rapporterait au score.</summary>
+public sealed record ScoreGain(Finding Finding, int Points);
 
 /// <summary>
 /// Score de santé du PC (0 à 100) et résumé par famille. Barème de MAUS (choix de conception, révisé le 29/09/2026 à la
@@ -59,6 +63,9 @@ public sealed record ScoreBreakdown(int Score, double Points, IReadOnlyList<Scor
 /// </summary>
 public static class HealthScore
 {
+    /// <summary>Nombre de corrections proposées sous le score.</summary>
+    public const int BestGainCount = 3;
+
     /// <summary>Points retirés en tout par les optimisations, quel que soit leur nombre.</summary>
     public const double OptimisationCap = 10;
 
@@ -72,6 +79,9 @@ public static class HealthScore
     private static readonly string[][] SameSubject =
     [
         ["M01.secure-boot", "M08.secure-boot"],
+        ["M01.wu-services", "M03.update-services"],
+        ["M01.wu-pause", "M03.automatic-updates"],
+        ["M01.wu-auto-update", "M03.automatic-updates"],
     ];
 
     /// <summary>
@@ -132,19 +142,37 @@ public static class HealthScore
 
     /// <summary>Modules dont la détection a échoué (erreur ou délai dépassé) : rien n'y a été lu.</summary>
     public static IReadOnlyList<UncheckedModule> UncheckedModules(IEnumerable<ModuleResult> results) =>
-        results.Where(r => r.Error is not null).Select(r => new UncheckedModule(r.ModuleId, r.Title, r.Error!)).ToList();
+        results.Where(r => r.Error is not null).Select(r => new UncheckedModule(r.ModuleId, r.Title, r.Error!, r.NotChosen)).ToList();
 
     /// <summary>Phrase qui signale un score partiel, ou <c>null</c> quand tous les modules ont été vérifiés.</summary>
     public static string? PartialNote(ScoreBreakdown breakdown)
     {
         ArgumentNullException.ThrowIfNull(breakdown);
-        return breakdown.Unchecked.Count switch
+        var failed = breakdown.Unchecked.Where(u => !u.NotChosen).ToList();
+        var notChosen = breakdown.Unchecked.Where(u => u.NotChosen).ToList();
+        string? failedNote = failed.Count switch
+        {
+            0 => null,
+            1 => T("Score partiel : 1 module n'a pas pu être vérifié ({0}). Le score ne tient compte que du reste.", failed[0].Title),
+            var count => T("Score partiel : {0} modules n'ont pas pu être vérifiés ({1}). Le score ne tient compte que du reste.", count, string.Join(", ", failed.Select(u => u.Title))),
+        };
+        string? notChosenNote = notChosen.Count switch
+        {
+            0 => null,
+            1 => T("Score partiel : 1 module n'a pas été choisi pour cet audit ({0}). Le score ne tient compte que du reste.", notChosen[0].Title),
+            var count => T("Score partiel : {0} modules n'ont pas été choisis pour cet audit ({1}). Le score ne tient compte que du reste.", count, string.Join(", ", notChosen.Select(u => u.Title))),
+        };
+        return failedNote is null ? notChosenNote : notChosenNote is null ? failedNote : failedNote + " " + notChosenNote;
+    }
+
+    /// <summary>Audit sans droits administrateur : le score est partiel, et cette phrase le dit en clair (écran et rapport).</summary>
+    public static string LimitedNote(IEnumerable<ModuleResult> results)
     {
-        0 => null,
-        1 => T("Score partiel : 1 module n'a pas pu être vérifié ({0}). Le score ne tient compte que du reste.", breakdown.Unchecked[0].Title),
-        var count => T("Score partiel : {0} modules n'ont pas pu être vérifiés ({1}). Le score ne tient compte que du reste.", count,
-            string.Join(", ", breakdown.Unchecked.Select(u => u.Title))),
-    };
+        ArgumentNullException.ThrowIfNull(results);
+        return Plural(
+            results.SelectMany(r => r.Findings).Count(f => f.Status == FindingStatus.Unknown),
+            T("Score partiel, audit sans droits administrateur : {0} contrôle non lu, et vos constats « voulus » ne sont pas relus. Ce score n'est pas gardé dans l'historique."),
+            T("Score partiel, audit sans droits administrateur : {0} contrôles non lus, et vos constats « voulus » ne sont pas relus. Ce score n'est pas gardé dans l'historique."));
     }
 
     /// <summary>
@@ -162,7 +190,10 @@ public static class HealthScore
 
         var lines = new List<string> { note };
         lines.AddRange(breakdown.Unchecked.Select(u => "• " + T("{0} : {1}", u.Title, u.Reason)));
-        lines.Add(T("Un module non vérifié ne retire ni n'ajoute de points : ses constats manquent. Ce score partiel n'est pas gardé dans l'historique, pour ne pas faire croire à une amélioration. Relancez l'audit pour obtenir un score complet."));
+        // Relancer l'audit ne change rien pour un module décoché : il faut d'abord le recocher.
+        lines.Add(breakdown.Unchecked.All(u => u.NotChosen)
+            ? T("Un module non vérifié ne retire ni n'ajoute de points : ses constats manquent. Ce score partiel n'est pas gardé dans l'historique, pour ne pas faire croire à une amélioration. Pour obtenir un score complet, recochez les modules dans la liste de l'audit, puis relancez-le.")
+            : T("Un module non vérifié ne retire ni n'ajoute de points : ses constats manquent. Ce score partiel n'est pas gardé dans l'historique, pour ne pas faire croire à une amélioration. Relancez l'audit pour obtenir un score complet."));
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -237,6 +268,68 @@ public static class HealthScore
     public static ModuleFamily FamilyOf(string moduleId) => Families.GetValueOrDefault(moduleId, ModuleFamily.Maintenance);
 
     public static int Compute(IEnumerable<ModuleResult> results) => Explain(results).Score;
+
+    /// <summary>
+    /// Les corrections qui rapportent le plus : le score est recalculé sans chaque constat que MAUS sait corriger (0 point :
+    /// constat important dont la correction seule ne lève pas encore le plafond du score). Une estimation selon le barème.
+    /// </summary>
+    public static IReadOnlyList<ScoreGain> BestGains(IReadOnlyList<ModuleResult> results, Func<Finding, bool> canFix)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        ArgumentNullException.ThrowIfNull(canFix);
+
+        var score = Explain(results).Score;
+        return results.SelectMany(r => r.Findings)
+            .Where(f => GravityOf(f) > Severity.Info && canFix(f))
+            .DistinctBy(f => SubjectOf(f.Id) ?? f.Id, StringComparer.Ordinal)
+            .Select(f => new ScoreGain(f, Explain(Without(results, f)).Score - score))
+            .Where(g => g.Points > 0 || GravityOf(g.Finding) >= Severity.High)
+            .OrderByDescending(g => g.Points)
+            .ThenByDescending(g => GravityOf(g.Finding))
+            .ThenBy(g => g.Finding.Title, StringComparer.CurrentCulture)
+            .Take(BestGainCount)
+            .ToList();
+    }
+
+    private static List<ModuleResult> Without(IReadOnlyList<ModuleResult> results, Finding finding)
+    {
+        // Un constat peut appartenir à plusieurs groupes : tous comptent.
+        var sameSubject = SameSubject.Where(group => group.Contains(finding.Id, StringComparer.Ordinal)).SelectMany(group => group).ToHashSet(StringComparer.Ordinal);
+        return results.Select(r => r with
+        {
+            Findings = r.Findings.Where(f => f.Id != finding.Id && !sameSubject.Contains(f.Id)).ToList(),
+        }).ToList();
+    }
+
+    /// <summary>État des pilotes graphiques en une ligne (constats M09.driver.*), ou <c>null</c> si l'audit n'en a lu aucun.</summary>
+    public static string? DriverLine(IEnumerable<Finding> findings)
+    {
+        var drivers = findings.Where(f => f.Id.StartsWith("M09.driver.", StringComparison.Ordinal)).ToList();
+        if (drivers.Count == 0)
+        {
+            return null;
+        }
+
+        var current = drivers.Count(f => f.Status == FindingStatus.Ok);
+        var unknown = drivers.Count(f => f.Status == FindingStatus.Unknown);
+        var parts = new List<string>();
+        if (current > 0)
+        {
+            parts.Add(T("{0} à jour", current));
+        }
+
+        if (drivers.Count - current - unknown > 0)
+        {
+            parts.Add(T("{0} à vérifier", drivers.Count - current - unknown));
+        }
+
+        if (unknown > 0)
+        {
+            parts.Add(T("{0} inconnu(s)", unknown));
+        }
+
+        return T("Pilotes graphiques : {0}", string.Join(" · ", parts));
+    }
 
     /// <summary>Mot qui qualifie le score, pour l'afficher sous le chiffre.</summary>
     public static string Describe(int score) => score switch

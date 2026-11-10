@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -33,6 +34,46 @@ public partial class TranslationCoverageTests
             .ToList();
 
         Assert.True(wrong.Count == 0, "Emplacements différents :\n" + string.Join("\n", wrong));
+    }
+
+    /// <summary>Accolade seule, emplacement mal fermé : le test précédent ne les voit pas, et <see cref="Texts.T(string, object?[])"/> les rencontrerait à l'affichage.</summary>
+    [Theory]
+    [MemberData(nameof(Languages))]
+    public void Translations_with_placeholders_can_be_filled(string language)
+    {
+        var args = Enumerable.Repeat<object?>(new AnyValue(), 20).ToArray();
+        var wrong = Texts.Load(language)
+            .Where(pair => Placeholders(pair.Key).Count > 0 && !CanFormat(pair.Value, args))
+            .Select(pair => pair.Key)
+            .ToList();
+
+        Assert.True(wrong.Count == 0, "Modèles invalides :\n" + string.Join("\n", wrong));
+    }
+
+    private static bool CanFormat(string text, object?[] args)
+    {
+        try
+        {
+            _ = string.Format(CultureInfo.InvariantCulture, text, args);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Accepte tous les formats ({0:d}, {0:0.0}…) : c'est la forme du modèle qui est contrôlée, pas la valeur.</summary>
+    private sealed class AnyValue : IFormattable
+    {
+        public string ToString(string? format, IFormatProvider? formatProvider) => "x";
+    }
+
+    [Fact]
+    public void A_wrong_template_never_breaks_the_screen()
+    {
+        Assert.Equal("{0", Texts.T("{0", "valeur"));
+        Assert.Equal("{5}", Texts.T("{5}", "valeur"));
     }
 
     [Fact]
@@ -86,9 +127,11 @@ public partial class TranslationCoverageTests
         ["m01-audit-rules.json"] = RuleFields,
         ["m04-privacy-rules.json"] = RuleFields,
         ["m06-visual-rules.json"] = RuleFields,
-        ["m08-bios-vendors.json"] = ["vendors[].rescueTool"],
+        ["m08-bios-vendors.json"] = ["vendors[].rescueTool", "vendors[].oemTool"],
         ["m09-gpu-drivers.json"] = ["branches[].label", "branches[].note"],
-        ["m12-startup-catalog.json"] = ["families[].label", "families[].item", "families[].loses", "families[].recommendation"],
+        ["m12-startup-catalog.json"] = ["families[].label", "families[].item", "families[].loses", "families[].recommendation", "apps[].name"],
+        ["intel-memory-controller.json"] = ["[].displayName"],
+        ["hw-safety-limits.json"] = ["memoryVoltage[].source", "cpuMaxTemperature[].source"],
     };
 
     /// <summary>Textes d'un chemin « a[].b.c » dans un document JSON (« [] » : chaque élément de la liste).</summary>

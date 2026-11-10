@@ -39,9 +39,10 @@ public sealed class SessionRecording(DateTimeOffset start)
 
     public DateTimeOffset Start { get; } = start;
 
-    public int Count => _samples.Count;
+    /// <summary>Les seuils de ce bilan ne viennent pas d'une norme : l'écran le dit.</summary>
+    public static string ThresholdNote => T("Seuils de ce bilan : processeur à moins de 3 °C de sa limite ou carte graphique à son seuil de ralentissement pendant 10 % du temps ; cœur à 95 % avec une carte graphique sous 85 % pendant 30 % du temps ; carte graphique à 95 % pendant 50 % du temps ; mémoire au-dessus de 90 %. Ils sont choisis par MAUS, sans source publiée.");
 
-    public IReadOnlyList<SensorSnapshot> Samples => _samples;
+    public int Count => _samples.Count;
 
     public void Add(SensorSnapshot snapshot) => _samples.Add(snapshot);
 
@@ -56,16 +57,16 @@ public sealed class SessionRecording(DateTimeOffset start)
 
         var cpuTemps = _samples.Select(s => s.CpuTemperatureC).ToList();
         var chipLimit = _samples.Select(s => s.CpuTjMaxC).FirstOrDefault(t => t is not null);
-        if (cpuTemps.Any(t => t is not null) && (chipLimit ?? cpuMaxC) is { } max)
+        if (cpuTemps.Any(t => t is not null) && ThermalRules.CpuLimit(chipLimit, cpuMaxC) is { } max)
         {
-            var hot = Share(cpuTemps.Select(t => t is { } v ? v >= max - 3 : (bool?)null));
+            var hot = Share(cpuTemps.Select(t => t is { } v ? ThermalRules.CpuAtLimit(v, max) : (bool?)null));
             if (hot >= 10)
             {
                 findings.Add(T("Le processeur a passé {0:0} % du temps à sa limite de température ({1} °C) : il a ralenti pour se protéger. Vérifiez le refroidissement (pâte thermique, ventilateurs, poussière) ; sur certains modèles récents, c'est aussi leur fonctionnement normal en pleine charge.", hot, max));
             }
         }
 
-        var gpuSlow = _samples.Select(s => MainGpu(s) is { TemperatureC: { } t, SlowdownTemperatureC: { } limit } ? t >= limit : (bool?)null).ToList();
+        var gpuSlow = _samples.Select(s => MainGpu(s) is { TemperatureC: { } t, SlowdownTemperatureC: { } limit } ? ThermalRules.GpuDanger(t, limit) : (bool?)null).ToList();
         if (gpuSlow.Any(v => v is not null) && Share(gpuSlow) is var slowShare and >= 10)
         {
             findings.Add(T("La carte graphique a atteint son seuil de ralentissement {0:0} % du temps : elle a baissé ses fréquences. Nettoyez-la, aérez le boîtier ou ajustez la courbe de ses ventilateurs.", slowShare));
@@ -95,7 +96,9 @@ public sealed class SessionRecording(DateTimeOffset start)
 
         if (findings.Count == 0 && n > 0)
         {
-            findings.Add(T("Aucun signe de surchauffe, de mémoire pleine ni de goulot d'étranglement marqué pendant cette session."));
+            findings.Add(_samples.All(s => s.CpuTemperatureC is null && MainGpu(s)?.TemperatureC is null)
+                ? T("Aucun signe de mémoire pleine ni de goulot d'étranglement marqué pendant cette session (température non lue).")
+                : T("Aucun signe de surchauffe, de mémoire pleine ni de goulot d'étranglement marqué pendant cette session."));
         }
 
         return new SessionSummary(
@@ -121,12 +124,14 @@ public sealed class SessionRecording(DateTimeOffset start)
     public string ToCsv(CultureInfo culture)
     {
         ArgumentNullException.ThrowIfNull(culture);
-        var separator = culture.TextInfo.ListSeparator;
+        var separator = Reporting.CsvText.Separator(culture);
         string F(double? value) => value?.ToString("0.#", culture) ?? string.Empty;
         var csv = new StringBuilder();
-        csv.AppendLine(string.Join(separator,
+        csv.AppendLine(string.Join(separator, new[]
+        {
             T("Heure"), T("Processeur %"), T("Cœur le plus chargé %"), T("Processeur MHz"), T("Processeur °C"), T("Processeur W"),
-            T("Carte graphique %"), T("Carte graphique °C"), T("Carte graphique MHz"), T("Carte graphique W"), T("Mémoire %")));
+            T("Carte graphique %"), T("Carte graphique °C"), T("Carte graphique MHz"), T("Carte graphique W"), T("Mémoire %"),
+        }.Select(Reporting.CsvText.Cell)));
         foreach (var s in _samples)
         {
             var gpu = s.Gpus.OrderByDescending(g => g.UtilizationPercent ?? 0).FirstOrDefault();

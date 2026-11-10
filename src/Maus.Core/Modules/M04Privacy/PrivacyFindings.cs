@@ -86,19 +86,5 @@ internal static class PrivacyFindings
     };
 
     /// <summary>Traduit une lecture refusée ou une source absente en constat « indéterminé », jamais en problème.</summary>
-    public static Finding Guard(string id, string title, string category, Func<Finding> check)
-    {
-        try
-        {
-            return check();
-        }
-        catch (MausAccessDeniedException)
-        {
-            return Finding.AdminRequired(id, title, category);
-        }
-        catch (DataSourceUnavailableException)
-        {
-            return Finding.Unknown(id, title, T("Cette information n'est pas disponible sur ce PC."), category);
-        }
-    }
+    public static Finding Guard(string id, string title, string category, Func<Finding> check) => Finding.Guard(id, title, category, check);
 }

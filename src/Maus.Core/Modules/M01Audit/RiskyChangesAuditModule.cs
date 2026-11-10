@@ -25,18 +25,18 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
     private static readonly Lazy<IReadOnlyList<RegistryRule>> Rules = new(() => EmbeddedCatalog.LoadRegistryRules("m01-audit-rules.json"));
 
     private readonly ISignatureVerifier _signatures;
-    private readonly IScheduledTaskReader _tasks;
     private readonly string _windowsDirectory;
+    private readonly IWinHttpProxyReader _proxy;
 
     public RiskyChangesAuditModule()
-        : this(new WinTrustSignatureVerifier(), new ComScheduledTaskReader(), Environment.GetFolderPath(Environment.SpecialFolder.Windows))
+        : this(new WinTrustSignatureVerifier(), Environment.GetFolderPath(Environment.SpecialFolder.Windows))
     {
     }
 
-    internal RiskyChangesAuditModule(ISignatureVerifier signatures, IScheduledTaskReader tasks, string windowsDirectory)
+    internal RiskyChangesAuditModule(ISignatureVerifier signatures, string windowsDirectory, IWinHttpProxyReader? proxy = null)
     {
+        _proxy = proxy ?? new WinHttpProxyReader();
         _signatures = signatures;
-        _tasks = tasks;
         _windowsDirectory = windowsDirectory.TrimEnd('\\');
     }
 
@@ -63,7 +63,6 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
         var antivirus = ReadSecurityProducts(context.Cim, "AntiVirusProduct");
         var firewalls = ReadSecurityProducts(context.Cim, "FirewallProduct");
         var defender = CimQueryResult.Run(context.Cim, DefenderStatusQuery, CimScopes.Defender);
-        var winHttp = await RunAsync(context, "netsh.exe", ["winhttp", "show", "proxy"], cancellationToken).ConfigureAwait(false);
         var bcd = context.IsElevated
             ? BcdEditParser.Parse(await RunAsync(context, "bcdedit.exe", ["/enum", "{current}"], cancellationToken).ConfigureAwait(false))
             : null;
@@ -101,7 +100,10 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
 
         // Réseau
         findings.Add(Guard(HostsCheck, () => DetectHosts(context)));
-        findings.Add(Guard(ProxyCheck, () => DetectProxy(context.Registry, winHttp, managed)));
+        findings.Add(Guard(ProxyCheck, () => DetectProxy(context.Registry, _proxy.Read(), managed)));
+        findings.Add(Guard(RemoteDesktopCheck, () => DetectRemoteDesktop(context.Registry, managed)));
+        findings.Add(Guard(Smb1Check, () => DetectSmb1(context.Cim)));
+        findings.Add(Guard(AutoLogonCheck, () => DetectAutoLogon(context.Registry)));
 
         // Composants
         findings.Add(Guard(CoreServicesCheck, () => DetectCoreServices(context.Registry, antivirus)));
@@ -141,25 +143,7 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
     }
 
     /// <summary>Un contrôle qui échoue ne doit jamais faire échouer le module : droits manquants ou source absente donnent « indéterminé ».</summary>
-    private static Finding Guard(Check check, Func<Finding> detect)
-    {
-        try
-        {
-            return detect();
-        }
-        catch (Exception ex) when (ex is MausAccessDeniedException or UnauthorizedAccessException)
-        {
-            return check.AdminRequired();
-        }
-        catch (Exception ex) when (ex is DataSourceUnavailableException or ManagementException or COMException)
-        {
-            return check.Unknown(T("Information indisponible sur ce PC."));
-        }
-        catch (IOException ex)
-        {
-            return check.Unknown(T("Lecture impossible : {0}", ex.Message));
-        }
-    }
+    private static Finding Guard(Check check, Func<Finding> detect) => Finding.Guard(check.Id, check.Title, check.Category, detect);
 
     private static async Task<string?> RunAsync(AuditContext context, string executable, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
@@ -195,5 +179,5 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
 
     private static bool IsSet([NotNullWhen(true)] string? value) => !string.IsNullOrWhiteSpace(value);
 
-    private static CimRow? FirstRow(IReadOnlyList<CimRow> rows) => rows.Count > 0 ? rows[0] : null;
+    private static CimRow? FirstRow(IReadOnlyList<CimRow> rows) => rows.FirstOrNull();
 }

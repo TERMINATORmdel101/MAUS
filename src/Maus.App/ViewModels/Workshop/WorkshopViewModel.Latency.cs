@@ -69,7 +69,7 @@ public sealed partial class WorkshopViewModel
         }
         catch (Exception ex) when (ex is InvalidOperationException or Maus.Core.Engine.Broker.EngineException)
         {
-            LatencyStatus = ex.Message;
+            LatencyStatus = Maus.Core.Diagnostics.ErrorText.For(ex);
         }
         finally
         {

@@ -1,1 +1,5 @@
 blank_issues_enabled: true
+contact_links:
+  - name: Signaler une faille de sécurité, en privé / Report a vulnerability, privately
+    url: https://github.com/TERMINATORmdel101/MAUS/security/advisories/new
+    about: Ne publiez pas une faille dans un ticket public. Ce signalement est vu seulement par le responsable du projet. / Please do not report a vulnerability in a public issue; only the maintainer sees this report.

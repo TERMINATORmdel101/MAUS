@@ -44,9 +44,12 @@ internal static partial class OverclockingParsers
         new("memtest86", "MemTest86", true, MemTestName()),
     ];
 
+    /// <summary>Tout programme peut écrire ce nom dans HKCU : un texte plus long n'est le nom d'aucun outil connu et ne passe pas par les regex.</summary>
+    private const int MaxDisplayNameLength = 256;
+
     /// <summary>Outil reconnu d'après le nom affiché d'un programme installé, ou <c>null</c>.</summary>
     public static TuningTool? MatchTool(string? displayName) =>
-        string.IsNullOrWhiteSpace(displayName) ? null : KnownTools.FirstOrDefault(t => t.DisplayName.IsMatch(displayName.Trim()));
+        string.IsNullOrWhiteSpace(displayName) || displayName.Length > MaxDisplayNameLength ? null : KnownTools.FirstOrDefault(t => t.DisplayName.IsMatch(displayName.Trim()));
 
     /// <summary>
     /// Modèle court d'un processeur pour une recherche de tutoriel :
@@ -88,6 +91,14 @@ internal static partial class OverclockingParsers
 
     /// <summary>Intel à coefficient débloqué : suffixe K, KF ou KS, ou gamme X et XE (plateformes HEDT).</summary>
     public static bool IsUnlockedIntel(string model) => UnlockedIntelSuffix().IsMatch(model);
+
+    public static bool IsRyzen(string? name) => name?.Contains("Ryzen", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>
+    /// Ryzen d'avant les 5000 (Threadripper compris) : Curve Optimizer n'existe pas sur ces générations. Source : AMD, « FAQ - Curve Optimizer
+    /// Feature in Ryzen Master » (amd.com, faq-curve-optimizer.pdf), lu le 1/11/2026 ; les fiches des Ryzen 7000 et 9000 le citent aussi.
+    /// </summary>
+    public static bool IsRyzenBefore5000(string? name) => OlderRyzenModel().IsMatch(name ?? string.Empty);
 
     public static X3DGeneration X3DGenerationOf(string? name)
     {
@@ -175,6 +186,9 @@ internal static partial class OverclockingParsers
     [GeneratedRegex(@"\bRyzen\s+(?:Threadripper\s+)?(?:PRO\s+)?(?:\d\s+)?(?:PRO\s+)?\d{4}[A-Z0-9]*\b", RegexOptions.IgnoreCase)]
     private static partial Regex RyzenModel();
 
+    [GeneratedRegex(@"\bRyzen\b[^\r\n]{0,40}?\b[1-4]\d{3}[A-Z0-9]*\b", RegexOptions.IgnoreCase)]
+    private static partial Regex OlderRyzenModel();
+
     [GeneratedRegex(@"\bCPU\b|@\s*[\d.]+\s*GHz|\b\d+-Core\b|\bProcessor\b|\bw(?:ith|/)\s+Radeon\b.*$|\b\d+(?:th|nd|rd|st) Gen\b", RegexOptions.IgnoreCase)]
     private static partial Regex CpuNoise();
 
@@ -208,7 +222,7 @@ internal static partial class OverclockingParsers
     [GeneratedRegex(@"^AMD Software\b", RegexOptions.IgnoreCase)]
     private static partial Regex AdrenalinName();
 
-    [GeneratedRegex(@"^Intel.*\b(?:Graphics Software|Arc.*Control)\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^Intel[^\r\n]{0,128}\b(?:Graphics Software|Arc\b[^\r\n]{0,64}\bControl)\b", RegexOptions.IgnoreCase)]
     private static partial Regex IntelGraphicsName();
 
     [GeneratedRegex(@"^HWiNFO", RegexOptions.IgnoreCase)]

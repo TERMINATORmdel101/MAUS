@@ -13,6 +13,8 @@ namespace Maus.App.ViewModels.Workshop;
 /// <summary>Une ligne de timing : nom, valeur (cycles et parfois nanosecondes), explication en infobulle.</summary>
 public sealed class TimingRowViewModel(MemoryTiming timing)
 {
+    public override string ToString() => Key;
+
     public string Key { get; } = timing.Key;
 
     public string Value { get; } = (timing.Nanoseconds is { } ns
@@ -26,11 +28,11 @@ public sealed class TimingRowViewModel(MemoryTiming timing)
 /// <summary>Un bloc de timings (primaires, secondaires, tertiaires, ou un profil SPD).</summary>
 public sealed class TimingBlockViewModel(string title, string? subtitle, IEnumerable<MemoryTiming> timings)
 {
+    public override string ToString() => Title;
+
     public string Title { get; } = title;
 
     public string? Subtitle { get; } = subtitle;
-
-    public bool HasSubtitle => Subtitle is not null;
 
     public IReadOnlyList<TimingRowViewModel> Rows { get; } = timings.Select(t => new TimingRowViewModel(t)).ToList();
 }
@@ -38,21 +40,24 @@ public sealed class TimingBlockViewModel(string title, string? subtitle, IEnumer
 /// <summary>Une barrette : identité, organisation et profils SPD.</summary>
 public sealed class MemoryModuleViewModel(SpdModule module)
 {
+    public override string ToString() => Title;
+
     public string Title { get; } = T("Emplacement {0} · {1} {2}", module.Slot + 1, module.ModuleManufacturer ?? T("fabricant inconnu"), module.PartNumber);
 
     public IReadOnlyList<string> Lines { get; } =
     [
-        T("{0:0.#} Go {1} {2}, {3}", module.CapacityBytes / (1024.0 * 1024 * 1024), module.MemoryType, module.ModuleType, module.Organization),
+        T("{0} {1} {2}, {3}", module.CapacityText, module.MemoryType, module.ModuleType, module.Organization),
         T("Puces : {0}{1}, {2} groupes de {3} banques, {4} lignes / {5} colonnes (bits d'adresse)",
             module.DramManufacturer ?? T("fabricant inconnu"),
             module.DramStepping is { } stepping ? T(" (révision 0x{0:X2})", stepping) : string.Empty,
             module.BankGroups, module.BanksPerGroup, module.RowBits, module.ColumnBits),
-        module.MemoryType == "DDR5"
+        module.FirstPageOnly ? T("ECC et alimentation inconnus : seul le début de la puce est lisible.")
+        : module.MemoryType == "DDR5"
             ? T("{0} sous-canaux · {1} · capteur de température : {2} · alimentation : {3}", module.SubChannels, module.Ecc ? "ECC" : T("sans ECC"), module.HasThermalSensor ? T("oui") : T("non"), module.Pmic ?? "?")
             : T("{0} · capteur de température : {1}", module.Ecc ? "ECC" : T("sans ECC"), module.HasThermalSensor ? T("oui") : T("non")),
         T("Fabriquée : {0} · révision SPD {1} · somme de contrôle : {2}",
             module.ManufacturedYear is { } year ? T("{0}, semaine {1}", year, module.ManufacturedWeek ?? 0) : "?",
-            module.SpdRevision, module.ChecksumOk ? T("correcte") : T("INCORRECTE")),
+            module.SpdRevision, module.FirstPageOnly ? T("non vérifiée") : module.ChecksumOk ? T("correcte") : T("INCORRECTE")),
     ];
 
     public IReadOnlyList<TimingBlockViewModel> Profiles { get; } = module.Profiles.Select(p => new TimingBlockViewModel(
@@ -169,21 +174,38 @@ public sealed partial class WorkshopViewModel
 
     public ICommand ReadMemoryCommand => _readMemory ??= new AsyncCommand(ReadMemoryAsync);
 
-    public ICommand CopyMemoryCommand => _copyMemory ??= new AsyncCommand(() => Run(() =>
+    public ICommand CopyMemoryCommand => _copyMemory ??= new AsyncCommand(() =>
     {
         if (_memoryReport is { } report)
         {
-            try
-            {
-                Clipboard.SetText(MemoryConfiguration + Environment.NewLine + Environment.NewLine + MemoryDetails.ToText(report));
-                MemoryStatus = T("Fiche copiée : collez-la avec Ctrl+V.");
-            }
-            catch (ExternalException)
-            {
-                MemoryStatus = T("Le presse-papiers est occupé : réessayez.");
-            }
+            MemoryStatus = ClipboardText.TryCopy(MemoryConfiguration + Environment.NewLine + Environment.NewLine + MemoryDetails.ToText(report))
+                ? T("Fiche copiée : collez-la avec Ctrl+V.")
+                : ClipboardText.Busy;
         }
-    }));
+    });
+
+    private ICommand? _reportMemory;
+
+    /// <summary>Comme le signalement de l'aide : la fiche passe par le presse-papiers, jamais par l'adresse de la page, et MAUS n'envoie rien.</summary>
+    public ICommand ReportMemoryCommand => _reportMemory ??= new AsyncCommand(() =>
+    {
+        if (_memoryReport is not { } report)
+        {
+            return;
+        }
+
+        try
+        {
+            var text = MemoryConfiguration + Environment.NewLine + Environment.NewLine + MemoryDetails.ToText(report);
+            Clipboard.SetText(Maus.Core.Reporting.PrivacyFilter.ForCurrentUser().Mask(text));
+            ShellLauncher.OpenUrl(Maus.Core.ProjectLinks.HardwareReport);
+            MemoryStatus = T("Fiche copiée : collez-la sur la page qui vient de s'ouvrir (Ctrl+V).");
+        }
+        catch (ExternalException)
+        {
+            MemoryStatus = T("Le presse-papiers est occupé : réessayez.");
+        }
+    });
 
     private async Task ReadMemoryAsync()
     {
@@ -195,7 +217,7 @@ public sealed partial class WorkshopViewModel
         // Sans pilote et sans droits particuliers : vitesse appliquée et tension déclarée par le BIOS, pour tous les processeurs.
         _memorySlots = await Task.Run(() => WindowsMemoryConfiguration.Read(new WmiCimReader()));
         _dramVoltage = T("La tension donnée par Windows est celle que le BIOS déclare, souvent la tension par défaut plutôt que celle que vous avez réglée. La tension mesurée se lit avec le pilote PawnIO, si la carte mère la communique.");
-        ShowMemoryConfiguration(null);
+        ShowMemoryConfiguration();
 
         var registry = new WindowsRegistryReader();
         var installed = PawnIo.State(registry).Installed;
@@ -217,7 +239,7 @@ public sealed partial class WorkshopViewModel
         Maus.Core.Diagnostics.Breadcrumbs.Add("Mémoire : tension mesurée par la carte mère");
         _dramVoltage = await ReadDramVoltageAsync();
         Maus.Core.Diagnostics.Breadcrumbs.Add("Mémoire : tension lue");
-        ShowMemoryConfiguration(null);
+        ShowMemoryConfiguration();
 
         if (_pendingMemoryRead is { IsCompleted: false })
         {
@@ -227,7 +249,6 @@ public sealed partial class WorkshopViewModel
 
         IsReadingMemory = true;
         MemoryStatus = T("Lecture en cours (jusqu'à une vingtaine de secondes avec 4 barrettes)…");
-        var log = new StepLogFile("lecture-memoire.txt");
         try
         {
             // Lecture faite par le moteur (pilote PawnIO, lecture seule) ; une lecture bloquée y est gardée et signalée.
@@ -236,22 +257,19 @@ public sealed partial class WorkshopViewModel
             if (await Task.WhenAny(reading, Task.Delay(MemoryReadTimeout)) != reading)
             {
                 // La lecture continue en arrière-plan (on ne peut pas interrompre un appel au pilote) ; l'interface, elle, reste libre.
-                log.Write("délai dépassé : lecture abandonnée par l'interface");
-                MemoryStatus = T("La lecture ne se termine pas au bout de {0} secondes : un autre programme bloque probablement le bus des barrettes (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère). Fermez-les, fermez MAUS, puis relancez-le. Étapes de la lecture : {1}",
-                    (int)MemoryReadTimeout.TotalSeconds, log.Path ?? "—");
+                MemoryStatus = T("La lecture ne se termine pas au bout de {0} secondes : un autre programme bloque probablement le bus des barrettes (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère). Fermez-les, fermez MAUS, puis relancez-le.",
+                    (int)MemoryReadTimeout.TotalSeconds);
                 return;
             }
 
             var report = await reading;
-            log.Write("lecture terminée");
             Show(report);
             await SaveSnapshotAsync(report);
             MemoryStatus = T("Lu le {0:g}. Survolez un timing pour savoir ce qu'il mesure. MAUS ne modifie aucun réglage mémoire : cela se fait dans le BIOS.", DateTime.Now);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            log.Write($"échec : ({ex.GetType().Name}) {ex.Message}");
-            MemoryStatus = T("La lecture a échoué : {0}", ex.Message);
+            MemoryStatus = T("La lecture a échoué : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
@@ -311,12 +329,16 @@ public sealed partial class WorkshopViewModel
             MemoryModules.Add(new MemoryModuleViewModel(module));
         }
 
-        ShowMemoryConfiguration(WindowsMemoryConfiguration.CompareWithSpd(_memorySlots, report.Modules));
+        _spdComparison = WindowsMemoryConfiguration.CompareWithSpd(_memorySlots, report.Modules);
+        ShowMemoryConfiguration();
         MemoryNotes = string.Join(Environment.NewLine, report.Notes.Select(n => "• " + n));
     }
 
+    /// <summary>Comparaison aux profils des barrettes : gardée pour survivre à une nouvelle lecture de la tension.</summary>
+    private string? _spdComparison;
+
     /// <summary>Carte « Vitesse appliquée et tension » : Windows, tension mesurée si possible, comparaison aux profils.</summary>
-    private void ShowMemoryConfiguration(string? comparison)
+    private void ShowMemoryConfiguration()
     {
         var text = WindowsMemoryConfiguration.Describe(_memorySlots);
         if (_dramVoltage.Length > 0)
@@ -324,9 +346,9 @@ public sealed partial class WorkshopViewModel
             text += Environment.NewLine + Environment.NewLine + _dramVoltage;
         }
 
-        if (comparison is not null)
+        if (_spdComparison is not null)
         {
-            text += Environment.NewLine + Environment.NewLine + comparison;
+            text += Environment.NewLine + Environment.NewLine + _spdComparison;
         }
 
         MemoryConfiguration = text;
@@ -352,9 +374,9 @@ public sealed partial class WorkshopViewModel
         }
     }
 
-    private static string OnOff(bool value) => value ? T("activé") : T("désactivé");
+    private static string OnOff(bool value) => MemoryDetails.OnOff(value);
 
-    private static string Mhz(double? value) => value is { } v ? v.ToString("0", CultureInfo.InvariantCulture) + " MHz" : "?";
+    private static string Mhz(double? value) => MemoryDetails.Mhz(value);
 
-    private static string Volts(double? value) => value is { } v ? v.ToString("0.000", CultureInfo.InvariantCulture) + " V" : "?";
+    private static string Volts(double? value) => MemoryDetails.VoltsIn(value, Culture);
 }

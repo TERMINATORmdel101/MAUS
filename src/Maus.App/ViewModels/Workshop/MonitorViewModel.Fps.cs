@@ -112,7 +112,19 @@ public sealed partial class MonitorViewModel
         }
         catch (Maus.Core.Engine.Broker.EngineException ex)
         {
-            FpsStatus = ex.Message;
+            FpsStatus = Maus.Core.Diagnostics.ErrorText.For(ex);
+            return;
+        }
+
+        // La fenêtre a été fermée pendant l'attente : la mesure qui vient de partir ne doit pas continuer seule.
+        if (_disposed)
+        {
+            if (started)
+            {
+                _measuringFps = true;
+                StopFpsWithoutWaiting();
+            }
+
             return;
         }
 
@@ -123,12 +135,6 @@ public sealed partial class MonitorViewModel
         }
 
         _measuringFps = true;
-        if (!_fpsTimerHooked)
-        {
-            _fpsTimer.Tick += async (_, _) => await RefreshFpsAsync();
-            _fpsTimerHooked = true;
-        }
-
         _fpsTimer.Start();
         OnFpsStateChanged();
         SyncOverlay();
@@ -137,7 +143,6 @@ public sealed partial class MonitorViewModel
             : T("Mesure en cours. Fréquence de l'écran inconnue.");
     }
 
-    private bool _fpsTimerHooked;
     private bool _fpsReading;
 
     private async Task RefreshFpsAsync()
@@ -157,7 +162,7 @@ public sealed partial class MonitorViewModel
         {
             StopFpsWithoutWaiting();
             OnFpsStateChanged();
-            FpsStatus = ex.Message;
+            FpsStatus = Maus.Core.Diagnostics.ErrorText.For(ex);
             return;
         }
         finally
@@ -174,7 +179,7 @@ public sealed partial class MonitorViewModel
         {
             StopFpsWithoutWaiting();
             OnFpsStateChanged();
-            FpsStatus = T("La mesure s'est arrêtée toute seule : un autre programme a peut-être repris l'écoute des images de Windows. Relancez la mesure.");
+            FpsStatus = T("La mesure s'est arrêtée toute seule : un autre programme a peut-être pris la place de MAUS pour suivre les images de Windows. Relancez la mesure.");
             return;
         }
 
@@ -193,7 +198,7 @@ public sealed partial class MonitorViewModel
         FpsLow1 = frames.HasLows ? frames.Low1Fps.ToString("0", Culture) : "—";
         FpsLow01 = frames.Low01Fps is { } low01 ? low01.ToString("0", Culture) : "—";
         FpsGpu = frames.GpuBusyShare is { } busy ? (busy * 100).ToString("0", Culture) + " %" : "—";
-        FpsAdvice = string.Join(Environment.NewLine + Environment.NewLine, FrameAdvice.Explain(frames, _refreshHz));
+        FpsAdvice = string.Join(Environment.NewLine + Environment.NewLine, [.. FrameAdvice.Explain(frames, _refreshHz), FrameAdvice.ThresholdNote]);
     }
 
     /// <summary>Arrête PresentMon (bouton) : le moteur referme sa session d'écoute.</summary>

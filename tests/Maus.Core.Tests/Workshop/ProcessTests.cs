@@ -22,6 +22,35 @@ public class ProcessTests
         new(pid, name, path, 0, 0, 0, 0, null, 1, Started);
 
     [Fact]
+    public void Each_nvidia_card_serves_one_adapter_and_the_exact_name_comes_first()
+    {
+        var plain = new NvidiaGpuState { Name = "NVIDIA GeForce RTX 4070" };
+        var ti = new NvidiaGpuState { Name = "NVIDIA GeForce RTX 4070 Ti" };
+        List<NvidiaGpuState> cards = [plain, ti];
+
+        Assert.Same(ti, WindowsSensorSource.TakeCard(cards, "NVIDIA GeForce RTX 4070 Ti"));
+        Assert.Same(plain, WindowsSensorSource.TakeCard(cards, "NVIDIA GeForce RTX 4070"));
+        Assert.Null(WindowsSensorSource.TakeCard(cards, "NVIDIA GeForce RTX 4070"));
+    }
+
+    [Fact]
+    public void Gpu_percent_is_the_busiest_engine_type_of_a_process()
+    {
+        var percent = WindowsProcessSource.GpuPercentByPid(
+        [
+            ("pid_10_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 30),
+            ("pid_10_luid_0x0_0x1_phys_0_eng_1_engtype_3D", 20),
+            ("pid_10_luid_0x0_0x1_phys_0_eng_2_engtype_Copy", 40),
+            ("pid_11_luid_0x0_0x1_phys_0_eng_3_engtype_VideoDecode", 5),
+            ("autre chose", 99),
+        ]);
+
+        Assert.Equal(50, percent[10]);
+        Assert.Equal(5, percent[11]);
+        Assert.Equal(2, percent.Count);
+    }
+
+    [Fact]
     public void Monitor_turns_cumulative_counters_into_rates()
     {
         var clock = new DateTimeOffset(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
@@ -39,7 +68,7 @@ public class ProcessTests
 
         Assert.Equal(0, first.CpuPercent);
         Assert.Equal(50, second.CpuPercent, precision: 3);
-        Assert.Equal(2_000_000, second.DiskBytesPerSecond, precision: 3);
+        Assert.Equal(2_000_000, second.IoBytesPerSecond, precision: 3);
         Assert.Equal(75, second.GpuPercent);
     }
 
@@ -80,6 +109,30 @@ public class ProcessTests
     {
         Assert.Equal(allowed, ProcessRules.CanTerminate(Sample(name, null), ownPid: 1).Allowed);
     }
+
+    [Theory]
+    [InlineData(@"C:\Windows\System32\svchost.exe", false)]
+    [InlineData(@"C:\Windows\Temp\svchost.exe", true)]
+    [InlineData(@"C:\Users\x\AppData\Local\Temp\lsass.exe", true)]
+    [InlineData(@"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18\MsMpEng.exe", false)]
+    public void A_vital_name_only_protects_a_program_at_the_right_place(string path, bool allowed) =>
+        Assert.Equal(allowed, ProcessRules.CanTerminate(Sample(Path.GetFileName(path), path), ownPid: 1, folders: Folders).Allowed);
+
+    [Fact]
+    public void Services_and_other_sessions_are_refused_with_a_reason()
+    {
+        var chrome = Sample("chrome.exe", @"C:\Program Files\Google\chrome.exe") with { SessionId = 0 };
+
+        var (allowed, reason) = ProcessRules.CanTerminate(chrome, ownPid: 1, session: 2, folders: Folders);
+
+        Assert.False(allowed);
+        Assert.NotNull(reason);
+        Assert.True(ProcessRules.CanTerminate(chrome with { SessionId = 2 }, ownPid: 1, session: 2, folders: Folders).Allowed);
+    }
+
+    [Fact]
+    public void Windows_tells_the_owner_of_this_process() =>
+        Assert.Equal(System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value, WindowsProcessSource.OwnerOf(Environment.ProcessId));
 
     [Fact]
     public void Maus_never_terminates_itself()
@@ -130,6 +183,34 @@ public class ProcessTests
         Assert.Contains("processeur", causes[0].Title, StringComparison.Ordinal);
         Assert.Contains("chrome.exe", causes[0].Explanation, StringComparison.Ordinal);
         Assert.Equal("M10", causes[1].ModuleId);
+    }
+
+    [Fact]
+    public void Processor_at_its_limit_is_a_cause()
+    {
+        var samples = new[] { new SensorSnapshot { At = DateTimeOffset.UnixEpoch, CpuPercent = 5, CpuTemperatureC = 95, CpuTjMaxC = 95 } };
+
+        var cause = SlownessDiagnosis.Analyze(samples, [], ProcessCatalog.Default).Single();
+
+        Assert.Contains("95 °C sur 95 °C", cause.Title, StringComparison.Ordinal);
+        Assert.Equal("M11", cause.ModuleId);
+    }
+
+    [Fact]
+    public void Manufacturer_limit_serves_when_the_processor_gives_none()
+    {
+        var samples = new[] { new SensorSnapshot { At = DateTimeOffset.UnixEpoch, CpuPercent = 5, CpuTemperatureC = 90 } };
+
+        Assert.Contains("90 °C sur 90 °C", SlownessDiagnosis.Analyze(samples, [], ProcessCatalog.Default, 90).Single().Title, StringComparison.Ordinal);
+        Assert.Equal(0, SlownessDiagnosis.Analyze(samples, [], ProcessCatalog.Default).Single().Weight);
+    }
+
+    [Fact]
+    public void Motherboard_zone_alone_is_never_called_overheating()
+    {
+        var samples = new[] { new SensorSnapshot { At = DateTimeOffset.UnixEpoch, CpuPercent = 5, ThermalZoneC = 99 } };
+
+        Assert.Equal(0, SlownessDiagnosis.Analyze(samples, [], ProcessCatalog.Default).Single().Weight);
     }
 
     [Fact]

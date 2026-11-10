@@ -34,6 +34,25 @@ public class LanguageSwitchTests
     }
 
     [Fact]
+    public void Zero_is_singular_in_french_only()
+    {
+        try
+        {
+            Texts.Use("fr");
+            Assert.Equal("0 ligne", Texts.Plural(0, "{0} ligne", "{0} lignes"));
+            Assert.Equal("2 lignes", Texts.Plural(2, "{0} ligne", "{0} lignes"));
+
+            Texts.Use("en");
+            Assert.Equal("0 lines", Texts.Plural(0, "{0} line", "{0} lines"));
+            Assert.Equal("1 line", Texts.Plural(1, "{0} line", "{0} lines"));
+        }
+        finally
+        {
+            Texts.Use("fr");
+        }
+    }
+
+    [Fact]
     public async Task French_stays_the_source_after_switching_back()
     {
         Texts.Use("en");

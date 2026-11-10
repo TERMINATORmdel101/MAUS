@@ -1,18 +1,91 @@
+using System.Xml.Linq;
 using System.Globalization;
 using System.Security;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Engine;
 
+/// <summary>Ce que le Planificateur dit de la tâche existante.</summary>
+public sealed record ExistingTask(DayOfWeek? Day, string? Command, string? Arguments, string? Author, string? UserId, string? RunLevel = null);
+
 /// <summary>
 /// Audit automatique chaque semaine, activé seulement par l'utilisateur : une tâche du Planificateur de tâches lance MAUS
-/// sans fenêtre (<c>--scheduled-audit</c>), en priorité basse ; MAUS ne se montre que si un problème rouge apparaît.
+/// sans fenêtre (<c>--scheduled-audit</c>), en priorité basse et sans droits ; MAUS se signale selon le choix de l'utilisateur (par défaut : seulement un problème rouge).
 /// Aucune donnée n'est envoyée ; la tâche se retire en un clic.
 /// </summary>
 public static class ScheduledAudit
 {
     public const string TaskName = @"MAUS\WeeklyAudit";
     public const string Argument = "--scheduled-audit";
+    private const string TaskAuthor = "MAUS";
+
+    /// <summary>
+    /// Sans droits administrateur (0.8.6) : l'environnement d'une tâche vient du profil, modifiable sans droits, et .NET le lit
+    /// avant le premier code de MAUS. Une tâche à droits élevés, lancée sans invite, serait une porte ouverte.
+    /// </summary>
+    internal const string RunLevel = "LeastPrivilege";
+
+    private static readonly XNamespace TaskNs = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+
+    /// <summary>La tâche telle que le Planificateur la décrit ; <c>null</c> si sa définition est illisible.</summary>
+    public static ExistingTask? ParseTask(string xml)
+    {
+        ArgumentNullException.ThrowIfNull(xml);
+        try
+        {
+            var document = XDocument.Parse(xml);
+            var day = document.Descendants(TaskNs + "DaysOfWeek").Elements().FirstOrDefault()?.Name.LocalName;
+            return new ExistingTask(
+                Enum.TryParse<DayOfWeek>(day, out var parsed) && Enum.IsDefined(parsed) ? parsed : null,
+                document.Descendants(TaskNs + "Command").FirstOrDefault()?.Value.Trim('"', ' '),
+                document.Descendants(TaskNs + "Arguments").FirstOrDefault()?.Value.Trim(),
+                document.Descendants(TaskNs + "Author").FirstOrDefault()?.Value.Trim(),
+                document.Descendants(TaskNs + "UserId").FirstOrDefault()?.Value.Trim(),
+                document.Descendants(TaskNs + "RunLevel").FirstOrDefault()?.Value.Trim());
+        }
+        catch (System.Xml.XmlException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// La tâche est bien celle que MAUS pose : son auteur, son unique argument, et l'un des comptes de cette session. Rien
+    /// d'autre n'est recréé : un programme qui aurait glissé sa tâche sous ce nom n'obtient pas une tâche à droits élevés.
+    /// </summary>
+    public static bool IsMausTask(ExistingTask task, IEnumerable<string?> accounts)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(accounts);
+        return task.Author == TaskAuthor && task.Arguments == Argument && task.UserId is { Length: > 0 } user
+            && accounts.Contains(user, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// La tâche, unique sur le PC, n'est pas celle de ce compte (un autre compte l'a posée, ou elle ne vient pas de MAUS) : la
+    /// remplacer ou la retirer ne se fait pas sans le dire. Une tâche sans compte lisible compte comme étrangère.
+    /// </summary>
+    public static bool BelongsToSomeoneElse(ExistingTask? task, IEnumerable<string?> accounts) =>
+        task is not null && !IsMausTask(task, accounts);
+
+    /// <summary>
+    /// Tâche posée par MAUS sous une version précédente, encore élevée : à recréer sans droits. Sans niveau lisible ou déjà sans
+    /// droits, rien à faire ; une tâche qui n'est pas celle de MAUS n'est jamais recréée.
+    /// </summary>
+    public static bool MustDropRights(ExistingTask task, IEnumerable<string?> accounts)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return task is { Day: not null, RunLevel: { Length: > 0 } level }
+            && !level.Equals(RunLevel, StringComparison.OrdinalIgnoreCase)
+            && IsMausTask(task, accounts);
+    }
+
+    /// <summary>Ce que l'interface a besoin de savoir de la tâche lue : rien n'est décidé ni recréé ici.</summary>
+    public static Broker.ScheduleState StateOf(ExistingTask? task, IReadOnlyList<string?> accounts) => new(
+        task?.Day,
+        task?.Command,
+        BelongsToSomeoneElse(task, accounts),
+        task is not null && MustDropRights(task, accounts));
 
     /// <summary>Définition XML de la tâche (format du Planificateur de tâches, enregistrée par <c>schtasks /Create /XML</c>).</summary>
     /// <param name="executable">Chemin complet de MAUS.exe.</param>
@@ -32,7 +105,7 @@ public static class ScheduledAudit
             <?xml version="1.0" encoding="UTF-16"?>
             <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
               <RegistrationInfo>
-                <Author>MAUS</Author>
+                <Author>{TaskAuthor}</Author>
                 <Description>{E(T("Audit hebdomadaire de MAUS, en lecture seule. MAUS ne s'affiche que s'il trouve un problème rouge. Pour l'arrêter : MAUS, onglet Corrections, « Vos choix »."))}</Description>
               </RegistrationInfo>
               <Triggers>
@@ -51,7 +124,7 @@ public static class ScheduledAudit
                 <Principal id="Author">
                   <UserId>{E(userId)}</UserId>
                   <LogonType>InteractiveToken</LogonType>
-                  <RunLevel>HighestAvailable</RunLevel>
+                  <RunLevel>{RunLevel}</RunLevel>
                 </Principal>
               </Principals>
               <Settings>
@@ -77,27 +150,9 @@ public static class ScheduledAudit
     }
 
     /// <summary>
-    /// Raison de refuser la tâche, ou <c>null</c>. Elle lance MAUS avec les droits les plus élevés sans rien demander :
-    /// son exécutable doit être dans un dossier que seul un administrateur peut modifier (Program Files, dont celui des
-    /// applications du Microsoft Store). Ailleurs (Téléchargements, Bureau, clé USB), n'importe quel programme ouvert par
-    /// l'utilisateur pourrait remplacer MAUS.exe et obtenir ainsi les droits administrateur à la prochaine exécution.
-    /// </summary>
-    /// <param name="executable">Chemin complet de MAUS.exe.</param>
-    /// <param name="protectedRoots">Dossiers réservés aux administrateurs (voir <see cref="ProtectedRoots"/>).</param>
-    public static string? Refusal(string executable, IReadOnlyList<string> protectedRoots)
-    {
-        ArgumentNullException.ThrowIfNull(executable);
-
-        return IsInProtectedFolder(executable, protectedRoots)
-            ? null
-            : T("L'audit automatique n'est proposé que si MAUS est installé dans un dossier protégé (Program Files, ou par le Microsoft Store). Depuis {0}, un autre programme pourrait remplacer MAUS.exe et profiter des droits administrateur de la tâche.",
-                Path.GetDirectoryName(executable) ?? executable);
-    }
-
-    /// <summary>
     /// Vrai si <paramref name="executable"/> est dans un dossier que seuls les administrateurs peuvent modifier (Program Files,
-    /// WindowsApps compris) : un programme sans droits ne peut pas y remplacer MAUS.exe. Sert à la tâche hebdomadaire et à la
-    /// demande des droits administrateur (le moteur est le même MAUS.exe, lancé avec ces droits).
+    /// WindowsApps compris) : un programme sans droits ne peut pas y remplacer MAUS.exe. Sert à la demande des droits
+    /// administrateur (le moteur est le même MAUS.exe, lancé avec ces droits).
     /// </summary>
     /// <param name="executable">Chemin complet de MAUS.exe.</param>
     /// <param name="protectedRoots">Dossiers réservés aux administrateurs (voir <see cref="ProtectedRoots"/>).</param>
@@ -129,6 +184,13 @@ public static class ScheduledAudit
         return string.Equals(previous.Family, current.Family, StringComparison.OrdinalIgnoreCase)
             && string.Equals(previous.File, current.File, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(previous.Version, current.Version, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Vrai si l'exécutable est rangé dans le dossier d'un paquet du Microsoft Store.</summary>
+    public static bool IsInStoreFolder(string executable)
+    {
+        ArgumentNullException.ThrowIfNull(executable);
+        return StoreFolder(executable) is not null;
     }
 
     /// <summary>Famille du paquet (nom, architecture, éditeur), version et fichier d'un exécutable rangé sous WindowsApps.</summary>
@@ -164,6 +226,11 @@ public static class ScheduledAudit
     /// <summary>Problèmes rouges qui justifient de déranger l'utilisateur (les constats « voulus » n'en font plus partie).</summary>
     public static IReadOnlyList<Finding> WorthNotifying(IEnumerable<ModuleResult> results) =>
         results.SelectMany(r => r.Findings).Where(f => f.Status == FindingStatus.Problem).ToList();
+
+    /// <summary>Résumé d'un audit sans problème rouge, pour qui a choisi d'être prévenu à chaque fois ; le score est absent s'il est partiel.</summary>
+    public static string SummaryText(int? score) => score is { } value
+        ? T("L'audit de la semaine est terminé : score {0} sur 100, aucun problème rouge.", value)
+        : T("L'audit de la semaine est terminé : aucun problème rouge, mais certains modules n'ont pas pu être vérifiés.");
 
     /// <summary>
     /// Texte de la notification : combien de problèmes, et les premiers ; puis les modules qui n'ont pas pu être vérifiés

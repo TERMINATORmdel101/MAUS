@@ -13,20 +13,26 @@ namespace Maus.Bench;
 internal sealed record SharePicture(string Id, string File);
 
 /// <summary>
-/// Dossier temporaire des vignettes (<c>%TEMP%\MAUS-benchmark-&lt;processus&gt;</c>), effacé à la fin du benchmark.
+/// Dossier temporaire des vignettes (<c>%TEMP%\MAUS-benchmark-&lt;nom tiré au hasard&gt;</c>, créé par ce processus à la première
+/// vignette). À la fin du benchmark, seuls les fichiers qu'il y a écrits sont effacés, puis le dossier s'il est vide.
 /// </summary>
 internal sealed class SharePictureStore : IDisposable
 {
-    private readonly string _folder = Path.Combine(Path.GetTempPath(), "MAUS-benchmark-" + Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    private readonly List<string> _files = [];
+    private string? _folder;
+
+    /// <summary>Dossier des vignettes ; <c>null</c> avant la première.</summary>
+    internal string? Folder => _folder;
 
     /// <summary>Réduit l'image à la taille d'une vignette et l'écrit sur le disque ; l'image entière n'est pas gardée.</summary>
     public SharePicture? Save(string id, byte[] pixels, int width, int height)
     {
         try
         {
-            Directory.CreateDirectory(_folder);
+            _folder ??= Directory.CreateTempSubdirectory("MAUS-benchmark-").FullName;
             var file = Path.Combine(_folder, id + ".rgba");
             File.WriteAllBytes(file, ShareCard.Fit(pixels, width, height));
+            _files.Add(file);
             return new SharePicture(id, file);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -40,9 +46,14 @@ internal sealed class SharePictureStore : IDisposable
     {
         try
         {
-            if (Directory.Exists(_folder))
+            foreach (var file in _files)
             {
-                Directory.Delete(_folder, recursive: true);
+                File.Delete(file);
+            }
+
+            if (_folder is not null)
+            {
+                Directory.Delete(_folder);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -61,8 +72,8 @@ internal static class ShareCard
 {
     public const int Width = 1920;
     public const int Height = 1080;
-    private const int CellWidth = 480;
-    private const int CellHeight = 270;
+    internal const int CellWidth = 480;
+    internal const int CellHeight = 270;
     private const int Columns = 3;
     private const int Rows = 2;
 
@@ -75,7 +86,7 @@ internal static class ShareCard
         {
             var atlasPixels = Atlas(cells, out var atlasWidth, out var atlasHeight);
             atlas = device.CreateTexture(TextureDesc.Image(atlasWidth, atlasHeight, PixelFormat.Rgba8Unorm, "Vignettes du résultat"));
-            device.UploadTexture(atlas, 0, 0, atlasPixels, atlasWidth * 4);
+            device.UploadTexture(atlas, 0, atlasPixels, atlasWidth * 4);
         }
 
         using var target = device.CreateTexture(TextureDesc.Target(Width, Height, PixelFormat.Rgba8Unorm, "Image du résultat"));
@@ -166,7 +177,7 @@ internal static class ShareCard
         ui.Text(subtitle, 170, 92, 21, UiColors.Grey());
         if (!report.Completed)
         {
-            ui.Text(T("Passe arrêtée avant la fin : scores partiels"), Width - 56, 44, 20, UiColors.Rose(), bold: true, TextAlign.Right);
+            ui.Text(T("Mesure arrêtée avant la fin : scores partiels"), Width - 56, 44, 20, UiColors.Rose(), bold: true, TextAlign.Right);
         }
 
         // Score principal.
@@ -174,7 +185,7 @@ internal static class ShareCard
             ? (T("Score combiné"), report.OverallScore)
             : report.GpuScore > 0 ? (T("Score de la carte graphique"), report.GpuScore) : (T("Score du processeur"), report.CpuScore);
         ui.Text(label.ToUpper(culture), 60, 178, 22, UiColors.Lilac(), bold: true);
-        ui.Text(Points(score), 52, 204, 150, UiColors.White(), bold: true, glow: 0.4f);
+        ui.Text(BenchmarkTexts.Points(score), 52, 204, 150, UiColors.White(), bold: true, glow: 0.4f);
         ui.Text(T("Les points se comparent à résolution égale"), 60, 384, 17, UiColors.Grey(0.9f));
 
         var y = 446f;
@@ -185,8 +196,8 @@ internal static class ShareCard
         var (strongest, weakest) = BenchmarkScoring.Extremes(report.Tests);
         if (strongest is not null && weakest is not null)
         {
-            ui.Text(T("Point fort : {0}", BenchmarkRunner.TestName(strongest.Id)), 60, y + 8, 20, UiColors.Mint(), bold: true);
-            ui.Text(T("Point faible : {0}", BenchmarkRunner.TestName(weakest.Id)), 60, y + 40, 20, UiColors.Rose(), bold: true);
+            ui.Text(T("Le plus rapide : {0}", BenchmarkTexts.Name(strongest.Id)), 60, y + 8, 20, UiColors.Mint(), bold: true);
+            ui.Text(T("Le moins rapide : {0}", BenchmarkTexts.Name(weakest.Id)), 60, y + 40, 20, UiColors.Sand(), bold: true);
         }
 
         // Légendes des vignettes : nom du test, points, mesure.
@@ -200,21 +211,17 @@ internal static class ShareCard
             }
 
             ui.Text(Trim(ui, ShortName(test.Id), 18, 230), x + 12, top + 202.5f - 37, 18, UiColors.White(0.95f), bold: true);
-            ui.Text(Points(test.Score), x + 348, top + 202.5f - 42, 26, UiColors.White(), bold: true, TextAlign.Right);
-            var detail = test.Device != "cpu"
-                ? T("{0} images/s", test.Value.ToString("0.0", culture))
-                : test.Value.ToString("0.00", culture) + " " + test.Unit;
-            ui.Text(Capability(test.Id) + "  ·  " + detail, x + 2, top + 202.5f + 12, 15, UiColors.Grey(0.9f));
+            ui.Text(BenchmarkTexts.Points(test.Score), x + 348, top + 202.5f - 42, 26, UiColors.White(), bold: true, TextAlign.Right);
+            ui.Text(Capability(test.Id) + "  ·  " + BenchmarkTexts.Measure(test), x + 2, top + 202.5f + 12, 15, UiColors.Grey(0.9f));
         }
 
         // Tests sans vignette (processeur) : une ligne chacun sous les vignettes.
         var listY = 166 + (Rows * 292) + 8f;
         foreach (var test in report.Tests.Where(t => cells.TrueForAll(c => c.Id != t.Id)))
         {
-            ui.Text(BenchmarkRunner.TestName(test.Id), 764, listY, 18, UiColors.White(0.9f));
-            var value = test.Device != "cpu" ? T("{0} images/s", test.Value.ToString("0.0", culture)) : test.Value.ToString("0.00", culture) + " " + test.Unit;
-            ui.Text(value, 1460, listY + 2, 15, UiColors.Grey(0.85f), align: TextAlign.Right);
-            ui.Text(Points(test.Score), 1864, listY - 2, 22, UiColors.White(), bold: true, TextAlign.Right);
+            ui.Text(BenchmarkTexts.Name(test.Id), 764, listY, 18, UiColors.White(0.9f));
+            ui.Text(BenchmarkTexts.Measure(test), 1460, listY + 2, 15, UiColors.Grey(0.85f), align: TextAlign.Right);
+            ui.Text(BenchmarkTexts.Points(test.Score), 1864, listY - 2, 22, UiColors.White(), bold: true, TextAlign.Right);
             listY += 34;
         }
 
@@ -233,7 +240,7 @@ internal static class ShareCard
 
         ui.Rect(52, y, 620, 112, new Vector4(1, 1, 1, 0.05f), 16);
         ui.Text(title, 74, y + 14, 22, accent, bold: true);
-        ui.Text(Points(score), 650, y + 6, 44, UiColors.White(), bold: true, TextAlign.Right);
+        ui.Text(BenchmarkTexts.Points(score), 650, y + 6, 44, UiColors.White(), bold: true, TextAlign.Right);
         ui.Text(Trim(ui, name, 17, 560), 74, y + 58, 17, UiColors.Grey(0.95f));
         var tests = report.Tests.Where(t => t.Device == device).ToList();
         if (BenchmarkSensorText.Describe(BenchmarkSensorSummary.Merge(tests.Select(t => t.Sensors)), device) is { } sensors)
@@ -260,7 +267,6 @@ internal static class ShareCard
         return text.TrimEnd() + "…";
     }
 
-    private static string Points(double score) => score > 0 ? score.ToString("N0", Culture) : "—";
 
     /// <summary>Nom court d'un test sur sa vignette (le titre de la scène).</summary>
     private static string ShortName(string id) => id switch
@@ -271,7 +277,7 @@ internal static class ShareCard
         "fractal" => T("Forge fractale"),
         "materials" => T("Cabinet de curiosités"),
         "raytracing" => T("Galerie des glaces"),
-        _ => BenchmarkRunner.TestName(id),
+        _ => BenchmarkTexts.Name(id),
     };
 
     /// <summary>Ce que le test sollicite, sous sa vignette.</summary>

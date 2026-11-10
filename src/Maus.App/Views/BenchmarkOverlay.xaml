@@ -1,0 +1,126 @@
+<UserControl x:Class="Maus.App.Views.BenchmarkOverlay"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="clr-namespace:Maus.App"
+             xmlns:appearance="clr-namespace:Maus.App.Appearance"
+             xmlns:controls="clr-namespace:Maus.App.Controls"
+             Visibility="Collapsed" KeyboardNavigation.TabNavigation="Cycle" PreviewKeyDown="OnPreviewKey">
+    <UserControl.Resources>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
+        <!-- Une valeur mesurée : son nom en petit, la valeur dessous. -->
+        <DataTemplate x:Key="ValueCell">
+            <StackPanel MinWidth="136" Margin="0,0,14,4">
+                <TextBlock Text="{Binding Label, Mode=OneWay}" Style="{StaticResource Muted}" FontSize="{StaticResource FontSizeNote}" />
+                <TextBlock Text="{Binding Value, Mode=OneWay}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+    <Grid>
+        <!-- Le fond assombri : un clic à côté referme. -->
+        <Border Background="#A6000000" MouseLeftButtonDown="OnBackdropClick" />
+
+        <!-- Détail d'un score : les couleurs de l'image à partager en haut, le score qui monte, les barres qui se remplissent l'une après l'autre. -->
+        <Border x:Name="DetailShadow" Visibility="Collapsed" Margin="28" MaxWidth="880" VerticalAlignment="Center" CornerRadius="16"
+                Background="{DynamicResource ApplicationBackgroundBrush}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" ShadowDepth="4" Direction="270" Opacity="0.5" />
+            </Border.Effect>
+            <Border x:Name="DetailCard" CornerRadius="16" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" SizeChanged="OnRoundedSizeChanged">
+                <DockPanel>
+                    <UniformGrid DockPanel.Dock="Top" Rows="1" Height="5">
+                        <Border Background="{StaticResource MausBlue}" />
+                        <Border Background="{StaticResource MausRed}" />
+                        <Border Background="{StaticResource MausGreen}" />
+                        <Border Background="{StaticResource MausGold}" />
+                    </UniformGrid>
+                    <Border x:Name="DetailHeader" DockPanel.Dock="Top" Padding="24,18">
+                        <DockPanel>
+                            <TextBlock x:Name="DetailScore" DockPanel.Dock="Right" FontSize="52" FontWeight="Bold" VerticalAlignment="Center" Margin="16,0,0,0">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect x:Name="ScoreGlow" BlurRadius="20" ShadowDepth="0" Opacity="0.55" />
+                                </TextBlock.Effect>
+                            </TextBlock>
+                            <Border x:Name="DetailBadge" DockPanel.Dock="Left" Width="48" Height="48" CornerRadius="24" Margin="0,0,14,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="DetailGlyph" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="DetailTitle" FontSize="{StaticResource FontSizeCardTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock x:Name="DetailSubtitle" Style="{StaticResource Muted}" FontSize="{StaticResource FontSizeSmall}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
+                        <DockPanel>
+                            <Button x:Name="CloseDetail" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.CloseWindow}" Padding="20,6" Click="OnClose" />
+                            <Button x:Name="CopyDetail" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkCopy}" Padding="14,6" HorizontalAlignment="Left" Command="{Binding Workshop.CopyBenchmarkCommand}" />
+                        </DockPanel>
+                    </Border>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="24,16,24,14">
+                            <TextBlock x:Name="DetailWarning" FontWeight="SemiBold" Foreground="{StaticResource MausRed}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                            <Border x:Name="DetailHealth" CornerRadius="10" Padding="12,8" Margin="0,0,0,12" Background="{DynamicResource PastelMint}">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Text="&#xE73E;" Foreground="{DynamicResource PastelMintInk}" Margin="0,2,10,0" />
+                                    <TextBlock x:Name="DetailHealthText" Foreground="{DynamicResource PastelMintInk}" TextWrapping="Wrap" />
+                                </DockPanel>
+                            </Border>
+                            <ItemsControl Focusable="False" x:Name="DetailChips" Margin="0,0,0,10" ItemTemplate="{StaticResource ValueCell}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                            <ItemsControl Focusable="False" x:Name="DetailRows">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8" Padding="14,10" CornerRadius="10" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" appearance:Motion.EnterOnLoad="True">
+                                            <StackPanel>
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Points, Mode=OneWay}" FontWeight="Bold" FontSize="{StaticResource FontSizeCardTitle}" Margin="10,0,0,0" />
+                                                    <Border DockPanel.Dock="Right" Style="{StaticResource Chip}" Margin="10,0,0,0" VerticalAlignment="Center" Loaded="OnMarkLoaded">
+                                                        <TextBlock Text="{Binding Mark, Mode=OneWay}" FontSize="{StaticResource FontSizeNote}" FontWeight="SemiBold" />
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                </DockPanel>
+                                                <ProgressBar AutomationProperties.Name="{Binding Name, Mode=OneWay}" Height="8" Maximum="1" Margin="0,8,0,8" Tag="{Binding Fill, Mode=OneWay}" Loaded="OnBarLoaded"
+                                                             Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+                                                <ItemsControl Focusable="False" ItemsSource="{Binding Values, Mode=OneWay}" ItemTemplate="{StaticResource ValueCell}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <controls:Sparkline x:Name="DetailTrend" Height="64" Maximum="0" Margin="0,2,0,10" Stroke="{StaticResource MausAccent}" />
+                            <TextBlock x:Name="DetailNote" Style="{StaticResource Muted}" FontSize="{StaticResource FontSizeSmall}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Border>
+
+        <!-- La carte de score en grand : l'image arrive en grandissant, un clic dessus ou à côté referme. -->
+        <DockPanel x:Name="PicturePanel" Visibility="Collapsed" Margin="48,32" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <WrapPanel DockPanel.Dock="Bottom" HorizontalAlignment="Center" Margin="0,14,0,0">
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkImageCopy}" Command="{Binding Workshop.CopyBenchmarkImageCommand}" Margin="0,0,8,0" Padding="14,6" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkImageOpen}" Command="{Binding Workshop.OpenBenchmarkImageCommand}" Margin="0,0,8,0" Padding="14,6" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.BenchmarkImageFolder}" Command="{Binding Workshop.ShowBenchmarkImageCommand}" Margin="0,0,8,0" Padding="14,6" />
+                <Button x:Name="ClosePicture" Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.CloseWindow}" Padding="20,6" Click="OnClose" />
+            </WrapPanel>
+            <Border CornerRadius="12">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="34" ShadowDepth="4" Direction="270" Opacity="0.6" />
+                </Border.Effect>
+                <Image x:Name="Picture" Stretch="Uniform" IsHitTestVisible="False" SizeChanged="OnRoundedSizeChanged"
+                       AutomationProperties.Name="{x:Static app:Ui.BenchmarkImageTitle}" />
+            </Border>
+        </DockPanel>
+    </Grid>
+</UserControl>

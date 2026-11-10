@@ -17,12 +17,6 @@ internal sealed class WindowsLifecycleCatalog
 {
     public const string FileName = "m03-windows-lifecycle.json";
 
-    public string Reviewed { get; init; } = string.Empty;
-
-    public string Source { get; init; } = string.Empty;
-
-    public int MinimumSupportedBuild { get; init; }
-
     public DateOnly Windows10EndOfSupport { get; init; }
 
     public IReadOnlyList<WindowsRelease> Releases { get; init; } = [];

@@ -1,4 +1,5 @@
 using System.Globalization;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M13Security;
 
@@ -48,7 +49,7 @@ internal static class CpuMitigationOverrides
         var parts = new List<string>();
         if ((overrideValue & SpectreV2Bit) != 0)
         {
-            parts.Add("Spectre variante 2");
+            parts.Add(T("Spectre variante 2"));
         }
 
         if ((overrideValue & MeltdownBit) != 0)
@@ -56,7 +57,7 @@ internal static class CpuMitigationOverrides
             parts.Add("Meltdown");
         }
 
-        return string.Join(" et ", parts);
+        return string.Join(T(" et "), parts);
     }
 
     /// <summary>Valeur numérique d'une valeur de registre (DWORD, QWORD ou texte décimal ou « 0x… »), <c>null</c> si absente ou illisible.</summary>

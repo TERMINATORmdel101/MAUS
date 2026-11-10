@@ -51,8 +51,7 @@ internal sealed record AdvancedColorInfo(
     bool HdrSupported,
     bool HdrActive,
     ColorEncoding Encoding,
-    int BitsPerColorChannel,
-    AdvancedColorMode? ActiveMode = null);
+    int BitsPerColorChannel);
 
 /// <summary>Un chemin d'affichage actif : un écran, sa source et l'adaptateur qui le pilote.</summary>
 internal sealed record DisplayPath

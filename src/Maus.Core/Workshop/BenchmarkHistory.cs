@@ -12,11 +12,18 @@ public sealed record BenchmarkEntry(string Kind, double Score, bool Stable, Date
 /// Stocké dans <c>%LOCALAPPDATA%\MAUS\benchmarks.json</c> : rien n'est envoyé (aucune télémétrie).
 /// </summary>
 /// <param name="wait">Attente entre deux tentatives de lecture (remplaçable pour les tests).</param>
-public sealed class BenchmarkHistory(string path, Action<TimeSpan>? wait = null)
+public sealed class BenchmarkHistory(string path, Action<TimeSpan>? wait = null, int maxEntries = 200)
 {
-    private const int MaxEntries = 200;
-
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+
+    private readonly JsonHistoryFile<BenchmarkEntry> _file = new(
+        path,
+        Options,
+        maxEntries,
+        e => e.At,
+        error => T("L'historique des scores ({0}) est momentanément illisible : il n'est pas réécrit, pour ne rien perdre. {1}", path, error?.Message),
+        wait,
+        clean: Clean);
 
     public static BenchmarkHistory CreateDefault() =>
         new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "benchmarks.json"));
@@ -25,12 +32,12 @@ public sealed class BenchmarkHistory(string path, Action<TimeSpan>? wait = null)
     public static BenchmarkHistory CreateHealth() =>
         new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "health-history.json"));
 
+    /// <summary>Mesures gardées dans le temps (disques, batterie, températures), à part : elles sont plus nombreuses.</summary>
+    public static BenchmarkHistory CreateMeasures() =>
+        new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "measures-history.json"), maxEntries: 2000);
+
     /// <summary>Passages enregistrés, pour l'affichage ; vide si l'historique est absent ou illisible.</summary>
-    public IReadOnlyList<BenchmarkEntry> Load()
-    {
-        var read = AtomicFile.ReadText(path, wait: wait);
-        return read.State == StoredFileState.Read && Parse(read.Text!) is { } entries ? entries : [];
-    }
+    public IReadOnlyList<BenchmarkEntry> Load() => _file.Load();
 
     /// <summary>
     /// Ajoute un passage. L'historique n'est réécrit qu'à partir de ce qui a vraiment été lu : un fichier momentanément
@@ -38,32 +45,13 @@ public sealed class BenchmarkHistory(string path, Action<TimeSpan>? wait = null)
     /// </summary>
     /// <exception cref="IOException">Historique illisible (laissé intact) ou écriture impossible.</exception>
     /// <exception cref="UnauthorizedAccessException">Écriture refusée.</exception>
-    public void Add(BenchmarkEntry entry)
-    {
-        var read = AtomicFile.ReadText(path, wait: wait);
-        IReadOnlyList<BenchmarkEntry> existing = [];
-        if (read.State == StoredFileState.Unavailable)
-        {
-            throw new IOException(T("L'historique des scores ({0}) est momentanément illisible : il n'est pas réécrit, pour ne rien perdre. {1}", path, read.Error?.Message), read.Error);
-        }
+    public void Add(BenchmarkEntry entry) => _file.Add(entry);
 
-        if (read.State == StoredFileState.Read)
-        {
-            if (Parse(read.Text!) is { } entries)
-            {
-                existing = entries;
-            }
-            else
-            {
-                // Abîmé : une copie reste à côté, l'historique repart de ce passage.
-                AtomicFile.KeepCopy(path, DateTime.Now);
-            }
-        }
-
-        var updated = existing.Append(entry).OrderBy(e => e.At).TakeLast(MaxEntries).ToList();
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        AtomicFile.WriteAllText(path, JsonSerializer.Serialize(updated, Options));
-    }
+    /// <summary>Fichier modifiable par un programme du même compte : une valeur impossible n'est pas lue, plutôt que montrée.</summary>
+    private static BenchmarkEntry? Clean(BenchmarkEntry entry) =>
+        entry.Kind is null || !StoredValues.IsPastDate(entry.At) || !ScoreTrends.IsPossible(entry.Kind, entry.Score)
+            ? null
+            : entry with { Kind = StoredValues.Text(entry.Kind, 500), Detail = entry.Detail is null ? null : StoredValues.Text(entry.Detail, 500) };
 
     /// <summary>Écart en % avec la moyenne des passages précédents du même type ; <c>null</c> sans passage précédent.</summary>
     public static double? CompareToPrevious(IReadOnlyList<BenchmarkEntry> previous, BenchmarkEntry current)
@@ -72,18 +60,5 @@ public sealed class BenchmarkHistory(string path, Action<TimeSpan>? wait = null)
 
         var same = previous.Where(e => e.Kind == current.Kind && e.At < current.At && e.Stable).Select(e => e.Score).ToList();
         return same.Count == 0 || same.Average() <= 0 ? null : Math.Round((current.Score / same.Average() - 1) * 100, 1);
-    }
-
-    /// <summary>JSON invalide (fichier abîmé) : <c>null</c>.</summary>
-    private static List<BenchmarkEntry>? Parse(string text)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<List<BenchmarkEntry>>(text, Options);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 }

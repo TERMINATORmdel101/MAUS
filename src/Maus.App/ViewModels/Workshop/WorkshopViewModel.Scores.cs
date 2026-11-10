@@ -44,12 +44,19 @@ public sealed partial class WorkshopViewModel
 
     private void LoadScoreHistory()
     {
-        _scoreEntries = BenchmarkHistory.CreateDefault().Load();
+        _scoreEntries =
+        [
+            .. BenchmarkHistory.CreateDefault().Load(),
+            .. BenchmarkHistory.CreateHealth().Load().Where(e => e.Kind == ScoreTrends.WeeklyHealthKind),
+            .. BenchmarkHistory.CreateMeasures().Load(),
+        ];
         var selected = ScoreKind?.Value;
         ScoreKinds.Clear();
         foreach (var kind in _scoreEntries.Where(e => e.Stable).Select(e => e.Kind).Distinct(StringComparer.Ordinal))
         {
-            ScoreKinds.Add(new TestOption<string>(ScoreTrends.Label(kind), kind));
+            // Une mesure (disque, batterie, température) porte son nom dans sa dernière entrée.
+            var label = MeasureHistory.IsMeasure(kind) ? _scoreEntries.Last(e => e.Kind == kind).Detail ?? kind : ScoreTrends.Label(kind);
+            ScoreKinds.Add(new TestOption<string>(label, kind));
         }
 
         OnPropertyChanged(nameof(HasScores));
@@ -72,7 +79,7 @@ public sealed partial class WorkshopViewModel
         ScoreTrend = ScoreTrends.Describe(series);
         foreach (var entry in series.AsEnumerable().Reverse().Take(10))
         {
-            ScoreLines.Add(T("{0:g} · {1:0.#} {2}{3}", entry.At.LocalDateTime, entry.Score, ScoreTrends.Unit(entry.Kind), entry.Detail is { Length: > 0 } detail ? " · " + detail : string.Empty));
+            ScoreLines.Add(T("{0:g} · {1:0.#} {2}{3}", entry.At.LocalDateTime, entry.Score, ScoreTrends.Unit(entry.Kind), !MeasureHistory.IsMeasure(entry.Kind) && entry.Detail is { Length: > 0 } detail ? " · " + detail : string.Empty));
         }
     }
 }

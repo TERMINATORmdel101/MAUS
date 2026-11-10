@@ -31,11 +31,19 @@ public class DevicesModuleTests
     {
         var findings = await Detect(new FakeCim().Answer(DevicesModule.ProblemQuery, Device("Lecteur de cartes", "SDHost", 28)));
 
-        Assert.Equal(FindingStatus.Warning, findings.Single(f => f.Id == "M17.devices").Status);
+        Assert.Equal(FindingStatus.Info, findings.Single(f => f.Id == "M17.devices").Status);
         var device = findings.Single(f => f.Id.StartsWith("M17.device.", StringComparison.Ordinal));
         Assert.Contains("code 28", device.Current, StringComparison.Ordinal);
         Assert.Contains("Windows Update", device.Advice, StringComparison.Ordinal);
         Assert.Equal("ms-settings:windowsupdate-optionalupdates", device.SettingsPage);
+    }
+
+    [Fact]
+    public async Task The_name_of_a_device_is_marked_as_read_on_the_pc()
+    {
+        var findings = await Detect(new FakeCim().Answer(DevicesModule.ProblemQuery, Device("Lecteur de cartes", "SDHost", 28)));
+
+        Assert.True(findings.Single(f => f.Id.StartsWith("M17.device.", StringComparison.Ordinal)).ExplanationHasPcData);
     }
 
     [Fact]
@@ -100,6 +108,7 @@ public class DevicesModuleTests
         Assert.Equal(FindingStatus.Info, unsigned.Status);
         Assert.Equal("1 sur 2 : Manette maison", unsigned.Current);
         Assert.Contains("Voir les pilotes non signés", unsigned.Advice, StringComparison.Ordinal);
+        Assert.Equal(["Manette maison", "Realtek(R) Audio"], unsigned.Followed!.Select(d => d.Name));
 
         // Le résumé des périphériques en erreur ouvre la page des mises à jour facultatives de Windows.
         Assert.Equal("ms-settings:windowsupdate-optionalupdates", findings.Single(f => f.Id == "M17.devices").SettingsPage);

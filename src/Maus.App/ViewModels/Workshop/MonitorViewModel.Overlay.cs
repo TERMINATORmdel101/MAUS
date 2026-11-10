@@ -15,7 +15,6 @@ public sealed partial class MonitorViewModel
 {
     private readonly DispatcherTimer _overlaySave = new() { Interval = TimeSpan.FromMilliseconds(700) };
     private FpsOverlayWindow? _overlay;
-    private bool _overlaySaveHooked;
     private bool _overlayEnabled = AppearanceManager.Current.OverlayEnabled;
     private double _overlayScale = AppearanceManager.Current.OverlayScaleUsed;
     private double _overlayOpacity = AppearanceManager.Current.OverlayOpacityUsed;
@@ -116,36 +115,32 @@ public sealed partial class MonitorViewModel
         if (_overlay is { } overlay)
         {
             _overlay = null;
-            overlay.Dispatcher.Invoke(overlay.Close);
+            overlay.Close();
         }
     }
 
     /// <summary>Enregistre les réglages un peu après le dernier mouvement du curseur (pas à chaque pixel).</summary>
     private void SaveOverlaySoon()
     {
-        if (!_overlaySaveHooked)
-        {
-            _overlaySave.Tick += (_, _) =>
-            {
-                _overlaySave.Stop();
-                var (enabled, scale, opacity, corner) = (OverlayEnabled, OverlayScale, OverlayOpacity, OverlayCornerChoice.Value);
-                AppearanceManager.Apply(AppearanceManager.Current with { OverlayEnabled = enabled, OverlayScale = scale, OverlayOpacity = opacity, OverlayCorner = corner });
-                Task.Run(() =>
-                {
-                    try
-                    {
-                        EngineHost.Preferences.Update(p => p with { OverlayEnabled = enabled, OverlayScale = scale, OverlayOpacity = opacity, OverlayCorner = corner });
-                    }
-                    catch (Exception ex) when (ex is Maus.Core.Fixes.JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException or Maus.Core.Engine.Broker.EngineException)
-                    {
-                        // Le réglage vaut pour cette ouverture de MAUS.
-                    }
-                }).Forget("compteur au-dessus du jeu : enregistrement des réglages");
-            };
-            _overlaySaveHooked = true;
-        }
-
         _overlaySave.Stop();
         _overlaySave.Start();
+    }
+
+    private void SaveOverlay()
+    {
+        _overlaySave.Stop();
+        var (enabled, scale, opacity, corner) = (OverlayEnabled, OverlayScale, OverlayOpacity, OverlayCornerChoice.Value);
+        AppearanceManager.Apply(AppearanceManager.Current with { OverlayEnabled = enabled, OverlayScale = scale, OverlayOpacity = opacity, OverlayCorner = corner });
+        Task.Run(() =>
+        {
+            try
+            {
+                EngineHost.Preferences.Update(p => p with { OverlayEnabled = enabled, OverlayScale = scale, OverlayOpacity = opacity, OverlayCorner = corner });
+            }
+            catch (Exception ex) when (ex is Maus.Core.Fixes.JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException or Maus.Core.Engine.Broker.EngineException)
+            {
+                // Le réglage vaut pour cette ouverture de MAUS.
+            }
+        }).Forget("compteur au-dessus du jeu : enregistrement des réglages");
     }
 }

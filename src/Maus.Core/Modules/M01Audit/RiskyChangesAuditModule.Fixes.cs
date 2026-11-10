@@ -82,7 +82,10 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
         {
             plan.Add(uacPrompt, T("Remettre la demande de confirmation de l'UAC par défaut"),
                 T("Curseur de l'UAC sur le niveau par défaut : confirmation sur le bureau sécurisé."),
-                [Set(UacKey, "ConsentPromptBehaviorAdmin", 5), Set(UacKey, "PromptOnSecureDesktop", 1)]);
+                // Un réglage plus strict que le niveau par défaut reste en place : seule une confirmation coupée est remise.
+                registry.GetDword(Microsoft.Win32.RegistryHive.LocalMachine, UacKey, "ConsentPromptBehaviorAdmin") == 0
+                    ? new[] { Set(UacKey, "ConsentPromptBehaviorAdmin", 5), Set(UacKey, "PromptOnSecureDesktop", 1) }
+                    : new[] { Set(UacKey, "PromptOnSecureDesktop", 1) });
         }
 
         if (plan.Deviates("M01.firewall", out var firewall))
@@ -195,7 +198,7 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                 writes.Add(Set(key, "LoadAppInit_DLLs", 0));
             }
 
-            plan.Add(appInit, "Vider AppInit_DLLs", T("Plus aucune bibliothèque n'est injectée dans tous les programmes."), writes,
+            plan.Add(appInit, T("Vider AppInit_DLLs"), T("Plus aucune bibliothèque n'est injectée dans tous les programmes."), writes,
                 effect: ChangeEffect.Restart,
                 warning: T("Lancez aussi une analyse antivirus complète."));
         }
@@ -221,7 +224,13 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
                         continue;
                     }
 
-                    if (IsSet(debugger))
+                    // Même programme sous les deux clés (64 et 32 bits) : une seule correction, tout est remis ou rien.
+                    var sameProgram = plan.Changes.FindIndex(c => c.Id == $"M01.ifeo-debugger.{program.ToLowerInvariant()}");
+                    if (IsSet(debugger) && sameProgram >= 0)
+                    {
+                        plan.Changes[sameProgram] = plan.Changes[sameProgram] with { Writes = [.. plan.Changes[sameProgram].Writes, Delete(path, "Debugger")] };
+                    }
+                    else if (IsSet(debugger))
                     {
                         plan.Add(ifeo, T("Supprimer le détournement de {0}", program),
                             T("{0} est actuellement remplacé par : {1}.", program, debugger),
@@ -277,29 +286,11 @@ public sealed partial class RiskyChangesAuditModule : IFixableModule
 
     private bool HasLocalPolicyFile(AuditContext context) => context.Files.FileExists(_windowsDirectory + @"\" + LocalPolicyFile);
 
-    private static IReadOnlyList<string> SafeSubKeys(IRegistryReader registry, string path)
-    {
-        try
-        {
-            return registry.GetSubKeyNames(Microsoft.Win32.RegistryHive.LocalMachine, path);
-        }
-        catch (MausAccessDeniedException)
-        {
-            return [];
-        }
-    }
+    private static IReadOnlyList<string> SafeSubKeys(IRegistryReader registry, string path) =>
+        RegistryReaderExtensions.OrNull(() => registry.GetSubKeyNames(Microsoft.Win32.RegistryHive.LocalMachine, path)) ?? [];
 
-    private static object? Read(IRegistryReader registry, string path, string name)
-    {
-        try
-        {
-            return registry.GetValue(Microsoft.Win32.RegistryHive.LocalMachine, path, name);
-        }
-        catch (MausAccessDeniedException)
-        {
-            return null;
-        }
-    }
+    private static object? Read(IRegistryReader registry, string path, string name) =>
+        RegistryReaderExtensions.OrNull(() => registry.GetValue(Microsoft.Win32.RegistryHive.LocalMachine, path, name));
 
     private static SettingWrite Delete(string path, string name) => new(SettingKey.Registry("HKLM", path, name), null);
 

@@ -47,16 +47,14 @@ internal sealed class D3D11Texture : ITexture
     private readonly ID3D11Device _device;
     private readonly Dictionary<int, ID3D11ShaderResourceView> _mipViews = [];
     private readonly Dictionary<(int Mip, int Slice), ID3D11RenderTargetView> _targets = [];
-    private readonly Dictionary<int, ID3D11UnorderedAccessView> _storage = [];
-    private readonly bool _ownsResource;
     private ID3D11ShaderResourceView? _allMips;
     private ID3D11DepthStencilView? _depth;
 
+    /// <param name="existing">Ressource déjà créée (image de la chaîne d'échange) : la texture prend possession de cette référence.</param>
     public D3D11Texture(ID3D11Device device, TextureDesc desc, ID3D11Resource? existing = null)
     {
         _device = device;
         Desc = desc;
-        _ownsResource = existing is null;
         Resource = existing ?? Create(device, desc);
     }
 
@@ -96,20 +94,6 @@ internal sealed class D3D11Texture : ITexture
     public ID3D11DepthStencilView DepthView() =>
         _depth ??= _device.CreateDepthStencilView(Resource, new DepthStencilViewDescription(DepthStencilViewDimension.Texture2D, Format.D32_Float));
 
-    public ID3D11UnorderedAccessView StorageView(int mip)
-    {
-        if (!_storage.TryGetValue(mip, out var view))
-        {
-            var format = DxgiFormats.View(Desc.Format);
-            var description = Desc.Kind == TextureKind.Texture3D
-                ? new UnorderedAccessViewDescription(UnorderedAccessViewDimension.Texture3D, format, (uint)mip, 0, uint.MaxValue)
-                : new UnorderedAccessViewDescription(UnorderedAccessViewDimension.Texture2D, format, (uint)mip);
-            _storage[mip] = view = _device.CreateUnorderedAccessView(Resource, description);
-        }
-
-        return view;
-    }
-
     public void Dispose()
     {
         _allMips?.Dispose();
@@ -124,15 +108,7 @@ internal sealed class D3D11Texture : ITexture
             view.Dispose();
         }
 
-        foreach (var view in _storage.Values)
-        {
-            view.Dispose();
-        }
-
-        if (_ownsResource)
-        {
-            Resource.Dispose();
-        }
+        Resource.Dispose();
     }
 
     private ShaderResourceViewDescription ViewDesc(int mip)
@@ -140,16 +116,13 @@ internal sealed class D3D11Texture : ITexture
         var format = DxgiFormats.View(Desc.Format);
         var first = mip < 0 ? 0u : (uint)mip;
         var count = mip < 0 ? uint.MaxValue : 1u;
-        var dimension = Desc.Kind switch
-        {
-            TextureKind.Texture3D => Vortice.Direct3D.ShaderResourceViewDimension.Texture3D,
-            TextureKind.TextureCube => Vortice.Direct3D.ShaderResourceViewDimension.TextureCube,
-            _ => Vortice.Direct3D.ShaderResourceViewDimension.Texture2D,
-        };
+        var dimension = Desc.Kind == TextureKind.TextureCube
+            ? Vortice.Direct3D.ShaderResourceViewDimension.TextureCube
+            : Vortice.Direct3D.ShaderResourceViewDimension.Texture2D;
         return new ShaderResourceViewDescription(dimension, format, first, count);
     }
 
-    private static ID3D11Resource Create(ID3D11Device device, TextureDesc desc)
+    private static ID3D11Texture2D Create(ID3D11Device device, TextureDesc desc)
     {
         var bind = BindFlags.None;
         if (desc.Usage.HasFlag(TextureUsage.Sampled))
@@ -165,18 +138,6 @@ internal sealed class D3D11Texture : ITexture
         if (desc.Usage.HasFlag(TextureUsage.DepthStencil))
         {
             bind |= BindFlags.DepthStencil;
-        }
-
-        if (desc.Usage.HasFlag(TextureUsage.Storage))
-        {
-            bind |= BindFlags.UnorderedAccess;
-        }
-
-        if (desc.Kind == TextureKind.Texture3D)
-        {
-            var volume = device.CreateTexture3D(new Texture3DDescription(DxgiFormats.Storage(desc.Format), (uint)desc.Width, (uint)desc.Height, (uint)desc.Depth, (uint)desc.MipLevels, bind));
-            volume.DebugName = desc.Name;
-            return volume;
         }
 
         var texture = device.CreateTexture2D(new Texture2DDescription(
@@ -197,7 +158,6 @@ internal sealed class D3D11Buffer : IBuffer
     public D3D11Buffer(ID3D11Device device, BufferDesc desc, ReadOnlySpan<byte> initial)
     {
         Desc = desc;
-        var raw = desc.Usage.HasFlag(BufferUsage.Raw) || desc.Usage.HasFlag(BufferUsage.IndirectArgs);
         var bind = BindFlags.None;
         var misc = ResourceOptionFlags.None;
         if (desc.Usage.HasFlag(BufferUsage.Vertex))
@@ -220,14 +180,9 @@ internal sealed class D3D11Buffer : IBuffer
             bind |= BindFlags.UnorderedAccess;
         }
 
-        if (desc.Usage.HasFlag(BufferUsage.IndirectArgs))
-        {
-            misc |= ResourceOptionFlags.DrawIndirectArguments;
-        }
-
         if ((bind & (BindFlags.ShaderResource | BindFlags.UnorderedAccess)) != 0)
         {
-            misc |= raw ? ResourceOptionFlags.BufferAllowRawViews : ResourceOptionFlags.BufferStructured;
+            misc |= ResourceOptionFlags.BufferStructured;
         }
 
         var description = new BufferDescription(
@@ -253,18 +208,18 @@ internal sealed class D3D11Buffer : IBuffer
         }
 
         Buffer.DebugName = desc.Name;
-        var elements = raw ? (uint)(desc.SizeInBytes / 4) : (uint)(desc.SizeInBytes / Math.Max(1, desc.Stride));
+        var elements = (uint)(desc.SizeInBytes / Math.Max(1, desc.Stride));
         if (desc.Usage.HasFlag(BufferUsage.Structured))
         {
             var view = new ShaderResourceViewDescription
             {
-                Format = raw ? Format.R32_Typeless : Format.Unknown,
+                Format = Format.Unknown,
                 ViewDimension = Vortice.Direct3D.ShaderResourceViewDimension.BufferExtended,
                 BufferEx = new BufferExtendedShaderResourceView
                 {
                     FirstElement = 0,
                     NumElements = elements,
-                    Flags = raw ? BufferExtendedShaderResourceViewFlags.Raw : BufferExtendedShaderResourceViewFlags.None,
+                    Flags = BufferExtendedShaderResourceViewFlags.None,
                 },
             };
             ShaderView = device.CreateShaderResourceView(Buffer, view);
@@ -274,13 +229,13 @@ internal sealed class D3D11Buffer : IBuffer
         {
             var view = new UnorderedAccessViewDescription
             {
-                Format = raw ? Format.R32_Typeless : Format.Unknown,
+                Format = Format.Unknown,
                 ViewDimension = UnorderedAccessViewDimension.Buffer,
                 Buffer = new BufferUnorderedAccessView
                 {
                     FirstElement = 0,
                     NumElements = elements,
-                    Flags = raw ? BufferUnorderedAccessViewFlags.Raw : BufferUnorderedAccessViewFlags.None,
+                    Flags = BufferUnorderedAccessViewFlags.None,
                 },
             };
             StorageView = device.CreateUnorderedAccessView(Buffer, view);

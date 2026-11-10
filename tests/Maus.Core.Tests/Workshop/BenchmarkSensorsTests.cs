@@ -4,15 +4,18 @@ namespace Maus.Core.Tests.Workshop;
 
 public sealed class BenchmarkSensorsTests
 {
+    /// <summary>Bit « limite de puissance » de nvml.h : normal à pleine charge, il ne compte dans aucun bilan.</summary>
+    private const ulong PowerCap = 0x4;
+
     [Fact]
     public void Summary_of_a_graphics_test_keeps_the_peak_the_averages_and_the_share_of_each_slowdown()
     {
         BenchmarkSensorSample[] samples =
         [
-            new() { GpuTemperatureC = 70, GpuClockMhz = 1900, GpuPowerWatts = 250, GpuClockReasons = NvidiaClockReasons.SwPowerCap, GpuSlowdownC = 89 },
-            new() { GpuTemperatureC = 76, GpuClockMhz = 1800, GpuPowerWatts = 240, GpuClockReasons = NvidiaClockReasons.SwPowerCap | NvidiaClockReasons.SwThermalSlowdown, GpuSlowdownC = 89 },
+            new() { GpuTemperatureC = 70, GpuClockMhz = 1900, GpuPowerWatts = 250, GpuClockReasons = PowerCap, GpuSlowdownC = 89 },
+            new() { GpuTemperatureC = 76, GpuClockMhz = 1800, GpuPowerWatts = 240, GpuClockReasons = PowerCap | NvidiaClockReasons.SwThermalSlowdown, GpuSlowdownC = 89 },
             new() { GpuTemperatureC = 74, GpuClockMhz = 1850, GpuPowerWatts = 245, GpuClockReasons = 0, GpuSlowdownC = 89 },
-            new() { GpuTemperatureC = 73, GpuClockMhz = 1850, GpuPowerWatts = 245, GpuClockReasons = NvidiaClockReasons.SwPowerCap, GpuSlowdownC = 89 },
+            new() { GpuTemperatureC = 73, GpuClockMhz = 1850, GpuPowerWatts = 245, GpuClockReasons = PowerCap, GpuSlowdownC = 89 },
         ];
 
         var summary = BenchmarkSensorSummary.Summarize(samples, "gpu")!;
@@ -23,7 +26,6 @@ public sealed class BenchmarkSensorsTests
         Assert.Equal(245, summary.AveragePowerWatts);
         Assert.Equal(89, summary.LimitTemperatureC);
         Assert.Equal(25, summary.ThermalSlowdownPercent);
-        Assert.Equal(75, summary.PowerLimitPercent);
         Assert.Equal(0, summary.HardwareBrakePercent);
     }
 
@@ -58,7 +60,7 @@ public sealed class BenchmarkSensorsTests
     public void Warnings_only_come_from_what_the_chip_reports()
     {
         // Limite de puissance seule : normal à pleine charge, aucun avertissement.
-        Assert.Null(BenchmarkSensorText.Warning(new BenchmarkSensorSummary { Samples = 10, MaxTemperatureC = 83, PowerLimitPercent = 100, ThermalSlowdownPercent = 0 }, "gpu"));
+        Assert.Null(BenchmarkSensorText.Warning(new BenchmarkSensorSummary { Samples = 10, MaxTemperatureC = 83, ThermalSlowdownPercent = 0 }, "gpu"));
         Assert.Contains("chaleur", BenchmarkSensorText.Warning(new BenchmarkSensorSummary { Samples = 10, ThermalSlowdownPercent = 12.5 }, "gpu"), StringComparison.Ordinal);
 
         // Processeur : seulement si la limite lue dans la puce est atteinte ; sans limite connue, rien n'est supposé.
@@ -90,13 +92,13 @@ public sealed class BenchmarkSensorsTests
     {
         var report = new BenchmarkReport
         {
-            Tests = [new BenchmarkTestResult("ring", "gpu", "geometry", 30, "images par seconde", 9000) { Sensors = new BenchmarkSensorSummary { Samples = 3, MaxTemperatureC = 71 } }],
+            Tests = [new BenchmarkTestResult("ring", "gpu", 30, "images par seconde", 9000) { Sensors = new BenchmarkSensorSummary { Samples = 3, MaxTemperatureC = 71 } }],
         };
 
-        var copy = BenchmarkHistoryStore.Deserialize(BenchmarkHistoryStore.Serialize(report))!;
+        var copy = System.Text.Json.JsonSerializer.Deserialize<BenchmarkReport>(BenchmarkHistoryStore.Serialize(report), BenchmarkHistoryStore.Json)!;
 
         Assert.Equal(71, copy.Tests[0].Sensors!.MaxTemperatureC);
-        Assert.Null(BenchmarkHistoryStore.Deserialize("""{"tests":[{"id":"ring","device":"gpu","capability":"geometry","value":30,"unit":"x","score":9000}]}""")!.Tests[0].Sensors);
+        Assert.Null(System.Text.Json.JsonSerializer.Deserialize<BenchmarkReport>("""{"tests":[{"id":"ring","device":"gpu","capability":"geometry","value":30,"unit":"x","score":9000}]}""", BenchmarkHistoryStore.Json)!.Tests[0].Sensors);
     }
 
     [Fact]
@@ -115,6 +117,40 @@ public sealed class BenchmarkSensorsTests
         }
 
         Assert.True(reader.Disposed);
+    }
+
+    [Fact]
+    public void A_reading_older_than_the_maximum_age_is_no_longer_given()
+    {
+        var ticks = TimeSpan.FromHours(1).Ticks;
+        using var sampler = new BenchmarkSensorSampler(() => new SingleReadingReader(), TimeSpan.FromMilliseconds(5), () => TimeSpan.FromTicks(Interlocked.Read(ref ticks)));
+
+        Assert.True(SpinWait.SpinUntil(() => sampler.Latest is not null, TimeSpan.FromSeconds(5)));
+        Interlocked.Add(ref ticks, BenchmarkSensorSampler.MaxAge.Ticks);
+        Assert.NotNull(sampler.Latest);
+        Interlocked.Add(ref ticks, TimeSpan.FromSeconds(1).Ticks);
+        Assert.Null(sampler.Latest);
+    }
+
+    /// <summary>Une seule mesure réussie, puis des capteurs en panne.</summary>
+    private sealed class SingleReadingReader : IBenchmarkSensorReader
+    {
+        private bool _read;
+
+        public BenchmarkSensorSample Read()
+        {
+            if (_read)
+            {
+                throw new InvalidOperationException("capteur en panne");
+            }
+
+            _read = true;
+            return new BenchmarkSensorSample { GpuTemperatureC = 60 };
+        }
+
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class CountingReader : IBenchmarkSensorReader
@@ -154,7 +190,7 @@ public sealed class BenchmarkImagesTests
                 File.WriteAllText(file, "png");
             }
 
-            store.Add(new BenchmarkReport { Date = date, Image = kept, Tests = [new BenchmarkTestResult("ring", "gpu", "geometry", 30, "x", 9000)] });
+            store.Add(new BenchmarkReport { Date = date, Image = kept, Tests = [new BenchmarkTestResult("ring", "gpu", 30, "x", 9000)] });
             store.PruneImages();
 
             Assert.StartsWith("MAUS-benchmark-", Path.GetFileName(kept), StringComparison.Ordinal);

@@ -45,7 +45,7 @@ public sealed partial class WorkshopViewModel
 
     public ICommand StartNetTestCommand => _startNetTest ??= new AsyncCommand(RunNetTestAsync);
 
-    public ICommand StopNetTestCommand => _stopNetTest ??= new AsyncCommand(() => Run(() => _stopNet?.Invoke()));
+    public ICommand StopNetTestCommand => _stopNetTest ??= new AsyncCommand(() => _stopNet?.Invoke());
 
     private async Task RunNetTestAsync()
     {
@@ -65,6 +65,11 @@ public sealed partial class WorkshopViewModel
             var progress = new Progress<double>(p => NetProgress = p);
             var result = await ConnectionTest.RunAsync(new SystemPinger(), gateway, NetRounds, TimeSpan.FromMilliseconds(250), progress, cancellation.Token);
             NetProgress = 100;
+            if (result.StoppedBeforeFirstMeasure)
+            {
+                NetStatus = T("Test arrêté avant la première mesure.");
+                return;
+            }
 
             var text = new StringBuilder();
             if (result.Aborted)
@@ -86,12 +91,12 @@ public sealed partial class WorkshopViewModel
                 text.AppendLine(ConnectionTest.Describe(server));
             }
 
-            text.AppendLine().AppendLine(ConnectionTest.Advice(result)).Append(ConnectionTest.References);
+            text.AppendLine().AppendLine(ConnectionTest.Advice(result)).AppendLine(ConnectionTest.References).Append(ConnectionTest.ThresholdNote);
             NetStatus = text.ToString();
         }
         catch (Exception ex) when (ex is System.Net.NetworkInformation.NetworkInformationException or InvalidOperationException or PlatformNotSupportedException)
         {
-            NetStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
+            NetStatus = T("Le test n'a pas pu se dérouler : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {

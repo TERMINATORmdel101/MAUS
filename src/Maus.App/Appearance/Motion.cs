@@ -1,8 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace Maus.App.Appearance;
@@ -11,13 +14,13 @@ namespace Maus.App.Appearance;
 /// Animations discrètes de l'interface : changement de page, apparition des cartes, fenêtres qui s'ouvrent, jauges.
 /// Toutes passent par ici et s'arrêtent d'un coup si l'utilisateur les coupe (paramètres, ou « Effets d'animation » de Windows).
 /// </summary>
-public static class Motion
+public static partial class Motion
 {
     /// <summary>Durée d'une transition de page.</summary>
-    public static readonly Duration PageDuration = new(TimeSpan.FromMilliseconds(260));
+    public static readonly Duration PageDuration = new(TimeSpan.FromMilliseconds(220));
 
     /// <summary>Décalage entre l'apparition de deux cartes successives.</summary>
-    private static readonly TimeSpan Stagger = TimeSpan.FromMilliseconds(40);
+    private static readonly TimeSpan Stagger = TimeSpan.FromMilliseconds(45);
 
     private const int MaxStaggered = 8;
 
@@ -27,6 +30,31 @@ public static class Motion
     public static bool IsEnabled { get; set; } = true;
 
     /// <summary>Anime le contenu d'un <see cref="TabControl"/> quand l'onglet choisi change.</summary>
+    /// <summary>Quand la valeur passe à vrai, la page défile jusqu'à cet élément (carte choisie depuis un autre onglet).</summary>
+    public static readonly DependencyProperty BringIntoViewWhenProperty = DependencyProperty.RegisterAttached(
+        "BringIntoViewWhen", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnBringIntoViewWhenChanged));
+
+    public static bool GetBringIntoViewWhen(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return (bool)element.GetValue(BringIntoViewWhenProperty);
+    }
+
+    public static void SetBringIntoViewWhen(DependencyObject element, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(BringIntoViewWhenProperty, value);
+    }
+
+    private static void OnBringIntoViewWhenChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is true && element is FrameworkElement target)
+        {
+            // Une fois l'onglet ouvert et la page mise en place : avant, l'élément n'a pas encore de position.
+            target.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(target.BringIntoView));
+        }
+    }
+
     public static readonly DependencyProperty AnimateSelectionProperty = DependencyProperty.RegisterAttached(
         "AnimateSelection", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnAnimateSelectionChanged));
 
@@ -72,7 +100,109 @@ public static class Motion
         slide.KeyFrames.Add(new DiscreteDoubleKeyFrame(offset, KeyTime.FromTimeSpan(TimeSpan.Zero)));
         slide.KeyFrames.Add(new DiscreteDoubleKeyFrame(offset, KeyTime.FromTimeSpan(delay)));
         slide.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(delay + PageDuration.TimeSpan), Ease));
+
+        // Le cadre de focus s'est placé au début du glissement, et une transformation ne le déplace pas : il se replace à la fin.
+        slide.Completed += (_, _) => AdornerLayer.GetAdornerLayer(element)?.Update();
         parts.Translate.BeginAnimation(TranslateTransform.YProperty, slide);
+    }
+
+    /// <summary>
+    /// Élément qui ne s'affiche que dans un certain état : apparaît quand la valeur liée passe à vrai, pas à chaque retour sur
+    /// la page. Les enfants d'un panneau apparaissent l'un après l'autre.
+    /// </summary>
+    public static readonly DependencyProperty EnterWhenProperty = DependencyProperty.RegisterAttached(
+        "EnterWhen", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnEnterWhenChanged));
+
+    public static bool GetEnterWhen(DependencyObject element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return (bool)element.GetValue(EnterWhenProperty);
+    }
+
+    public static void SetEnterWhen(DependencyObject element, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        element.SetValue(EnterWhenProperty, value);
+    }
+
+    private static void OnEnterWhenChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (!(bool)e.NewValue)
+        {
+            return;
+        }
+
+        if (element is Panel panel)
+        {
+            for (var i = 0; i < panel.Children.Count; i++)
+            {
+                Enter(panel.Children[i], TimeSpan.FromMilliseconds(120 * i), offset: 6);
+            }
+        }
+        else if (element is UIElement target)
+        {
+            Enter(target, offset: 6);
+        }
+    }
+
+    /// <summary>Toutes les zones repliables s'ouvrent en douceur au lieu de sauter.</summary>
+    internal static void WatchExpanders() =>
+        EventManager.RegisterClassHandler(typeof(Expander), Expander.ExpandedEvent, new RoutedEventHandler(OnExpanded));
+
+    private static void OnExpanded(object sender, RoutedEventArgs e)
+    {
+        if (ReferenceEquals(sender, e.OriginalSource) && sender is Expander { Content: UIElement content } expander)
+        {
+            // Depuis le bas : le contenu qui arrive ne passe jamais sur la barre de la catégorie.
+            Enter(content, offset: 8);
+            if (IsEnabled)
+            {
+                expander.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => Cascade(content));
+            }
+        }
+    }
+
+    /// <summary>Changement de thème : une image de la fenêtre telle qu'elle était s'efface au-dessus de la nouvelle apparence.</summary>
+    internal static void CrossFade(Window window)
+    {
+        if (!IsEnabled || !window.IsVisible || window.Content is not FrameworkElement { ActualWidth: >= 1, ActualHeight: >= 1 } content
+            || AdornerLayer.GetAdornerLayer(content) is not { } layer)
+        {
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(content);
+        var image = new RenderTargetBitmap(
+            (int)Math.Ceiling(content.ActualWidth * dpi.DpiScaleX), (int)Math.Ceiling(content.ActualHeight * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        image.Render(content);
+        image.Freeze();
+
+        var veil = new SnapshotAdorner(content, image, window.Background?.CloneCurrentValue());
+        layer.Add(veil);
+        var fade = new DoubleAnimation(1, 0, new Duration(TimeSpan.FromMilliseconds(220))) { FillBehavior = FillBehavior.Stop };
+        fade.Completed += (_, _) => layer.Remove(veil);
+        veil.BeginAnimation(UIElement.OpacityProperty, fade);
+    }
+
+    private sealed class SnapshotAdorner : Adorner
+    {
+        private readonly ImageSource _image;
+        private readonly Brush? _background;
+
+        public SnapshotAdorner(UIElement adorned, ImageSource image, Brush? background)
+            : base(adorned)
+        {
+            _image = image;
+            _background = background;
+            IsHitTestVisible = false;
+        }
+
+        protected override void OnRender(DrawingContext drawingContext)
+        {
+            var area = new Rect(AdornedElement.RenderSize);
+            drawingContext.DrawRectangle(_background, null, area);
+            drawingContext.DrawImage(_image, area);
+        }
     }
 
     /// <summary>Carte cliquable : se soulève légèrement au survol de la souris.</summary>
@@ -184,7 +314,11 @@ public static class Motion
 
     private static void OnPressDown(object sender, MouseButtonEventArgs e) => Squeeze((UIElement)sender, Pressed, 90);
 
-    private static void OnPressUp(object sender, MouseEventArgs e) => Squeeze((UIElement)sender, 1, 160);
+    private static void OnPressUp(object sender, MouseEventArgs e)
+    {
+        var element = (UIElement)sender;
+        Squeeze(element, GetHoverGrow(element) && element.IsMouseOver ? Grown(element) : 1, 160);
+    }
 
     private static void Squeeze(UIElement element, double to, int milliseconds)
     {
@@ -221,9 +355,19 @@ public static class Motion
 
     private static void OnItemLoaded(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement element && IsEnabled && ItemIndex(element) is { } index && index < MaxStaggered)
+        if (sender is not FrameworkElement element || !IsEnabled)
         {
-            Enter(element, Stagger * (index + 1), 14);
+            return;
+        }
+
+        // Plus bas que la partie visible : il apparaîtra quand le défilement l'atteindra.
+        if (ScrollOwner(element) is { } scroll && IsBelow(element, scroll))
+        {
+            Hold(element, scroll);
+        }
+        else if (ItemIndex(element) is { } index)
+        {
+            EnterItem(element, Math.Min(index, MaxStaggered));
         }
     }
 
@@ -275,6 +419,30 @@ public static class Motion
         }
     }
 
+    /// <summary>Arrivée d'un panneau : il grandit légèrement en apparaissant.</summary>
+    internal static void Pop(UIElement element)
+    {
+        Enter(element, offset: 16);
+        if (IsEnabled && Parts(element) is { } parts)
+        {
+            var grow = new DoubleAnimation(0.94, 1, new Duration(TimeSpan.FromMilliseconds(280))) { EasingFunction = Ease };
+            parts.Scale.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
+            parts.Scale.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
+        }
+    }
+
+    /// <summary>Remplit une barre depuis zéro, après <paramref name="delay"/>.</summary>
+    internal static void FillTo(RangeBase bar, double to, TimeSpan delay)
+    {
+        if (!IsEnabled)
+        {
+            bar.Value = to;
+            return;
+        }
+
+        bar.BeginAnimation(RangeBase.ValueProperty, new DoubleAnimation(0, to, new Duration(TimeSpan.FromMilliseconds(750))) { BeginTime = delay, EasingFunction = Ease });
+    }
+
     /// <summary>Anime une valeur numérique d'un élément (par exemple la jauge du score) vers <paramref name="to"/>.</summary>
     public static void To(IAnimatable element, DependencyProperty property, double to, TimeSpan duration)
     {
@@ -304,33 +472,43 @@ public static class Motion
         if ((bool)e.NewValue)
         {
             tabs.SelectionChanged += OnSelectionChanged;
+            tabs.Loaded += OnTabsLoaded;
         }
         else
         {
             tabs.SelectionChanged -= OnSelectionChanged;
+            tabs.Loaded -= OnTabsLoaded;
         }
+    }
+
+    private static void OnTabsLoaded(object sender, RoutedEventArgs e)
+    {
+        var tabs = (TabControl)sender;
+        tabs.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => MoveNavMark(tabs, animated: false));
     }
 
     private static void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // Les listes et menus déroulants de la page remontent aussi cet événement : seul l'onglet compte.
-        if (!ReferenceEquals(e.OriginalSource, sender) || sender is not TabControl tabs || !IsEnabled || !tabs.IsLoaded)
+        if (!ReferenceEquals(e.OriginalSource, sender) || sender is not TabControl tabs || !tabs.IsLoaded)
         {
             return;
         }
 
+        var direction = Direction(tabs, e);
         tabs.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
-            if (tabs.Template?.FindName("PART_SelectedContentHost", tabs) is not ContentPresenter host)
+            MoveNavMark(tabs, animated: true);
+            if (!IsEnabled || tabs.Template?.FindName("PART_SelectedContentHost", tabs) is not ContentPresenter host)
             {
                 return;
             }
 
-            Enter(host, offset: 10);
+            Enter(host, offset: 14 * direction);
             var index = 0;
             foreach (var card in Cards(host))
             {
-                Enter(card, Stagger * (index + 1), 14);
+                Enter(card, Stagger * (index + 1), 18 * direction);
                 if (++index >= MaxStaggered)
                 {
                     break;

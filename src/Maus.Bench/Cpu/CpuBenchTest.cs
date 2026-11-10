@@ -1,5 +1,5 @@
 using System.Numerics;
-using static Maus.Core.Localization.Texts;
+using Maus.Core.Workshop.Benchmark;
 
 namespace Maus.Bench.Cpu;
 
@@ -15,7 +15,6 @@ internal abstract class CpuBenchTest
     {
         Width = width;
         Height = height;
-        Image = new byte[width * height * 4];
     }
 
     public abstract string Id { get; }
@@ -24,11 +23,8 @@ internal abstract class CpuBenchTest
 
     public abstract string Subtitle { get; }
 
-    /// <summary>Capacité mesurée (« multicore », « singlecore », « simd »).</summary>
-    public abstract string Capability { get; }
-
     /// <summary>Unité affichée de la mesure, en clair (déjà divisée par <see cref="UnitScale"/>).</summary>
-    public abstract string Unit { get; }
+    public string Unit => BenchmarkTexts.Unit(Id);
 
     /// <summary>Diviseur entre le travail compté et l'unité affichée (1e6 pour des millions…).</summary>
     public abstract double UnitScale { get; }
@@ -40,12 +36,18 @@ internal abstract class CpuBenchTest
     public int Height { get; }
 
     /// <summary>Image en cours (RVBA 8 bits, déjà en sRVB), lue par l'affichage sans verrou : un pixel à moitié écrit ne gêne pas.</summary>
-    public byte[] Image { get; }
+    public byte[] Image { get; private set; } = [];
 
     /// <summary>Nombre de fils de calcul utilisés.</summary>
     public int Threads { get; protected set; } = 1;
 
     public long Work => Interlocked.Read(ref _work);
+
+    /// <summary>Réserve les images du test, juste avant lui (avant le début de la mesure) : elles ne pèsent rien pendant le reste de la passe.</summary>
+    public virtual void Prepare() => Image = new byte[Width * Height * 4];
+
+    /// <summary>Rend les images du test, une fois son calcul arrêté et sa vignette prise.</summary>
+    public virtual void Release() => Image = [];
 
     /// <summary>Calcule jusqu'à l'annulation (bloquant : à lancer sur une tâche à part).</summary>
     public abstract void Run(CancellationToken token);
@@ -68,8 +70,6 @@ internal abstract class CpuBenchTest
         var b = (uint)(Curve(color.Z) * 255f + 0.5f);
         return r | (g << 8) | (b << 16) | 0xFF000000u;
     }
-
-    internal static string MillionsOfRays => T("millions de rayons par seconde");
 }
 
 /// <summary>Générateur pseudo-aléatoire rapide (xorshift 32 bits), un par fil de calcul.</summary>

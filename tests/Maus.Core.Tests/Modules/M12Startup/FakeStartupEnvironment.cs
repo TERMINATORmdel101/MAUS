@@ -10,6 +10,8 @@ internal sealed class FakeStartupEnvironment : IStartupEnvironment
 
     public Dictionary<string, string> Shortcuts { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public Dictionary<string, string> ShortcutArguments { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public string? UserStartupFolder { get; init; } = UserFolder;
 
     public string? CommonStartupFolder { get; init; } = CommonFolder;
@@ -20,5 +22,6 @@ internal sealed class FakeStartupEnvironment : IStartupEnvironment
         .Replace("%ProgramFiles%", @"C:\Program Files", StringComparison.OrdinalIgnoreCase)
         .Replace("%LOCALAPPDATA%", @"C:\Users\Bob\AppData\Local", StringComparison.OrdinalIgnoreCase);
 
-    public string? ResolveShortcut(string shortcutPath) => Shortcuts.GetValueOrDefault(shortcutPath);
+    public ShortcutInfo? ResolveShortcut(string shortcutPath) =>
+        Shortcuts.TryGetValue(shortcutPath, out var target) ? new ShortcutInfo(target, ShortcutArguments.GetValueOrDefault(shortcutPath) ?? string.Empty) : null;
 }

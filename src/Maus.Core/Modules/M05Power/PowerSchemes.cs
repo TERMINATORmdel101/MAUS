@@ -61,6 +61,7 @@ internal static partial class PowerSchemes
         var match = registryFriendlyName is null ? null : ResourcePattern().Match(registryFriendlyName);
         if (match is { Success: true } && int.TryParse(match.Groups["id"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var resource))
         {
+            // Numéros de ressource de powrprof.dll : constatés sur Windows 11, non documentés par Microsoft.
             var kind = resource switch
             {
                 15 => SchemeKind.Balanced,

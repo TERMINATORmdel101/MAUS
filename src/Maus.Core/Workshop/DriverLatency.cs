@@ -71,7 +71,9 @@ public sealed class DriverLatencyAggregator
             }
         }
 
-        return found < 0 ? T("adresse inconnue") : _drivers[found].Name;
+        return _drivers.Length == 0 ? T("pilote non identifié (Windows ne donne pas les adresses des pilotes)")
+            : found < 0 ? T("adresse inconnue")
+            : _drivers[found].Name;
     }
 
     /// <summary>Ajoute une exécution (durée en microsecondes).</summary>

@@ -10,6 +10,14 @@ public class CombinedSensorSourceTests
 {
     private static readonly DateTimeOffset Start = new(2026, 9, 28, 9, 0, 0, TimeSpan.FromHours(2));
 
+    /// <summary>La première lecture part sur un autre fil : sur un PC chargé, elle peut arriver après la première mesure.</summary>
+    private static double? FirstTemperature(CombinedSensorSource source)
+    {
+        double? temperature = null;
+        SpinWait.SpinUntil(() => (temperature = source.Sample().CpuTemperatureC) is not null, TimeSpan.FromSeconds(10));
+        return temperature;
+    }
+
     private static HardwareReading CpuTemperature(double value) => new("Intel Core i7-8700K", ReadingGroup.Cpu, "CPU Package", ReadingKind.Temperature, value);
 
     [Fact]
@@ -29,9 +37,9 @@ public class CombinedSensorSourceTests
         Assert.Empty(first.Readings);
 
         release.Set();
-        SpinWait.SpinUntil(() => !source.IsOpening, TimeSpan.FromSeconds(5));
+        SpinWait.SpinUntil(() => !source.IsOpening, TimeSpan.FromSeconds(10));
         basic.At = Start.AddSeconds(1);
-        Assert.Equal(55, source.Sample().CpuTemperatureC);
+        Assert.Equal(55, FirstTemperature(source));
     }
 
     [Fact]
@@ -45,7 +53,7 @@ public class CombinedSensorSourceTests
             return [CpuTemperature(60)];
         }), TimeSpan.FromMilliseconds(200));
 
-        Assert.Equal(60, source.Sample().CpuTemperatureC);
+        Assert.Equal(60, FirstTemperature(source));
 
         // Le pilote ne répond plus : la mesure suivante sort quand même, avec la dernière valeur tant qu'elle est récente.
         hang.Reset();

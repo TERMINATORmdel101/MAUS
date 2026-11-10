@@ -7,11 +7,11 @@ namespace Maus.App.Controls;
 public sealed class RingGauge : FrameworkElement
 {
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
-        nameof(Value), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, OnValueChanged));
+        nameof(Value), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender, OnValueChanged));
 
-    /// <summary>Valeur dessinée : elle rejoint <see cref="Value"/> en tournant, si les animations sont permises.</summary>
-    private static readonly DependencyProperty DisplayedValueProperty = DependencyProperty.Register(
-        "DisplayedValue", typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+    /// <summary>Halo très court quand la jauge arrive à sa valeur (voir <see cref="Halo"/>).</summary>
+    private static readonly DependencyProperty GlowProperty = DependencyProperty.Register(
+        "Glow", typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty StrokeProperty = DependencyProperty.Register(
         nameof(Stroke), typeof(Brush), typeof(RingGauge), new FrameworkPropertyMetadata(Palette.Green, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -21,6 +21,9 @@ public sealed class RingGauge : FrameworkElement
 
     public static readonly DependencyProperty ThicknessProperty = DependencyProperty.Register(
         nameof(Thickness), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(14.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    /// <summary>Un léger halo salue l'arrivée de la jauge à sa valeur (jauge du score de l'accueil).</summary>
+    public bool Halo { get; set; }
 
     /// <summary>Valeur de 0 à 100.</summary>
     public double Value
@@ -59,9 +62,16 @@ public sealed class RingGauge : FrameworkElement
 
         var center = new Point(ActualWidth / 2, ActualHeight / 2);
         var radius = (size - Thickness) / 2;
+        if ((double)GetValue(GlowProperty) is > 0 and var glow)
+        {
+            drawingContext.PushOpacity(0.4 * glow);
+            drawingContext.DrawEllipse(null, new Pen(Stroke, Thickness + (10 * glow)), center, radius, radius);
+            drawingContext.Pop();
+        }
+
         drawingContext.DrawEllipse(null, new Pen(Track, Thickness), center, radius, radius);
 
-        var sweep = Math.Clamp((double)GetValue(DisplayedValueProperty), 0, 100) / 100 * 360;
+        var sweep = Math.Clamp(Value, 0, 100) / 100 * 360;
         if (sweep <= 0)
         {
             return;
@@ -83,9 +93,9 @@ public sealed class RingGauge : FrameworkElement
 
     private static void OnValueChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
     {
-        if (element is RingGauge gauge)
+        if (element is RingGauge { Halo: true } gauge && (double)e.NewValue > 0)
         {
-            Appearance.Motion.To(gauge, DisplayedValueProperty, (double)e.NewValue, TimeSpan.FromMilliseconds(800));
+            Appearance.Motion.Halo(gauge, GlowProperty, TimeSpan.FromMilliseconds(760));
         }
     }
 

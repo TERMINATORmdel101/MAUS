@@ -14,11 +14,16 @@ namespace Maus.App.ViewModels.Workshop;
 /// <summary>Une mesure de la fenêtre de surveillance : actuelle, minimale, maximale.</summary>
 public sealed class MonitorRowViewModel(string name, MonitorKind kind) : ObservableObject
 {
+    public override string ToString() => Name;
+
     private string _value = "—";
     private string _min = "—";
     private string _max = "—";
 
     public string Name { get; } = name;
+
+    /// <summary>Plus aucune mesure : la valeur actuelle s'efface, le minimum et le maximum restent.</summary>
+    public void Clear() => SetProperty(ref _value, "—", nameof(Value));
 
     public MonitorKind Kind { get; } = kind;
 
@@ -43,12 +48,20 @@ public sealed class MonitorRowViewModel(string name, MonitorKind kind) : Observa
     /// <summary>Dernières valeurs, pour la mini-courbe (une minute environ à une mesure par seconde).</summary>
     public double[] History { get; private set; } = [];
 
+    /// <summary>Haut de la mini-courbe : 100 pour un pourcentage, échelle automatique (0) pour des MHz, des watts ou des °C.</summary>
+    public double CurveMaximum => Kind == MonitorKind.Load ? 100 : 0;
+
     internal void Show(MonitorRow row)
     {
         Value = Format(row.Value);
         Min = Format(row.Min);
         Max = Format(row.Max);
-        History = [.. History.TakeLast(59), row.Value];
+        // Sans LINQ : relu à chaque mesure pour chaque ligne.
+        var kept = Math.Min(History.Length, 59);
+        var history = new double[kept + 1];
+        Array.Copy(History, History.Length - kept, history, 0, kept);
+        history[kept] = row.Value;
+        History = history;
         OnPropertyChanged(nameof(History));
     }
 
@@ -64,6 +77,8 @@ public sealed class MonitorRowViewModel(string name, MonitorKind kind) : Observa
 /// <summary>Un composant (processeur, carte graphique, mémoire, carte mère) et ses mesures.</summary>
 public sealed class MonitorGroupViewModel(string component)
 {
+    public override string ToString() => Component;
+
     public string Component { get; } = component;
 
     public ObservableCollection<MonitorRowViewModel> Rows { get; } = [];
@@ -72,6 +87,8 @@ public sealed class MonitorGroupViewModel(string component)
 /// <summary>Un événement relevé : heure, source, identifiant, message.</summary>
 public sealed class WatchedEventViewModel(WatchedEvent e)
 {
+    public override string ToString() => Message;
+
     public string Time { get; } = e.Time.ToString("T", CultureInfo.CurrentCulture);
 
     public string Source { get; } = $"{e.Provider} ({e.Id})";
@@ -90,6 +107,8 @@ public sealed class WatchedEventViewModel(WatchedEvent e)
 /// </summary>
 public sealed partial class MonitorViewModel : ObservableObject, IDisposable
 {
+    private bool _disposed;
+
     private static readonly TimeSpan ErrorPeriod = TimeSpan.FromSeconds(5);
 
     private readonly WorkshopViewModel _workshop;
@@ -98,6 +117,7 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _errorTimer = new() { Interval = ErrorPeriod };
     private readonly Dictionary<(string Component, string Name, MonitorKind Kind), MonitorRowViewModel> _rows = [];
     private DateTime _since = DateTime.Now;
+    private ErrorWatchTail _tail;
     private bool _readingErrors;
     private string _hardwareErrors = "—";
     private string _hardwareDetail = string.Empty;
@@ -116,20 +136,25 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
     public MonitorViewModel(WorkshopViewModel workshop)
     {
         _workshop = workshop;
+        _tail = new ErrorWatchTail(_logs, _since);
         _workshop.Sampled += OnSampled;
         _workshop.PropertyChanged += OnWorkshopChanged;
         StartRecordingCommand = new AsyncCommand(() =>
         {
             StartRecording(automatic: false);
-            return Task.CompletedTask;
         });
         StopRecordingCommand = new AsyncCommand(StopRecordingAsync);
         ExportRecordingCommand = new AsyncCommand(ExportRecordingAsync);
         _errorTimer.Tick += async (_, _) => await ReadErrorsAsync();
+        _fpsTimer.Tick += async (_, _) => await RefreshFpsAsync();
+        _overlaySave.Tick += (_, _) => SaveOverlay();
         ResetCommand = new AsyncCommand(() =>
         {
             _tracker.Reset();
             _since = DateTime.Now;
+            _tail = new ErrorWatchTail(_logs, _since);
+            Events.Clear();
+            OnPropertyChanged(nameof(HasEvents));
             OnPropertyChanged(nameof(Since));
             return ReadErrorsAsync();
         });
@@ -198,6 +223,7 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         StopFpsWithoutWaiting();
         _errorTimer.Stop();
         _workshop.Sampled -= OnSampled;
@@ -249,7 +275,7 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
         }
         else if (!_workshop.IsTesting && _autoRecording)
         {
-            StopRecordingAsync().Forget("surveillance : fin du relevé", ex => RecordingStatus = T("Le bilan du relevé n'a pas pu être établi : {0}", ex.Message));
+            StopRecordingAsync().Forget("surveillance : fin du relevé", ex => RecordingStatus = T("Le bilan du relevé n'a pas pu être établi : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
         }
     }
 
@@ -276,7 +302,7 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsRecording));
         OnPropertyChanged(nameof(IsNotRecording));
         var errors = await Task.Run(() => ErrorWatch.Read(_logs, recording.Start.LocalDateTime));
-        RecordingSummary = recording.Summary(errors.Hardware, errors.PciExpress, errors.Windows);
+        RecordingSummary = await Task.Run(() => recording.Summary(errors.Hardware, errors.PciExpress, errors.Windows, errors.Incomplete));
         RecordingStatus = T("Relevé terminé à {0:T}.", DateTime.Now);
     }
 
@@ -287,28 +313,12 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            FileName = T("releve-surveillance-{0:yyyy-MM-dd-HHmm}", recording.Start.LocalDateTime) + ".csv",
-            DefaultExt = ".csv",
-            Filter = T("Tableau CSV") + " (*.csv)|*.csv",
-            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-        };
-        if (dialog.ShowDialog() != true)
-        {
-            return;
-        }
-
-        try
-        {
-            // Format régional de Windows (séparateur, virgule décimale), pas celui de la langue de MAUS : c'est lui qu'Excel attend.
-            await System.IO.File.WriteAllTextAsync(dialog.FileName, recording.ToCsv(RegionalCulture), new System.Text.UTF8Encoding(true));
-            RecordingStatus = T("Relevé exporté : {0}", dialog.FileName);
-        }
-        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
-        {
-            RecordingStatus = T("L'export a échoué : {0}", ex.Message);
-        }
+        // Format régional de Windows (séparateur, virgule décimale), pas celui de la langue de MAUS : c'est lui qu'Excel attend.
+        await CsvExport.SaveAsync(
+            T("releve-surveillance-{0:yyyy-MM-dd-HHmm}", recording.Start.LocalDateTime) + ".csv",
+            () => recording.ToCsv(RegionalCulture),
+            path => RecordingStatus = T("Relevé exporté : {0}", path),
+            ex => RecordingStatus = T("L'export a échoué : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
     }
 
     private void OnSampled(object? sender, SensorSnapshot snapshot)
@@ -318,6 +328,16 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
         {
             recording.Add(snapshot.At, rows);
             RecordingStatus = T("Relevé en cours : {0:hh\\:mm\\:ss}, {1} mesures.", recording.Elapsed, recording.Count);
+        }
+
+        // Un capteur disparu ne garde pas sa dernière valeur : « jamais une température figée présentée comme actuelle ».
+        var seen = rows.Select(r => (r.Component, r.Name, r.Kind)).ToHashSet();
+        foreach (var (known, stale) in _rows)
+        {
+            if (!seen.Contains(known))
+            {
+                stale.Clear();
+            }
         }
 
         foreach (var row in rows)
@@ -363,30 +383,50 @@ public sealed partial class MonitorViewModel : ObservableObject, IDisposable
         _readingErrors = true;
         try
         {
-            var since = _since;
-            var result = await Task.Run(() => ErrorWatch.Read(_logs, since));
+            var tail = _tail;
+            var result = await Task.Run(tail.Poll);
+            if (!ReferenceEquals(tail, _tail))
+            {
+                return; // Remise à zéro pendant la lecture : la prochaine lecture repart du nouveau début.
+            }
+
             HardwareErrors = result.Hardware.ToString(CultureInfo.CurrentCulture);
             HardwareDetail = T("dont PCI Express : {0}", result.PciExpress);
             HardwareBrush = result.Hardware > 0 ? Palette.Red : Palette.Green;
             WindowsErrors = result.Windows.ToString(CultureInfo.CurrentCulture);
-            WindowsBrush = result.Windows > 0 ? Palette.Gold : Palette.Green;
+            WindowsBrush = result.Windows > 0 ? Appearance.Pastel.Ink(Appearance.Tone.Sand) : Palette.Green;
             ErrorsStatus = result.Incomplete ? T("Un journal de Windows n'a pas pu être lu : les compteurs peuvent être incomplets.") : string.Empty;
 
-            Events.Clear();
-            foreach (var e in result.Events.Take(ErrorWatch.MaxEvents))
-            {
-                Events.Add(new WatchedEventViewModel(e));
-            }
-
-            OnPropertyChanged(nameof(HasEvents));
+            AddNewEvents(result.Events);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            ErrorsStatus = T("Lecture des journaux impossible : {0}", ex.Message);
+            ErrorsStatus = T("Lecture des journaux impossible : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
             _readingErrors = false;
         }
+    }
+
+    /// <summary>Seuls les nouveaux événements entrent en tête de liste : les lignes déjà affichées ne sont ni détruites ni recréées.</summary>
+    private void AddNewEvents(IReadOnlyList<WatchedEvent> added)
+    {
+        if (added.Count == 0)
+        {
+            return;
+        }
+
+        for (var i = Math.Min(added.Count, ErrorWatch.MaxEvents) - 1; i >= 0; i--)
+        {
+            Events.Insert(0, new WatchedEventViewModel(added[i]));
+        }
+
+        while (Events.Count > ErrorWatch.MaxEvents)
+        {
+            Events.RemoveAt(Events.Count - 1);
+        }
+
+        OnPropertyChanged(nameof(HasEvents));
     }
 }

@@ -12,6 +12,8 @@ namespace Maus.App.ViewModels.Workshop;
 /// <summary>Une ligne de la liste des pilotes.</summary>
 public sealed record DriverRowViewModel(string Group, string Device, string Version, string Date, DateTime? DateValue, string Age, string Provider, string Package, string Signature)
 {
+    public override string ToString() => Device;
+
     public static DriverRowViewModel From(DriverEntry driver) => From(driver, DateTime.Today);
 
     public static DriverRowViewModel From(DriverEntry driver, DateTime today)
@@ -51,6 +53,8 @@ public sealed record DriverRowViewModel(string Group, string Device, string Vers
 /// <summary>Carte d'une carte graphique dans l'onglet Pilotes : son pilote en détail et les actions manuelles.</summary>
 public sealed class GraphicsDriverCardViewModel
 {
+    public override string ToString() => Title;
+
     public GraphicsDriverCardViewModel(DriverEntry driver, Uri? downloadPage, Func<GraphicsDriverAction, DriverEntry, Task> run, Action<Uri> open)
     {
         ArgumentNullException.ThrowIfNull(driver);
@@ -79,8 +83,6 @@ public sealed class GraphicsDriverCardViewModel
             {
                 open(downloadPage);
             }
-
-            return Task.CompletedTask;
         });
     }
 
@@ -118,7 +120,8 @@ public sealed class GraphicsDriverCardViewModel
 /// <summary>
 /// Atelier, onglet « Pilotes » : tous les pilotes installés (version, date, éditeur, paquet, signature), en lecture seule,
 /// et actions manuelles sur le pilote de la carte graphique (redémarrer, retirer et redétecter, sauvegarder, supprimer,
-/// réinstaller une sauvegarde), toujours après confirmation et dans une fenêtre de commande visible.
+/// réinstaller une sauvegarde), toujours après confirmation et dans une fenêtre de commande visible. Seul « redémarrer » est
+/// affiché à tous : les autres, et les sauvegardes existantes, sont en mode technicien (MainWindow.xaml).
 /// </summary>
 public sealed partial class WorkshopViewModel
 {
@@ -166,7 +169,6 @@ public sealed partial class WorkshopViewModel
     public ICommand ShowUnsignedDriversCommand => _showUnsigned ??= new AsyncCommand(() =>
     {
         DriverFilter = T("non signé");
-        return Task.CompletedTask;
     });
 
     private ICommand? _showUnsigned;
@@ -191,7 +193,7 @@ public sealed partial class WorkshopViewModel
     {
         if (_drivers.Count == 0)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var text = new System.Text.StringBuilder(T("Pilotes relevés par MAUS {0} le {1}", AppVersion.Display, DateTime.Now.ToString("g", Culture))).AppendLine();
@@ -206,17 +208,9 @@ public sealed partial class WorkshopViewModel
             }
         }
 
-        try
-        {
-            System.Windows.Clipboard.SetText(Maus.Core.Reporting.PrivacyFilter.ForCurrentUser().Mask(text.ToString().TrimEnd()));
-            DriversStatus = T("Liste copiée (nom d'utilisateur, nom du PC et e-mails masqués) : collez-la avec Ctrl+V.");
-        }
-        catch (System.Runtime.InteropServices.ExternalException)
-        {
-            DriversStatus = T("Le presse-papiers est occupé : réessayez.");
-        }
-
-        return Task.CompletedTask;
+        DriversStatus = ClipboardText.TryCopy(text.ToString().TrimEnd())
+            ? T("Liste copiée (nom d'utilisateur, nom du PC et e-mails masqués) : collez-la avec Ctrl+V.")
+            : ClipboardText.Busy;
     });
 
     /// <summary>
@@ -226,7 +220,6 @@ public sealed partial class WorkshopViewModel
     public ICommand OpenDriverUpdatesCommand => _openDriverUpdates ??= new AsyncCommand(() =>
     {
         ShellLauncher.OpenSettings("ms-settings:windowsupdate-optionalupdates");
-        return Task.CompletedTask;
     });
 
     private ICommand? _openDriverUpdates;
@@ -235,7 +228,11 @@ public sealed partial class WorkshopViewModel
     public ICommand OpenDriverBackupsCommand => _openDriverBackups ??= new AsyncCommand(async () =>
     {
         // Le dossier est réservé aux administrateurs (comme le journal) : le moteur liste les sauvegardes.
-        var backups = await EngineHost.Current.DriverBackupsAsync(CancellationToken.None);
+        if (await ReadDriverBackupsAsync() is not { } backups)
+        {
+            return;
+        }
+
         DriversStatus = backups.Count == 0
             ? T("Aucune sauvegarde de pilote pour l'instant.")
             : T("{0} sauvegarde(s) dans {1} : {2}. « Réinstaller une sauvegarde… » permet d'en choisir une.", backups.Count, GraphicsDriverActions.BackupRoot, string.Join(", ", backups));
@@ -274,7 +271,7 @@ public sealed partial class WorkshopViewModel
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             _driversLoaded = false;
-            DriversStatus = T("La lecture des pilotes a échoué : {0}", ex.Message);
+            DriversStatus = T("La lecture des pilotes a échoué : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
@@ -319,8 +316,7 @@ public sealed partial class WorkshopViewModel
         }
 
         var folder = GraphicsDriverActions.BackupFolder(gpu.InfName ?? "pilote", DateTimeOffset.Now);
-        var arguments = GraphicsDriverActions.ConsoleArguments(action, gpu, folder);
-        if (arguments is null)
+        if (!GraphicsDriverActions.CanRun(action, gpu, folder))
         {
             DriversStatus = T("Action impossible pour ce pilote (pilote de Windows ou identifiant inattendu).");
             return;
@@ -348,15 +344,15 @@ public sealed partial class WorkshopViewModel
                     + "L'écran peut devenir noir plusieurs secondes. À essayer si le redémarrage du pilote ne suffit pas.", gpu.Device) + Environment.NewLine + Environment.NewLine
                 + T("Fermez d'abord les jeux et les logiciels 3D ou vidéo.")),
             GraphicsDriverAction.Backup => (T("Sauvegarder le pilote graphique ?"),
-                T("MAUS va copier le paquet du pilote de « {0} » ({1}) dans {2}. Rien n'est modifié : la sauvegarde permet de réinstaller ce pilote plus tard.", gpu.Device, gpu.InfName ?? "?", folder)),
+                T("MAUS va copier le paquet du pilote de « {0} » ({1}) dans un sous-dossier daté de {2}. Rien n'est modifié : la sauvegarde permet de réinstaller ce pilote plus tard.", gpu.Device, gpu.InfName ?? "?", GraphicsDriverActions.BackupRoot)),
             _ => (T("Supprimer le pilote graphique ?"),
-                T("MAUS va d'abord créer un point de restauration de Windows (vérifié), puis sauvegarder le pilote de « {0} » ({1}) dans {2}, et seulement ensuite le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.", gpu.Device, gpu.InfName ?? "?", folder) + Environment.NewLine + Environment.NewLine
-                + T("Ensuite, Windows affiche avec son pilote de base : image moins fluide, pas de jeux 3D, définition parfois limitée. Windows Update peut réinstaller un pilote de lui-même.") + Environment.NewLine
+                T("MAUS va d'abord créer un point de restauration de Windows (vérifié), puis sauvegarder le pilote de « {0} » ({1}) dans un sous-dossier daté de {2}, et seulement ensuite le supprimer avec pnputil. Sans sauvegarde réussie, rien n'est supprimé.", gpu.Device, gpu.InfName ?? "?", GraphicsDriverActions.BackupRoot) + Environment.NewLine + Environment.NewLine
+                + T("Ensuite, Windows affiche l'image avec son pilote graphique de base : image moins fluide, pas de jeux 3D, définition parfois limitée. Windows Update peut réinstaller un pilote de lui-même.") + Environment.NewLine
                 + T("Téléchargez AVANT le nouveau pilote sur le site du fabricant (bouton « Page officielle du pilote ») : vous en aurez besoin pour retrouver une image normale.") + Environment.NewLine
                 + T("Les logiciels du fabricant (NVIDIA App, AMD Software, Intel Graphics) restent installés. Pour un nettoyage complet, DDU (téléchargé uniquement sur wagnardsoft.com), lancé en mode sans échec, reste l'outil de référence.") + sharedNote),
         };
 
-        if (!_confirm(title, message + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.OperationReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(title, Maus.Core.Reporting.ConfirmationText.Build(message, reminder: Maus.Core.Legal.Disclaimer.OperationReminder)))
         {
             return;
         }
@@ -369,7 +365,17 @@ public sealed partial class WorkshopViewModel
                 // Point de restauration vérifié avant la suppression (même mécanisme que les corrections) ; s'il échoue,
                 // l'utilisateur décide de continuer ou non : la sauvegarde du pilote reste faite de toute façon.
                 DriversStatus = T("Création du point de restauration…");
-                var point = await EngineHost.Current.CreateDriverRestorePointAsync(CancellationToken.None);
+                IsCreatingRestorePoint = true;
+                Maus.Core.Fixes.RestorePointOutcome point;
+                try
+                {
+                    point = await EngineHost.Current.CreateDriverRestorePointAsync(CancellationToken.None);
+                }
+                finally
+                {
+                    IsCreatingRestorePoint = false;
+                }
+
                 if (!point.Succeeded && !_confirm(T("Point de restauration impossible"),
                         point.Message + Environment.NewLine + Environment.NewLine
                         + T("Supprimer le pilote quand même ? Il sera sauvegardé avant, et la sauvegarde permet de le réinstaller.")))
@@ -379,11 +385,11 @@ public sealed partial class WorkshopViewModel
                 }
             }
 
-            var outcome = await EngineHost.Current.OpenConsoleAsync(
-                new Maus.Core.Engine.Broker.ConsoleRequest(Maus.Core.Engine.Broker.ConsoleKind.DriverAction, Action: action, InstanceId: gpu.InstanceId), CancellationToken.None);
-            DriversStatus = outcome.Opened
-                ? T("Commande lancée dans une fenêtre visible : lisez son résultat, puis cliquez sur « Actualiser la liste ».")
-                : outcome.Message ?? T("La fenêtre de commande n'a pas pu s'ouvrir.");
+            var outcome = await Views.ToolWindow.RunAsync(T("Pilote graphique"), progress => EngineHost.Current.RunToolAsync(
+                new Maus.Core.Engine.Broker.ToolRequest(Maus.Core.Engine.Broker.ToolKind.DriverAction, Action: action, InstanceId: gpu.InstanceId), progress, CancellationToken.None));
+            DriversStatus = outcome.Ran
+                ? T("{0} Cliquez sur « Actualiser la liste ».", outcome.Message ?? string.Empty)
+                : outcome.Message ?? T("L'outil n'a pas pu démarrer.");
         }
         finally
         {
@@ -392,6 +398,9 @@ public sealed partial class WorkshopViewModel
     }
 
     private bool _driverActionRunning;
+
+    /// <summary>Un point de restauration est en cours de création : fermer MAUS à ce moment-là pose la question.</summary>
+    public bool IsCreatingRestorePoint { get; private set; }
 
     /// <summary>Résumé : nombre de pilotes, pilotes non signés, pilote de fabricant le plus ancien (sans seuil « trop vieux »).</summary>
     private static string Summary(IReadOnlyList<DriverEntry> drivers)
@@ -409,9 +418,27 @@ public sealed partial class WorkshopViewModel
         return string.Join(" · ", parts);
     }
 
+    /// <summary>Liste des sauvegardes selon le moteur ; <c>null</c>, avec la raison affichée, s'il refuse de lire le dossier.</summary>
+    private async Task<IReadOnlyList<string>?> ReadDriverBackupsAsync()
+    {
+        try
+        {
+            return await EngineHost.Current.DriverBackupsAsync(CancellationToken.None);
+        }
+        catch (Maus.Core.Engine.Broker.EngineException ex)
+        {
+            DriversStatus = ex.Message;
+            return null;
+        }
+    }
+
     private async Task RestoreDriverBackupAsync()
     {
-        var backups = await EngineHost.Current.DriverBackupsAsync(CancellationToken.None);
+        if (await ReadDriverBackupsAsync() is not { } backups)
+        {
+            return;
+        }
+
         if (backups.Count == 0)
         {
             DriversStatus = T("Aucune sauvegarde de pilote pour l'instant.");
@@ -423,17 +450,14 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        if (!_confirm(T("Réinstaller ce pilote ?"), T("MAUS va réinstaller le pilote sauvegardé dans {0} avec pnputil. L'écran peut devenir noir quelques secondes.", Path.Combine(GraphicsDriverActions.BackupRoot, chosen))
-                + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.OperationReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Réinstaller ce pilote ?"), Maus.Core.Reporting.ConfirmationText.Build(T("MAUS va réinstaller le pilote sauvegardé dans {0} avec pnputil. L'écran peut devenir noir quelques secondes.", Path.Combine(GraphicsDriverActions.BackupRoot, chosen)), reminder: Maus.Core.Legal.Disclaimer.OperationReminder)))
         {
             return;
         }
 
         // Le moteur vérifie le nom (dossier de sauvegarde de MAUS contenant un .inf) et construit lui-même la commande.
-        var outcome = await EngineHost.Current.OpenConsoleAsync(
-            new Maus.Core.Engine.Broker.ConsoleRequest(Maus.Core.Engine.Broker.ConsoleKind.DriverRestore, Backup: chosen), CancellationToken.None);
-        DriversStatus = outcome.Opened
-            ? T("Réinstallation lancée dans une fenêtre visible : lisez son résultat, redémarrez si Windows le demande.")
-            : outcome.Message ?? T("La fenêtre de commande n'a pas pu s'ouvrir.");
+        var outcome = await Views.ToolWindow.RunAsync(T("Pilote graphique"), progress => EngineHost.Current.RunToolAsync(
+            new Maus.Core.Engine.Broker.ToolRequest(Maus.Core.Engine.Broker.ToolKind.DriverRestore, Backup: chosen), progress, CancellationToken.None));
+        DriversStatus = outcome.Message ?? T("L'outil n'a pas pu démarrer.");
     }
 }

@@ -19,10 +19,13 @@ internal static class PrivacySystemChecks
     internal const long FeatureDisabled = 2;
     internal const long FeatureAbsent = 3;
 
+    /// <summary>Mesure interne du constat M04.delivery-optimization : le mode lu.</summary>
+    internal const string DownloadModeMeasure = "download-mode";
+
     private static string DiagTrackExplanation => T("Le service « Expériences des utilisateurs connectés et télémétrie » (DiagTrack) gère l'envoi des événements et journaux de diagnostic. " +
         "Le désactiver doit couper cet envoi (à confirmer par une capture réseau) ; comme au niveau 0, les informations d'échec des mises à jour ne partent plus.");
 
-    private static string DiagTrackAdvice => T("Option avancée, à cocher séparément : désactiver DiagTrack. Microsoft ne recevra plus les informations d'échec de Windows Update (voir Module 3).");
+    private static string DiagTrackAdvice => T("Option avancée, que MAUS ne règle pas à votre place : le service se désactive dans services.msc. Microsoft ne recevra alors plus les informations d'échec de Windows Update (voir Module 3).");
 
     private static readonly string[] CeipTasks = ["Consolidator", "UsbCeip"];
 
@@ -42,9 +45,13 @@ internal static class PrivacySystemChecks
             var startMode = service.GetString("StartMode");
             var disabled = string.Equals(startMode, "Disabled", StringComparison.OrdinalIgnoreCase);
             var current = $"{DescribeStartMode(startMode)}, {DescribeServiceState(service.GetString("State"))}";
-            return Choice(id, title, Diagnostic, disabled, current, T("désactivé (option avancée)"), DiagTrackExplanation, DiagTrackAdvice);
+            return InformationOnly(Choice(id, title, Diagnostic, disabled, current, T("désactivé (option avancée)"), DiagTrackExplanation, DiagTrackAdvice));
         });
     }
+
+    /// <summary>Réglage sans correction dans MAUS : l'état par défaut de Windows reste une simple information, pas un écart à traiter.</summary>
+    private static Finding InformationOnly(Finding finding) =>
+        finding.Status == FindingStatus.Ok ? finding : finding with { Status = FindingStatus.Info, Severity = Severity.Info, Fixable = false };
 
     /// <summary>Tâches <c>Consolidator</c> et <c>UsbCeip</c> du programme d'amélioration de l'expérience utilisateur.</summary>
     public static Finding CeipTasksState(ICimReader cim)
@@ -60,9 +67,9 @@ internal static class PrivacySystemChecks
             var current = tasks.Count == 0
                 ? T("tâches absentes")
                 : string.Join(" ; ", tasks.Select(task => $"{task.Name} : {DescribeTaskState(task.State)}"));
-            return Choice(id, title, Diagnostic, tasks.All(task => task.State == TaskDisabled), current, T("désactivées"),
+            return InformationOnly(Choice(id, title, Diagnostic, tasks.All(task => task.State == TaskDisabled), current, T("désactivées"),
                 T("Les tâches planifiées Consolidator et UsbCeip rassemblent et envoient à Microsoft des statistiques d'utilisation du PC et des périphériques USB."),
-                T("Désactiver les deux tâches dans le Planificateur de tâches (Microsoft > Windows > Customer Experience Improvement Program). La tâche Appraiser est conservée (voir Module 3)."));
+                T("Désactiver les deux tâches dans le Planificateur de tâches (Microsoft > Windows > Customer Experience Improvement Program). La tâche Appraiser est conservée (voir Module 3).")));
         });
     }
 
@@ -85,18 +92,21 @@ internal static class PrivacySystemChecks
             }
 
             var current = DescribeDownloadMode(mode.Value) + (source is null ? string.Empty : $" ({source})");
-            return Choice(id, title, Downloads, mode is 0 or 99, current, T("0 : téléchargement depuis Microsoft uniquement (HTTP)"),
+            var finding = Choice(id, title, Downloads, mode is 0 or 99, current, T("0 : téléchargement depuis Microsoft uniquement (HTTP)"),
                 T("L'optimisation de la distribution peut télécharger des morceaux de mises à jour depuis d'autres PC et envoyer les vôtres en retour. " +
                 "En mode 3, votre connexion sert aussi à des PC inconnus sur Internet."),
                 mode switch
                 {
                     1 => T("Le mode 0 (HTTP seul) est recommandé. Gardez le mode 1 si plusieurs PC de la maison se partagent les mises à jour."),
-                    100 => T("Le mode 100 (contournement) est déprécié : choisir le mode 0."),
+                    100 => T("Le mode 100 (contournement) est obsolète : choisir le mode 0."),
                     _ => T("Couper « Autoriser les téléchargements à partir d'autres PC » dans Paramètres > Windows Update > Options avancées > Optimisation de la distribution, " +
                          "ou le limiter aux PC du réseau local (mode 1) si vous avez plusieurs PC."),
                 },
                 // Seul le conseil par défaut renvoie vers Paramètres ; ceux des modes 1 (choix valable) et 100 (contournement) n'y renvoient pas.
                 mode is 1 or 100 ? null : DeliveryOptimizationPage);
+
+            // Mesure interne : le plan relit le mode ici, jamais dans le texte affiché.
+            return finding with { Measures = new Dictionary<string, double> { [DownloadModeMeasure] = mode.Value } };
         });
     }
 
@@ -107,7 +117,7 @@ internal static class PrivacySystemChecks
         2 => T("2 : groupe de PC"),
         3 => T("3 : PC du réseau local et d'Internet"),
         99 => T("99 : simple, sans pair-à-pair"),
-        100 => T("100 : contournement (déprécié)"),
+        100 => T("100 : contournement (obsolète)"),
         _ => T("{0} : valeur inconnue", mode.ToString(CultureInfo.InvariantCulture)),
     };
 
@@ -120,7 +130,7 @@ internal static class PrivacySystemChecks
     public static Finding Copilot(IPackageInventory packages)
     {
         const string id = "M04.copilot";
-        const string title = "Application Copilot";
+        var title = T("Application Copilot");
         return Guard(id, title, Ai, () =>
         {
             InstalledPackage? copilot;
@@ -247,7 +257,7 @@ internal static class PrivacySystemChecks
         return (null, null, denied);
     }
 
-    private static CimRow? FirstRow(IReadOnlyList<CimRow> rows) => rows.Count > 0 ? rows[0] : null;
+    private static CimRow? FirstRow(IReadOnlyList<CimRow> rows) => rows.FirstOrNull();
 
     private static string? DescribeProvider(long? provider) => provider switch
     {

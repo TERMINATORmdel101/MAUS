@@ -13,6 +13,7 @@
             <views:TrustToBrushConverter x:Key="TrustToBrush" />
             <views:PastelConverter x:Key="Pastel" />
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+            <views:PositiveToVisibilityConverter x:Key="PositiveToVisibility" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

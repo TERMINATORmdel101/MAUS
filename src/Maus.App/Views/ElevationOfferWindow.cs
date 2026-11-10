@@ -10,21 +10,14 @@ namespace Maus.App.Views;
 /// administrateur, et propose les deux façons de l'utiliser, côte à côte. La demande d'autorisation de Windows ne vient
 /// qu'après « Toutes les fonctionnalités » : c'est l'utilisateur qui la déclenche.
 /// </summary>
-public sealed class ElevationOfferWindow : Window
+public sealed class ElevationOfferWindow : MausDialog
 {
     private readonly CheckBox _dontAsk = new() { Content = T("Ne plus me poser la question (modifiable dans les Paramètres)"), Margin = new Thickness(0, 6, 0, 14) };
 
     private ElevationOfferWindow()
+        : base(T("Comment utiliser MAUS ?"), 560)
     {
-        Title = T("Comment utiliser MAUS ?");
-        Width = 560;
-        SizeToContent = SizeToContent.Height;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
         ShowInTaskbar = false;
-        Owner = Application.Current?.MainWindow;
-        SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
-        SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
 
         var heading = new TextBlock
         {
@@ -35,22 +28,15 @@ public sealed class ElevationOfferWindow : Window
             Margin = new Thickness(0, 0, 0, 12),
         };
 
-        var limited = Choice("Grey",
-            T("Mode limité, sans droits administrateur"),
-            T("Vous voyez votre matériel, les mesures en direct, les processus et l'espace disque. Les options qui ont besoin des droits administrateur sont grisées : le bouton « Toutes les fonctionnalités », en haut de la fenêtre, les active à tout moment."));
-        var full = Choice("Mint",
-            T("Toutes les fonctionnalités, avec les droits administrateur"),
-            T("Toute l'application est disponible : audit complet, corrections (toujours annulables), réparation de Windows, capteurs avancés, fiche mémoire… Windows vous demande votre autorisation ; après 15 minutes sans utilisation, les droits se referment seuls et les options redeviennent grises."));
-
+        var limited = Choice("Grey", LimitedTitle, LimitedText);
+        var full = Choice("Mint", FullTitle, FullTextHere);
         var yes = new Button { Content = T("Toutes les fonctionnalités"), IsDefault = true, Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, 0, 8, 0) };
         yes.SetResourceReference(StyleProperty, "PrimaryButton");
         yes.Click += (_, _) => DialogResult = true;
         var no = new Button { Content = T("Mode limité"), IsCancel = true, Padding = new Thickness(16, 6, 16, 6) };
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        buttons.Children.Add(yes);
-        buttons.Children.Add(no);
+        var buttons = ButtonRow(yes, no);
 
-        var panel = new StackPanel { Margin = new Thickness(20) };
+        var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(heading);
         panel.Children.Add(limited);
         panel.Children.Add(full);
@@ -59,8 +45,25 @@ public sealed class ElevationOfferWindow : Window
         Content = panel;
     }
 
+    internal static string LimitedTitle => T("Mode limité, sans droits administrateur");
+
+    internal static string LimitedText => T("Vous voyez votre matériel, les mesures en direct, les processus et l'espace disque, et l'audit marche, avec un score partiel. Les options qui ont besoin des droits administrateur sont grisées : le bouton « Toutes les fonctionnalités », en haut de la fenêtre, les active à tout moment.");
+
+    internal static string FullTitle => T("Toutes les fonctionnalités, avec les droits administrateur");
+
+    internal static string FullText => T("Toute l'application est disponible : audit complet, corrections (toujours annulables), réparation de Windows, capteurs avancés, fiche mémoire… Windows vous demande votre autorisation ; après 15 minutes sans utilisation, les droits se referment seuls et les options redeviennent grises.");
+
+    /// <summary>Copie venue du Microsoft Store (signée par lui) ou d'ailleurs (pas encore signée).</summary>
+    internal static bool IsUnsignedCopy(string? executable) =>
+        executable is null || !executable.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>C'est le moment où l'on décide si l'on a confiance : ce que Windows va afficher est dit avant qu'il l'affiche.</summary>
+    internal static string FullTextHere => IsUnsignedCopy(Environment.ProcessPath)
+        ? FullText + " " + T("Sa fenêtre affichera « Éditeur : Inconnu » en jaune : cette copie de MAUS n'est pas encore signée. Si vous doutez, répondez non : MAUS reste utilisable en mode limité.")
+        : FullText;
+
     /// <summary>Carte pastel d'une des deux façons d'utiliser MAUS : un titre de couleur, puis une phrase simple.</summary>
-    private static Border Choice(string tone, string title, string text)
+    internal static Border Choice(string tone, string title, string text)
     {
         var name = new TextBlock { Text = title, FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
         name.SetResourceReference(TextBlock.ForegroundProperty, "Pastel" + tone + "Ink");
@@ -73,7 +76,6 @@ public sealed class ElevationOfferWindow : Window
         card.SetResourceReference(StyleProperty, "SoftCard");
         card.SetResourceReference(Border.BackgroundProperty, "Pastel" + tone);
         card.SetResourceReference(Border.BorderBrushProperty, "Pastel" + tone + "Stroke");
-        AutomationProperties.SetName(card, title + ". " + text);
         return card;
     }
 

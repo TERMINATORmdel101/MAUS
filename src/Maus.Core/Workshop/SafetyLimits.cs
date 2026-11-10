@@ -6,7 +6,8 @@ namespace Maus.Core.Workshop;
 /// <summary>Repères de tension d'une génération de RAM ; <see cref="DangerAboveMv"/> est absent quand aucune source n'en publie.</summary>
 public sealed record MemoryVoltageLimit(int Generation, int NominalMv, int ElevatedAboveMv, int? DangerAboveMv, string Source);
 
-public sealed record CpuTemperatureLimit(string Pattern, int MaxC, string Source);
+/// <param name="Verified">Faux quand la fiche du fabricant n'a pas pu être relue : la valeur s'affiche alors comme non vérifiée.</param>
+public sealed record CpuTemperatureLimit(string Pattern, int MaxC, string Source, bool Verified = true);
 
 /// <summary>Seuils de sécurité par famille de composant (catalogue <c>hw-safety-limits.json</c>).</summary>
 public sealed record SafetyLimits
@@ -18,7 +19,9 @@ public sealed record SafetyLimits
     /// <summary>Au repos, une carte à moins de ce nombre de degrés de son seuil de ralentissement refroidit mal.</summary>
     public int GpuIdleHotMarginC { get; init; } = 15;
 
-    public static SafetyLimits Load() => EmbeddedCatalog.Load<SafetyLimits>("hw-safety-limits.json");
+    private static readonly Lazy<SafetyLimits> Cached = new(() => EmbeddedCatalog.Load<SafetyLimits>("hw-safety-limits.json"));
+
+    public static SafetyLimits Load() => Cached.Value;
 
     public MemoryVoltageLimit? ForMemory(int? generation) => MemoryVoltage.FirstOrDefault(l => l.Generation == generation);
 

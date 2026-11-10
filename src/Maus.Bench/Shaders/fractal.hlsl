@@ -9,12 +9,6 @@
 // Params2 : densité du brouillard, intensité de la lueur, pas maximum, pas des ombres
 // Params3 : décalage des couleurs, finesse des détails, reflets (0 ou 1), rayon de l'orbe
 
-struct SceneOut
-{
-    float4 Color : SV_Target0;
-    float2 Velocity : SV_Target1;
-};
-
 float FractalDistance(float3 p, out float4 trap)
 {
     float scale = Params0.x;

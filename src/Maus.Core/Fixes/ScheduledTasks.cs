@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Maus.Core.Platform;
 using static Maus.Core.Localization.Texts;
 
@@ -39,30 +38,16 @@ public sealed class WindowsScheduledTaskAccessor(ICimReader cim) : IScheduledTas
     {
         ArgumentNullException.ThrowIfNull(taskPath);
         ArgumentNullException.ThrowIfNull(taskName);
-        var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "schtasks.exe"))
+        // Appelé hors du fil de l'interface, comme toute correction : l'attente est bornée par le délai.
+        var result = Task.Run(() => Platform.SchtasksTool.RunAsync(["/Change", "/TN", FullName(taskPath, taskName), enabled ? "/ENABLE" : "/DISABLE"], Timeout)).GetAwaiter().GetResult();
+        if (result.TimedOut)
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        foreach (var argument in new[] { "/Change", "/TN", FullName(taskPath, taskName), enabled ? "/ENABLE" : "/DISABLE" })
-        {
-            start.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(start) ?? throw new InvalidOperationException(T("Impossible de lancer schtasks.exe."));
-        _ = process.StandardOutput.ReadToEndAsync();
-        _ = process.StandardError.ReadToEndAsync();
-        if (!process.WaitForExit(Timeout))
-        {
-            process.Kill();
             throw new InvalidOperationException(T("schtasks.exe n'a pas répondu en {0} s.", (int)Timeout.TotalSeconds));
         }
 
-        if (process.ExitCode != 0)
+        if (result.Code != 0)
         {
-            throw new InvalidOperationException(T("Windows a refusé de modifier la tâche {0} (code {1}).", FullName(taskPath, taskName), process.ExitCode));
+            throw new InvalidOperationException(T("Windows a refusé de modifier la tâche {0} (code {1}).", FullName(taskPath, taskName), result.Code));
         }
     }
 

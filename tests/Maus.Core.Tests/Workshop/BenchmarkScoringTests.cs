@@ -56,6 +56,21 @@ public class BenchmarkScoringTests
     }
 
     [Fact]
+    public void ExtremesCompareEachTestToItsOwnComponent()
+    {
+        // Le processeur compte 4 fois plus de points : ce n'est pas un défaut de la carte graphique, ses scènes restent égales.
+        var tests = new[]
+        {
+            new BenchmarkTestResult("g1", "gpu", 1, "u", 9500),
+            new BenchmarkTestResult("g2", "gpu", 1, "u", 9900),
+            new BenchmarkTestResult("c1", "cpu", 1, "u", 40000),
+            new BenchmarkTestResult("c2", "cpu", 1, "u", 41000),
+        };
+
+        Assert.Equal((null, null), BenchmarkScoring.Extremes(tests));
+    }
+
+    [Fact]
     public void HistoryKeepsReportsAndSurvivesABrokenFile()
     {
         var folder = Path.Combine(Path.GetTempPath(), "maus-bench-" + Guid.NewGuid().ToString("N"));
@@ -80,5 +95,5 @@ public class BenchmarkScoringTests
         }
     }
 
-    private static BenchmarkTestResult Result(string id, double score) => new(id, "gpu", "compute", 10, "images par seconde", score);
+    private static BenchmarkTestResult Result(string id, double score) => new(id, "gpu", 10, "images par seconde", score);
 }

@@ -1,5 +1,6 @@
-// Seuils de sécurité de l'atelier matériel (Module 16). Chaque valeur cite sa source publiée (relevé du 25/09/2026).
-// Pas de source = pas de seuil : MAUS n'invente aucune limite. Avec PawnIO, les processeurs Intel donnent eux-mêmes leur limite (TjMax).
+// Seuils de sécurité de l'atelier matériel (Module 16). Chaque limite cite sa source publiée (relevé du 25/09/2026, Ryzen 5000 relu le 31/10/2026).
+// Pas de source = pas de limite : MAUS n'en invente aucune. Avec PawnIO, les processeurs Intel donnent eux-mêmes leur limite (TjMax).
+// Exceptions, signalées à l'écran comme telles : la marge gpuIdleHotMarginC, en bas, choisie par MAUS, et les entrées marquées "verified": false.
 {
   "memoryVoltage": [
     {
@@ -21,9 +22,11 @@
     { "pattern": "Ryzen [579] 7(600|700|900|950)X?\\b", "maxC": 95, "source": "AMD : Ryzen 7000 de bureau sans 3D V-Cache, 95 °C (wccftech.com, même article)" },
     { "pattern": "Ryzen [579] 9(600|700|800|900|950)X?(3D)?\\b", "maxC": 95, "source": "AMD : Ryzen 9000 de bureau, 95 °C (amd.com, fiches 9800X3D et 9950X ; TechPowerUp : cible thermique de 95 °C pour Zen 4 et Zen 5)" },
     { "pattern": "Ryzen 5 5600X\\b", "maxC": 95, "source": "AMD : Ryzen 5 5600X, 95 °C (amd.com)" },
-    { "pattern": "Ryzen (7 5700X|7 5800X|7 5800X3D|9 5950X)\\b", "maxC": 90, "source": "AMD : Ryzen 7 5700X, 5800X, 5800X3D et Ryzen 9 5950X, 90 °C" },
+    { "pattern": "Ryzen (7 5800X|7 5800X3D|9 5950X)\\b", "maxC": 90, "source": "AMD, fiches produit : Ryzen 7 5800X, 5800X3D et Ryzen 9 5950X, Max. Operating Temperature (Tjmax) 90 °C (amd.com, relu le 31/10/2026)" },
+    { "pattern": "Ryzen 7 5700X\\b", "maxC": 90, "verified": false, "source": "valeur non vérifiée : la fiche AMD de ce modèle n'est plus en ligne (31/10/2026) ; gardée parce qu'elle sert à l'arrêt automatique des tests de charge" },
     { "pattern": "Core\\(TM\\) Ultra 9 285K\\b", "maxC": 105, "source": "Intel : Core Ultra 9 285K, 105 °C (TechPowerUp)" },
     { "pattern": "Core\\(TM\\) i7-13700K\\b", "maxC": 100, "source": "Intel ARK : Core i7-13700K, TJUNCTION 100 °C" }
   ],
+  // Choisi par MAUS, sans source publiée : annoncé dans les détails du constat (ThresholdNotes, contrôlé par un test).
   "gpuIdleHotMarginC": 15
 }

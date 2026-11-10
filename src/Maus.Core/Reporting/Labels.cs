@@ -15,13 +15,16 @@ public static class Labels
         _ => T("Indéterminé"),
     };
 
-    public static string Of(Severity severity) => severity switch
+    /// <summary>État d'une écriture du journal, en quelques mots.</summary>
+    public static string Of(Fixes.EntryState state) => state switch
     {
-        Severity.Low => T("Faible"),
-        Severity.Medium => T("Moyen"),
-        Severity.High => T("Élevé"),
-        Severity.Critical => T("Critique"),
-        _ => T("Info"),
+        Fixes.EntryState.Applied => T("en place"),
+        Fixes.EntryState.Reverted => T("annulée"),
+        Fixes.EntryState.RevertSkipped => T("modifiée depuis"),
+        Fixes.EntryState.Failed => T("échec, origine remise"),
+        Fixes.EntryState.Pending => T("interrompue : peut-être appliquée, « Annuler » vérifie"),
+        Fixes.EntryState.RollbackFailed => T("retour arrière raté"),
+        _ => state.ToString(),
     };
 
     public static string Of(Hardware.FormFactor formFactor) => formFactor switch
@@ -50,7 +53,8 @@ public static class Labels
     {
         Fixes.RevertStatus.Reverted => T("Restauré"),
         Fixes.RevertStatus.ChangedSince => T("Modifié depuis"),
-        Fixes.RevertStatus.Skipped => T("Ignoré"),
+        Fixes.RevertStatus.Skipped => T("Déjà en place"),
+        Fixes.RevertStatus.WrongAccount => T("Ignoré"),
         _ => T("Échec"),
     };
 }

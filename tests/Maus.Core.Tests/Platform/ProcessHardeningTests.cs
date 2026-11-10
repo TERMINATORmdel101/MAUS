@@ -8,6 +8,7 @@ public class ProcessHardeningTests
     public void Protections_are_applied_on_windows_and_never_throw_elsewhere()
     {
         // Seule la protection de la fenêtre est essayée ici : celles du moteur changeraient le processus des tests.
+        // Celle-ci est irréversible aussi : ce processus de tests ne peut plus charger d'image depuis le réseau jusqu'à sa fin.
         var applied = ProcessHardening.HardenInterface();
 
         if (OperatingSystem.IsWindows())

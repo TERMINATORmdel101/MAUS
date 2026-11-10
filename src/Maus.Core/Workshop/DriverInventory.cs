@@ -39,7 +39,7 @@ public sealed partial record DriverEntry(
     /// <summary>Pilote ajouté au magasin de pilotes (<c>oem#.inf</c>) : sauvegardable et supprimable par <c>pnputil</c>.</summary>
     public bool IsThirdPartyPackage => InfName is not null && OemInf().IsMatch(InfName);
 
-    [GeneratedRegex(@"^oem\d{1,5}\.inf$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\Aoem\d{1,5}\.inf\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     internal static partial Regex OemInf();
 }
 
@@ -152,7 +152,10 @@ public static class DriverAge
     /// </summary>
     public static DateTime IntelConventionalDate { get; } = new(1968, 7, 18);
 
-    /// <summary>Date de convention (Microsoft 2006 ou Intel 1968) : elle ne dit rien de l'âge réel du pilote.</summary>
+    /// <summary>Le 01/01/1970, début du compteur de temps des programmes : un paquet qui ne donne pas de vraie date, chez n'importe quel éditeur.</summary>
+    public static DateTime NoRealDate { get; } = new(1970, 1, 1);
+
+    /// <summary>Date de convention (Microsoft 2006, Intel 1968, ou pas de vraie date) : elle ne dit rien de l'âge réel du pilote.</summary>
     public static bool HasConventionalDate(DriverEntry driver)
     {
         ArgumentNullException.ThrowIfNull(driver);
@@ -195,6 +198,7 @@ public static class DriverAge
     {
         { } day when day == WindowsConventionalDate && Mentions(driver, "Microsoft") => T("date de convention de Windows"),
         { } day when day == IntelConventionalDate && Mentions(driver, "Intel") => T("date de convention d'Intel"),
+        { } day when day == NoRealDate => T("pas de vraie date"),
         _ => null,
     };
 

@@ -1,5 +1,6 @@
 using Maus.Core.Hardware;
 using Maus.Core.Modules.M10Memory;
+using Maus.Core.Modules.M11Health;
 using Maus.Core.Platform;
 using Microsoft.Win32;
 
@@ -37,9 +38,10 @@ public sealed record MemoryModuleInfo(
 
 public sealed record GpuIdentity(GpuInfo Info, long? MemoryBytes, NvidiaGpuState? Nvidia);
 
-public sealed record DiskIdentity(string Model, string? Bus, string? Media, long? SizeBytes, string? Firmware, int? TemperatureC, int? WearPercent, long? PowerOnHours);
+/// <param name="ComesAndGoes">Se branche et se débranche (USB, carte SD, disque virtuel) : ce n'est pas une pièce du PC.</param>
+public sealed record DiskIdentity(string Model, string? Bus, string? Media, long? SizeBytes, string? Firmware, int? TemperatureC, int? WearPercent, long? PowerOnHours, bool ComesAndGoes = false);
 
-public sealed record BatteryIdentity(string? Name, string? Manufacturer, int? DesignCapacityMwh, int? FullChargeCapacityMwh, int? VoltageMv, int? ChargeRateMw, int? DischargeRateMw, int? CycleCount = null)
+public sealed record BatteryIdentity(string? Name, string? Manufacturer, int? DesignCapacityMwh, int? FullChargeCapacityMwh, int? VoltageMv, int? CycleCount = null)
 {
     /// <summary>Capacité restante par rapport à la capacité d'origine (usure).</summary>
     public int? HealthPercent => DesignCapacityMwh is > 0 && FullChargeCapacityMwh is { } full
@@ -54,10 +56,7 @@ public sealed record HardwareInventory(
     IReadOnlyList<MemoryModuleInfo> Memory,
     IReadOnlyList<GpuIdentity> Gpus,
     IReadOnlyList<DiskIdentity> Disks,
-    IReadOnlyList<BatteryIdentity> Batteries)
-{
-    public long TotalMemoryBytes => Memory.Sum(m => m.CapacityBytes);
-}
+    IReadOnlyList<BatteryIdentity> Batteries);
 
 public static class HardwareInventoryReader
 {
@@ -70,7 +69,7 @@ public static class HardwareInventoryReader
     internal const string ReliabilityQuery = "SELECT DeviceId, Temperature, Wear, PowerOnHours FROM MSFT_StorageReliabilityCounter";
     internal const string BatteryStaticQuery = "SELECT InstanceName, DeviceName, ManufactureName, DesignedCapacity FROM BatteryStaticData";
     internal const string BatteryFullQuery = "SELECT InstanceName, FullChargedCapacity FROM BatteryFullChargedCapacity";
-    internal const string BatteryStatusQuery = "SELECT InstanceName, Voltage, ChargeRate, DischargeRate FROM BatteryStatus";
+    internal const string BatteryStatusQuery = "SELECT InstanceName, Voltage FROM BatteryStatus";
     internal const string BatteryCycleQuery = "SELECT InstanceName, CycleCount FROM BatteryCycleCount";
     internal const string DisplayClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
 
@@ -103,7 +102,7 @@ public static class HardwareInventoryReader
 
     internal static CpuIdentity ReadCpu(ICimReader cim, ICpuIdSource cpuId)
     {
-        var row = First(Query(cim, ProcessorQuery));
+        var row = cim.QueryOrEmpty(ProcessorQuery).FirstOrNull();
         var id = Safe(() => CpuIdParser.Read(cpuId));
         var name = id?.Brand ?? row?.GetString("Name")?.Trim() ?? Localization.Texts.T("Processeur inconnu");
         return new CpuIdentity(
@@ -124,8 +123,8 @@ public static class HardwareInventoryReader
 
     internal static BoardIdentity ReadBoard(ICimReader cim)
     {
-        var board = First(Query(cim, BoardQuery));
-        var bios = First(Query(cim, BiosQuery));
+        var board = cim.QueryOrEmpty(BoardQuery).FirstOrNull();
+        var bios = cim.QueryOrEmpty(BiosQuery).FirstOrNull();
         return new BoardIdentity(
             Clean(board?.GetString("Manufacturer")),
             Clean(board?.GetString("Product")),
@@ -135,23 +134,18 @@ public static class HardwareInventoryReader
     }
 
     internal static IReadOnlyList<MemoryModuleInfo> ReadMemory(ICimReader cim) =>
-        Query(cim, MemoryQuery).Select(row =>
+        cim.QueryOrEmpty(MemoryQuery).Select(row =>
         {
             var part = Clean(row.GetString("PartNumber"));
             var decoded = MemoryPartDecoder.Decode(part);
-            var generation = row.GetInt64("SMBIOSMemoryType") switch
-            {
-                26 => 4,
-                34 => 5,
-                24 => 3,
-                _ => decoded?.Generation,
-            };
+            var generation = Modules.M10Memory.MemorySpeeds.Generation(row.GetInt64("SMBIOSMemoryType")) ?? decoded?.Generation;
+            var speeds = Modules.M10Memory.MemorySpeeds.FromRow(row, generation);
             var slot = Clean(row.GetString("DeviceLocator")) ?? Clean(row.GetString("BankLabel")) ?? "?";
             return new MemoryModuleInfo(
                 slot,
                 row.GetInt64("Capacity") ?? 0,
-                (int?)row.GetInt64("Speed") ?? decoded?.RatedSpeed,
-                (int?)row.GetInt64("ConfiguredClockSpeed"),
+                speeds.Rated ?? decoded?.RatedSpeed,
+                speeds.Configured,
                 VendorName(row.GetString("Manufacturer")) ?? decoded?.Brand,
                 part,
                 generation,
@@ -180,6 +174,23 @@ public static class HardwareInventoryReader
         }).ToList();
     }
 
+    private static NvmeHealthLog? ReadNvme(INvmeHealthReader nvme, string? deviceId)
+    {
+        if (!int.TryParse(deviceId, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number))
+        {
+            return null;
+        }
+
+        try
+        {
+            return nvme.Read(number);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Mémoire vidéo annoncée par le pilote : clé de la classe d'affichage dont <c>MatchingDeviceId</c> correspond à la carte.</summary>
     internal static long? ReadVideoMemory(IRegistryReader registry, string pnpDeviceId)
     {
@@ -200,7 +211,7 @@ public static class HardwareInventoryReader
                     int bytes when bytes > 0 => bytes,
                     _ => registry.GetValue(RegistryHive.LocalMachine, path, "HardwareInformation.MemorySize") switch
                     {
-                        int bytes when bytes > 0 => (uint)bytes,
+                        int bytes when bytes != 0 => (uint)bytes,
                         byte[] { Length: >= 4 } raw => BitConverter.ToUInt32(raw, 0),
                         _ => null,
                     },
@@ -215,14 +226,18 @@ public static class HardwareInventoryReader
         return null;
     }
 
-    internal static IReadOnlyList<DiskIdentity> ReadDisks(ICimReader cim)
+    internal static IReadOnlyList<DiskIdentity> ReadDisks(ICimReader cim, INvmeHealthReader? nvme = null)
     {
-        var reliability = Query(cim, ReliabilityQuery, CimScopes.Storage)
+        nvme ??= new WindowsNvmeHealthReader();
+        var reliability = cim.QueryOrEmpty(ReliabilityQuery, CimScopes.Storage)
             .GroupBy(r => r.GetString("DeviceId") ?? string.Empty)
             .ToDictionary(g => g.Key, g => g.First());
-        return Query(cim, DiskQuery, CimScopes.Storage).Select(row =>
+        return cim.QueryOrEmpty(DiskQuery, CimScopes.Storage).Select(row =>
         {
             reliability.TryGetValue(row.GetString("DeviceId") ?? string.Empty, out var health);
+
+            // Windows ne remplit pas ces compteurs pour tous les SSD NVMe : le journal de santé du disque les donne.
+            var log = row.GetInt64("BusType") == 17 && (health?.GetInt64("Wear") is null || health.GetInt64("PowerOnHours") is null) ? ReadNvme(nvme, row.GetString("DeviceId")) : null;
             return new DiskIdentity(
                 Clean(row.GetString("FriendlyName")) ?? "?",
                 row.GetInt64("BusType") switch
@@ -241,18 +256,19 @@ public static class HardwareInventoryReader
                 },
                 row.GetInt64("Size"),
                 Clean(row.GetString("FirmwareVersion")),
-                (int?)health?.GetInt64("Temperature") is > 0 and var t ? t : null,
-                (int?)health?.GetInt64("Wear"),
-                health?.GetInt64("PowerOnHours"));
+                (int?)health?.GetInt64("Temperature") is > 0 and var t ? t : log?.TemperatureCelsius,
+                (int?)health?.GetInt64("Wear") ?? log?.PercentageUsed,
+                health?.GetInt64("PowerOnHours") ?? (long?)log?.PowerOnHours,
+                row.GetInt64("BusType") is 4 or 7 or 12 or 13 or 14 or 15);
         }).ToList();
     }
 
     internal static IReadOnlyList<BatteryIdentity> ReadBatteries(ICimReader cim)
     {
-        var full = Query(cim, BatteryFullQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
-        var status = Query(cim, BatteryStatusQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
-        var cycles = Query(cim, BatteryCycleQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
-        return Query(cim, BatteryStaticQuery, CimScopes.Wmi).Select(row =>
+        var full = cim.QueryOrEmpty(BatteryFullQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        var status = cim.QueryOrEmpty(BatteryStatusQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        var cycles = cim.QueryOrEmpty(BatteryCycleQuery, CimScopes.Wmi).ToDictionary(r => r.GetString("InstanceName") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        return cim.QueryOrEmpty(BatteryStaticQuery, CimScopes.Wmi).Select(row =>
         {
             var name = row.GetString("InstanceName") ?? string.Empty;
             full.TryGetValue(name, out var capacity);
@@ -264,8 +280,6 @@ public static class HardwareInventoryReader
                 (int?)row.GetInt64("DesignedCapacity"),
                 (int?)capacity?.GetInt64("FullChargedCapacity"),
                 (int?)state?.GetInt64("Voltage"),
-                (int?)state?.GetInt64("ChargeRate"),
-                (int?)state?.GetInt64("DischargeRate"),
                 cycle?.GetInt64("CycleCount") is > 0 and var count ? (int)count : null);
         }).ToList();
     }
@@ -292,25 +306,7 @@ public static class HardwareInventoryReader
     private static bool NamesMatch(string nvml, string wmi) =>
         wmi.Contains(nvml.Replace("NVIDIA ", string.Empty, StringComparison.OrdinalIgnoreCase), StringComparison.OrdinalIgnoreCase);
 
-    private static string? Clean(string? value)
-    {
-        var trimmed = value?.Trim();
-        return string.IsNullOrEmpty(trimmed) || trimmed.Equals("To Be Filled By O.E.M.", StringComparison.OrdinalIgnoreCase) || trimmed.Equals("Default string", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : trimmed;
-    }
-
-    private static IReadOnlyList<CimRow> Query(ICimReader cim, string wql, string scope = CimScopes.Default)
-    {
-        try
-        {
-            return cim.Query(wql, scope);
-        }
-        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
-        {
-            return [];
-        }
-    }
+    private static string? Clean(string? value) => Hardware.HardwareText.Clean(value);
 
     private static T? Safe<T>(Func<T?> read)
         where T : class
@@ -324,6 +320,4 @@ public static class HardwareInventoryReader
             return null;
         }
     }
-
-    private static CimRow? First(IReadOnlyList<CimRow> rows) => rows.Count > 0 ? rows[0] : null;
 }

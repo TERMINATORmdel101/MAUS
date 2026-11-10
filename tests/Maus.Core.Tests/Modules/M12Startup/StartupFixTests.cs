@@ -33,7 +33,7 @@ public class StartupFixTests
         Assert.Equal(0x03, bytes[0]);
 
         // La valeur Run n'est jamais touchée.
-        Assert.DoesNotContain(registry.Writes, w => w.Contains(@"\Run\\Steam", StringComparison.Ordinal) && !w.Contains("StartupApproved", StringComparison.Ordinal));
+        Assert.DoesNotContain(registry.Writes, w => w.Contains(@"\Run\Steam", StringComparison.Ordinal) && !w.Contains("StartupApproved", StringComparison.Ordinal));
         Assert.Equal($"\"{SteamExe}\" -silent", registry.GetValue(RegistryHive.CurrentUser, Run, "Steam"));
         Assert.Null(registry.GetValue(RegistryHive.CurrentUser, $@"{Approved}\Run", "Steam"));
         Assert.Equal(2, applied.AppliedCount);

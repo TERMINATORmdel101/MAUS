@@ -9,12 +9,16 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.App.Views;
 
 /// <summary>Une ligne du détail du score : points retirés, constat, gravité.</summary>
-public sealed record ScoreRow(string Points, string Title, string Detail, Brush Brush);
+public sealed record ScoreRow(string Points, string Title, string Detail, Brush Brush)
+{
+    public override string ToString() => Title;
+}
 
 /// <summary>« Pourquoi ce score ? » : ce qui a coûté des points, selon quelle gravité, et le barème de MAUS.</summary>
 public partial class ScoreWindow : Window
 {
-    public ScoreWindow(ScoreBreakdown breakdown)
+    /// <param name="limitedNote">Audit sans droits administrateur : la phrase qui dit que le score est partiel.</param>
+    public ScoreWindow(ScoreBreakdown breakdown, string? limitedNote = null)
     {
         ArgumentNullException.ThrowIfNull(breakdown);
 
@@ -49,7 +53,7 @@ public partial class ScoreWindow : Window
         }
 
         // Score partiel : les modules en erreur ou en délai dépassé sont nommés, avec la raison (donnée illisible = gris).
-        if (HealthScore.PartialDetail(breakdown) is { } partial)
+        if (string.Join(Environment.NewLine, new[] { limitedNote, HealthScore.PartialDetail(breakdown) }.OfType<string>()) is { Length: > 0 } partial)
         {
             PartialNote.Text = partial;
             PartialPanel.Visibility = Visibility.Visible;

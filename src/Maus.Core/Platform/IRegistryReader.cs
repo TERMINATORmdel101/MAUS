@@ -36,6 +36,36 @@ public interface IRegistryReader
 
 public static class RegistryReaderExtensions
 {
+    /// <summary>Une lecture dont le refus vaut « rien ». Pas là où un constat doit distinguer « refusé » d'« absent ».</summary>
+    public static T? OrNull<T>(Func<T?> read)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        try
+        {
+            return read();
+        }
+        catch (MausAccessDeniedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Même chose pour une valeur simple (nombre, booléen).</summary>
+    public static T? ValueOrNull<T>(Func<T> read)
+        where T : struct
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        try
+        {
+            return read();
+        }
+        catch (MausAccessDeniedException)
+        {
+            return null;
+        }
+    }
+
     public static int? GetDword(this IRegistryReader registry, RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64)
     {
         ArgumentNullException.ThrowIfNull(registry);

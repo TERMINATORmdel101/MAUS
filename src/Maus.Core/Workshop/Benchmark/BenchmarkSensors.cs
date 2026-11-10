@@ -9,9 +9,6 @@ namespace Maus.Core.Workshop.Benchmark;
 /// </summary>
 public static class NvidiaClockReasons
 {
-    /// <summary>« Les fréquences sont ajustées pour ne pas dépasser la limite de puissance » : normal à pleine charge.</summary>
-    public const ulong SwPowerCap = 0x4;
-
     /// <summary>Fréquence divisée par 2 ou plus : température trop haute, frein de l'alimentation ou pic de puissance.</summary>
     public const ulong HwSlowdown = 0x8;
 
@@ -26,8 +23,6 @@ public static class NvidiaClockReasons
 
     public static bool Thermal(ulong reasons) => (reasons & (SwThermalSlowdown | HwThermalSlowdown)) != 0;
 
-    public static bool PowerLimit(ulong reasons) => (reasons & SwPowerCap) != 0;
-
     /// <summary>Freinage matériel (fréquence divisée par 2 ou plus) dont la cause n'est pas seulement la chaleur.</summary>
     public static bool HardwareBrake(ulong reasons) => (reasons & (HwSlowdown | HwPowerBrakeSlowdown)) != 0;
 }
@@ -40,8 +35,6 @@ public sealed record BenchmarkSensorSample
     public int? GpuClockMhz { get; init; }
 
     public double? GpuPowerWatts { get; init; }
-
-    public int? GpuLoadPercent { get; init; }
 
     /// <summary>Raisons qui limitent la fréquence de la carte (NVIDIA seulement), voir <see cref="NvidiaClockReasons"/>.</summary>
     public ulong? GpuClockReasons { get; init; }
@@ -60,6 +53,9 @@ public sealed record BenchmarkSensorSample
 
     /// <summary>Limite de température donnée par le processeur lui-même (Intel, pilote PawnIO requis).</summary>
     public int? CpuTjMaxC { get; init; }
+
+    /// <summary>Limite de température publiée par le fabricant pour ce modèle (catalogue des seuils), si elle est connue.</summary>
+    public int? CpuCatalogLimitC { get; init; }
 }
 
 /// <summary>Ce que les capteurs ont relevé pendant la mesure d'un test, ou de tous les tests d'un composant.</summary>
@@ -79,9 +75,6 @@ public sealed record BenchmarkSensorSummary
 
     /// <summary>Part des mesures où la carte réduisait sa fréquence à cause de la chaleur (NVIDIA), en %.</summary>
     public double? ThermalSlowdownPercent { get; init; }
-
-    /// <summary>Part des mesures où la carte tenait sa limite de puissance (NVIDIA ; normal à pleine charge), en %.</summary>
-    public double? PowerLimitPercent { get; init; }
 
     /// <summary>Part des mesures avec un freinage matériel, fréquence divisée par 2 ou plus (NVIDIA), en %.</summary>
     public double? HardwareBrakePercent { get; init; }
@@ -114,7 +107,6 @@ public sealed record BenchmarkSensorSummary
             AveragePowerWatts = powers.Count > 0 ? Math.Round(powers.Average(), 1) : null,
             LimitTemperatureC = limits.Count > 0 ? limits[^1] : null,
             ThermalSlowdownPercent = Share(NvidiaClockReasons.Thermal),
-            PowerLimitPercent = Share(NvidiaClockReasons.PowerLimit),
             HardwareBrakePercent = Share(NvidiaClockReasons.HardwareBrake),
         };
     }
@@ -143,7 +135,6 @@ public sealed record BenchmarkSensorSummary
             AveragePowerWatts = Average(p => p.AveragePowerWatts, 1),
             LimitTemperatureC = list.LastOrDefault(p => p.LimitTemperatureC is not null)?.LimitTemperatureC,
             ThermalSlowdownPercent = Average(p => p.ThermalSlowdownPercent, 1),
-            PowerLimitPercent = Average(p => p.PowerLimitPercent, 1),
             HardwareBrakePercent = Average(p => p.HardwareBrakePercent, 1),
         };
     }
@@ -263,32 +254,38 @@ public interface IBenchmarkSensorReader : IDisposable
 /// </summary>
 public sealed class BenchmarkSensorSampler : IDisposable
 {
+    /// <summary>Au-delà, une mesure n'est plus rendue : l'affichage disparaît plutôt que de montrer une valeur figée.</summary>
+    public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(5);
+
     private readonly Lock _gate = new();
     private readonly List<BenchmarkSensorSample> _segment = [];
     private readonly ManualResetEventSlim _stop = new();
     private readonly Thread _thread;
     private readonly TimeSpan _interval;
+    private readonly Func<TimeSpan> _clock;
     private BenchmarkSensorSample? _latest;
+    private TimeSpan _latestAt;
     private bool _recording;
 
-    public BenchmarkSensorSampler(Func<IBenchmarkSensorReader> open, TimeSpan? interval = null)
+    public BenchmarkSensorSampler(Func<IBenchmarkSensorReader> open, TimeSpan? interval = null, Func<TimeSpan>? clock = null)
     {
         _interval = interval ?? TimeSpan.FromSeconds(1);
+        _clock = clock ?? (static () => TimeSpan.FromMilliseconds(Environment.TickCount64));
         _thread = new Thread(() => Loop(open)) { IsBackground = true, Name = "MAUS benchmark sensors", Priority = ThreadPriority.AboveNormal };
         _thread.Start();
     }
 
-    /// <summary>Capteurs de ce PC pour la carte <paramref name="gpuName"/> (nom donné par DirectX).</summary>
-    public static BenchmarkSensorSampler ForThisPc(string gpuName) => new(() => new WindowsBenchmarkSensors(gpuName));
+    /// <summary>Capteurs de ce PC pour la carte <paramref name="gpuName"/> (nom donné par DirectX) et le processeur <paramref name="cpuName"/>.</summary>
+    public static BenchmarkSensorSampler ForThisPc(string gpuName, string cpuName) => new(() => new WindowsBenchmarkSensors(gpuName, cpuName));
 
-    /// <summary>Dernière mesure (affichée en direct), ou <c>null</c> avant la première.</summary>
+    /// <summary>Dernière mesure (affichée en direct), ou <c>null</c> avant la première et si elle a plus de <see cref="MaxAge"/>.</summary>
     public BenchmarkSensorSample? Latest
     {
         get
         {
             lock (_gate)
             {
-                return _latest;
+                return _latest is not null && _clock() - _latestAt <= MaxAge ? _latest : null;
             }
         }
     }
@@ -342,6 +339,7 @@ public sealed class BenchmarkSensorSampler : IDisposable
                 lock (_gate)
                 {
                     _latest = sample;
+                    _latestAt = _clock();
                     if (_recording)
                     {
                         _segment.Add(sample);
@@ -375,10 +373,12 @@ internal sealed class WindowsBenchmarkSensors : IBenchmarkSensorReader
     private readonly nint _frequency;
     private readonly WindowsNvmlSource _nvml = new();
     private readonly CombinedSensorSource? _driver;
+    private readonly int? _cpuCatalogLimit;
 
-    public WindowsBenchmarkSensors(string gpuName)
+    public WindowsBenchmarkSensors(string gpuName, string cpuName)
     {
         _gpuName = gpuName;
+        _cpuCatalogLimit = CatalogLimit(cpuName);
         _performance = _pdh.Add(@"\Processor Information(_Total)\% Processor Performance");
         _frequency = _pdh.Add(@"\Processor Information(_Total)\Processor Frequency");
         _pdh.Collect();
@@ -402,13 +402,13 @@ internal sealed class WindowsBenchmarkSensors : IBenchmarkSensorReader
             GpuTemperatureC = nvidia?.TemperatureC ?? otherTemperature,
             GpuClockMhz = nvidia?.GraphicsClockMhz,
             GpuPowerWatts = nvidia?.PowerWatts,
-            GpuLoadPercent = nvidia?.UtilizationPercent,
             GpuClockReasons = nvidia?.ClockEventReasons,
             GpuSlowdownC = nvidia?.SlowdownTemperatureC,
             CpuMhz = performance is { } p && nominal is { } n && n > 0 ? n * p / 100 : null,
             CpuTemperatureC = driver?.CpuTemperatureC,
             CpuPowerWatts = driver?.CpuPowerWatts,
             CpuTjMaxC = driver?.CpuTjMaxC,
+            CpuCatalogLimitC = _cpuCatalogLimit,
         };
     }
 
@@ -418,11 +418,26 @@ internal sealed class WindowsBenchmarkSensors : IBenchmarkSensorReader
         _pdh.Dispose();
     }
 
+    /// <summary>Une limite introuvable ne doit pas priver le benchmark de ses autres capteurs.</summary>
+    private static int? CatalogLimit(string cpuName)
+    {
+        try
+        {
+            return SafetyLimits.Load().ForCpu(cpuName)?.MaxC;
+        }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        {
+            return null;
+        }
+    }
+
     private NvidiaGpuState? Nvidia()
     {
         try
         {
-            return _nvml.Read()?.FirstOrDefault(g => SameGpu(g.Name, _gpuName));
+            var cards = _nvml.Read();
+            return cards?.FirstOrDefault(g => string.Equals(g.Name.Replace("NVIDIA ", string.Empty, StringComparison.OrdinalIgnoreCase).Trim(), _gpuName.Replace("NVIDIA ", string.Empty, StringComparison.OrdinalIgnoreCase).Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? cards?.FirstOrDefault(g => SameGpu(g.Name, _gpuName));
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {

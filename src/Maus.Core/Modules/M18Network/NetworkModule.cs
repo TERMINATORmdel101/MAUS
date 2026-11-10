@@ -14,7 +14,9 @@ public sealed class NetworkModule : IAuditModule
 
     private const long Ethernet = 14;
     private const long Wireless = 9;
-    private const long Gigabit = 1_000_000_000;
+    internal const long Gigabit = 1_000_000_000;
+    internal const long VerySlowLink = 10_000_000;
+    internal const int WeakSignalPercent = 50;
 
     private readonly IWifiSource _wifi;
 
@@ -84,7 +86,7 @@ public sealed class NetworkModule : IAuditModule
         var name = adapter.GetString("Name") ?? "Ethernet";
         var speed = adapter.GetInt64("ReceiveLinkSpeed") ?? 0;
         var slow = speed is > 0 and < Gigabit;
-        var severity = speed is > 0 and <= 10_000_000 ? Severity.Medium : Severity.Low;
+        var severity = speed is > 0 and <= VerySlowLink ? Severity.Medium : Severity.Low;
         return new Finding
         {
             Id = "M18.ethernet." + Slug(name),
@@ -126,7 +128,7 @@ public sealed class NetworkModule : IAuditModule
             };
         }
 
-        var weak = link.SignalPercent < 50;
+        var weak = link.SignalPercent < WeakSignalPercent;
         var old = link.PhyType is > 0 and < 7;
         var details = new List<string> { T("signal {0} %", link.SignalPercent) };
         if (link.Standard is { } standard)
@@ -136,7 +138,7 @@ public sealed class NetworkModule : IAuditModule
 
         if (link.Band is { } band)
         {
-            details.Add(band);
+            details.Add(BandLabel(band));
         }
 
         details.Add(T("{0} Mb/s", Math.Max(link.ReceiveMbps, link.TransmitMbps)));
@@ -146,7 +148,7 @@ public sealed class NetworkModule : IAuditModule
             advice.Add(T("Signal faible : rapprochez-vous de la box, évitez les murs épais et les meubles métalliques, ou ajoutez un répéteur ou un système mesh."));
         }
 
-        if (link.Band == "2,4 GHz")
+        if (link.Band == WifiChannels.Band24)
         {
             advice.Add(T("Vous êtes en 2,4 GHz : si la box le propose, la bande 5 GHz est plus rapide et moins encombrée à courte distance."));
         }
@@ -186,13 +188,13 @@ public sealed class NetworkModule : IAuditModule
             .GroupBy(p => (Band: p.Band!, Channel: p.Channel!.Value))
             .OrderBy(g => g.Key.Band, StringComparer.Ordinal).ThenBy(g => g.Key.Channel)
             .GroupBy(g => g.Key.Band)
-            .Select(band => T("{0} : {1}", band.Key, string.Join(", ", band.Select(g => T("canal {0} ({1})", g.Key.Channel, g.Count())))))
+            .Select(band => T("{0} : {1}", BandLabel(band.Key), string.Join(", ", band.Select(g => T("canal {0} ({1})", g.Key.Channel, g.Count())))))
             .ToList();
         var text = T(" Autres points d'accès visibles : {0}.", nearby.Count);
         if (link.Channel is { } channel && link.Band is { } band)
         {
             var same = nearby.Count(p => p.Channel == channel && p.Band == band);
-            text += T(" Sur votre canal ({0}, {1}) : {2}.", channel, band, same);
+            text += T(" Sur votre canal ({0}, {1}) : {2}.", channel, BandLabel(band), same);
         }
 
         return byChannel.Count == 0 ? text : text + T(" Par canal : {0}.", string.Join(" ; ", byChannel));
@@ -202,10 +204,8 @@ public sealed class NetworkModule : IAuditModule
         ? T("{0:0.#} Gb/s", bitsPerSecond / 1e9)
         : T("{0:0} Mb/s", bitsPerSecond / 1e6);
 
-    private static string Slug(string value)
-    {
-        var chars = value.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray();
-        var slug = new string(chars).Trim('-');
-        return slug.Length == 0 ? "x" : slug;
-    }
+    /// <summary>Seul « 2,4 GHz » change selon la langue (virgule ou point) ; « 5 GHz » et « 6 GHz » s'écrivent partout pareil.</summary>
+    private static string BandLabel(string band) => band == WifiChannels.Band24 ? T("2,4 GHz") : band;
+
+    private static string Slug(string value) => FindingSlug.Of(value);
 }

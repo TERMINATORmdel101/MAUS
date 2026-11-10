@@ -7,7 +7,7 @@ namespace Maus.Core.Modules.M01Audit;
 public sealed partial class RiskyChangesAuditModule
 {
     private const string DefenderCategory = "Defender";
-    internal const string DefenderStatusQuery = "SELECT RealTimeProtectionEnabled, IsTamperProtected, AntivirusEnabled, AMServiceEnabled FROM MSFT_MpComputerStatus";
+    internal const string DefenderStatusQuery = "SELECT RealTimeProtectionEnabled, IsTamperProtected FROM MSFT_MpComputerStatus";
     internal const string DefenderPreferenceQuery = "SELECT ExclusionPath, ExclusionExtension, ExclusionProcess FROM MSFT_MpPreference";
     private const string RealtimePolicyKey = @"SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection";
 
@@ -48,6 +48,16 @@ public sealed partial class RiskyChangesAuditModule
                 T("un antivirus actif"),
                 T("Un autre antivirus ({0}) protège ce PC : Microsoft Defender se met alors en retrait. C'est le fonctionnement normal.", thirdParty.Name),
                 policy ? T("La stratégie DisableRealtimeMonitoring est aussi présente : pensez à la supprimer si vous désinstallez un jour cet antivirus.") : null);
+        }
+
+        if (policy && realtime == true)
+        {
+            return RealtimeCheck.Deviation(
+                T("stratégie présente, mais protection active d'après Defender"),
+                expected,
+                T("La stratégie DisableRealtimeMonitoring est présente, mais Defender indique que la protection reste active. Mieux vaut retirer cette stratégie. ") + explanation,
+                T("Supprimer la valeur DisableRealtimeMonitoring."),
+                Severity.Medium);
         }
 
         if (policy)
@@ -110,7 +120,7 @@ public sealed partial class RiskyChangesAuditModule
                 T("active"),
                 explanation,
                 T("Ouvrir Sécurité Windows > Protection contre les virus et menaces > Gérer les paramètres, puis activer « Protection contre les falsifications ». " +
-                "Ce réglage ne peut pas être changé par un programme : MAUS vous guidera pas à pas."));
+                "Ce réglage ne peut pas être changé par un programme."));
         }
 
         return defender.AccessDenied ? TamperCheck.AdminRequired() : TamperCheck.Unknown(T("État de Microsoft Defender illisible sur ce PC."));

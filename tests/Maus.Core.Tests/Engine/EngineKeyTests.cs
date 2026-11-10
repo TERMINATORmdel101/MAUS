@@ -5,16 +5,22 @@ namespace Maus.Core.Tests.Engine;
 /// <summary>Signature des messages du canal privé et refus des demandes rejouées (anti-rejeu, 29/10/2026).</summary>
 public sealed class EngineKeyTests
 {
+    private static byte[] Utf8(string text) => System.Text.Encoding.UTF8.GetBytes(text);
+
     [Fact]
     public void A_request_signed_with_the_key_is_accepted_and_any_change_is_refused()
     {
         var key = EngineKey.Create();
-        var signed = key.SignRequest("{\"op\":\"ping\",\"language\":\"fr\",\"sequence\":1}");
+        var signed = key.SignRequest(Utf8("{\"op\":\"ping\",\"language\":\"fr\",\"sequence\":1}"));
 
         Assert.True(key.VerifyRequest(signed));
-        Assert.False(key.VerifyRequest(signed with { Body = signed.Body.Replace("ping", "audit", StringComparison.Ordinal) }));
-        Assert.False(key.VerifyRequest(signed with { Mac = signed.Mac.ToUpperInvariant() }));
-        Assert.False(key.VerifyRequest(signed with { Mac = string.Empty }));
+        Assert.Equal(EngineKey.MacSize, signed.Mac.Length);
+        Assert.False(key.VerifyRequest(signed with { Body = Utf8("{\"op\":\"audit\",\"language\":\"fr\",\"sequence\":1}") }));
+        var flipped = (byte[])signed.Mac.Clone();
+        flipped[0] ^= 1;
+        Assert.False(key.VerifyRequest(signed with { Mac = flipped }));
+        Assert.False(key.VerifyRequest(signed with { Mac = [] }));
+        Assert.False(key.VerifyRequest(signed with { Mac = signed.Mac[..31] }));
         Assert.False(EngineKey.Create().VerifyRequest(signed));
     }
 
@@ -22,7 +28,7 @@ public sealed class EngineKeyTests
     public void A_response_is_valid_only_for_its_own_request_and_never_as_a_request()
     {
         var key = EngineKey.Create();
-        var response = key.SignResponse(7, "{\"kind\":\"result\"}");
+        var response = key.SignResponse(7, Utf8("{\"kind\":\"result\"}"));
 
         Assert.True(key.VerifyResponse(7, response));
         Assert.False(key.VerifyResponse(8, response));
@@ -31,19 +37,18 @@ public sealed class EngineKeyTests
     }
 
     [Fact]
-    public void The_key_travels_as_64_lowercase_hex_digits_and_nothing_else_is_accepted()
+    public void The_key_travels_as_exactly_32_bytes_and_nothing_else_is_accepted()
     {
         var key = EngineKey.Create();
-        var text = key.ToHex();
+        var secret = key.Introduction().Key!;
 
-        Assert.Matches("^[0-9a-f]{64}$", text);
-        Assert.Equal(text, EngineKey.Parse(text)!.ToHex());
-        Assert.NotEqual(text, EngineKey.Create().ToHex());
+        Assert.Equal(EngineKey.Size, secret.Length);
+        Assert.Equal(key.Fingerprint(), EngineKey.Parse(secret)!.Fingerprint());
+        Assert.NotEqual(key.Fingerprint(), EngineKey.Create().Fingerprint());
         Assert.Null(EngineKey.Parse(null));
-        Assert.Null(EngineKey.Parse(text.ToUpperInvariant()));
-        Assert.Null(EngineKey.Parse(text[..62]));
-        Assert.Null(EngineKey.Parse(text + "0"));
-        Assert.Null(EngineKey.Parse(new string('g', 64)));
+        Assert.Null(EngineKey.Parse([]));
+        Assert.Null(EngineKey.Parse(secret[..31]));
+        Assert.Null(EngineKey.Parse([.. secret, 0]));
         Assert.Throws<ArgumentException>(() => new EngineKey(new byte[16]));
     }
 
@@ -54,7 +59,7 @@ public sealed class EngineKeyTests
         var fingerprint = key.Fingerprint();
 
         Assert.True(EngineKey.IsFingerprint(fingerprint));
-        Assert.NotEqual(key.ToHex(), fingerprint);
+        Assert.NotEqual(Convert.ToHexStringLower(key.Introduction().Key!), fingerprint);
         Assert.True(key.HasFingerprint(fingerprint));
         Assert.False(EngineKey.Create().HasFingerprint(fingerprint));
         Assert.False(EngineKey.IsFingerprint(fingerprint.ToUpperInvariant()));
@@ -62,9 +67,13 @@ public sealed class EngineKeyTests
 
         // La présentation porte la clé elle-même, et rien d'autre.
         var introduction = key.Introduction();
-        Assert.Equal(key.ToHex(), introduction.Key);
-        Assert.Equal(string.Empty, introduction.Body);
+        Assert.Empty(introduction.Body);
+        Assert.Empty(introduction.Mac);
         Assert.True(EngineKey.Parse(introduction.Key)!.HasFingerprint(fingerprint));
+
+        // Une présentation n'est jamais prise pour un message signé.
+        Assert.False(key.VerifyRequest(introduction));
+        Assert.False(key.VerifyResponse(0, introduction));
     }
 
     [Fact]

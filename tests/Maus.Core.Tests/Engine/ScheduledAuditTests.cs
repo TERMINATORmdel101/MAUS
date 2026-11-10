@@ -5,6 +5,39 @@ namespace Maus.Core.Tests.Engine;
 
 public class ScheduledAuditTests
 {
+    [Fact]
+    public void Only_the_task_maus_wrote_for_this_account_counts_as_ours()
+    {
+        var ours = ScheduledAudit.ParseTask(ScheduledAudit.TaskXml(@"C:\Program Files\WindowsApps\MAUS_1\MAUS.exe", DayOfWeek.Monday, "S-1-5-21-1", new DateTime(2026, 11, 2, 8, 0, 0, DateTimeKind.Local)))!;
+
+        Assert.Equal(DayOfWeek.Monday, ours.Day);
+        Assert.True(ScheduledAudit.IsMausTask(ours, [null, "s-1-5-21-1"]));
+        Assert.False(ScheduledAudit.IsMausTask(ours, ["S-1-5-21-2"]));
+        Assert.False(ScheduledAudit.IsMausTask(ours with { Author = "Autre" }, ["S-1-5-21-1"]));
+        Assert.False(ScheduledAudit.IsMausTask(ours with { Arguments = "--scheduled-audit --tout" }, ["S-1-5-21-1"]));
+        Assert.Null(ScheduledAudit.ParseTask("pas du XML"));
+        Assert.False(ScheduledAudit.BelongsToSomeoneElse(null, ["S-1-5-21-1"]));
+        Assert.False(ScheduledAudit.BelongsToSomeoneElse(ours, ["S-1-5-21-1"]));
+        Assert.True(ScheduledAudit.BelongsToSomeoneElse(ours, ["S-1-5-21-2"]));
+        Assert.True(ScheduledAudit.BelongsToSomeoneElse(ours with { Author = "Autre" }, ["S-1-5-21-1"]));
+    }
+
+    [Fact]
+    public void The_state_read_from_a_task_says_who_owns_it_and_whether_it_keeps_old_rights()
+    {
+        var ours = new ExistingTask(DayOfWeek.Monday, "maus.exe", ScheduledAudit.Argument, "MAUS", "S-1-5-21-1", "LeastPrivilege");
+        var elevated = ours with { RunLevel = "HighestAvailable" };
+
+        Assert.Equal(new(DayOfWeek.Monday, "maus.exe"), ScheduledAudit.StateOf(ours, ["S-1-5-21-1"]));
+        Assert.True(ScheduledAudit.StateOf(elevated, ["S-1-5-21-1"]).KeepsOldRights);
+
+        // Une tâche qui n'est pas celle de ce compte ne passe jamais pour une tâche à remettre en place.
+        var foreign = ScheduledAudit.StateOf(elevated, ["S-1-5-21-2"]);
+        Assert.True(foreign.OfAnotherAccount);
+        Assert.False(foreign.KeepsOldRights);
+        Assert.Equal(new(null, null), ScheduledAudit.StateOf(null, ["S-1-5-21-1"]));
+    }
+
     private static readonly XNamespace Ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
 
     [Fact]
@@ -17,7 +50,7 @@ public class ScheduledAuditTests
         Assert.NotNull(xml.Descendants(Ns + "Sunday").SingleOrDefault());
         Assert.Equal(@"C:\Program Files\MAUS & co\MAUS.exe", xml.Descendants(Ns + "Command").Single().Value);
         Assert.Equal("--scheduled-audit", xml.Descendants(Ns + "Arguments").Single().Value);
-        Assert.Equal("HighestAvailable", xml.Descendants(Ns + "RunLevel").Single().Value);
+        Assert.Equal("LeastPrivilege", xml.Descendants(Ns + "RunLevel").Single().Value);
         Assert.Equal("InteractiveToken", xml.Descendants(Ns + "LogonType").Single().Value);
         Assert.Equal(@"PC\Alex", xml.Descendants(Ns + "UserId").Single().Value);
         Assert.Equal("true", xml.Descendants(Ns + "StartWhenAvailable").Single().Value);
@@ -34,19 +67,35 @@ public class ScheduledAuditTests
     [InlineData(@"C:\Program FilesEvil\MAUS.exe", false)]
     [InlineData(@"E:\MAUS.exe", false)]
     [InlineData("MAUS.exe", false)]
-    public void Task_is_only_offered_when_maus_sits_in_an_admin_only_folder(string executable, bool allowed)
+    public void Rights_are_only_asked_when_maus_sits_in_an_admin_only_folder(string executable, bool allowed)
     {
         string[] roots = [@"C:\Program Files", @"C:\Program Files (x86)"];
 
-        var refusal = ScheduledAudit.Refusal(executable, roots);
-
-        // Même règle pour la demande des droits administrateur (le moteur est ce même MAUS.exe).
         Assert.Equal(allowed, ScheduledAudit.IsInProtectedFolder(executable, roots));
-        Assert.Equal(allowed, refusal is null);
-        if (!allowed)
-        {
-            Assert.Contains("dossier protégé", refusal, StringComparison.Ordinal);
-        }
+    }
+
+    [Theory]
+    [InlineData("MAUS", ScheduledAudit.Argument, "u", "HighestAvailable", true)]
+    [InlineData("MAUS", ScheduledAudit.Argument, "u", "LeastPrivilege", false)]
+    [InlineData("MAUS", ScheduledAudit.Argument, "u", null, false)]
+    [InlineData("Autre", ScheduledAudit.Argument, "u", "HighestAvailable", false)]
+    [InlineData("MAUS", "--autre", "u", "HighestAvailable", false)]
+    [InlineData("MAUS", ScheduledAudit.Argument, "quelqu'un d'autre", "HighestAvailable", false)]
+    public void Only_an_elevated_task_written_by_maus_loses_its_rights(string author, string arguments, string user, string? level, bool expected) =>
+        Assert.Equal(expected, ScheduledAudit.MustDropRights(new ExistingTask(DayOfWeek.Monday, "maus.exe", arguments, author, user, level), ["u"]));
+
+    [Fact]
+    public void A_task_without_a_day_is_not_recreated() =>
+        Assert.False(ScheduledAudit.MustDropRights(new ExistingTask(null, "maus.exe", ScheduledAudit.Argument, "MAUS", "u", "HighestAvailable"), ["u"]));
+
+    [Theory]
+    [InlineData("LeastPrivilege")]
+    [InlineData("HighestAvailable")]
+    public void The_run_level_of_an_existing_task_is_read(string level)
+    {
+        var xml = ScheduledAudit.TaskXml("maus.exe", DayOfWeek.Monday, "u", new DateTime(2026, 9, 24, 15, 0, 0)).Replace("LeastPrivilege", level, StringComparison.Ordinal);
+
+        Assert.Equal(level, ScheduledAudit.ParseTask(xml)!.RunLevel);
     }
 
     [Fact]
@@ -68,6 +117,12 @@ public class ScheduledAuditTests
     {
         Assert.Equal(expected, ScheduledAudit.IsOlderStoreFolder(taskCommand, current));
     }
+
+    [Theory]
+    [InlineData(@"C:\Program Files\WindowsApps\Editeur.MAUS_0.7.6.0_x64__6c0b8wp3bzq1y\MAUS.exe", true)]
+    [InlineData(@"C:\Program Files\MAUS\MAUS.exe", false)]
+    public void A_store_folder_is_recognised(string executable, bool expected) =>
+        Assert.Equal(expected, ScheduledAudit.IsInStoreFolder(executable));
 
     [Fact]
     public void Only_red_problems_trigger_a_notification()

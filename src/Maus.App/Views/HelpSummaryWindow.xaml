@@ -13,18 +13,22 @@
     <DockPanel Margin="24">
         <Border DockPanel.Dock="Top" Style="{StaticResource SoftCard}" Background="{DynamicResource PastelMint}" BorderBrush="{DynamicResource PastelMintStroke}" Margin="0,0,0,12">
             <StackPanel>
-                <TextBlock Text="{x:Static app:Ui.HelpWindowTitle}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{x:Static app:Ui.HelpWindowTitle}" FontSize="{StaticResource FontSizeSectionTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
                 <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Text="{x:Static app:Ui.HelpIntro}" />
+                <TextBlock x:Name="Anonymization" Margin="0,6,0,0" TextWrapping="Wrap" FontWeight="SemiBold" />
             </StackPanel>
         </Border>
-        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" LastChildFill="True">
-            <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CloseWindow}" IsCancel="True" />
-            <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CopyText}" Margin="0,0,8,0" IsDefault="True" Click="OnCopy"
-                    Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" />
-            <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.ReportOnGitHub}" Padding="16,6" Margin="0,0,8,0"
-                    Click="OnGitHub" ToolTip="{x:Static app:Ui.ReportOnGitHubTip}" />
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <TextBlock x:Name="CopyStatus" VerticalAlignment="Center" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" Margin="0,0,12,0" />
-        </DockPanel>
+            <WrapPanel HorizontalAlignment="Right" Margin="0,6,0,0">
+                <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.ReportOnGitHub}" Padding="16,6" Margin="0,0,8,0"
+                    Click="OnGitHub" ToolTip="{x:Static app:Ui.ReportOnGitHubTip}" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CopyMarkdown}" Margin="0,0,8,0" Click="OnCopyMarkdown" ToolTip="{x:Static app:Ui.CopyMarkdownTip}" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CopyText}" Margin="0,0,8,0" IsDefault="True" Click="OnCopy"
+                    Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" />
+                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CloseWindow}" IsCancel="True" />
+            </WrapPanel>
+        </StackPanel>
         <Border Style="{StaticResource SoftCard}" Padding="6">
             <TextBox x:Name="Summary" AutomationProperties.Name="{x:Static app:Ui.HelpWindowTitle}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
                      FontFamily="Cascadia Mono, Consolas" FontSize="13" Padding="8" BorderThickness="0" />

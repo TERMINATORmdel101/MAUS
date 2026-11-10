@@ -18,22 +18,7 @@ internal sealed partial class Win32PowerPlatform : IPowerPlatform
     private static readonly ConcurrentDictionary<nint, TaskCompletionSource<int>> PendingModes = new();
     private static long _nextRegistration;
 
-    public Guid? GetActiveScheme()
-    {
-        if (PowerGetActiveScheme(0, out var pointer) != 0 || pointer == 0)
-        {
-            return null;
-        }
-
-        try
-        {
-            return Marshal.PtrToStructure<Guid>(pointer);
-        }
-        finally
-        {
-            LocalFree(pointer);
-        }
-    }
+    public Guid? GetActiveScheme() => Platform.PowerSchemeNative.ReadActive();
 
     public unsafe PowerCapabilities? GetCapabilities()
     {
@@ -126,9 +111,6 @@ internal sealed partial class Win32PowerPlatform : IPowerPlatform
     }
 
     [LibraryImport("powrprof.dll")]
-    private static partial uint PowerGetActiveScheme(nint userRootPowerKey, out nint activePolicyGuid);
-
-    [LibraryImport("powrprof.dll")]
     private static unsafe partial int CallNtPowerInformation(int informationLevel, void* inputBuffer, uint inputBufferLength, void* outputBuffer, uint outputBufferLength);
 
     [LibraryImport("powrprof.dll")]
@@ -140,7 +122,4 @@ internal sealed partial class Win32PowerPlatform : IPowerPlatform
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static unsafe partial bool GetLogicalProcessorInformationEx(int relationshipType, void* buffer, ref uint returnedLength);
-
-    [LibraryImport("kernel32.dll")]
-    private static partial nint LocalFree(nint memory);
 }

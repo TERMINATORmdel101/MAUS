@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Principal;
 using System.Text;
 using System.Xml.Linq;
@@ -12,52 +11,49 @@ namespace Maus.Core.Engine;
 /// </summary>
 public static class TaskSchedulerClient
 {
-    private static readonly XNamespace TaskNs = "http://schemas.microsoft.com/windows/2004/02/mit/task";
-
-    /// <summary>
-    /// Jour de la tâche existante (<c>null</c> si elle n'existe pas) et programme qu'elle lance (<c>null</c> si illisible).
-    /// </summary>
-    public static async Task<(DayOfWeek? Day, string? Command)> GetAsync()
+    /// <summary>La tâche existante ; <c>null</c> si elle n'existe pas ou si sa définition est illisible.</summary>
+    public static async Task<ExistingTask?> GetAsync()
     {
         var (code, output) = await RunAsync([.. ScheduledAudit.QueryArguments(), "/XML"]);
-        if (code != 0)
-        {
-            return (null, null);
-        }
+        return code == 0 ? ScheduledAudit.ParseTask(output) : null;
+    }
 
-        try
-        {
-            var document = XDocument.Parse(output);
-            var day = document.Descendants(TaskNs + "DaysOfWeek").Elements().FirstOrDefault()?.Name.LocalName;
-            var command = document.Descendants(TaskNs + "Command").FirstOrDefault()?.Value.Trim('"', ' ');
-            return (Enum.TryParse<DayOfWeek>(day, out var parsed) ? parsed : DayOfWeek.Sunday, command);
-        }
-        catch (System.Xml.XmlException)
-        {
-            return (DayOfWeek.Sunday, null);
-        }
+    /// <summary>Les comptes auxquels la tâche de MAUS peut appartenir : la personne devant l'écran et le compte du processus, par SID ou par nom.</summary>
+    public static IReadOnlyList<string?> AccountsOfThisSession()
+    {
+        using var self = WindowsIdentity.GetCurrent();
+        return [Maus.Core.Platform.SessionUser.Sid(), self.User?.Value, self.Name];
     }
 
     /// <summary>Chemin de MAUS.exe qu'utiliserait la tâche.</summary>
     public static string Executable => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "MAUS.exe");
 
-    /// <summary>Raison de ne pas créer la tâche depuis ce dossier (voir <see cref="ScheduledAudit.Refusal"/>), ou <c>null</c>.</summary>
-    public static string? Refusal(string? executable = null) => ScheduledAudit.Refusal(executable ?? Executable, ScheduledAudit.ProtectedRoots());
+    /// <summary>
+    /// Lancé avec les droits administrateur par une tâche d'une version précédente : la recrée sans droits, sans rien demander
+    /// puisque cela ne fait que retirer des droits. Rend vrai si c'était le cas : ce passage ne doit alors rien auditer.
+    /// </summary>
+    public static async Task<bool> DropRightsOfOldTaskAsync()
+    {
+        if (await GetAsync() is not { Day: { } day } task || !ScheduledAudit.MustDropRights(task, AccountsOfThisSession()))
+        {
+            return false;
+        }
+
+        var error = await CreateAsync(day);
+        Maus.Core.Diagnostics.Breadcrumbs.Add("audit hebdomadaire : ancienne tâche recréée sans droits" + (error is null ? string.Empty : " (échec)"));
+        return true;
+    }
 
     /// <summary>Crée (ou remplace) la tâche ; renvoie le message d'erreur, ou <c>null</c> si tout va bien.</summary>
     public static async Task<string?> CreateAsync(DayOfWeek day)
     {
         var executable = Executable;
-        if (Refusal(executable) is { } refusal)
-        {
-            return refusal;
-        }
-
-        var xml = ScheduledAudit.TaskXml(executable, day, WindowsIdentity.GetCurrent().Name, DateTime.Now);
+        // Par SID : c'est sans ambiguïté, et c'est le compte de la personne devant l'écran même si un autre administrateur a validé.
+        var xml = ScheduledAudit.TaskXml(executable, day, Maus.Core.Platform.SessionUser.Sid() ?? Environment.UserName, DateTime.Now);
         // Jamais dans le dossier temporaire de l'utilisateur : un programme sans droits pourrait y remplacer le fichier entre
         // son écriture et sa lecture par schtasks, et obtenir une tâche lancée avec les droits administrateur. Le dossier
         // %ProgramData%\MAUS\tasks n'est modifiable que par SYSTEM et les administrateurs (comme le journal des corrections).
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "MAUS", "tasks");
+        var folder = Path.Combine(Maus.Core.Platform.SystemPaths.MausData, "tasks");
         var path = Path.Combine(folder, $"maus-task-{Guid.NewGuid():N}.xml");
         try
         {
@@ -66,7 +62,7 @@ public static class TaskSchedulerClient
             // schtasks attend un fichier UTF-16, comme l'annonce l'en-tête XML.
             await File.WriteAllTextAsync(path, xml, Encoding.Unicode);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.AccessControl.PrivilegeNotHeldException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.AccessControl.PrivilegeNotHeldException or Maus.Core.Fixes.JournalUnsafeException)
         {
             // Dossier plein, protégé ou inaccessible : aucune tâche n'est créée, et on le dit.
             DeleteQuietly(path);
@@ -105,49 +101,12 @@ public static class TaskSchedulerClient
 
     private static async Task<(int Code, string Output)> RunAsync(IEnumerable<string> arguments)
     {
-        // schtasks écrit dans la page de code OEM du système, y compris ses messages d'erreur (« Erreur : Le fichier spécifié
-        // est introuvable. » : octets 0xFF et 0x82 en page 850, relevé le 30/09/2026) : lus en UTF-8, les accents seraient cassés.
-        var oem = Maus.Core.Platform.OemEncoding.Current;
-        var info = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "schtasks.exe"))
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = oem,
-            StandardErrorEncoding = oem,
-        };
-        foreach (var argument in arguments)
-        {
-            info.ArgumentList.Add(argument);
-        }
-
         try
         {
-            using var process = Process.Start(info)!;
-            // schtasks répond en moins d'une seconde ; au-delà d'une minute (outil bloqué par un antivirus ou un verrou),
-            // il est arrêté et le moteur le dit, au lieu d'attendre sans fin.
-            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            try
-            {
-                var output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
-                var error = await process.StandardError.ReadToEndAsync(timeout.Token);
-                await process.WaitForExitAsync(timeout.Token);
-                return (process.ExitCode, output + error);
-            }
-            catch (OperationCanceledException)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-                {
-                    // Déjà terminé.
-                }
-
-                return (-1, T("schtasks n'a pas répondu en une minute : la tâche n'a pas été modifiée."));
-            }
+            var result = await Maus.Core.Platform.SchtasksTool.RunAsync(arguments, TimeSpan.FromMinutes(1)).ConfigureAwait(false);
+            return result.TimedOut
+                ? (-1, T("schtasks n'a pas répondu en une minute : la tâche n'a pas été modifiée."))
+                : (result.Code, result.Output);
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {

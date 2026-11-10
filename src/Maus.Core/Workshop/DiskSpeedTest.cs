@@ -7,7 +7,7 @@ namespace Maus.Core.Workshop;
 public sealed record DiskSpeedProgress(double Percent, string Step);
 
 /// <summary>Résultat du test de vitesse : lecture et écriture séquentielles (Mo/s), lectures aléatoires de 4 Ko (par seconde, latence).</summary>
-public sealed record DiskSpeedResult(string Folder, long TestedBytes, double? WriteMegabytesPerSecond, double? ReadMegabytesPerSecond, double? RandomReadsPerSecond, double? RandomLatencyMilliseconds, bool Aborted);
+public sealed record DiskSpeedResult(double? WriteMegabytesPerSecond, double? ReadMegabytesPerSecond, double? RandomReadsPerSecond, double? RandomLatencyMilliseconds, bool Aborted);
 
 /// <summary>
 /// Test de vitesse du disque, lancé uniquement par l'utilisateur : MAUS écrit un fichier temporaire incompressible, le relit
@@ -22,6 +22,9 @@ public static unsafe class DiskSpeedTest
     private const FileOptions NoBuffering = (FileOptions)0x20000000;
     private static readonly TimeSpan RandomDuration = TimeSpan.FromSeconds(5);
 
+    /// <summary>Position d'un bloc dans le fichier de test, en 64 bits : le fichier peut dépasser 2 Go.</summary>
+    internal static long BlockOffset(int block) => (long)block * BlockBytes;
+
     public static Task<DiskSpeedResult> RunAsync(string folder, long bytes, IProgress<DiskSpeedProgress>? progress = null, CancellationToken cancellationToken = default) =>
         RunAsync(folder, bytes, RandomDuration, progress, cancellationToken);
 
@@ -33,6 +36,26 @@ public static unsafe class DiskSpeedTest
     {
         var blocks = Math.Max(Workers, bytes / BlockBytes);
         var size = blocks * BlockBytes;
+        // Fichier laissé par un test coupé net (panne de courant) : DeleteOnClose n'a pas pu le retirer.
+        try
+        {
+            foreach (var old in Directory.EnumerateFiles(folder, "MAUS-test-*.tmp"))
+            {
+                try
+                {
+                    File.Delete(old);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Encore ouvert ou protégé : il reste en place.
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Dossier illisible : le test dira lui-même ce qui ne va pas.
+        }
+
         var path = Path.Combine(folder, $"MAUS-test-{Guid.NewGuid():N}.tmp");
         var options = FileOptions.DeleteOnClose | (OperatingSystem.IsWindows() ? FileOptions.WriteThrough | NoBuffering : FileOptions.None);
         var buffers = Enumerable.Range(0, Workers).Select(_ => (nint)NativeMemory.AlignedAlloc(BlockBytes, 4096)).ToArray();
@@ -55,7 +78,7 @@ public static unsafe class DiskSpeedTest
                 for (var block = worker; block < blocks; block += Workers)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    RandomAccess.Write(handle, data, block * BlockBytes);
+                    RandomAccess.Write(handle, data, BlockOffset(block));
                     var total = Interlocked.Increment(ref done);
                     if (total % 64 == 0)
                     {
@@ -74,7 +97,7 @@ public static unsafe class DiskSpeedTest
                 for (var block = worker; block < blocks; block += Workers)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    RandomAccess.Read(handle, data, block * BlockBytes);
+                    RandomAccess.Read(handle, data, BlockOffset(block));
                     var total = Interlocked.Increment(ref done);
                     if (total % 64 == 0)
                     {
@@ -101,11 +124,11 @@ public static unsafe class DiskSpeedTest
 
             iops = reads / watch.Elapsed.TotalSeconds;
             latency = watch.Elapsed.TotalMilliseconds / Math.Max(1, reads);
-            return new DiskSpeedResult(folder, size, write, read, iops, latency, false);
+            return new DiskSpeedResult(write, read, iops, latency, false);
         }
         catch (OperationCanceledException)
         {
-            return new DiskSpeedResult(folder, size, write, read, null, null, true);
+            return new DiskSpeedResult(write, read, null, null, true);
         }
         finally
         {

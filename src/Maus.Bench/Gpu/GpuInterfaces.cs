@@ -69,6 +69,9 @@ public interface IGpuDevice : IDisposable
 
     string AdapterName { get; }
 
+    /// <summary>Version du pilote de cette carte, lue à la création, avant toute mesure ; <c>null</c> si elle n'a pas pu être lue.</summary>
+    string? DriverVersion { get; }
+
     /// <summary>Mémoire vidéo dédiée annoncée par la carte (octets).</summary>
     long DedicatedVideoMemory { get; }
 
@@ -90,11 +93,8 @@ public interface IGpuDevice : IDisposable
 
     ITexture CreateTexture(TextureDesc desc);
 
-    /// <summary>
-    /// Remplit un niveau de détail d'une texture depuis la mémoire du processeur (chargement, hors mesure).
-    /// <paramref name="slice"/> = face d'un cube ; pour une texture 3D, <paramref name="data"/> contient toutes les tranches.
-    /// </summary>
-    void UploadTexture(ITexture texture, int mip, int slice, ReadOnlySpan<byte> data, int rowPitch);
+    /// <summary>Remplit un niveau de détail d'une texture depuis la mémoire du processeur (chargement, hors mesure).</summary>
+    void UploadTexture(ITexture texture, int mip, ReadOnlySpan<byte> data, int rowPitch);
 
     IBuffer CreateBuffer(BufferDesc desc, ReadOnlySpan<byte> initialData = default);
 
@@ -112,7 +112,12 @@ public interface IGpuDevice : IDisposable
     void WaitIdle();
 
     /// <summary>Copie l'image affichée en mémoire (RVBA 8 bits par composante) : captures de contrôle.</summary>
-    byte[] CaptureBackBuffer(out int width, out int height);
+    byte[] CaptureBackBuffer(out int width, out int height)
+    {
+        width = OutputWidth;
+        height = OutputHeight;
+        return ReadTexture(BackBuffer);
+    }
 
     /// <summary>
     /// Copie en mémoire le premier niveau d'une texture 2D RVBA 8 bits (vignettes des scènes, image du résultat). Attend
@@ -126,7 +131,17 @@ public interface ICommandList
 {
     void SetRenderTargets(ReadOnlySpan<ITexture> colors, ITexture? depth, int mip = 0, int slice = 0);
 
-    void SetRenderTarget(ITexture? color, ITexture? depth = null, int mip = 0, int slice = 0);
+    void SetRenderTarget(ITexture? color, ITexture? depth = null, int mip = 0, int slice = 0)
+    {
+        if (color is null)
+        {
+            SetRenderTargets([], depth, mip, slice);
+        }
+        else
+        {
+            SetRenderTargets([color], depth, mip, slice);
+        }
+    }
 
     void SetViewport(float x, float y, float width, float height);
 
@@ -151,9 +166,7 @@ public interface ICommandList
     /// <summary>Tampon lu par les shaders (registre t<paramref name="slot"/>).</summary>
     void SetBuffer(int slot, IBuffer? buffer);
 
-    /// <summary>Texture écrite par un shader de calcul (registre u<paramref name="slot"/>, 0 à 7).</summary>
-    void SetStorageTexture(int slot, ITexture? texture, int mip = 0);
-
+    /// <summary>Tampon écrit par un shader de calcul (registre u<paramref name="slot"/>, 0 à 7).</summary>
     void SetStorageBuffer(int slot, IBuffer? buffer);
 
     void SetVertexBuffer(int slot, IBuffer? buffer, int stride);
@@ -167,9 +180,6 @@ public interface ICommandList
     void Draw(int vertexCount, int instanceCount = 1, int firstVertex = 0, int firstInstance = 0);
 
     void DrawIndexed(int indexCount, int instanceCount = 1, int firstIndex = 0, int baseVertex = 0, int firstInstance = 0);
-
-    /// <summary>Dessin dont les paramètres (5 entiers) ont été écrits par la carte elle-même à <paramref name="offsetBytes"/>.</summary>
-    void DrawIndexedIndirect(IBuffer arguments, int offsetBytes);
 
     void Dispatch(int groupsX, int groupsY, int groupsZ);
 

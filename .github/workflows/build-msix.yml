@@ -1,0 +1,54 @@
+# Fabrique le paquet du Microsoft Store sur les machines de GitHub, à partir du code public du dépôt : compilation sans
+# avertissement, tous les tests, bibliothèques verrouillées, puis attestation de provenance. Même recette que sur le PC du
+# porteur : installer/msix/build-msix.ps1. Le paquet n'est pas signé : le Store le signe après la certification.
+name: Paquet du Store
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  # Attestation de provenance (Sigstore, par l'identité du workflow).
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: paquet-store-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paquet:
+    # Image fixe, et non « windows-latest » : GitHub peut changer celle-ci sans prévenir (équivalent aujourd'hui).
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - name: Code du dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: SDK .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Tests puis paquet
+        shell: pwsh
+        run: ./installer/msix/build-msix.ps1
+
+      # Preuve d'origine vérifiable : gh attestation verify MAUS-x.y.z.msix -R TERMINATORmdel101/MAUS
+      - name: Attestation de provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/msix/MAUS-*.msix
+
+      - name: Paquet à télécharger
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: MAUS-paquet-store
+          path: |
+            artifacts/msix/MAUS-*.msix
+            artifacts/msix/MAUS-*.sha256
+          if-no-files-found: error

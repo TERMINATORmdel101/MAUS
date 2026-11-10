@@ -14,7 +14,7 @@ public static class WheaEvents
 
         try
         {
-            return logs.Query("System", WindowsHealthModule.WheaProvider, [.. WindowsHealthModule.WheaFatalIds, .. WindowsHealthModule.WheaCorrectedIds], since.LocalDateTime, 500).Count;
+            return WindowsHealthModule.QueryWhea(logs, since.LocalDateTime, 500).Count(e => !ErrorWatch.IsPciExpress(e)); // Le bus PCI Express n'est pas le processeur.
         }
         catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException or EventLogException or InvalidOperationException)
         {

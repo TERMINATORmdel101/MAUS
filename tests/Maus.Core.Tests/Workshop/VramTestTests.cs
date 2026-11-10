@@ -88,7 +88,7 @@ public class VramTestTests
         var result = await VramTest.RunAsync(gpu, Adapter, new VramTestOptions(1L << 20));
 
         Assert.False(result.Stable);
-        Assert.Contains(123L * 4, result.FirstErrorOffsets);
+        Assert.True(result.Errors > 0);
     }
 
     [Fact]

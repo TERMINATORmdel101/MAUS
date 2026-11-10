@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
 using Maus.App.Appearance;
@@ -8,6 +9,16 @@ using Maus.Core;
 namespace Maus.App.Views;
 
 /// <summary>Couleur du voyant selon le verdict, prise dans le logo : vert, bleu, or, rouge ; gris pour l'information et l'indéterminé.</summary>
+/// <summary>Barre d'un test : rien à l'écran tant que le test n'a pas avancé.</summary>
+public sealed class PositiveToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is double and > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class StatusToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
@@ -26,11 +37,15 @@ public sealed class StatusToBrushConverter : IValueConverter
 /// <summary>Couleur d'un score de santé : vert au-dessus de 75, or au-dessus de 50, rouge en dessous.</summary>
 public sealed class ScoreToBrushConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
+    /// <param name="parameter"><c>Ink</c> : couleur d'un texte, encre foncée du thème ; l'or et le vert du logo ne se lisent pas sur fond clair.</param>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => (value, parameter) switch
     {
-        int and >= 75 => Palette.Green,
-        int and >= 50 => Palette.Gold,
-        int and >= 0 => Palette.Red,
+        (int and >= 75, "Ink") => Appearance.Pastel.Ink(Appearance.Tone.Mint),
+        (int and >= 50, "Ink") => Appearance.Pastel.Ink(Appearance.Tone.Sand),
+        (int and >= 0, "Ink") => Appearance.Pastel.Ink(Appearance.Tone.Rose),
+        (int and >= 75, _) => Palette.Green,
+        (int and >= 50, _) => Palette.Gold,
+        (int and >= 0, _) => Palette.Red,
         _ => ThemeText(),
     };
 
@@ -64,7 +79,8 @@ public sealed class LetterToBrushConverter : IValueConverter
 /// <summary>Couleur de la pastille « confiance » d'un processus : vert pour Windows et les programmes installés, or pour un emplacement inhabituel.</summary>
 public sealed class TrustToBrushConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
+    // Contraste élevé : fond et texte de la pastille viennent de la même paire de Windows ; le verdict reste écrit dans le texte.
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => System.Windows.SystemParameters.HighContrast ? System.Windows.SystemColors.HighlightBrush : value switch
     {
         Maus.Core.Workshop.ProcessTrust.Windows or Maus.Core.Workshop.ProcessTrust.Installed => Palette.Green,
         Maus.Core.Workshop.ProcessTrust.UserFolder => Palette.Blue,

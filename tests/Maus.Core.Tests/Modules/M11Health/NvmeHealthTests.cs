@@ -31,7 +31,6 @@ public class NvmeHealthTests
         Assert.Equal(100, log.AvailableSpare);
         Assert.Equal(10, log.AvailableSpareThreshold);
         Assert.Equal(37UL, log.PowerOnHours);
-        Assert.Equal(27UL, log.UnsafeShutdowns);
         Assert.Equal(1.024, log.TerabytesWritten, 3);
         Assert.False(log.ReadOnly);
     }

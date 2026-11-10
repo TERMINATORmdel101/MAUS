@@ -14,9 +14,6 @@ public enum RuleExpectation
 
     /// <summary>La valeur ne doit pas valoir <see cref="RegistryRule.Value"/> ; absente, elle est conforme.</summary>
     NotEqualTo,
-
-    /// <summary>La valeur doit figurer dans <see cref="RegistryRule.Values"/>.</summary>
-    OneOf,
 }
 
 /// <summary>Contrôle de registre déclaratif, chargé depuis un catalogue JSON versionné.</summary>
@@ -39,9 +36,7 @@ public sealed record RegistryRule
 
     public string? Value { get; init; }
 
-    public IReadOnlyList<string> Values { get; init; } = [];
-
-    /// <summary>Pour <see cref="RuleExpectation.EqualTo"/> et <see cref="RuleExpectation.OneOf"/> : une valeur absente vaut-elle le défaut attendu ?</summary>
+    /// <summary>Pour <see cref="RuleExpectation.EqualTo"/> : une valeur absente vaut-elle le défaut attendu ?</summary>
     public bool AbsentIsOk { get; init; }
 
     public Severity Severity { get; init; } = Severity.Medium;
@@ -50,8 +45,8 @@ public sealed record RegistryRule
 
     public string? Advice { get; init; }
 
-    /// <summary>Texte affiché pour la valeur attendue ; à défaut, il est déduit de la règle.</summary>
-    public string? ExpectedLabel { get; init; }
+    /// <summary>Texte affiché pour la valeur attendue.</summary>
+    public required string ExpectedLabel { get; init; }
 
     /// <summary>Correction réversible proposée en cas d'écart (V0.2) ; <c>null</c> si la règle se contente de signaler.</summary>
     public RuleFix? Fix { get; init; }
@@ -65,19 +60,13 @@ public sealed record RegistryRule
 }
 
 /// <summary>
-/// Correction déclarée dans le catalogue. Par défaut : écrire <see cref="RegistryRule.Value"/> en DWORD pour
-/// <see cref="RuleExpectation.EqualTo"/>, supprimer la valeur pour <see cref="RuleExpectation.Absent"/>.
+/// Correction déclarée dans le catalogue : écrire <see cref="RegistryRule.Value"/> en DWORD pour
+/// <see cref="RuleExpectation.EqualTo"/>, supprimer la valeur pour <see cref="RuleExpectation.Absent"/> ou avec <see cref="Delete"/>.
 /// </summary>
 public sealed record RuleFix
 {
     /// <summary>Libellé de l'action ; à défaut, le conseil de la règle.</summary>
     public string? Title { get; init; }
-
-    /// <summary>Valeur à écrire si elle diffère de la valeur attendue (obligatoire pour <c>OneOf</c> et <c>NotEqualTo</c>).</summary>
-    public string? Value { get; init; }
-
-    /// <summary>Type de la valeur écrite.</summary>
-    public RegistryValueKind Type { get; init; } = RegistryValueKind.DWord;
 
     /// <summary>Supprimer la valeur au lieu de l'écrire (retour au défaut de Windows).</summary>
     public bool Delete { get; init; }
@@ -109,21 +98,13 @@ public sealed record RuleFix
     private SettingWrite? ToWrite(RegistryRule rule)
     {
         var key = SettingKey.Registry(rule.Hive, rule.Path, rule.Name);
-        if (Delete || (Value is null && rule.Expect == RuleExpectation.Absent))
+        if (Delete || rule.Expect == RuleExpectation.Absent)
         {
             return new SettingWrite(key, null);
         }
 
-        var text = Value ?? (rule.Expect == RuleExpectation.EqualTo ? rule.Value : null);
-        if (text is null)
-        {
-            return null;
-        }
-
-        return new SettingWrite(key, Type switch
-        {
-            RegistryValueKind.DWord or RegistryValueKind.QWord => new SettingValue(Type, text.Trim()),
-            _ => new SettingValue(Type, text),
-        });
+        return rule.Expect == RuleExpectation.EqualTo && rule.Value is { } text
+            ? new SettingWrite(key, new SettingValue(RegistryValueKind.DWord, text.Trim()))
+            : null;
     }
 }

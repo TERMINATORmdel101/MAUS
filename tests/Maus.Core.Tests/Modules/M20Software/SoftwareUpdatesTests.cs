@@ -28,12 +28,64 @@ public class WingetParserTests
         "2 mises à niveau disponibles.\r\n";
 
     [Fact]
+    public void Wide_characters_take_two_cells_in_japanese_tables()
+    {
+        const string japanese =
+            "名前                ID                  バージョン  利用可能  ソース\n" +
+            "----------------------------------------------------------------------\n" +
+            "メモ帳アプリ        Contoso.Memo        1.0         2.0       winget\n" +
+            "Notepad++           Notepad++.Notepad++ 8.6.9       8.7       winget\n";
+
+        var updates = Winget.Parse(japanese);
+
+        Assert.Equal(new SoftwareUpdate("メモ帳アプリ", "Contoso.Memo", "1.0", "2.0"), updates[0]);
+        Assert.Equal(new SoftwareUpdate("Notepad++", "Notepad++.Notepad++", "8.6.9", "8.7"), updates[1]);
+    }
+
+    [Fact]
+    public void Wide_characters_in_a_row_of_a_french_table_keep_the_columns()
+    {
+        const string french =
+            "Nom            ID            Version Disponible Source\n" +
+            "------------------------------------------------------\n" +
+            "メモ帳         Contoso.Memo  1.0     2.0        winget\n";
+
+        Assert.Equal(new SoftwareUpdate("メモ帳", "Contoso.Memo", "1.0", "2.0"), Assert.Single(Winget.Parse(french)));
+    }
+
+    [Fact]
+    public void Header_of_several_words_is_refused_rather_than_misread()
+    {
+        const string korean =
+            "이름       ID            버전  사용 가능  원본\n" +
+            "----------------------------------------------\n" +
+            "메모       Contoso.Memo  1.0   2.0        winget\n";
+
+        Assert.Throws<DataSourceUnavailableException>(() => Winget.Parse(korean));
+    }
+
+    [Theory]
+    [InlineData(":")]
+    [InlineData("：")]
+    public void Table_of_explicit_upgrades_alone_is_not_the_normal_list(string colon)
+    {
+        var output =
+            "No installed package found matching input criteria.\n\n" +
+            "The following packages have an upgrade available, but require explicit targeting for upgrade" + colon + "\n" +
+            "Name      Id              Version Available Source\n" +
+            "--------------------------------------------------\n" +
+            "Pinned    Pinned.App      1.0     2.0       winget\n";
+
+        Assert.Empty(Winget.Parse(output));
+    }
+
+    [Fact]
     public void English_table_is_read_by_column_positions()
     {
         var updates = Winget.Parse(English);
 
         Assert.Equal(4, updates.Count);
-        Assert.Equal(new SoftwareUpdate("Mozilla Firefox (x64 fr)", "Mozilla.Firefox", "129.0.1", "130.0", "winget"), updates[0]);
+        Assert.Equal(new SoftwareUpdate("Mozilla Firefox (x64 fr)", "Mozilla.Firefox", "129.0.1", "130.0"), updates[0]);
         Assert.Equal("7zip.7zip", updates[1].Id);
         Assert.Equal("Microsoft Visual Studio Code (Use…", updates[2].Name);
         Assert.DoesNotContain(updates, u => u.Id == "Pinned.App");
@@ -46,7 +98,7 @@ public class WingetParserTests
 
         Assert.False(updates[3].CanTarget);
         Assert.True(updates[0].CanTarget);
-        Assert.False(new SoftwareUpdate("x", "a&calc", "1", "2", "winget").CanTarget);
+        Assert.False(new SoftwareUpdate("x", "a&calc", "1", "2").CanTarget);
     }
 
     [Fact]
@@ -84,7 +136,7 @@ public class WingetParserTests
     {
         const string folder = @"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1.24_x64__8wekyb3d8bbwe";
         var packages = new FakePackages();
-        packages.Packages.Add(new InstalledPackage(Winget.PackageName, "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe", "1.24.0.0", "CN=Microsoft", folder));
+        packages.Packages.Add(new InstalledPackage("Microsoft.DesktopAppInstaller", "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe", "1.24.0.0", "CN=Microsoft", folder));
         var files = new FakeFiles().AddFile(folder + @"\winget.exe", string.Empty);
 
         Assert.Equal(folder + @"\winget.exe", Winget.Locate(packages, files, @"C:\Program Files"));
@@ -97,18 +149,47 @@ public class SoftwareUpdatesModuleTests
 {
     private const string Folder = @"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1.24_x64__8wekyb3d8bbwe";
 
-    private static async Task<Finding> Detect(FakeCommands commands, bool wingetInstalled = true)
+    /// <summary>Audit sans droits administrateur, comme dans la fenêtre : winget n'est jamais lancé avec ces droits.</summary>
+    private static async Task<Finding> Detect(FakeCommands commands, bool wingetInstalled = true, bool elevated = false)
     {
         var packages = new FakePackages();
         if (wingetInstalled)
         {
-            packages.Packages.Add(new InstalledPackage(Winget.PackageName, "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe", "1.24.0.0", "CN=Microsoft", Folder));
+            packages.Packages.Add(new InstalledPackage("Microsoft.DesktopAppInstaller", "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe", "1.24.0.0", "CN=Microsoft", Folder));
         }
 
         var files = new FakeFiles().AddFile(Folder + @"\winget.exe", string.Empty);
-        var context = TestContext.Create(commands: commands, packages: packages, files: files);
+        var context = TestContext.Create(commands: commands, packages: packages, files: files, elevated: elevated);
         var findings = await new SoftwareUpdatesModule(@"C:\Program Files").DetectAsync(context, CancellationToken.None);
         return Assert.Single(findings);
+    }
+
+    /// <summary>
+    /// winget est un outil propre au compte de l'utilisateur : un audit avec les droits administrateur (moteur, fenêtre lancée
+    /// en administrateur) ne le lance pas, et dit pourquoi. La liste simulée prouve qu'il n'a pas été lancé : elle donnerait un orange.
+    /// </summary>
+    [Fact]
+    public async Task Winget_is_never_started_with_administrator_rights()
+    {
+        var finding = await Detect(Answer(WingetParserTests.English), elevated: true);
+
+        Assert.Equal(FindingStatus.Unknown, finding.Status);
+        Assert.Contains("droits administrateur", finding.Explanation, StringComparison.Ordinal);
+        Assert.Contains("ouvrez MAUS normalement", finding.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Winget_is_never_started_without_network()
+    {
+        var commands = new FakeCommands();
+        var packages = new FakePackages();
+        packages.Packages.Add(new InstalledPackage("Microsoft.DesktopAppInstaller", "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe", "1.24.0.0", "CN=Microsoft", @"C:\Program Files\WindowsApps\x"));
+        var context = TestContext.Create(commands: commands, packages: packages, files: new FakeFiles().AddFile(Folder + @"\winget.exe", string.Empty)).WithoutNetwork();
+
+        var finding = Assert.Single(await new SoftwareUpdatesModule(@"C:\Program Files").DetectAsync(context, CancellationToken.None));
+
+        Assert.Equal(FindingStatus.Unknown, finding.Status);
+        Assert.Contains("réseau", finding.Explanation, StringComparison.Ordinal);
     }
 
     private static FakeCommands Answer(string output, int exitCode = 0) =>

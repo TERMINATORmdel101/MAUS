@@ -89,11 +89,77 @@ public class MonitorTests
     }
 
     [Fact]
+    public void Tail_reads_only_what_is_new_and_adds_up_the_counters()
+    {
+        var since = new DateTime(2026, 9, 26, 14, 0, 0);
+        var logs = new FakeEventLogs()
+            .Add("System", "Microsoft-Windows-WHEA-Logger", 17, since.AddMinutes(1), level: 3, message: "Component: PCI Express Root Port")
+            .Add("System", "Microsoft-Windows-WHEA-Logger", 17, since.AddMinutes(-5), level: 3, message: "before opening")
+            .Add("Application", "Some App", 1, since.AddMinutes(2), level: 3)
+            .Add("Application", "Application Error", 1000, since.AddMinutes(3), level: 2);
+        var tail = new ErrorWatchTail(logs, since);
+
+        var first = tail.Poll();
+
+        Assert.Equal((1, 1, 1), (first.Hardware, first.PciExpress, first.Windows));
+        Assert.Equal(["Application Error", "Microsoft-Windows-WHEA-Logger"], first.Events.Select(e => e.Provider));
+
+        var nothing = tail.Poll();
+
+        Assert.Equal((1, 1, 1), (nothing.Hardware, nothing.PciExpress, nothing.Windows));
+        Assert.Empty(nothing.Events);
+
+        logs.Add("System", "Service Control Manager", 7031, since.AddMinutes(4), level: 2)
+            .Add("System", "Microsoft-Windows-WHEA-Logger", 18, since.AddMinutes(5), level: 2, message: "Fatal: Processor Core");
+
+        var next = tail.Poll();
+
+        Assert.Equal((2, 1, 2), (next.Hardware, next.PciExpress, next.Windows));
+        Assert.Equal([18, 7031], next.Events.Select(e => e.Id));
+    }
+
+    [Fact]
+    public void Tail_counters_are_not_capped_by_the_displayed_list()
+    {
+        var since = new DateTime(2026, 9, 26, 14, 0, 0);
+        var logs = new FakeEventLogs();
+        for (var i = 0; i < ErrorWatch.MaxEvents + 50; i++)
+        {
+            logs.Add("Application", "Application Error", 1000, since.AddSeconds(i), level: 2);
+        }
+
+        Assert.Equal(ErrorWatch.MaxEvents + 50, new ErrorWatchTail(logs, since).Poll().Windows);
+    }
+
+    [Fact]
+    public void Tail_says_when_a_log_cannot_be_read()
+    {
+        var result = new ErrorWatchTail(new FakeEventLogs().Deny("Application"), DateTime.Now.AddMinutes(-1)).Poll();
+
+        Assert.True(result.Incomplete);
+    }
+
+    [Fact]
     public void Unreadable_log_is_reported_as_incomplete()
     {
         var result = ErrorWatch.Read(new FakeEventLogs().Deny("Application"), DateTime.Now.AddMinutes(-1));
 
         Assert.True(result.Incomplete);
         Assert.Equal(0, result.Windows);
+    }
+
+    [Fact]
+    public void Fatal_and_corrected_whea_errors_are_both_read_despite_the_query_limit()
+    {
+        var since = new DateTime(2026, 5, 1, 12, 0, 0);
+        var logs = new FakeEventLogs()
+            .Add("System", "Microsoft-Windows-WHEA-Logger", 2, since.AddMinutes(1), level: 3, message: "corrigée")
+            .Add("System", "Microsoft-Windows-WHEA-Logger", 1, since.AddMinutes(2), message: "irrécupérable");
+
+        var result = ErrorWatch.Read(logs, since);
+
+        Assert.False(result.Incomplete);
+        Assert.Equal(2, result.Hardware);
+        Assert.Equal(2, WheaEvents.CountSince(logs, since));
     }
 }

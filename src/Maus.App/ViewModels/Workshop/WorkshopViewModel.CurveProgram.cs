@@ -67,33 +67,19 @@ public sealed partial class WorkshopViewModel
         }
 
         // Occupé dès le clic : lecture des cœurs, des programmes actifs et confirmation prennent du temps.
-        SetPreparing(true);
-        try
+        await WithPreparingAsync(async () =>
         {
+            // Mesure fraîche : ce que la confirmation dit de l'arrêt sur la chaleur en dépend.
+            await SampleLiveAsync();
             await CurveProgramAsync();
-        }
-        finally
-        {
-            SetPreparing(false);
-        }
+        });
     }
 
     private async Task CurveProgramAsync()
     {
-        IReadOnlyList<CpuCore> cores;
-        try
+        CrashNotice = null;
+        if (await ReadCoresAsync(status => CurveStatus = status) is not { } cores)
         {
-            cores = await Task.Run(_topology.Cores);
-        }
-        catch (Exception ex)
-        {
-            CurveStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
-            return;
-        }
-
-        if (cores.Count == 0)
-        {
-            CurveStatus = T("Windows n'a pas décrit les cœurs du processeur : le test cœur par cœur est impossible sur ce PC.");
             return;
         }
 
@@ -146,7 +132,7 @@ public sealed partial class WorkshopViewModel
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            CurveStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
+            CurveStatus = T("Le test n'a pas pu se dérouler : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
@@ -197,15 +183,7 @@ public sealed partial class WorkshopViewModel
     /// <summary>Pastilles par cœur et conseils du bilan.</summary>
     private void ShowCurveResult(CurveProgramResult result, Func<int, string> name)
     {
-        foreach (var verdict in result.Cores)
-        {
-            CoreChips.Add(new CoreChipViewModel(
-                verdict.Froze ? T("{0} · figé", name(verdict.Core))
-                    : verdict.Errors > 0 ? T("{0} · {1} erreur(s)", name(verdict.Core), verdict.Errors)
-                    : verdict.Rounds > 0 ? T("{0} · stable", name(verdict.Core)) : name(verdict.Core),
-                verdict.Froze || verdict.Errors > 0 ? Controls.Palette.Red : verdict.Rounds > 0 ? Controls.Palette.Green : Controls.Palette.Grey));
-        }
-
+        AddCoreChips(result.Cores, name);
         if (result.Bursts > 0)
         {
             CoreChips.Add(new CoreChipViewModel(

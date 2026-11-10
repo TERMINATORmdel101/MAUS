@@ -38,4 +38,40 @@ public class SpdBusFilterTests
         Assert.False(Allowed(0x36, Read, 0, ProcCall));
         Assert.False(ReadOnlySpdModule.IsAllowedTransfer([0x50, Write], 2));
     }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(7, true)]
+    [InlineData(8, false)]
+    [InlineData(-1, false)]
+    [InlineData(0x103, false)]
+    public void A_ddr5_page_write_carries_a_page_number(long page, bool allowed) =>
+        Assert.Equal(allowed, Allowed(0x50, Write, 0x0B, ByteData, page));
+
+    [Fact]
+    public void A_ddr5_page_write_without_its_data_is_refused() =>
+        Assert.False(ReadOnlySpdModule.IsAllowedTransfer([0x50, Write, 0x0B, ByteData], 4));
+
+    [Fact]
+    public void Only_a_ddr5_hub_receives_a_page_write()
+    {
+        Assert.True(ReadOnlySpdModule.WritesHubPage([0x53, Write, 0x0B, ByteData, 0]));
+        Assert.False(ReadOnlySpdModule.WritesHubPage([0x36, Write, 0, Quick, 0]));
+        Assert.False(ReadOnlySpdModule.WritesHubPage([0x53, Read, 0x0B, ByteData, 0]));
+
+        Assert.True(ReadOnlySpdModule.IsSpdHub(register => register == 0 ? 0x51 : 0x18));
+        Assert.False(ReadOnlySpdModule.IsSpdHub(register => register == 0 ? 0x23 : 0x11));
+        Assert.False(ReadOnlySpdModule.IsSpdHub(register => register == 0 ? 0x51 : 0x10));
+        Assert.False(ReadOnlySpdModule.IsSpdHub(_ => null));
+    }
+
+    [Theory]
+    [InlineData("ioctl_identity", true)]
+    [InlineData("ioctl_write_protection", true)]
+    [InlineData("ioctl_piix4_port_sel", true)]
+    [InlineData("ioctl_clock_freq", false)]
+    [InlineData("ioctl_smbus_xfer", false)]
+    [InlineData("", false)]
+    public void Other_module_functions_are_a_closed_list(string name, bool allowed) =>
+        Assert.Equal(allowed, ReadOnlySpdModule.IsAllowedFunction(name));
 }

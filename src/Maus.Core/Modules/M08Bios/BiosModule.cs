@@ -15,7 +15,8 @@ public sealed class BiosModule : IAuditModule
 {
     internal const string BiosQuery = "SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS";
     internal const string BoardQuery = "SELECT Manufacturer, Product, Version FROM Win32_BaseBoard";
-    internal const string BitLockerQuery = "SELECT DriveLetter, ProtectionStatus, VolumeType FROM Win32_EncryptableVolume";
+    internal const string BitLockerQuery = "SELECT DeviceID, DriveLetter, ProtectionStatus, VolumeType FROM Win32_EncryptableVolume";
+    private const string BitLockerId = "M08.bitlocker";
     internal const string CpuKey = @"HARDWARE\DESCRIPTION\System\CentralProcessor\0";
     internal const string SecureBootStateKey = @"SYSTEM\CurrentControlSet\Control\SecureBoot\State";
     internal const string ServicingKey = @"SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing";
@@ -26,11 +27,11 @@ public sealed class BiosModule : IAuditModule
     internal const string WindowsUpdatePage = "ms-settings:windowsupdate";
 
     private const string IntelAdvisoryUrl = "https://www.intel.com/content/www/us/en/support/articles/000102331/processors.html";
-    private const string RecoveryKeyUrl = "https://aka.ms/myrecoverykey";
     private static string UpdateCategory => T("Mise à jour du BIOS");
     private static string CertificatesCategory => T("Certificats Secure Boot 2023");
     private static string PreparationCategory => T("Avant la mise à jour");
-    private const int EventWindowDays = 180;
+    internal const int EventWindowDays = 180;
+    internal const int OldBiosDays = 365;
 
     /// <summary>Message affiché avant toute mise à jour du BIOS.</summary>
     internal static string UpdateWarning => T("La mise à jour du BIOS est une opération manuelle et sensible. Téléchargez-le uniquement sur le site du fabricant " +
@@ -93,10 +94,16 @@ public sealed class BiosModule : IAuditModule
         findings.Add(secureBootFinding);
 
         cancellationToken.ThrowIfCancellationRequested();
-        findings.Add(DetectBitLocker(context.Cim));
+        var bitLocker = BitLockerState.Read(context.Cim);
+        findings.Add(DetectBitLocker(bitLocker));
         findings.Add(DetectBoard(board, boardRow, target));
         findings.Add(DescribeUpdateMethod(context, target));
-        return Task.FromResult<IReadOnlyList<Finding>>(findings);
+
+        // L'encadré va dans le constat BitLocker et partout où MAUS parle de mettre à jour le BIOS.
+        var callout = bitLocker.BiosUpdateCallout;
+        var warning = UpdateWarning;
+        return Task.FromResult<IReadOnlyList<Finding>>(
+            [.. findings.Select(f => f.Id == BitLockerId || f.Advice?.Contains(warning, StringComparison.Ordinal) == true ? f with { Callout = callout } : f)]);
     }
 
     private static Finding DetectBiosAge(CimQuery bios, BiosTarget target, AuditContext context)
@@ -131,7 +138,7 @@ public sealed class BiosModule : IAuditModule
 
         var ageDays = (context.Now.LocalDateTime.Date - date.Value.Date).TotalDays;
         var months = Math.Max(0, (int)(ageDays / 30.44));
-        var old = ageDays > 365;
+        var old = ageDays > OldBiosDays;
         return new Finding
         {
             Id = id,
@@ -147,23 +154,32 @@ public sealed class BiosModule : IAuditModule
         };
     }
 
+    /// <summary>
+    /// Modèle 191 (0xBF) : ces Core de bureau de 13e et 14e génération suivent leur propre série de microcodes, bien en
+    /// dessous de 0x12F ; seul le modèle 183 (0xB7) suit la série 0x12F (notes de version d'Intel, 06-bf-02, 06-bf-05 et 06-b7-01).
+    /// </summary>
+    internal static bool HasOwnMicrocodeSeries(string? identifier) =>
+        identifier?.Contains(" Model 191 ", StringComparison.OrdinalIgnoreCase) == true;
+
     private static Finding? DetectMicrocode(AuditContext context, BiosTarget target)
     {
         var concerned = context.Hardware.Cpu.IsIntelRaptorLakeDesktop;
         var title = T("Microcode Intel 0x12F ou plus récent");
         uint? revision;
         uint? previous;
+        bool ownSeries;
         try
         {
             revision = MicrocodeRevision.Parse(context.Registry.GetBinary(RegistryHive.LocalMachine, CpuKey, "Update Revision"));
             previous = MicrocodeRevision.Parse(context.Registry.GetBinary(RegistryHive.LocalMachine, CpuKey, "Previous Update Revision"));
+            ownSeries = concerned && HasOwnMicrocodeSeries(context.Registry.GetString(RegistryHive.LocalMachine, CpuKey, "Identifier"));
         }
         catch (MausAccessDeniedException)
         {
             return concerned ? Finding.AdminRequired("M08.intel-microcode", title, UpdateCategory) : null;
         }
 
-        if (!concerned)
+        if (!concerned || ownSeries)
         {
             return revision is null ? null : new Finding
             {
@@ -172,8 +188,10 @@ public sealed class BiosModule : IAuditModule
                 Category = UpdateCategory,
                 Status = FindingStatus.Info,
                 Current = MicrocodeRevision.Format(revision.Value),
-                Explanation = T("Le microcode corrige le fonctionnement interne du processeur ; il est fourni par le BIOS et parfois par Windows. " +
-                    "Votre processeur n'est pas concerné par l'alerte Intel 0x12F (Core i5, i7 et i9 de bureau de 13e et 14e génération)."),
+                Explanation = ownSeries
+                    ? T("Ce modèle de processeur suit sa propre numérotation du microcode : le repère 0x12F de l'alerte Intel ne s'y compare pas, et MAUS ne peut pas dire si la correction d'Intel est présente. Gardez le BIOS à jour et les réglages « Intel Default Settings ».")
+                    : T("Le microcode corrige le fonctionnement interne du processeur ; il est fourni par le BIOS et parfois par Windows. " +
+                        "Votre processeur n'est pas concerné par l'alerte Intel 0x12F (Core i5, i7 et i9 de bureau de 13e et 14e génération)."),
             };
         }
 
@@ -235,7 +253,7 @@ public sealed class BiosModule : IAuditModule
     private static (Finding Finding, bool? Enabled) DetectSecureBoot(IRegistryReader registry)
     {
         const string id = "M08.secure-boot";
-        const string title = "Secure Boot actif";
+        var title = T("Secure Boot actif");
         var explanation = T("Secure Boot vérifie la signature de tout ce qui démarre avant Windows. Les certificats 2023 ne servent que s'il est actif.");
         int? value;
         try
@@ -292,7 +310,7 @@ public sealed class BiosModule : IAuditModule
         const string id = "M08.ca2023-status";
         var title = T("Certificats Secure Boot 2023 déployés");
         var explanation = T("Les certificats Microsoft de 2011 qui valident le démarrage ont expiré en juin 2026 (KEK CA et UEFI CA) ; " +
-            "le Windows Production PCA 2011 expire le 19 octobre 2026. Windows installe les certificats 2023 dans le firmware ; " +
+            "le Windows Production PCA 2011 a expiré le 19 octobre 2026. Windows installe les certificats 2023 dans le firmware ; " +
             "certains PC exigent d'abord un BIOS récent du fabricant.");
         if (servicing.Denied)
         {
@@ -344,7 +362,7 @@ public sealed class BiosModule : IAuditModule
             Expected = T("à jour (Updated)"),
             Explanation = explanation,
             Advice = T("Installez toutes les mises à jour de Windows Update, puis redémarrez deux fois. Si l'état ne progresse pas, " +
-                "installez le dernier BIOS du fabricant. {0} L'état est aussi visible dans Sécurité Windows > Sécurité de l'appareil.", PageAdvice(target)),
+                "installez le dernier BIOS du fabricant. {0} L'état est aussi visible dans Sécurité Windows > Sécurité des appareils.", PageAdvice(target)),
             SettingsPage = WindowsUpdatePage,
         };
     }
@@ -413,7 +431,7 @@ public sealed class BiosModule : IAuditModule
         var lastFailure = events.Where(e => e.Id is 1801 or 1795).OrderByDescending(e => e.TimeCreated).FirstOrDefault();
         if (lastFailure is not null && (lastSuccess is null || lastFailure.TimeCreated > lastSuccess.TimeCreated))
         {
-            var severity = secureBootEnabled == false ? Severity.Info : Severity.Medium;
+            var severity = secureBootEnabled == true ? Severity.Medium : Severity.Info;
             var what = lastFailure.Id == 1795 ? T("erreur renvoyée par le firmware") : T("certificats non appliqués au firmware");
             return new Finding
             {
@@ -543,52 +561,53 @@ public sealed class BiosModule : IAuditModule
         };
     }
 
-    private static Finding DetectBitLocker(ICimReader cim)
+    private static Finding DetectBitLocker(BitLockerState state)
     {
-        const string id = "M08.bitlocker";
         var title = T("BitLocker sur le disque système");
-        var explanation = T("Une mise à jour du BIOS change les mesures de démarrage : si BitLocker est actif et non suspendu, " +
-            "Windows demandera la clé de récupération au démarrage suivant.");
-        var query = QueryAll(cim, BitLockerQuery, CimScopes.BitLocker);
-        if (query.Denied)
+        var explanation = T("BitLocker chiffre les données du disque. Une mise à jour du BIOS change les mesures de démarrage : si BitLocker est actif et non suspendu, " +
+            "Windows peut demander la clé de récupération au démarrage suivant.");
+        if (state.Denied)
         {
-            return Finding.AdminRequired(id, title, PreparationCategory);
+            return Finding.AdminRequired(BitLockerId, title, PreparationCategory);
         }
 
-        var system = query.Rows.FirstOrDefault(r => r.GetInt64("VolumeType") == 0)
-            ?? query.Rows.FirstOrDefault(r => string.Equals(r.GetString("DriveLetter"), "C:", StringComparison.OrdinalIgnoreCase));
-        if (system is null)
+        if (state.NoAnswer)
         {
             return new Finding
             {
-                Id = id,
+                Id = BitLockerId,
                 Title = title,
                 Category = PreparationCategory,
-                Status = FindingStatus.Info,
-                Current = query.Unavailable ? T("non disponible sur ce PC") : T("aucun volume chiffrable trouvé"),
+                Status = FindingStatus.Unknown,
+                Current = T("non lu : Windows ne répond pas"),
                 Explanation = explanation,
             };
         }
 
-        var protection = system.GetInt64("ProtectionStatus");
+        if (!state.VolumeFound)
+        {
+            return new Finding
+            {
+                Id = BitLockerId,
+                Title = title,
+                Category = PreparationCategory,
+                Status = FindingStatus.Info,
+                Current = state.Unavailable ? T("non disponible sur ce PC") : T("aucun volume chiffrable trouvé"),
+                Explanation = explanation,
+            };
+        }
+
         return new Finding
         {
-            Id = id,
+            Id = BitLockerId,
             Title = title,
             Category = PreparationCategory,
             Status = FindingStatus.Info,
-            Current = protection switch
-            {
-                1 => T("protection active"),
-                0 => T("protection désactivée"),
-                _ => T("état inconnu"),
-            },
+            Current = state.Current,
             Explanation = explanation,
-            Advice = protection == 1
-                ? T("Avant de mettre à jour le BIOS, notez votre clé de récupération ({0}), puis suspendez la protection " +
-                  "pour deux redémarrages : elle reprend d'elle-même ensuite.", RecoveryKeyUrl)
-                : null,
-            Fixable = protection == 1,
+            Advice = state.KeyAdvice,
+            ScreenOnlyNote = state.KeyIdentifierNote,
+            SideNote = state.ChoiceNote,
         };
     }
 

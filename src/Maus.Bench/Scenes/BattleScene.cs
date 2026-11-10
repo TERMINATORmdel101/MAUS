@@ -44,11 +44,11 @@ internal sealed class BattleScene : BenchScene
     private IBuffer? _stoneBuffer;
     private IBuffer? _motionBuffer;
     private IComputePipeline? _motion;
-    private Mesh? _hull;
-    private Mesh? _turret;
-    private Mesh? _debris;
-    private RockBuffers? _pebble;
-    private RockBuffers? _boulder;
+    private IndexedMesh? _hull;
+    private IndexedMesh? _turret;
+    private IndexedMesh? _debris;
+    private IndexedMesh? _pebble;
+    private IndexedMesh? _boulder;
     private ITexture? _shadowMap;
     private IPipeline? _ground;
     private IPipeline? _solid;
@@ -71,9 +71,7 @@ internal sealed class BattleScene : BenchScene
 
     public override string Title => T("Champ de bataille");
 
-    public override string Subtitle => T("Effets : 24 chars explosent, des centaines de milliers de particules de feu, de fumée et d'étincelles");
-
-    public override GpuCapability Capability => GpuCapability.Effects;
+    public override string Subtitle => T("Effets : des chars explosent, avec des particules de feu, de fumée et d'étincelles");
 
     public override bool HasOverlay => true;
 
@@ -93,11 +91,11 @@ internal sealed class BattleScene : BenchScene
         _stoneBuffer = device.CreateBuffer(new BufferDesc(stones.Length * 48L, BufferUsage.Structured, 48, "Pierres"), MemoryMarshal.AsBytes(stones.AsSpan()));
         _motionBuffer = device.CreateBuffer(new BufferDesc(((Tanks * 4) + (Tanks * _debrisPerTank * 2)) * 16L, BufferUsage.Structured | BufferUsage.Storage, 16, "Tourelles et éclats : mouvement"));
         _motion = device.CreateComputePipeline(shaders.Get("battle.hlsl", "MotionCS", "cs_5_0"));
-        _hull = Mesh.Create(device, "Char : caisse", TankMeshes.Hull());
-        _turret = Mesh.Create(device, "Char : tourelle", TankMeshes.Turret());
-        _debris = Mesh.Create(device, "Éclat", TankMeshes.Shard());
-        _pebble = RockBuffers.Create(device, "Caillou", context.Light ? 0 : 1, 41);
-        _boulder = RockBuffers.Create(device, "Rocher", context.Light ? 1 : 2, 93);
+        _hull = TankMesh(device, "Char : caisse", TankMeshes.Hull());
+        _turret = TankMesh(device, "Char : tourelle", TankMeshes.Turret());
+        _debris = TankMesh(device, "Éclat", TankMeshes.Shard());
+        _pebble = RockModel(device, "Caillou", context.Light ? 0 : 1, 41);
+        _boulder = RockModel(device, "Rocher", context.Light ? 1 : 2, 93);
         _shadowMap = device.CreateTexture(TextureDesc.DepthTarget(_shadowSize, _shadowSize, "Ombres du soleil couchant"));
 
         VertexElement[] layout = [new("POSITION", 0, VertexFormat.Float3, 0), new("NORMAL", 0, VertexFormat.Float3, 12), new("TEXCOORD", 0, VertexFormat.Float1, 24)];
@@ -538,31 +536,14 @@ internal sealed class BattleScene : BenchScene
         private Vector4 _element;
     }
 
-    /// <summary>Maillage d'une pierre (sommets de 24 octets : position, normale).</summary>
-    private sealed class RockBuffers(IBuffer vertices, IBuffer indices, int indexCount) : IDisposable
+    private static IndexedMesh TankMesh(IGpuDevice device, string name, (float[] Vertices, uint[] Indices) data) =>
+        IndexedMesh.Create(device, name, data.Vertices, data.Indices, TankMeshes.Stride);
+
+    /// <summary>Maillage d'une pierre.</summary>
+    private static IndexedMesh RockModel(IGpuDevice device, string name, int subdivisions, int seed)
     {
-        public int IndexCount { get; } = indexCount;
-
-        public static RockBuffers Create(IGpuDevice device, string name, int subdivisions, int seed)
-        {
-            var (vertices, indices) = RockMesh.Create(subdivisions, seed);
-            return new RockBuffers(
-                device.CreateBuffer(new BufferDesc(vertices.Length * 4, BufferUsage.Vertex, 24, name), MemoryMarshal.AsBytes(vertices.AsSpan())),
-                device.CreateBuffer(new BufferDesc(indices.Length * 4, BufferUsage.Index, 4, name + " : indices"), MemoryMarshal.AsBytes(indices.AsSpan())),
-                indices.Length);
-        }
-
-        public void Bind(ICommandList cmd)
-        {
-            cmd.SetVertexBuffer(0, vertices, 24);
-            cmd.SetIndexBuffer(indices);
-        }
-
-        public void Dispose()
-        {
-            vertices.Dispose();
-            indices.Dispose();
-        }
+        var (vertices, indices) = RockMesh.Create(subdivisions, seed);
+        return IndexedMesh.Create(device, name, vertices, indices, RockMesh.Stride);
     }
 }
 

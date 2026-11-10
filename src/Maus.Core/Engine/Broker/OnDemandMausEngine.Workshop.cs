@@ -1,5 +1,6 @@
 using Maus.Core.Fixes;
 using Maus.Core.Workshop;
+using Maus.Core.Workshop.Benchmark;
 using Maus.Core.Workshop.Memory;
 using static Maus.Core.Localization.Texts;
 
@@ -10,37 +11,31 @@ public sealed partial class OnDemandMausEngine
 {
     // Lisibles sans droits (en moins complet) : moteur administrateur s'il tourne, sinon dans ce processus.
     public Task<InventoryReading> ReadInventoryAsync(CancellationToken cancellationToken) =>
-        Available(e => e.ReadInventoryAsync(cancellationToken));
+        AvailableRead(e => e.ReadInventoryAsync(cancellationToken));
 
     public Task<DriversReading> ReadDriversAsync(CancellationToken cancellationToken) =>
-        Available(e => e.ReadDriversAsync(cancellationToken));
+        AvailableRead(e => e.ReadDriversAsync(cancellationToken));
 
     public Task<SensorReading> SampleSensorsAsync(CancellationToken cancellationToken) =>
-        Available(e => e.SampleSensorsAsync(cancellationToken));
+        AvailableRead(e => e.SampleSensorsAsync(cancellationToken));
 
     public Task<ProcessReading> ReadProcessesAsync(CancellationToken cancellationToken) =>
-        Available(e => e.ReadProcessesAsync(cancellationToken));
+        AvailableRead(e => e.ReadProcessesAsync(cancellationToken));
 
     public Task<string?> TerminateProcessAsync(int pid, DateTime? startTime, CancellationToken cancellationToken) =>
         Available(e => e.TerminateProcessAsync(pid, startTime, cancellationToken));
 
     public Task<SpaceReport> ScanSpaceAsync(string root, IProgress<long>? progress, CancellationToken cancellationToken) =>
-        Available(e => e.ScanSpaceAsync(root, progress, cancellationToken));
+        AvailableRead(e => e.ScanSpaceAsync(root, progress, cancellationToken));
 
     public Task<ScheduleState> GetScheduleAsync(CancellationToken cancellationToken) =>
-        Available(e => e.GetScheduleAsync(cancellationToken));
+        AvailableRead(e => e.GetScheduleAsync(cancellationToken));
 
-    public Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken) =>
-        Available(e => e.ListSoftwareUpdatesAsync(cancellationToken));
+    // La liste des logiciels à mettre à jour n'est plus ici (0.8.6) : la fenêtre la lit elle-même, sans droits
+    // (SoftwareListing.ReadHereAsync), même quand le moteur tourne.
 
-    /// <summary>
-    /// Toujours sans droits, même si le moteur tourne : powercfg écrit dans le profil de l'utilisateur, un dossier que tout
-    /// programme de l'utilisateur peut modifier, et les protections de Windows du moteur ne valent pas pour powercfg.exe.
-    /// </summary>
-    public Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken) =>
-        limited.CreateBatteryReportAsync(cancellationToken);
-
-    public Task<int> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken) =>
+    /// <summary>Moteur en marche : benchmark avec ses droits, qui rend sa passe sans rien écrire dans le profil (voir <see cref="IMausEngine.RunBenchmarkAsync"/>).</summary>
+    public Task<BenchmarkOutcome> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken) =>
         Available(e => e.RunBenchmarkAsync(launch, cancellationToken));
 
     // Réservées à l'administrateur : le moteur est lancé au besoin.
@@ -66,8 +61,8 @@ public sealed partial class OnDemandMausEngine
     public Task<FrameSummary?> StopFramesAsync(string session, CancellationToken cancellationToken) =>
         Live() is { } live ? live.Engine.StopFramesAsync(session, cancellationToken) : Task.FromResult<FrameSummary?>(null);
 
-    public Task<ConsoleOutcome> OpenConsoleAsync(ConsoleRequest request, CancellationToken cancellationToken) =>
-        Elevated(e => e.OpenConsoleAsync(request, cancellationToken), cancellationToken);
+    public Task<ToolOutcome> RunToolAsync(ToolRequest request, IProgress<string>? progress, CancellationToken cancellationToken) =>
+        Elevated(e => e.RunToolAsync(request, progress, cancellationToken), cancellationToken);
 
     public Task<RestorePointOutcome> CreateDriverRestorePointAsync(CancellationToken cancellationToken) =>
         Elevated(e => e.CreateDriverRestorePointAsync(cancellationToken), cancellationToken);
@@ -77,6 +72,26 @@ public sealed partial class OnDemandMausEngine
 
     public Task<RestorePointOutcome> CreateRestorePointAsync(CancellationToken cancellationToken) =>
         Elevated(e => e.CreateRestorePointAsync(cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// Seulement si le moteur tourne : refermer ne demande jamais d'autorisation. Dès que le moteur a accepté, il compte comme
+    /// arrêté (il finit de s'arrêter juste après) : rien ne doit plus partir vers lui, ni relancer un moteur que l'utilisateur vient de fermer.
+    /// </summary>
+    public async Task<bool> CloseRightsAsync(CancellationToken cancellationToken)
+    {
+        if (Live() is not { } live)
+        {
+            return false;
+        }
+
+        var closed = await live.Engine.CloseRightsAsync(cancellationToken).ConfigureAwait(false);
+        if (closed)
+        {
+            _closed = live;
+        }
+
+        return closed;
+    }
 
     public Task<string?> SetScheduleAsync(DayOfWeek? day, CancellationToken cancellationToken) =>
         Elevated(e => e.SetScheduleAsync(day, cancellationToken), cancellationToken);

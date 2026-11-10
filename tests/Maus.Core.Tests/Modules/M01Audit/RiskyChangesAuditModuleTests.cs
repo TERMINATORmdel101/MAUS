@@ -28,11 +28,33 @@ public class RiskyChangesAuditModuleTests
     }
 
     [Fact]
+    public async Task Doors_left_open_are_reported_and_the_password_is_never_shown()
+    {
+        var pc = new M01Pc();
+        pc.Registry
+            .Set(Hklm, @"SYSTEM\CurrentControlSet\Control\Terminal Server", "fDenyTSConnections", 0)
+            .Set(Hklm, M01Pc.Winlogon, "AutoAdminLogon", "1")
+            .Set(Hklm, M01Pc.Winlogon, "DefaultPassword", "secret-de-test");
+        pc.Cim.Answer(RiskyChangesAuditModule.Smb1Query, new Dictionary<string, object?> { ["InstallState"] = 1u });
+
+        var findings = await pc.RunAsync();
+
+        var remote = findings.Single(f => f.Id == "M01.remote-desktop");
+        Assert.NotEqual(FindingStatus.Ok, remote.Status);
+        Assert.Equal(RiskyChangesAuditModule.RemoteDesktopPage, remote.SettingsPage);
+        Assert.NotEqual(FindingStatus.Ok, findings.Single(f => f.Id == "M01.smb1").Status);
+        var logon = findings.Single(f => f.Id == "M01.auto-logon");
+        Assert.NotEqual(FindingStatus.Ok, logon.Status);
+        Assert.Equal(Severity.High, logon.Severity);
+        Assert.DoesNotContain(findings, f => $"{f.Current} {f.Explanation} {f.Advice}".Contains("secret-de-test", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Clean_windows_is_fully_compliant()
     {
         var findings = await new M01Pc().RunAsync();
 
-        Assert.Equal(31, findings.Count);
+        Assert.Equal(34, findings.Count);
         Assert.All(findings, f => Assert.StartsWith("M01.", f.Id, StringComparison.Ordinal));
         Assert.Equal(findings.Count, findings.Select(f => f.Id).Distinct().Count());
         Assert.All(findings, f => Assert.True(f.Status == FindingStatus.Ok, $"{f.Id} : {f.Status} ({f.Current})"));
@@ -56,7 +78,7 @@ public class RiskyChangesAuditModuleTests
             ["ExclusionExtension"] = new[] { hidden },
             ["ExclusionProcess"] = new[] { hidden },
         });
-        pc.Tasks.Folders.Clear();
+        pc.SetUpdateTasks();
         pc.Registry.Deny(Hklm, M01Pc.Ifeo + @"\MsMpEng.exe").Set(Hklm, M01Pc.Ifeo + @"\MsMpEng.exe", "x", 1);
 
         var findings = await pc.RunAsync();
@@ -116,7 +138,7 @@ public class RiskyChangesAuditModuleTests
             .AddFile(M01Pc.Hosts, "127.0.0.1 localhost\r\n0.0.0.0 update.microsoft.com\r\n0.0.0.0 fe2.update.microsoft.com # blocage\r\n0.0.0.0 v10.events.data.microsoft.com\r\n")
             .AddFile(@"C:\Windows\AtlasModules\Tools\x.cmd");
         pc.Packages.Packages.RemoveAll(p => p.Name == "Microsoft.SecHealthUI");
-        pc.Tasks.Folders[M01Pc.UpdateTasks] = [new ScheduledTaskInfo("Schedule Scan", false), new ScheduledTaskInfo("USO_UxBroker", true)];
+        pc.SetUpdateTasks(("Schedule Scan", false), ("USO_UxBroker", true));
         pc.Signatures.Statuses[@"C:\Program Files (x86)\Steam\steam.exe"] = SignatureStatus.Unsigned;
 
         var findings = await pc.RunAsync();
@@ -169,7 +191,7 @@ public class RiskyChangesAuditModuleTests
         Assert.Contains("powershell.exe", exclusions, StringComparison.Ordinal);
         Assert.DoesNotContain("Steam", exclusions, StringComparison.Ordinal);
         Assert.Contains("127.0.0.1", findings.Single(f => f.Id == "M01.wu-server").Current, StringComparison.Ordinal);
-        Assert.Contains("3 ligne(s)", findings.Single(f => f.Id == "M01.hosts").Current, StringComparison.Ordinal);
+        Assert.Contains("3 lignes", findings.Single(f => f.Id == "M01.hosts").Current, StringComparison.Ordinal);
         Assert.Contains("Audiosrv : désactivé", findings.Single(f => f.Id == "M01.core-services").Current, StringComparison.Ordinal);
         Assert.Contains("evil.exe", findings.Single(f => f.Id == "M01.winlogon").Current, StringComparison.Ordinal);
         Assert.Contains("MsMpEng.exe", findings.Single(f => f.Id == "M01.ifeo-debugger").Current, StringComparison.Ordinal);
@@ -383,19 +405,19 @@ public class RiskyChangesAuditModuleTests
     public async Task Update_tasks_all_disabled_or_unreadable()
     {
         var disabled = new M01Pc();
-        disabled.Tasks.Folders[M01Pc.UpdateTasks] = [new ScheduledTaskInfo("Report policies", false), new ScheduledTaskInfo("USO_UxBroker", false)];
+        disabled.SetUpdateTasks(("Report policies", false), ("USO_UxBroker", false));
         Assert.Equal(FindingStatus.Warning, (await disabled.RunAsync("M01.wu-tasks")).Status);
 
         var elevatedEmpty = new M01Pc();
-        elevatedEmpty.Tasks.Folders.Clear();
+        elevatedEmpty.SetUpdateTasks();
         Assert.Equal(FindingStatus.Warning, (await elevatedEmpty.RunAsync("M01.wu-tasks")).Status);
 
         var denied = new M01Pc();
-        denied.Tasks.Failure = new MausAccessDeniedException("refusé");
+        denied.Cim.Throw(RiskyChangesAuditModule.UpdateTasksQuery, new MausAccessDeniedException("refusé"), CimScopes.TaskScheduler);
         Assert.Equal(FindingStatus.Unknown, (await denied.RunAsync("M01.wu-tasks")).Status);
 
         var missing = new M01Pc();
-        missing.Tasks.Failure = new DataSourceUnavailableException("absent");
+        missing.Cim.Throw(RiskyChangesAuditModule.UpdateTasksQuery, new DataSourceUnavailableException("absent"), CimScopes.TaskScheduler);
         Assert.Equal(FindingStatus.Unknown, (await missing.RunAsync("M01.wu-tasks")).Status);
     }
 
@@ -567,10 +589,10 @@ public class RiskyChangesAuditModuleTests
     }
 
     [Fact]
-    public async Task System_proxy_is_read_from_netsh_and_unreadable_output_is_unknown()
+    public async Task System_proxy_is_read_from_winhttp_and_unreadable_is_unknown()
     {
         var pc = new M01Pc();
-        pc.Commands.Answer("netsh.exe winhttp show proxy", "Current WinHTTP proxy settings:\r\n\r\n    Proxy Server(s) :  10.0.0.1:3128\r\n    Bypass List     :  (none)\r\n");
+        pc.Proxy.Value = new WinHttpProxy(WinHttpProxyKind.Proxy, "10.0.0.1:3128");
         var proxy = await pc.RunAsync("M01.proxy");
         Assert.Equal(FindingStatus.Problem, proxy.Status);
         Assert.Contains("10.0.0.1:3128", proxy.Current, StringComparison.Ordinal);
@@ -578,14 +600,14 @@ public class RiskyChangesAuditModuleTests
         // Le proxy système (WinHTTP) n'apparaît pas dans Paramètres > Proxy : pas de bouton.
         Assert.Null(proxy.SettingsPage);
 
-        var garbled = new M01Pc();
-        garbled.Commands.Answer("netsh.exe winhttp show proxy", "???");
-        Assert.Equal(FindingStatus.Unknown, (await garbled.RunAsync("M01.proxy")).Status);
-
-        var failed = new M01Pc();
-        failed.Commands.Answer("netsh.exe winhttp show proxy", string.Empty, exitCode: 1);
-        Assert.Equal(FindingStatus.Unknown, (await failed.RunAsync("M01.proxy")).Status);
+        var unreadable = new M01Pc();
+        unreadable.Proxy.Value = new WinHttpProxy(WinHttpProxyKind.Unknown);
+        Assert.Equal(FindingStatus.Unknown, (await unreadable.RunAsync("M01.proxy")).Status);
     }
+
+    [Fact]
+    public void The_real_winhttp_proxy_reads_without_rights() =>
+        Assert.NotEqual(WinHttpProxyKind.Unknown, new WinHttpProxyReader().Read().Kind);
 
     [Fact]
     public async Task Hosts_file_without_microsoft_lines_or_absent_is_compliant()
@@ -595,7 +617,7 @@ public class RiskyChangesAuditModuleTests
         Assert.Equal(FindingStatus.Ok, (await pc.RunAsync("M01.hosts")).Status);
 
         var context = TestContext.Create(files: new FakeFiles());
-        var findings = await new RiskyChangesAuditModule(new FakeSignatureVerifier(), new FakeScheduledTasks(), M01Pc.WindowsDirectory).DetectAsync(context, CancellationToken.None);
+        var findings = await new RiskyChangesAuditModule(new FakeSignatureVerifier(), M01Pc.WindowsDirectory).DetectAsync(context, CancellationToken.None);
         Assert.Equal(FindingStatus.Ok, findings.Single(f => f.Id == "M01.hosts").Status);
     }
 
@@ -651,7 +673,7 @@ public class RiskyChangesAuditModuleTests
         Assert.Equal(FindingStatus.Unknown, findings.Single(f => f.Id == "M01.wu-server").Status);
         Assert.Equal(FindingStatus.Unknown, findings.Single(f => f.Id == "M01.wu-target-version").Status);
         Assert.Equal(FindingStatus.Unknown, findings.Single(f => f.Id == "M01.smartscreen").Status);
-        Assert.Equal(31, findings.Count);
+        Assert.Equal(34, findings.Count);
     }
 
     [Fact]

@@ -12,8 +12,8 @@ namespace Maus.Core.Modules.M15Overclocking;
 /// </summary>
 public sealed class OverclockingModule : IAuditModule
 {
-    internal const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
-    internal const string Wow64UninstallPath = @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
+    internal const string UninstallPath = InstalledPrograms.UninstallPath;
+    internal const string Wow64UninstallPath = InstalledPrograms.Wow64UninstallPath;
     internal const string AfterburnerUrl = "https://www.msi.com/Landing/afterburner/graphics-cards";
     internal const string RyzenMasterUrl = "https://www.amd.com/en/products/software/ryzen-master.html";
     internal const string XtuUrl = "https://www.intel.com/content/www/us/en/download/17881/intel-extreme-tuning-utility-intel-xtu.html";
@@ -31,13 +31,6 @@ public sealed class OverclockingModule : IAuditModule
 
     private static string FakeSitesWarning => T("Attention : plus de 50 faux sites MSI Afterburner ont diffusé un voleur de mots de passe et un mineur de cryptomonnaie "
         + "en 2022 (BleepingComputer, 23/11/2022).");
-
-    private static readonly (RegistryHive Hive, string Path)[] UninstallSources =
-    [
-        (RegistryHive.LocalMachine, UninstallPath),
-        (RegistryHive.LocalMachine, Wow64UninstallPath),
-        (RegistryHive.CurrentUser, UninstallPath),
-    ];
 
     public string Id => "M15";
 
@@ -65,42 +58,14 @@ public sealed class OverclockingModule : IAuditModule
     private static List<InstalledTool> ReadInstalledTools(IRegistryReader registry, out bool readable)
     {
         var found = new Dictionary<string, InstalledTool>(StringComparer.Ordinal);
-        var deniedSources = 0;
-        foreach (var (hive, path) in UninstallSources)
+        foreach (var program in InstalledPrograms.Read(registry, out readable))
         {
-            IReadOnlyList<string> keys;
-            try
+            if (OverclockingParsers.MatchTool(program.Name) is { } tool && !found.ContainsKey(tool.Key))
             {
-                keys = registry.GetSubKeyNames(hive, path);
-            }
-            catch (MausAccessDeniedException)
-            {
-                deniedSources++;
-                continue;
-            }
-
-            foreach (var key in keys)
-            {
-                var keyPath = $@"{path}\{key}";
-                try
-                {
-                    var tool = OverclockingParsers.MatchTool(registry.GetString(hive, keyPath, "DisplayName"));
-                    if (tool is not null && !found.ContainsKey(tool.Key))
-                    {
-                        found[tool.Key] = new InstalledTool(
-                            tool,
-                            registry.GetString(hive, keyPath, "DisplayVersion"),
-                            registry.GetString(hive, keyPath, "Publisher"));
-                    }
-                }
-                catch (MausAccessDeniedException)
-                {
-                    // Une clé illisible n'empêche pas de lire les autres.
-                }
+                found[tool.Key] = new InstalledTool(tool, program.Version, program.Publisher);
             }
         }
 
-        readable = deniedSources < UninstallSources.Length;
         return OverclockingParsers.KnownTools.Where(t => found.ContainsKey(t.Key)).Select(t => found[t.Key]).ToList();
     }
 
@@ -143,7 +108,8 @@ public sealed class OverclockingModule : IAuditModule
         {
             HardwareVendor.Intel when OverclockingParsers.IsUnlockedIntel(model) => IntelUnlocked(model, Find(tools, "xtu")),
             HardwareVendor.Intel => IntelLocked(model),
-            HardwareVendor.Amd => AmdRyzen(model, cpu.Name, Find(tools, "ryzen-master")),
+            HardwareVendor.Amd when OverclockingParsers.IsRyzenBefore5000(cpu.Name) => OlderRyzen(model, Find(tools, "ryzen-master")),
+            HardwareVendor.Amd when OverclockingParsers.IsRyzen(cpu.Name) => AmdRyzen(model, cpu.Name, Find(tools, "ryzen-master")),
             _ => new Finding
             {
                 Id = id,
@@ -158,7 +124,7 @@ public sealed class OverclockingModule : IAuditModule
 
     private static Finding RaptorLakeWarning(string model, InstalledTool? xtu)
     {
-        var advice = T("Gardez le profil « Intel Default Settings » du BIOS et vérifiez que le BIOS apporte le microcode 0x12F ou plus récent "
+        var advice = T("Gardez le profil « Intel Default Settings » du BIOS et vérifiez que le BIOS apporte le dernier microcode d'Intel "
             + "(voir Module 8).");
         if (xtu is not null)
         {
@@ -170,10 +136,9 @@ public sealed class OverclockingModule : IAuditModule
             Id = "M15.cpu",
             Title = T("Processeur {0} : pas d'overclocking", model),
             Category = CpuCategory,
-            Status = FindingStatus.Warning,
-            Severity = Severity.Medium,
+            Status = FindingStatus.Info,
             Current = T("{0} (Core de bureau de 13e ou 14e génération)", model),
-            Expected = T("réglages Intel par défaut, microcode 0x12F ou plus récent"),
+            Expected = T("réglages Intel par défaut, dernier microcode d'Intel"),
             Explanation = T("Les Core i5, i7 et i9 de bureau de 13e et 14e génération peuvent s'abîmer à cause de tensions trop élevées, avec des "
                 + "plantages de plus en plus fréquents. Intel a corrigé ce défaut par des mises à jour du microcode (0x12F et suivantes) livrées "
                 + "avec le BIOS. Sur ces processeurs : ni overclocking, ni undervolting agressif."),
@@ -226,6 +191,19 @@ public sealed class OverclockingModule : IAuditModule
             + "puissance se règlent dans le BIOS, pour un gain faible. La performance se gagne plutôt ailleurs : carte graphique, mémoire, "
             + "applications au démarrage (Module 12)."),
         Advice = T("Rien à régler côté processeur : gardez les réglages d'origine et un BIOS à jour (Module 8)."),
+    };
+
+    private static Finding OlderRyzen(string model, InstalledTool? ryzenMaster) => new()
+    {
+        Id = "M15.cpu",
+        Title = T("Processeur {0} : AMD Ryzen Master et PBO", model),
+        Category = CpuCategory,
+        Status = FindingStatus.Info,
+        Current = ryzenMaster is null ? model : T("{0} · {1} installé", model, ryzenMaster.Label),
+        Explanation = T("Ce Ryzen se règle avec AMD Ryzen Master, l'outil officiel d'AMD, si sa version actuelle prend encore ce modèle en charge, ou dans le BIOS "
+            + "avec Precision Boost Overdrive (PBO), selon le modèle. Curve Optimizer n'existe qu'à partir des Ryzen 5000 (source : AMD). Ces réglages sortent des spécifications d'AMD."),
+        Advice = T("Téléchargez Ryzen Master uniquement sur amd.com : {0}. "
+            + "Tutoriel pour votre modèle : {1}", RyzenMasterUrl, OverclockingParsers.TutorialUrl($"PBO {model}")),
     };
 
     private static Finding AmdRyzen(string model, string name, InstalledTool? ryzenMaster)

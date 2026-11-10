@@ -162,7 +162,6 @@ public class MemoryDetailsTests
         Assert.Equal("22-22-22-52", jedec.Summary);
         Assert.Equal(74, Clocks(jedec, "tRC"));
         Assert.Equal(880, Clocks(jedec, "tRFC"));
-        Assert.Contains(22, jedec.SupportedCl);
 
         var xmp = module.Profiles[1];
         Assert.Equal(ProfileKind.Xmp, xmp.Kind);
@@ -229,6 +228,31 @@ public class MemoryDetailsTests
 
         Assert.False(SpdDecoder.Decode(new SpdImage(0, bytes))!.ChecksumOk);
         Assert.Null(SpdDecoder.Decode(new SpdImage(0, new byte[512])));
+    }
+
+    [Fact]
+    public void A_zero_cycle_time_gives_no_standard_profile_instead_of_an_error()
+    {
+        var bytes = Ddr4Kit();
+        bytes[18] = 0;
+        bytes[125] = 0;
+
+        var module = SpdDecoder.Decode(new SpdImage(0, bytes))!;
+
+        Assert.DoesNotContain(module.Profiles, p => p.Kind == ProfileKind.Jedec);
+    }
+
+    [Fact]
+    public void An_image_too_short_for_its_type_is_refused()
+    {
+        var ddr4 = new byte[255];
+        ddr4[2] = Ddr4Kit()[2];
+        var ddr5 = new byte[511];
+        ddr5[2] = Ddr5Kit()[2];
+
+        Assert.Null(SpdDecoder.Decode(new SpdImage(0, [0x23, 0x10])));
+        Assert.Null(SpdDecoder.Decode(new SpdImage(0, ddr4)));
+        Assert.Null(SpdDecoder.Decode(new SpdImage(0, ddr5)));
     }
 
     [Theory]
@@ -353,7 +377,7 @@ public class MemoryDetailsTests
         Assert.Null(swapped.UclkMode);
         Assert.False(ZenMemoryController.ReadClocks(new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 1500, [0x138] = 3000 }))!.UclkAboveMclk);
 
-        var report = MemoryDetails.Read(new FakeSpd(), null, new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 3000, [0x138] = 1500 }), ddr5Hint: null);
+        var report = MemoryDetails.Read(new FakeSpd(), null, new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 3000, [0x138] = 1500 }), windowsMemoryType: null);
         Assert.Contains(report.Notes, n => n.StartsWith("UCLK plus haute que MCLK", StringComparison.Ordinal));
     }
 
@@ -366,7 +390,7 @@ public class MemoryDetailsTests
     public void Full_report_combines_everything_and_says_what_is_missing()
     {
         var report = MemoryDetails.Read(new FakeSpd(new SpdImage(0, Ddr5Kit(), "Corsair", "SK Hynix")), new FakeSmn(),
-            new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 3000, [0x138] = 3000 }), ddr5Hint: null);
+            new FakePm(0x540104, new() { [0x118] = 2000, [0x128] = 3000, [0x138] = 3000 }), windowsMemoryType: null);
 
         Assert.Single(report.Modules);
         Assert.NotNull(report.Live);
@@ -377,9 +401,52 @@ public class MemoryDetailsTests
         Assert.Contains("CMK32GX5M2B6000C36", text, StringComparison.Ordinal);
         Assert.Contains("EXPO", text, StringComparison.Ordinal);
 
-        var intel = MemoryDetails.Read(new FakeSpd(), null, null, ddr5Hint: true);
+        var intel = MemoryDetails.Read(new FakeSpd(), null, null, windowsMemoryType: "DDR5");
         Assert.Null(intel.Live);
         Assert.Equal(2, intel.Notes.Count);
         Assert.NotNull(MemoryDetails.Describe("tCL"));
+    }
+
+    [Fact]
+    public void Windows_memory_type_is_used_without_spd_and_lpddr5_timings_are_not_guessed()
+    {
+        Assert.NotNull(MemoryDetails.Read(new FakeSpd(), new FakeSmn(), null, windowsMemoryType: "DDR5").Live);
+
+        var lowPower = MemoryDetails.Read(new FakeSpd(), new FakeSmn(), null, windowsMemoryType: "LPDDR5");
+        Assert.Null(lowPower.Live);
+        Assert.Contains(lowPower.Notes, n => n.Contains("LPDDR5", StringComparison.Ordinal));
+    }
+
+    private sealed class FailingSpd : ISpdSource
+    {
+        public IReadOnlyList<SpdImage> ReadAll() => throw new SmbusBusyException("bus occupé");
+    }
+
+    [Fact]
+    public void A_failed_spd_read_gives_its_own_reason_only()
+    {
+        var report = MemoryDetails.Read(new FailingSpd(), null, null, windowsMemoryType: null);
+        Assert.Contains(report.Notes, n => n.Contains("bus occupé", StringComparison.Ordinal));
+        Assert.DoesNotContain(report.Notes, n => n.StartsWith("Aucune puce SPD lue", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Only_a_complete_spd_read_is_kept()
+    {
+        Assert.True(PawnIoSpdSource.IsComplete([new SpdImage(0, Ddr4Kit())]));
+        Assert.False(PawnIoSpdSource.IsComplete([]));
+
+        var damaged = Ddr4Kit();
+        damaged[20] ^= 0x01;
+        Assert.False(PawnIoSpdSource.IsComplete([new SpdImage(0, damaged)]));
+    }
+
+    [Fact]
+    public void A_jedec_profile_with_an_absurd_clock_is_left_out()
+    {
+        var bytes = Ddr4Kit();
+        bytes[18] = 0;
+        bytes[125] = 0;
+        Assert.DoesNotContain(SpdDecoder.Decode(new SpdImage(0, bytes))!.Profiles, p => p.Kind == ProfileKind.Jedec);
     }
 }

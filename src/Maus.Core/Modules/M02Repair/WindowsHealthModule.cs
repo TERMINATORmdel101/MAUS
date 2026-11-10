@@ -40,9 +40,13 @@ public sealed class WindowsHealthModule : IAuditModule
     internal const int ReliabilityLookbackDays = 7;
     internal const long MinimumFreeBytes = 20L * 1024 * 1024 * 1024;
     internal const double MinimumStabilityIndex = 5.0;
+    internal const int BlueScreensProblem = 3;
 
-    internal static readonly int[] WheaFatalIds = [1, 18, 20, 46];
-    internal static readonly int[] WheaCorrectedIds = [17, 19, 47];
+    /// <summary>Texte de Windows pour ces événements (Get-WinEvent -ListProvider) : « erreur matérielle irrécupérable ».</summary>
+    internal static readonly int[] WheaFatalIds = [1, 16, 18, 20, 22, 24, 26, 29, 40, 42, 44, 46, 48];
+
+    /// <summary>Texte de Windows pour ces événements (même source) : « erreur matérielle corrigée ».</summary>
+    internal static readonly int[] WheaCorrectedIds = [2, 17, 19, 21, 23, 25, 27, 28, 41, 43, 45, 47, 49];
     internal static readonly int[] DiskIds = [7, 51, 153];
 
     private static string HardwareCategory => T("Stabilité matérielle");
@@ -51,9 +55,8 @@ public sealed class WindowsHealthModule : IAuditModule
     private static string PrerequisiteCategory => T("Prérequis des réparations");
     private static string GeneralCategory => T("État général");
 
-    private static readonly int[] WheaIds = [.. WheaFatalIds, .. WheaCorrectedIds];
-    private static readonly int[] KernelPowerIds = [41];
-    private static readonly int[] WerIds = [1001];
+    internal static readonly int[] KernelPowerIds = [41];
+    internal static readonly int[] WerIds = [1001];
     private static readonly int[] VolmgrIds = [46];
     private static readonly int[] NtfsIds = [55];
     private static readonly int[] MemoryHealthyIds = [1101, 1201];
@@ -66,12 +69,9 @@ public sealed class WindowsHealthModule : IAuditModule
     private readonly string _windowsDirectory;
     private readonly IImageHealthChecker? _imageHealth;
 
-    /// <summary>
-    /// Lecture DISM par son API, sauf dans le paquet du Microsoft Store, où elle échoue : l'outil dism.exe la remplace
-    /// (<see cref="DismCommandImageHealthChecker"/>).
-    /// </summary>
+    /// <summary>Lecture DISM par l'outil dism.exe (<see cref="DismCommandImageHealthChecker"/>).</summary>
     public WindowsHealthModule()
-        : this(Environment.GetFolderPath(Environment.SpecialFolder.Windows), PackageIdentity.IsPackaged() ? null : new DismImageHealthChecker())
+        : this(Environment.GetFolderPath(Environment.SpecialFolder.Windows), null)
     {
     }
 
@@ -84,6 +84,16 @@ public sealed class WindowsHealthModule : IAuditModule
         _windowsDirectory = string.IsNullOrEmpty(windowsDirectory) ? @"C:\Windows" : windowsDirectory;
         _imageHealth = imageHealth;
     }
+
+    /// <summary>
+    /// Erreurs WHEA graves et corrigées, en deux requêtes : le journal refuse une requête de plus de 21 identifiants
+    /// (essai du 2/11/2026), et des centaines d'erreurs corrigées ne doivent pas masquer une erreur grave.
+    /// </summary>
+    internal static List<EventRecordInfo> QueryWhea(IEventLogReader logs, DateTime since, int maxEventsPerList, bool includeMessage = false) =>
+    [
+        .. logs.Query(SystemLogQuery.LogName, WheaProvider, WheaFatalIds, since, maxEventsPerList, includeMessage),
+        .. logs.Query(SystemLogQuery.LogName, WheaProvider, WheaCorrectedIds, since, maxEventsPerList, includeMessage),
+    ];
 
     public string Id => "M02";
 
@@ -116,7 +126,9 @@ public sealed class WindowsHealthModule : IAuditModule
         var since = now.AddDays(-LookbackDays);
         var logs = context.EventLogs;
 
-        var whea = SystemLogQuery.Run(logs, WheaProvider, WheaIds, since);
+        // Deux requêtes : des centaines d'erreurs corrigées ne doivent jamais masquer une erreur grave au-delà du plafond.
+        var wheaFatal = SystemLogQuery.Run(logs, WheaProvider, WheaFatalIds, since);
+        var wheaCorrected = SystemLogQuery.Run(logs, WheaProvider, WheaCorrectedIds, since);
         var kernelPower = SystemLogQuery.Run(logs, KernelPowerProvider, KernelPowerIds, since);
         var wer = SystemLogQuery.Run(logs, WerProvider, WerIds, since);
         var volmgr = SystemLogQuery.Run(logs, VolmgrProvider, VolmgrIds, since);
@@ -126,14 +138,15 @@ public sealed class WindowsHealthModule : IAuditModule
         cancellationToken.ThrowIfCancellationRequested();
 
         var crashes = CrashSummary.From(kernelPower, wer);
-        var instability = whea.Events.Count > 0 || crashes.BlueScreens > 0;
+        var instability = wheaFatal.Events.Count > 0 || wheaCorrected.Events.Count > 0 || crashes.BlueScreens > 0;
 
         var findings = new List<Finding>
         {
-            DetectWheaFatal(whea),
-            DetectWheaCorrected(whea),
+            DetectWheaFatal(wheaFatal),
+            DetectWheaCorrected(wheaCorrected),
             DetectBlueScreens(crashes, kernelPower, wer, volmgr),
             DetectUnexpectedShutdowns(kernelPower),
+            RecentEvents.Detect(context, crashes.BlueScreens, kernelPower.Events.Count, HardwareCategory),
             DetectMemoryTest(memory, instability),
             DetectDiskErrors(disk, ntfs),
             DetectDirtyVolume(context),
@@ -233,7 +246,7 @@ public sealed class WindowsHealthModule : IAuditModule
             };
         }
 
-        var severity = crashes.BlueScreens >= 3 ? Severity.High : Severity.Medium;
+        var severity = crashes.BlueScreens >= BlueScreensProblem ? Severity.High : Severity.Medium;
         var current = T("{0} en {1} jours", Plural(crashes.BlueScreens, T("écran bleu"), T("écrans bleus")), LookbackDays);
         if (crashes.LatestCode is { } code)
         {
@@ -290,7 +303,7 @@ public sealed class WindowsHealthModule : IAuditModule
     private static Finding DetectUnexpectedShutdowns(SystemLogQuery kernelPower)
     {
         const string id = "M02.unexpected-shutdowns";
-        var title = T("Arrêts brutaux sans écran bleu");
+        var title = T("Arrêts brutaux sans écran bleu noté");
         if (SystemLogQuery.FirstFailure(id, title, CrashCategory, kernelPower) is { } failure)
         {
             return failure;
@@ -307,7 +320,7 @@ public sealed class WindowsHealthModule : IAuditModule
 
         if (cuts > 0)
         {
-            details.Add(Plural(cuts, T("coupure sans arrêt propre"), T("coupures sans arrêt propre")));
+            details.Add(Plural(cuts, T("arrêt sans cause notée"), T("arrêts sans cause notée")));
         }
 
         return new Finding
@@ -321,9 +334,9 @@ public sealed class WindowsHealthModule : IAuditModule
                 ? T("aucun en {0} jours", LookbackDays)
                 : T("{0} en {1} jours : {2}", Plural(shutdowns.Count, T("arrêt brutal"), T("arrêts brutaux")), LookbackDays, string.Join(", ", details)),
             Expected = T("aucun"),
-            Explanation = T("L'événement Kernel-Power 41 signale un redémarrage sans arrêt propre. Sans code d'erreur, il s'agit "
-                + "d'une coupure de courant, d'un appui long sur le bouton d'alimentation (souvent parce que le PC était figé) "
-                + "ou d'une alimentation défaillante."),
+            Explanation = T("L'événement Kernel-Power 41 signale un redémarrage sans arrêt propre. Sans code d'erreur ni appui long noté, "
+                + "Windows n'en donne pas la cause. D'après Microsoft, ce peut être une coupure de courant, une alimentation trop faible "
+                + "ou défaillante, ou un PC figé éteint de force ; Microsoft conseille aussi de vérifier le surcadençage, la mémoire et la surchauffe."),
             Advice = shutdowns.Count == 0
                 ? null
                 : T("Si le PC s'éteint seul : vérifiez le bloc d'alimentation, la multiprise et les températures. "
@@ -421,7 +434,7 @@ public sealed class WindowsHealthModule : IAuditModule
         var current = T("{0} en {1} jours : {2}", CountText(total, disk.Truncated || ntfs.Truncated, T("événement"), T("événements")), LookbackDays, string.Join(", ", kinds));
         if (devices.Count > 0)
         {
-            current += $" ; {(devices.Count == 1 ? "périphérique" : "périphériques")} : {string.Join(", ", devices)}";
+            current += T(" ; {0} : {1}", devices.Count == 1 ? T("périphérique") : T("périphériques"), string.Join(", ", devices));
         }
 
         return new Finding
@@ -436,8 +449,7 @@ public sealed class WindowsHealthModule : IAuditModule
             Explanation = DiskExplanation,
             Advice = T("Sauvegardez vos données importantes, puis vérifiez la santé du disque avec le Module 11. "
                 + "Un disque externe ou une clé USB mal branchés produisent aussi ces erreurs.")
-                + (ntfs.Events.Count > 0 ? T(" La vérification du système de fichiers (chkdsk) sera proposée dans une prochaine version.") : string.Empty),
-            Fixable = ntfs.Events.Count > 0,
+                + (ntfs.Events.Count > 0 ? T(" Le système de fichiers se vérifie avec la commande chkdsk de Windows.") : string.Empty),
         };
     }
 
@@ -491,9 +503,8 @@ public sealed class WindowsHealthModule : IAuditModule
             Explanation = T("Windows marque un volume « à vérifier » (dirty bit) quand il détecte une incohérence du système de fichiers "
                 + "ou un arrêt brutal pendant une écriture. Une vérification chkdsk est alors lancée au démarrage."),
             Advice = dirty.Value
-                ? T("Redémarrez pour laisser Windows vérifier le disque ; la réparation hors ligne (chkdsk /spotfix) sera proposée dans une prochaine version.")
+                ? T("Redémarrez pour laisser Windows vérifier le disque.")
                 : null,
-            Fixable = dirty.Value,
         };
     }
 
@@ -648,7 +659,7 @@ public sealed class WindowsHealthModule : IAuditModule
                 + "des erreurs de Windows et des échecs d'installation. Une note basse résume une instabilité récente."),
             Advice = good
                 ? null
-                : T("Ouvrez l'Observateur de fiabilité (tapez « fiabilité » dans Démarrer) pour voir les incidents récents, "
+                : T("Ouvrez le Moniteur de fiabilité (tapez « fiabilité » dans Démarrer) pour voir les incidents récents, "
                     + "puis consultez les autres constats de ce module."),
         };
     }
@@ -684,8 +695,7 @@ public sealed class WindowsHealthModule : IAuditModule
                 + "Un dépôt WMI abîmé fausse les diagnostics et bloque certains outils."),
             Advice = problem is null
                 ? null
-                : T("La vérification puis la récupération du dépôt WMI (winmgmt /verifyrepository, /salvagerepository) seront proposées dans une prochaine version."),
-            Fixable = problem is not null,
+                : T("Le dépôt WMI se vérifie puis se récupère avec les commandes de Windows winmgmt /verifyrepository et /salvagerepository, en administrateur."),
         };
     }
 

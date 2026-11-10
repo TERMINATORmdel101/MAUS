@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 
 namespace Maus.App.Views;
@@ -9,10 +8,11 @@ namespace Maus.App.Views;
 /// </summary>
 public partial class HelpSummaryWindow : Window
 {
-    public HelpSummaryWindow(string summary)
+    public HelpSummaryWindow(string summary, string anonymization)
     {
         InitializeComponent();
         Summary.Text = summary;
+        Anonymization.Text = anonymization;
         Loaded += (_, _) =>
         {
             // Curseur placé à la fin de la première ligne, prêt pour décrire le problème.
@@ -23,6 +23,10 @@ public partial class HelpSummaryWindow : Window
     }
 
     private void OnCopy(object sender, RoutedEventArgs e) => CopyStatus.Text = Copy() ? Ui.Copied : Ui.CopyFailed;
+
+    /// <summary>Le texte relu (et complété) par l'utilisateur, mis en forme pour un forum.</summary>
+    private void OnCopyMarkdown(object sender, RoutedEventArgs e) =>
+        CopyStatus.Text = Copy(Maus.Core.Reporting.HelpSummary.ToMarkdown(Summary.Text)) ? Ui.Copied : Ui.CopyFailed;
 
     /// <summary>
     /// Signalement sur GitHub : le résumé relu par l'utilisateur est copié, puis la page « nouveau signalement » du dépôt
@@ -35,16 +39,8 @@ public partial class HelpSummaryWindow : Window
         CopyStatus.Text = copied ? Ui.GitHubPaste : Ui.CopyFailed;
     }
 
-    private bool Copy()
-    {
-        try
-        {
-            Clipboard.SetText(Summary.Text);
-            return true;
-        }
-        catch (ExternalException)
-        {
-            return false;
-        }
-    }
+    private bool Copy() => Copy(Summary.Text);
+
+    /// <summary>Déjà anonymisé et relu : ce qui part est exactement ce que l'utilisateur voit.</summary>
+    private static bool Copy(string text) => ClipboardText.TryCopy(text, mask: false);
 }

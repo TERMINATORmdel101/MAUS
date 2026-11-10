@@ -8,6 +8,12 @@ public interface IFileSystemReader
 {
     bool FileExists(string path);
 
+    /// <summary>
+    /// Comme <see cref="FileExists"/>, en distinguant l'absence d'une lecture refusée : <c>null</c> quand on ne peut pas savoir
+    /// (droits, lien que Windows refuse de suivre pour ce processus).
+    /// </summary>
+    bool? IsFilePresent(string path) => FileExists(path);
+
     bool DirectoryExists(string path);
 
     /// <exception cref="MausAccessDeniedException">Lecture refusée.</exception>
@@ -26,6 +32,29 @@ public interface IFileSystemReader
 public sealed class LocalFileSystemReader : IFileSystemReader
 {
     public bool FileExists(string path) => File.Exists(path);
+
+    public bool? IsFilePresent(string path)
+    {
+        if (File.Exists(path))
+        {
+            return true;
+        }
+
+        // File.Exists répond « non » à toute erreur : seuls « fichier » ou « chemin introuvable » prouvent l'absence.
+        try
+        {
+            File.GetAttributes(path);
+            return false;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return null;
+        }
+    }
 
     public bool DirectoryExists(string path) => Directory.Exists(path);
 

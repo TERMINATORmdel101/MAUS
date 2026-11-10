@@ -32,3 +32,28 @@ public static class CimScopes
     /// <summary>Puce TPM (<c>Win32_Tpm</c>) : lisible seulement en administrateur.</summary>
     public const string Tpm = @"root\cimv2\Security\MicrosoftTpm";
 }
+
+/// <summary>Lecture tolérante : une source refusée ou absente ne donne aucune ligne.</summary>
+public static class CimReaderExtensions
+{
+    /// <summary>Les lignes de la requête, ou aucune si la source est refusée ou absente. Là où un constat doit distinguer les deux, appeler <see cref="ICimReader.Query"/>.</summary>
+    public static IReadOnlyList<CimRow> QueryOrEmpty(this ICimReader cim, string wql, string scope = CimScopes.Default)
+    {
+        ArgumentNullException.ThrowIfNull(cim);
+        try
+        {
+            return cim.Query(wql, scope);
+        }
+        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>La première ligne, s'il y en a une.</summary>
+    public static CimRow? FirstOrNull(this IReadOnlyList<CimRow> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        return rows.Count > 0 ? rows[0] : null;
+    }
+}

@@ -7,6 +7,8 @@ namespace Maus.App.Views;
 /// <summary>Un logiciel à cocher : les plus exposés (navigateurs, PDF, compression…) sont en tête et cochés.</summary>
 public sealed class SoftwareChoice(SoftwareUpdate update)
 {
+    public override string ToString() => Title;
+
     public SoftwareUpdate Update { get; } = update;
 
     public bool CanUpdate => Update.CanTarget;

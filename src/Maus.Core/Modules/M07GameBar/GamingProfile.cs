@@ -20,8 +20,7 @@ internal enum GamingProfile
 internal sealed record GamingPackages(
     InstalledPackage? GameBar,
     InstalledPackage? XboxApp,
-    InstalledPackage? GamingServices,
-    InstalledPackage? IdentityProvider)
+    InstalledPackage? GamingServices)
 {
     /// <summary>L'app Xbox ou les Services de jeu indiquent un usage du Game Pass.</summary>
     public bool UsesXboxApp => XboxApp is not null || GamingServices is not null;
@@ -50,8 +49,7 @@ internal sealed record GamingPackages(
         return new GamingPackages(
             Find(packages, GameBarKeys.GameBarPackage),
             Find(packages, GameBarKeys.XboxAppPackage),
-            Find(packages, GameBarKeys.GamingServicesPackage),
-            Find(packages, GameBarKeys.IdentityProviderPackage));
+            Find(packages, GameBarKeys.GamingServicesPackage));
     }
 
     /// <summary>Profil présélectionné : X3D d'abord, puis app Xbox ; <c>null</c> si l'inventaire est illisible.</summary>

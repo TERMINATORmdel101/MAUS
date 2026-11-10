@@ -18,6 +18,14 @@ internal sealed record VisualEffectDefault(string Name, SettingKey Key, SettingV
 /// </summary>
 internal static class VisualEffectDefaults
 {
+    /// <summary>Les seules clés HKCU que Windows peut déclarer ici (document du Store, §3.1) ; une case déclarée ailleurs est ignorée.</summary>
+    private static readonly string[] DeclaredKeys =
+    [
+        @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+        @"Software\Microsoft\Windows\DWM",
+        @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+    ];
+
     internal const string Root = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects";
     internal const string WidgetsPolicy = @"SOFTWARE\Policies\Microsoft\Dsh";
     private const int CurrentUserRoot = unchecked((int)0x80000001);
@@ -56,9 +64,12 @@ internal static class VisualEffectDefaults
             var valueName = registry.GetString(RegistryHive.LocalMachine, path, "ValueName");
             var root = registry.GetDword(RegistryHive.LocalMachine, path, "HKeyRoot") ?? CurrentUserRoot;
             var value = registry.GetDword(RegistryHive.LocalMachine, path, on ? "CheckedValue" : "UncheckedValue");
-            if (!string.IsNullOrWhiteSpace(regPath) && !string.IsNullOrWhiteSpace(valueName) && root == CurrentUserRoot && value is not null)
+            // Clé déclarée par Windows, donc lue sur le PC : seulement si elle est dans la liste blanche (0.8.6).
+            if (!string.IsNullOrWhiteSpace(regPath) && !string.IsNullOrWhiteSpace(valueName) && root == CurrentUserRoot && value is not null
+                && DeclaredKeys.Contains(regPath, StringComparer.OrdinalIgnoreCase)
+                && SettingKey.Registry("HKCU", regPath, valueName) is { } key && SettingAllowlist.Allows(key))
             {
-                found.Add(new(name, SettingKey.Registry("HKCU", regPath, valueName), SettingValue.Dword(value.Value)));
+                found.Add(new(name, key, SettingValue.Dword(value.Value)));
             }
         }
 
@@ -79,9 +90,21 @@ internal static class VisualEffectDefaults
         };
     }
 
-    public static Finding Detect(IRegistryReader registry, ISystemParametersReader parameters, IReadOnlyDictionary<uint, (uint Set, bool UiParam)> knownSpi)
+    /// <summary>Constat des valeurs de Windows, lu une seule fois ; <c>null</c> si Windows n'en déclare aucune, constat gris si la lecture est refusée.</summary>
+    public static Finding? Detect(IRegistryReader registry, ISystemParametersReader parameters, IReadOnlyDictionary<uint, (uint Set, bool UiParam)> knownSpi)
     {
-        var effects = Read(registry, knownSpi);
+        try
+        {
+            return Read(registry, knownSpi) is { Count: > 0 } effects ? Describe(effects, registry, parameters) : null;
+        }
+        catch (MausAccessDeniedException)
+        {
+            return Finding.AdminRequired("M06.windows-defaults", T("Effets visuels et valeurs de Windows"), T("Effets"));
+        }
+    }
+
+    private static Finding Describe(IReadOnlyList<VisualEffectDefault> effects, IRegistryReader registry, ISystemParametersReader parameters)
+    {
         var different = effects.Count(e => Differs(e, registry, parameters));
         var widgetsPolicy = WidgetsBlockedByPolicy(registry);
         var total = different + (widgetsPolicy ? 1 : 0);

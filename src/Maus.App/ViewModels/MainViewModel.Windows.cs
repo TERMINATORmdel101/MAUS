@@ -20,13 +20,11 @@ public sealed partial class MainViewModel
     public ICommand OpenSettingsCommand => _openSettings ??= new AsyncCommand(() =>
     {
         OpenSettings();
-        return Task.CompletedTask;
     });
 
     public ICommand OpenMonitorCommand => _openMonitor ??= new AsyncCommand(() =>
     {
         OpenMonitor();
-        return Task.CompletedTask;
     });
 
     /// <summary>« À propos » : logo, version, licence, confidentialité, avertissements, composants et signalement.</summary>
@@ -36,13 +34,11 @@ public sealed partial class MainViewModel
     public ICommand OpenHelpSiteCommand => _openHelpSite ??= new AsyncCommand(() =>
     {
         ShellLauncher.OpenUrl(Maus.Core.ProjectLinks.HelpSite);
-        return Task.CompletedTask;
     });
 
     public ICommand OpenAboutCommand => _openAbout ??= new AsyncCommand(() =>
     {
         new AboutWindow { Owner = Application.Current?.MainWindow }.ShowDialog();
-        return Task.CompletedTask;
     });
 
     private ICommand? _openAbout;

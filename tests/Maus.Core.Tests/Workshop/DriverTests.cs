@@ -43,39 +43,54 @@ public class DriverTests
         Assert.Empty(DriverInventoryReader.Read(cim));
     }
 
-    [Fact]
-    public void Restart_uses_pnputil_on_the_exact_device_in_a_visible_console()
+    private static Func<IReadOnlyList<string>, Task<int>> Pnputil(List<string> calls, int export = 0, int other = 0) => arguments =>
     {
-        var arguments = GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, Gpu(), @"C:\ProgramData\MAUS\pilotes\x", @"C:\Windows\System32\pnputil.exe")!;
+        calls.Add(string.Join(' ', arguments));
+        return Task.FromResult(arguments[0] == "/export-driver" ? export : other);
+    };
 
-        Assert.StartsWith("/s /k \"title MAUS & echo ", arguments, StringComparison.Ordinal);
-        Assert.Contains($"\"C:\\Windows\\System32\\pnputil.exe\" /restart-device \"{NvidiaId}\"", arguments, StringComparison.Ordinal);
-        Assert.EndsWith("\"", arguments, StringComparison.Ordinal);
-        Assert.DoesNotContain("/delete-driver", arguments, StringComparison.Ordinal);
+    [Fact]
+    public async Task Restart_uses_pnputil_on_the_exact_device()
+    {
+        var calls = new List<string>();
+
+        var message = await GraphicsDriverActions.RunAsync(GraphicsDriverAction.Restart, Gpu(), @"C:\ProgramData\MAUS\pilotes\x", Pnputil(calls), _ => { });
+
+        Assert.Equal($"/restart-device {NvidiaId}", Assert.Single(calls));
+        Assert.Equal("Pilote redémarré.", message);
     }
 
     [Fact]
-    public void Removal_only_happens_after_a_successful_backup()
+    public async Task Removal_only_happens_after_a_successful_backup()
     {
-        var arguments = GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Remove, Gpu(), @"C:\ProgramData\MAUS\pilotes\20260929-101500-oem42", "pnputil.exe")!;
+        const string folder = @"C:\ProgramData\MAUS\pilotes\20260929-101500-oem42";
+        var calls = new List<string>();
 
-        Assert.Contains("\"pnputil.exe\" /export-driver oem42.inf \"C:\\ProgramData\\MAUS\\pilotes\\20260929-101500-oem42\" && (\"pnputil.exe\" /delete-driver oem42.inf /uninstall & (if not errorlevel 0", arguments, StringComparison.Ordinal);
-        Assert.Contains("else if errorlevel 3010", arguments, StringComparison.Ordinal);
-        Assert.DoesNotContain("/force", arguments, StringComparison.Ordinal);
+        await GraphicsDriverActions.RunAsync(GraphicsDriverAction.Remove, Gpu(), folder, Pnputil(calls), _ => { });
+
+        Assert.Equal([$"/export-driver oem42.inf {folder}", "/delete-driver oem42.inf /uninstall"], calls);
+
+        calls.Clear();
+        var refused = await GraphicsDriverActions.RunAsync(GraphicsDriverAction.Remove, Gpu(), folder, Pnputil(calls, export: 1), _ => { });
+
+        Assert.Single(calls);
+        Assert.Contains("n'a pas été supprimé", refused, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Reinstall_removes_then_rescans()
+    public async Task Reinstall_removes_then_rescans()
     {
-        var arguments = GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Reinstall, Gpu(), @"C:\x", "pnputil.exe")!;
+        var calls = new List<string>();
 
-        Assert.True(arguments.IndexOf("/remove-device", StringComparison.Ordinal) < arguments.IndexOf("/scan-devices", StringComparison.Ordinal));
+        await GraphicsDriverActions.RunAsync(GraphicsDriverAction.Reinstall, Gpu(), @"C:\x", Pnputil(calls), _ => { });
+
+        Assert.Equal([$"/remove-device {NvidiaId}", "/scan-devices"], calls);
 
         // Un adaptateur virtuel (ROOT\, SWD\) ne serait pas recréé par /scan-devices : pas de retrait.
         var parsec = Gpu(id: @"ROOT\DISPLAY\0000");
         Assert.False(GraphicsDriverActions.CanReinstall(parsec));
-        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Reinstall, parsec, @"C:\x", "pnputil.exe"));
-        Assert.NotNull(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, parsec, @"C:\x", "pnputil.exe"));
+        Assert.False(GraphicsDriverActions.CanRun(GraphicsDriverAction.Reinstall, parsec, @"C:\x"));
+        Assert.True(GraphicsDriverActions.CanRun(GraphicsDriverAction.Restart, parsec, @"C:\x"));
     }
 
     [Theory]
@@ -87,32 +102,32 @@ public class DriverTests
     public void Suspicious_device_ids_are_refused(string id)
     {
         Assert.False(GraphicsDriverActions.IsSafeInstanceId(id));
-        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, Gpu(id: id), @"C:\x"));
+        Assert.False(GraphicsDriverActions.CanRun(GraphicsDriverAction.Restart, Gpu(id: id), @"C:\x"));
     }
 
     [Fact]
     public void Windows_drivers_and_other_devices_are_never_backed_up_or_removed()
     {
-        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Remove, Gpu(inf: "display.inf"), @"C:\x"));
-        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Backup, Gpu(inf: null), @"C:\x"));
-        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Remove, Gpu(inf: "oem42.inf & calc"), @"C:\x"));
-        Assert.NotNull(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, Gpu(inf: "display.inf"), @"C:\x"));
+        Assert.False(GraphicsDriverActions.CanRun(GraphicsDriverAction.Remove, Gpu(inf: "display.inf"), @"C:\x"));
+        Assert.False(GraphicsDriverActions.CanRun(GraphicsDriverAction.Backup, Gpu(inf: null), @"C:\x"));
+        Assert.False(GraphicsDriverActions.CanRun(GraphicsDriverAction.Remove, Gpu(inf: "oem42.inf & calc"), @"C:\x"));
+        Assert.True(GraphicsDriverActions.CanRun(GraphicsDriverAction.Restart, Gpu(inf: "display.inf"), @"C:\x"));
 
         var audio = Gpu() with { Group = DriverGroup.Audio };
-        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, audio, @"C:\x"));
-        Assert.Null(GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Backup, Gpu(), "C:\\x\" & calc"));
+        Assert.False(GraphicsDriverActions.CanRun(GraphicsDriverAction.Restart, audio, @"C:\x"));
+        Assert.False(GraphicsDriverActions.CanRun(GraphicsDriverAction.Backup, Gpu(), "C:\\x\" & calc"));
     }
 
     [Fact]
-    public void Backup_folder_is_dated_and_restore_installs_every_inf_inside()
+    public async Task Backup_folder_is_dated_and_restore_installs_every_inf_inside()
     {
         var folder = GraphicsDriverActions.BackupFolder("OEM42.INF", new DateTimeOffset(2026, 9, 29, 10, 15, 0, TimeSpan.FromHours(2)));
         Assert.EndsWith(Path.Combine("MAUS", "pilotes", "20260929-101500-oem42"), folder, StringComparison.Ordinal);
 
-        var restore = GraphicsDriverActions.RestoreArguments(@"C:\ProgramData\MAUS\pilotes\20260929-101500-oem42", "pnputil.exe")!;
-        Assert.Contains("\"pnputil.exe\" /add-driver \"C:\\ProgramData\\MAUS\\pilotes\\20260929-101500-oem42", restore, StringComparison.Ordinal);
-        Assert.Contains("*.inf\" /subdirs /install", restore, StringComparison.Ordinal);
-        Assert.Null(GraphicsDriverActions.RestoreArguments("C:\\x%TEMP%"));
+        var calls = new List<string>();
+        await GraphicsDriverActions.RestoreAsync(@"C:\ProgramData\MAUS\pilotes\20260929-101500-oem42", Pnputil(calls), _ => { });
+        Assert.Equal(@"/add-driver C:\ProgramData\MAUS\pilotes\20260929-101500-oem42\*.inf /subdirs /install", Assert.Single(calls));
+        Assert.False(GraphicsDriverActions.CanRestore("C:\\x%TEMP%"));
     }
 
     [Fact]
@@ -132,6 +147,9 @@ public class DriverTests
         // Date de fondation d'Intel donnée à son « Chipset Device Software » : convention, pas un pilote de 58 ans.
         var chipset = Gpu() with { Provider = "INTEL", Manufacturer = "INTEL", Date = new DateTime(1968, 7, 18) };
         Assert.Equal("date de convention d'Intel", DriverAge.Describe(chipset, today));
+        var undated = Gpu() with { Date = DriverAge.NoRealDate };
+        Assert.Equal("pas de vraie date", DriverAge.Describe(undated, today));
+        Assert.Same(vendor, DriverAge.OldestVendorDriver([undated, vendor]));
         Assert.Same(vendor, DriverAge.OldestVendorDriver([chipset, vendor, recent]));
         Assert.Equal("—", DriverAge.Describe(Gpu() with { Date = null }, today));
 
@@ -145,58 +163,45 @@ public class DriverTests
     /// vérifie les branches « réussi », « redémarrage nécessaire », « échec », « sauvegarde ratée » et « pilote plus récent ».
     /// </summary>
     [Theory]
+    [InlineData("Restart", 0, 0, "Pilote redémarré.")]
+    [InlineData("Restart", 0, 3010, "redémarrage du PC")]
+    [InlineData("Restart", 0, 5, "a échoué")]
     [InlineData("Remove", 0, 0, "Pilote sauvegardé puis supprimé.")]
-    [InlineData("Remove", 0, 3010, "Pilote sauvegardé puis supprimé : redémarrez le PC pour terminer.")]
-    [InlineData("Remove", 0, 5, "La sauvegarde a réussi mais la suppression a échoué")]
-    [InlineData("Remove", 1, 0, "Sauvegarde impossible")]
-    [InlineData("Restore", 0, 259, "Rien n'a été remplacé")]
-    [InlineData("Restore", 0, 3010, "Pilote réinstallé : redémarrez le PC pour terminer.")]
-    [InlineData("Restart", 0, -1, "Le redémarrage du pilote a échoué")]
-    [InlineData("Restart", 0, 3010, "pnputil demande un redémarrage du PC pour terminer.")]
-    public void Console_commands_report_pnputil_exit_codes_for_real(string action, int export, int code, string expected)
+    [InlineData("Remove", 0, 3010, "redémarrez le PC")]
+    [InlineData("Remove", 0, 259, "la suppression a échoué")]
+    [InlineData("Remove", 1, 0, "n'a pas été supprimé")]
+    public async Task Pnputil_exit_codes_give_the_result(string action, int export, int code, string expected)
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
+        var message = await GraphicsDriverActions.RunAsync(Enum.Parse<GraphicsDriverAction>(action), Gpu(), @"C:\x", Pnputil([], export, code), _ => { });
 
-        // La sortie de cmd.exe redirigée est dans la page de code OEM de la console (850 en français), absente par défaut de .NET.
-        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-        var folder = Path.Combine(Path.GetTempPath(), "maus-test-pilotes-" + Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(folder);
-        try
-        {
-            var fake = Path.Combine(folder, "faux-pnputil.cmd");
-            File.WriteAllText(fake, "@echo off\r\nif \"%1\"==\"/export-driver\" exit /b %FAUX_EXPORT%\r\nexit /b %FAUX_CODE%\r\n");
-            var backup = Path.Combine(folder, "sauvegarde");
-            var arguments = action switch
-            {
-                "Remove" => GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Remove, Gpu(), backup, fake),
-                "Restart" => GraphicsDriverActions.ConsoleArguments(GraphicsDriverAction.Restart, Gpu(), backup, fake),
-                _ => GraphicsDriverActions.RestoreArguments(backup, fake),
-            };
-
-            var start = new System.Diagnostics.ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"), arguments!.Replace("/s /k ", "/s /c ", StringComparison.Ordinal))
-            {
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = System.Text.Encoding.GetEncoding(System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage),
-            };
-            start.Environment["FAUX_EXPORT"] = export.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            start.Environment["FAUX_CODE"] = code.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            using var process = System.Diagnostics.Process.Start(start)!;
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(30_000);
-
-            Assert.Contains(expected, output, StringComparison.Ordinal);
-
-            // La dernière ligne s'affiche quel que soit le code (elle n'est pas prise dans le dernier « else »).
-            Assert.Contains(action == "Remove" ? "Après une suppression réussie" : action == "Restart" ? "Terminé." : "Vous pouvez fermer cette fenêtre.", output, StringComparison.Ordinal);
-        }
-        finally
-        {
-            Directory.Delete(folder, recursive: true);
-        }
+        Assert.Contains(expected, message, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData(0, "Pilote réinstallé.")]
+    [InlineData(3010, "redémarrez le PC")]
+    [InlineData(259, "Rien n'a été remplacé")]
+    [InlineData(5, "a échoué")]
+    public async Task Restore_exit_codes_give_the_result(int code, string expected) =>
+        Assert.Contains(expected, await GraphicsDriverActions.RestoreAsync(@"C:\x", Pnputil([], other: code), _ => { }), StringComparison.Ordinal);
+
+    [Fact]
+    public async Task An_action_outside_the_list_runs_nothing()
+    {
+        const GraphicsDriverAction unknown = (GraphicsDriverAction)99;
+        var calls = 0;
+
+        Assert.False(GraphicsDriverActions.CanRun(unknown, Gpu(), @"C:\x"));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => GraphicsDriverActions.RunAsync(unknown, Gpu(), @"C:\x", _ =>
+        {
+            calls++;
+            return Task.FromResult(0);
+        }, _ => { }));
+
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public void An_instance_id_with_a_final_line_break_is_refused() =>
+        Assert.False(GraphicsDriverActions.IsSafeInstanceId("PCI\\VEN_10DE\n"));
 }

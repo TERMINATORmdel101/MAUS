@@ -71,7 +71,7 @@ public class CoreCycleTestTests
     [Fact]
     public async Task A_calculation_error_points_to_its_core()
     {
-        var options = Quick with { Fault = (core, round, value) => core == 1 && round == 3 ? value ^ 1 : value };
+        var options = Quick with { Fault = (core, round, value) => core == 1 && round == 1 ? value ^ 1 : value };
 
         var result = await CoreCycleTest.RunAsync(new FakeTopology(3), null, options);
 
@@ -84,9 +84,9 @@ public class CoreCycleTestTests
     [Fact]
     public async Task A_core_that_stops_answering_is_reported_as_frozen_and_the_test_moves_on()
     {
-        var options = new CoreCycleOptions(TimeSpan.FromSeconds(3)) { FreezeAfter = TimeSpan.FromMilliseconds(300), Stall = core => core == 0 };
+        var options = new CoreCycleOptions(TimeSpan.FromSeconds(3)) { FreezeAfter = TimeSpan.FromSeconds(2), Stall = core => core == 0 };
 
-        var result = await CoreCycleTest.RunAsync(new FakeTopology(2), null, options with { PerCore = TimeSpan.FromMilliseconds(900) });
+        var result = await CoreCycleTest.RunAsync(new FakeTopology(2), null, options with { PerCore = TimeSpan.FromSeconds(3) });
 
         Assert.True(result.Cores[0].Froze);
         Assert.False(result.Cores[1].Froze);

@@ -56,6 +56,52 @@ public sealed class FakeRegistry : IRegistryReader, IRegistryWriter
         return this;
     }
 
+    /// <summary>Crée une clé vide (une clé qui existe déjà reste telle quelle).</summary>
+    public FakeRegistry EnsureKey(RegistryHive hive, string path)
+    {
+        if (!_keys.ContainsKey(KeyOf(hive, path)))
+        {
+            _keys[KeyOf(hive, path)] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return this;
+    }
+
+    /// <summary>État complet du registre (clés, valeurs et types), à comparer avant et après un aller-retour.</summary>
+    public IReadOnlyList<string> Snapshot()
+    {
+        static string Text(object? value) => value switch
+        {
+            string[] list => string.Join('|', list),
+            byte[] bytes => Convert.ToHexString(bytes),
+            _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "(nul)",
+        };
+
+        var lines = new List<string>();
+        foreach (var (key, values) in _keys)
+        {
+            lines.Add(key.ToUpperInvariant() + @"\");
+            foreach (var (name, value) in values)
+            {
+                var kind = value is null ? "?" : KindOf(key, name, value).ToString();
+                lines.Add($@"{key.ToUpperInvariant()}\{name.ToUpperInvariant()} [{kind}] = {Text(value)}");
+            }
+        }
+
+        lines.Sort(StringComparer.Ordinal);
+        return lines;
+    }
+
+    private RegistryValueKind KindOf(string key, string name, object value) =>
+        _kinds.TryGetValue(key + "|" + name, out var kind) ? kind : value switch
+        {
+            int => RegistryValueKind.DWord,
+            long => RegistryValueKind.QWord,
+            string[] => RegistryValueKind.MultiString,
+            byte[] => RegistryValueKind.Binary,
+            _ => RegistryValueKind.String,
+        };
+
     public RegistryValueKind? GetValueKind(RegistryHive hive, string path, string name, RegistryView view = RegistryView.Registry64)
     {
         var value = GetValue(hive, path, name, view);
@@ -64,14 +110,7 @@ public sealed class FakeRegistry : IRegistryReader, IRegistryWriter
             return null;
         }
 
-        return _kinds.TryGetValue(KeyOf(hive, path) + "|" + name, out var kind) ? kind : value switch
-        {
-            int => RegistryValueKind.DWord,
-            long => RegistryValueKind.QWord,
-            string[] => RegistryValueKind.MultiString,
-            byte[] => RegistryValueKind.Binary,
-            _ => RegistryValueKind.String,
-        };
+        return KindOf(KeyOf(hive, path), name, value);
     }
 
     public void SetValue(RegistryHive hive, string path, string name, object value, RegistryValueKind kind)
@@ -210,8 +249,28 @@ public sealed class FakeCim : ICimReader
         return _answers.TryGetValue($"{scope}|{wql}", out var answer) ? answer() : [];
     }
 
-    public CimRow? InvokeMethod(string wql, string method, IReadOnlyDictionary<string, object?>? parameters = null, string scope = CimScopes.Default) =>
-        _answers.TryGetValue($"{scope}|{wql}|{method}", out var answer) && answer() is { Count: > 0 } rows ? rows[0] : null;
+    /// <summary>Méthodes appelées, pour vérifier qu'un module n'appelle que ce qu'il doit.</summary>
+    public List<string> InvokedMethods { get; } = [];
+
+    private readonly Dictionary<string, Func<IReadOnlyDictionary<string, object?>?, Dictionary<string, object?>?>> _methodAnswers = new(StringComparer.OrdinalIgnoreCase);
+
+    public CimRow? InvokeMethod(string wql, string method, IReadOnlyDictionary<string, object?>? parameters = null, string scope = CimScopes.Default)
+    {
+        InvokedMethods.Add(method);
+        if (_methodAnswers.TryGetValue($"{scope}|{wql}|{method}", out var byParameters))
+        {
+            return byParameters(parameters) is { } output ? new CimRow(output) : null;
+        }
+
+        return _answers.TryGetValue($"{scope}|{wql}|{method}", out var answer) && answer() is { Count: > 0 } rows ? rows[0] : null;
+    }
+
+    /// <summary>Réponse qui dépend des paramètres d'entrée de la méthode.</summary>
+    public FakeCim AnswerMethod(string wql, string method, Func<IReadOnlyDictionary<string, object?>?, Dictionary<string, object?>?> answer, string scope = CimScopes.Default)
+    {
+        _methodAnswers[$"{scope}|{wql}|{method}"] = answer;
+        return this;
+    }
 
     public FakeCim AnswerMethod(string wql, string method, Dictionary<string, object?> outParams, string scope = CimScopes.Default)
     {
@@ -292,19 +351,43 @@ public sealed class FakeSystemRestore : ISystemRestore
 
     public int EnableCalls { get; private set; }
 
+    public int CreateCalls { get; private set; }
+
+    /// <summary>Erreur levée par la création, l'activation ou la lecture de la liste.</summary>
+    public Exception? CreateFailure { get; set; }
+
+    public Exception? EnableFailure { get; set; }
+
+    public Exception? ListFailure { get; set; }
+
+    /// <summary>La création attend ce signal : WMI qui ne répond plus.</summary>
+    public ManualResetEventSlim? CreateHang { get; set; }
+
     public ProtectionState GetProtectionState(string drive) => Protection;
 
     public void EnableProtection(string drive)
     {
         EnableCalls++;
+        if (EnableFailure is not null)
+        {
+            throw EnableFailure;
+        }
+
         Protection = ProtectionState.Enabled;
     }
 
-    public IReadOnlyList<RestorePointInfo> ListRestorePoints() => Points.ToList();
+    public IReadOnlyList<RestorePointInfo> ListRestorePoints() => ListFailure is null ? Points.ToList() : throw ListFailure;
 
     public void CreateRestorePoint(string description)
     {
+        CreateCalls++;
         FrequencyDuringCreate = FrequencyProbe?.Invoke();
+        CreateHang?.Wait();
+        if (CreateFailure is not null)
+        {
+            throw CreateFailure;
+        }
+
         if (!SilentlySkip && Protection == ProtectionState.Enabled)
         {
             Points.Add(new RestorePointInfo(Points.Max(p => p.SequenceNumber) + 1, description, null));
@@ -321,11 +404,19 @@ public sealed class InMemoryJournalStore : IJournalStore
 
     public bool Unsafe { get; set; }
 
+    /// <summary>À partir de quel enregistrement (1 = le premier) le journal lâche, et avec quelle erreur.</summary>
+    public (int FromSave, Exception Failure)? FailsFrom { get; set; }
+
     public void Save(JournalSession session)
     {
         if (Unsafe)
         {
             throw new JournalUnsafeException("dossier non sûr");
+        }
+
+        if (FailsFrom is { } failure && SaveCount + 1 >= failure.FromSave)
+        {
+            throw failure.Failure;
         }
 
         SaveCount++;
@@ -367,6 +458,14 @@ public sealed class FakeScheduledTasks(params Dictionary<string, object?>[] rows
         rows.FirstOrDefault(r => Equals(r["TaskPath"], path) && Equals(r["TaskName"], name));
 }
 
+/// <summary>Alimentation d'un test qui ne l'a pas prévue : la vraie ne doit jamais être touchée.</summary>
+public sealed class ThrowingPowerAccessor : IPowerSchemeAccessor
+{
+    public Guid? GetActiveScheme() => throw new InvalidOperationException("Ce test n'a pas prévu de faux mode d'alimentation.");
+
+    public bool SetActiveScheme(Guid scheme) => throw new InvalidOperationException("Ce test n'a pas prévu de faux mode d'alimentation.");
+}
+
 public static class TestFixContext
 {
     public static FixContext Create(
@@ -379,17 +478,19 @@ public static class TestFixContext
         bool elevatedAsAnotherUser = false,
         IPowerSchemeAccessor? power = null,
         Func<DateTimeOffset>? clock = null,
-        IScheduledTaskAccessor? tasks = null)
+        IScheduledTaskAccessor? tasks = null,
+        string? userSid = null)
     {
         parameters ??= (FakeSystemParameters)audit.SystemParameters;
         return new FixContext
         {
             Audit = audit,
-            Settings = new SettingsAccessor(registry, registry, parameters, parameters, power, tasks),
+            Settings = new SettingsAccessor(registry, registry, parameters, parameters, power ?? new ThrowingPowerAccessor(), tasks),
             Journal = journal ?? new InMemoryJournalStore(),
             SystemRestore = restore ?? new FakeSystemRestore(),
             Notifier = notifier ?? new FakeNotifier(),
             ElevatedAsAnotherUser = elevatedAsAnotherUser,
+            UserSid = userSid,
             Clock = clock,
         };
     }
@@ -443,17 +544,47 @@ public sealed class FakeEventLogs : IEventLogReader
             .ToList();
     }
 
+    private readonly Dictionary<string, int> _read = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Lecture à la suite : les événements ajoutés depuis la lecture précédente de ce journal, plus récents que le début.</summary>
+    public IReadOnlyList<EventRecordInfo> ReadNew(EventLogCursor cursor, EventSelector selector)
+    {
+        if (_denied.Contains(cursor.LogName))
+        {
+            throw new MausAccessDeniedException("refusé");
+        }
+
+        var all = _events.Where(e => e.Log.Equals(cursor.LogName, StringComparison.OrdinalIgnoreCase)).ToList();
+        var start = _read.GetValueOrDefault(cursor.LogName);
+        _read[cursor.LogName] = all.Count;
+        return all.Skip(start)
+            .Where(e => e.Record.TimeCreated >= cursor.Since && selector(e.Level, e.Record.Provider, e.Record.Id) != EventDetail.Skip)
+            .Select(e => e.Record)
+            .ToList();
+    }
+
     public FakeEventLogs Deny(string logName)
     {
         _denied.Add(logName);
         return this;
     }
 
+    /// <summary>La date de début des journaux ; <c>null</c> si le test ne la donne pas.</summary>
+    public DateTime? Oldest { get; set; }
+
+    public DateTime? OldestEvent(string logName) => _denied.Contains(logName) ? throw new MausAccessDeniedException("refusé") : Oldest;
+
     public IReadOnlyList<EventRecordInfo> Query(string logName, string? provider, IReadOnlyCollection<int> eventIds, DateTime since, int maxEvents = 200, bool includeMessage = false)
     {
         if (_denied.Contains(logName))
         {
             throw new MausAccessDeniedException("refusé");
+        }
+
+        // Comme le vrai journal : une requête de plus de 21 identifiants est refusée.
+        if (eventIds.Count > 21)
+        {
+            throw new DataSourceUnavailableException("requête invalide");
         }
 
         return _events
@@ -487,12 +618,22 @@ public sealed class FakeFiles : IFileSystemReader
     private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (string? Company, string? Product, string? Version)> _versions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, (long, long)> _drives = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _refused = new(StringComparer.OrdinalIgnoreCase);
 
     public FakeFiles AddFile(string path, string content = "")
     {
         _files[path] = content;
         return this;
     }
+
+    /// <summary>Windows refuse de dire si ce fichier existe (droits, lien non suivi).</summary>
+    public FakeFiles Refuse(string path)
+    {
+        _refused.Add(path);
+        return this;
+    }
+
+    public bool? IsFilePresent(string path) => _refused.Contains(path) ? null : FileExists(path);
 
     public FakeFiles SetVersionInfo(string path, string? company, string? product = null, string? version = null)
     {

@@ -4,10 +4,11 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.Core.Modules.M02Repair;
 
 /// <summary>
-/// Même lecture que <see cref="DismImageHealthChecker"/>, par l'outil <c>dism.exe /English /Online /Cleanup-Image
-/// /CheckHealth</c> (lecture seule : il ne fait que lire l'indicateur d'altération). Sert dans le paquet du Microsoft Store :
-/// essayé le 22/10/2026 sur le PC du porteur, l'API DISM appelée dans le processus d'une application empaquetée attend 132 s
-/// puis échoue (DismOpenSession = 0x80040154, « classe non enregistrée »), alors que dism.exe répond en une seconde.
+/// Lecture de l'indicateur d'altération par l'outil <c>dism.exe /English /Online /Cleanup-Image /CheckHealth</c> (lecture
+/// seule). Seule voie de lecture, dans le paquet du Microsoft Store comme ailleurs : elle s'arrête au délai, car le lanceur
+/// tue le processus. Essayé le 22/10/2026 sur le PC du porteur, l'API DISM appelée dans le processus d'une application
+/// empaquetée attend 132 s puis échoue (DismOpenSession = 0x80040154, « classe non enregistrée »), alors que dism.exe
+/// répond en une seconde.
 /// Messages reconnus (sortie anglaise forcée par <c>/English</c>, jamais traduite) : « No component store corruption
 /// detected », « The component store is repairable », « The component store cannot be repaired » (relevés par woshub.com,
 /// winhelponline.com et winaero.com ; le premier vu sur le PC du porteur). Toute autre sortie rend l'état inconnu.

@@ -22,31 +22,6 @@ internal static class TankMaterial
     public const float Edge = 10f;
 }
 
-/// <summary>Maillage prêt à dessiner : sommets de 28 octets (position, normale, matière) et indices 32 bits.</summary>
-internal sealed class Mesh(IBuffer vertices, IBuffer indices, int indexCount) : IDisposable
-{
-    public const int Stride = 28;
-
-    public int IndexCount { get; } = indexCount;
-
-    public static Mesh Create(IGpuDevice device, string name, (float[] Vertices, uint[] Indices) data) => new(
-        device.CreateBuffer(new BufferDesc(data.Vertices.Length * 4, BufferUsage.Vertex, Stride, name), MemoryMarshal.AsBytes(data.Vertices.AsSpan())),
-        device.CreateBuffer(new BufferDesc(data.Indices.Length * 4, BufferUsage.Index, 4, name + " : indices"), MemoryMarshal.AsBytes(data.Indices.AsSpan())),
-        data.Indices.Length);
-
-    public void Bind(ICommandList cmd)
-    {
-        cmd.SetVertexBuffer(0, vertices, Stride);
-        cmd.SetIndexBuffer(indices);
-    }
-
-    public void Dispose()
-    {
-        vertices.Dispose();
-        indices.Dispose();
-    }
-}
-
 /// <summary>
 /// Char d'assaut modélisé pour MAUS (repère : x vers l'avant, y vers le haut, z sur le côté ; chenilles au sol en y = 0).
 /// Caisse inférieure entre les chenilles, superstructure à flancs inclinés au-dessus d'elles, glacis supérieur et plaque de
@@ -57,6 +32,9 @@ internal sealed class Mesh(IBuffer vertices, IBuffer indices, int indexCount) : 
 /// </summary>
 internal static class TankMeshes
 {
+    /// <summary>Taille d'un sommet : position, normale, matière.</summary>
+    public const int Stride = 28;
+
     /// <summary>Axe de rotation de la tourelle (x) et hauteur du toit de la caisse, repris par battle.hlsl.</summary>
     public const float TurretPivotX = -0.25f;
     public const float DeckY = 1.66f;

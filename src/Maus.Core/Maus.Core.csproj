@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Maus.Core.Tests" />
+    <InternalsVisibleTo Include="Maus.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

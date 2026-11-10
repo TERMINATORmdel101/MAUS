@@ -81,12 +81,6 @@ float3 RotateY(float3 v, float angle)
     return float3(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
 }
 
-float3 RotateAxis(float3 v, float3 axis, float angle)
-{
-    float c = cos(angle), s = sin(angle);
-    return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
-}
-
 // ---------------------------------------------------------------------------------------------------------------
 // Relief : collines douces sur le champ de bataille (les chars s'y posent presque à plat), plus hautes vers l'horizon.
 // Somme de sinusoïdes : la même formule en C# (BattleTerrain.Height) place les chars, les pierres et la caméra.
@@ -564,12 +558,6 @@ float3 ExplosionLight(float3 world, float3 n, float3 albedo)
 
     return sum;
 }
-
-struct SceneOut
-{
-    float4 Color : SV_Target0;
-    float2 Velocity : SV_Target1;
-};
 
 // Rectangle plein (pochoir) : 1 dedans, 0 dehors.
 float Stencil(float2 p, float2 center, float2 half)

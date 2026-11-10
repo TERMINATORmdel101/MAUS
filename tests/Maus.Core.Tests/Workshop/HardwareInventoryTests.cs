@@ -1,5 +1,6 @@
 using System.Text;
 using Maus.Core.Hardware;
+using Maus.Core.Modules.M11Health;
 using Maus.Core.Platform;
 using Maus.Core.Workshop;
 using Microsoft.Win32;
@@ -126,6 +127,108 @@ public class HardwareInventoryTests
 
         Assert.Equal(80, battery.HealthPercent);
         Assert.Equal(12400, battery.VoltageMv);
+    }
+
+    /// <summary>Journal NVMe simulé (jamais le vrai disque de la machine de test) : compte les lectures, ou échoue.</summary>
+    private sealed class FakeNvme(NvmeHealthLog? log = null, Exception? failure = null) : INvmeHealthReader
+    {
+        public List<int> Reads { get; } = [];
+
+        public NvmeHealthLog? Read(int diskNumber)
+        {
+            Reads.Add(diskNumber);
+            return failure is null ? log : throw failure;
+        }
+    }
+
+    private static readonly NvmeHealthLog DiskLog = new(0, 41, 100, 10, 7, 20_000_000, 1234, 0);
+
+    private static FakeCim DiskCim(uint bus = 17, string deviceId = "3", Dictionary<string, object?>? counters = null)
+    {
+        var cim = new FakeCim().Answer(HardwareInventoryReader.DiskQuery, CimScopes.Storage,
+            new Dictionary<string, object?> { ["DeviceId"] = deviceId, ["FriendlyName"] = "Disque d'essai", ["BusType"] = bus, ["MediaType"] = 4u, ["Size"] = 1000L });
+        return counters is null ? cim : cim.Answer(HardwareInventoryReader.ReliabilityQuery, CimScopes.Storage, counters);
+    }
+
+    [Fact]
+    public void Empty_windows_counters_are_completed_by_the_nvme_log()
+    {
+        var nvme = new FakeNvme(DiskLog);
+
+        var disk = HardwareInventoryReader.ReadDisks(DiskCim(), nvme).Single();
+
+        Assert.Equal([3], nvme.Reads);
+        Assert.Equal(41, disk.TemperatureC);
+        Assert.Equal(7, disk.WearPercent);
+        Assert.Equal(1234, disk.PowerOnHours);
+    }
+
+    [Fact]
+    public void One_missing_counter_only_takes_what_windows_does_not_give()
+    {
+        var nvme = new FakeNvme(DiskLog);
+        var cim = DiskCim(counters: new Dictionary<string, object?> { ["DeviceId"] = "3", ["Temperature"] = 0u, ["Wear"] = 2u, ["PowerOnHours"] = null });
+
+        var disk = HardwareInventoryReader.ReadDisks(cim, nvme).Single();
+
+        Assert.Equal(41, disk.TemperatureC);
+        Assert.Equal(2, disk.WearPercent);
+        Assert.Equal(1234, disk.PowerOnHours);
+    }
+
+    [Theory]
+    [InlineData(typeof(IOException))]
+    [InlineData(typeof(UnauthorizedAccessException))]
+    [InlineData(typeof(System.ComponentModel.Win32Exception))]
+    public void A_failed_nvme_read_leaves_the_values_unknown(Type failure)
+    {
+        var nvme = new FakeNvme(failure: (Exception)Activator.CreateInstance(failure)!);
+
+        var disk = HardwareInventoryReader.ReadDisks(DiskCim(), nvme).Single();
+
+        Assert.Single(nvme.Reads);
+        Assert.Equal("Disque d'essai", disk.Model);
+        Assert.Null(disk.TemperatureC);
+        Assert.Null(disk.WearPercent);
+        Assert.Null(disk.PowerOnHours);
+    }
+
+    [Fact]
+    public void A_drive_without_a_log_leaves_the_values_unknown()
+    {
+        var disk = HardwareInventoryReader.ReadDisks(DiskCim(), new FakeNvme()).Single();
+
+        Assert.Null(disk.WearPercent);
+        Assert.Null(disk.PowerOnHours);
+    }
+
+    [Fact]
+    public void Present_windows_counters_win_and_the_log_is_not_read()
+    {
+        var nvme = new FakeNvme(DiskLog);
+        var cim = DiskCim(counters: new Dictionary<string, object?> { ["DeviceId"] = "3", ["Temperature"] = 30u, ["Wear"] = 2u, ["PowerOnHours"] = 99L });
+
+        var disk = HardwareInventoryReader.ReadDisks(cim, nvme).Single();
+
+        Assert.Empty(nvme.Reads);
+        Assert.Equal(30, disk.TemperatureC);
+        Assert.Equal(2, disk.WearPercent);
+        Assert.Equal(99, disk.PowerOnHours);
+    }
+
+    [Theory]
+    [InlineData(11u, "3")] // SATA
+    [InlineData(7u, "3")] // USB
+    [InlineData(17u, "pas un numéro")] // NVMe sans numéro de disque physique
+    public void No_read_without_an_nvme_disk_number(uint bus, string deviceId)
+    {
+        var nvme = new FakeNvme(DiskLog);
+
+        var disk = HardwareInventoryReader.ReadDisks(DiskCim(bus, deviceId), nvme).Single();
+
+        Assert.Empty(nvme.Reads);
+        Assert.Null(disk.WearPercent);
+        Assert.Null(disk.PowerOnHours);
     }
 
     [Fact]

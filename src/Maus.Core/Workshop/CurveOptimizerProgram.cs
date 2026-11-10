@@ -35,6 +35,15 @@ public sealed record CurveProgramOptions(TimeSpan CyclingPhase, TimeSpan Transie
     /// <summary>Pour les tests : ce cœur (phase 1) ou ce fil (phase 2, index + 1000) cesse de répondre.</summary>
     internal Func<int, bool>? Stall { get; init; }
 
+    /// <summary>Pour les tests : la phase 1 s'arrête sur ce critère (passages faits) au lieu de sa durée, pour ne pas dépendre de la vitesse de la machine.</summary>
+    internal Func<int, bool>? CyclingDone { get; init; }
+
+    /// <summary>Pour les tests : la phase 2 s'arrête sur ce critère (rafales faites, calculs faits) au lieu de sa durée.</summary>
+    internal Func<int, long, bool>? TransientDone { get; init; }
+
+    /// <summary>Pour les tests : délai de gel propre à un cœur de la phase 1, à la place de <see cref="FreezeAfter"/>.</summary>
+    internal Func<int, TimeSpan>? FreezeAfterFor { get; init; }
+
     /// <summary>Durée de la rafale n : 5, 6, 7, 8, 9, 10 secondes, puis on recommence.</summary>
     public TimeSpan BurstLength(int index)
     {
@@ -98,15 +107,7 @@ public static class CurveOptimizerProgram
         // Fin du programme (même interrompu par l'utilisateur) : seule une vraie coupure laisse la trace pour le lancement suivant.
         checkpoint?.Clear();
         run.Clock.Stop();
-        int? whea = null;
-        try
-        {
-            whea = wheaSince?.Invoke(run.Started);
-        }
-        catch (InvalidOperationException)
-        {
-            // Journal illisible : le bilan se fait sans lui.
-        }
+        var whea = wheaSince?.Invoke(run.Started);
 
         return run.Result(whea);
     }
@@ -145,7 +146,7 @@ public static class CurveOptimizerProgram
             }
 
             var phase = Stopwatch.StartNew();
-            for (var step = 0; _cores.Count > 0 && _abortReason is null && phase.Elapsed < options.CyclingPhase; step++)
+            for (var step = 0; _cores.Count > 0 && _abortReason is null && !(options.CyclingDone?.Invoke(step) ?? phase.Elapsed >= options.CyclingPhase); step++)
             {
                 await CycleCoreAsync(step % _cores.Count).ConfigureAwait(false);
             }
@@ -156,7 +157,7 @@ public static class CurveOptimizerProgram
         {
             var core = _cores[position];
             checkpoint?.Save(new CoreTestCheckpoint(Started, core.Index, position, _cores.Count, Phase: 1));
-            var worker = new SpikeWorker(core, topology, options, _kernel, _reference);
+            var worker = new PinnedCoreWorker(core, topology, _kernel, _reference, options.Fault, options.Stall, Spike);
             var thread = new Thread(worker.Run) { IsBackground = true, Name = $"MAUS pic cœur {core.Index}", Priority = ThreadPriority.BelowNormal };
             thread.Start();
             var froze = false;
@@ -172,21 +173,38 @@ public static class CurveOptimizerProgram
                 }
 
                 // Le « ping » : pic, chute et réveil doivent se terminer ; un fil muet trop longtemps = cœur figé.
-                if (worker.SilentFor > options.FreezeAfter)
+                if (worker.SilentFor > (options.FreezeAfterFor?.Invoke(core.Index) ?? options.FreezeAfter))
                 {
                     froze = true;
                     break;
                 }
             }
 
-            worker.Stop();
-            if (!froze)
+            _verdicts[core.Index] = worker.Finish(thread, froze, _verdicts[core.Index]);
+        }
+
+        /// <summary>Déroulé d'un passage : pic de charge sur ce seul cœur, chute où il peut s'endormir, puis réveil par un calcul vérifié.</summary>
+        private void Spike(PinnedCoreWorker worker)
+        {
+            // Pic : charge continue sur ce seul cœur.
+            var watch = Stopwatch.StartNew();
+            while (!worker.Stopping && watch.Elapsed < options.Spike)
             {
-                thread.Join(TimeSpan.FromSeconds(5));
+                worker.Verify();
             }
 
-            var previous = _verdicts[core.Index];
-            _verdicts[core.Index] = new CoreVerdict(core.Index, previous.Rounds + worker.Rounds, previous.Errors + worker.Errors, previous.Froze || froze, previous.Pinned && worker.Pinned);
+            // Chute : le fil dort, le cœur n'a plus rien à faire.
+            var drop = Stopwatch.StartNew();
+            while (!worker.Stopping && drop.Elapsed < options.Drop)
+            {
+                Thread.Sleep(TimeSpan.FromMilliseconds(Math.Min(25, (options.Drop - drop.Elapsed).TotalMilliseconds + 1)));
+            }
+
+            // Réveil : un calcul vérifié, qui doit revenir avant le délai de gel.
+            if (!worker.Stopping)
+            {
+                worker.Verify();
+            }
         }
 
         /// <summary>Phase 2 : tous les fils ensemble, arrêt simultané, repos, et on recommence.</summary>
@@ -201,7 +219,7 @@ public static class CurveOptimizerProgram
             checkpoint?.Save(new CoreTestCheckpoint(Started, -1, 0, threads, Phase: 2));
             using var group = new BurstGroup(threads, options, _kernel, _reference);
             var phase = Stopwatch.StartNew();
-            while (_abortReason is null && !_transientFroze && phase.Elapsed < options.TransientPhase)
+            while (_abortReason is null && !_transientFroze && !(options.TransientDone?.Invoke(_bursts, group.Rounds) ?? phase.Elapsed >= options.TransientPhase))
             {
                 await BurstAsync(group).ConfigureAwait(false);
                 _bursts++;
@@ -263,92 +281,6 @@ public static class CurveOptimizerProgram
             progress?.Report(new CurveProgramProgress(phase, core, position, _cores.Count, 100 * share,
                 _total - Clock.Elapsed > TimeSpan.Zero ? _total - Clock.Elapsed : TimeSpan.Zero,
                 _verdicts.Values.Count(v => !v.Stable) + currentErrors, _transientErrors, _bursts));
-        }
-    }
-
-    /// <summary>Phase 1 : un fil épinglé sur un cœur fait un pic de charge, laisse le cœur s'endormir, puis le réveille par un calcul vérifié.</summary>
-    private sealed class SpikeWorker(CpuCore core, ICoreTopology topology, CurveProgramOptions options, Func<ulong> kernel, ulong reference)
-    {
-        private volatile bool _stopping;
-        private long _heartbeat = Stopwatch.GetTimestamp();
-        private long _rounds;
-        private int _errors;
-
-        public bool Pinned { get; private set; } = true;
-
-        private volatile bool _finished;
-
-        public bool Finished => _finished;
-
-        public long Rounds => Interlocked.Read(ref _rounds);
-
-        public int Errors => Volatile.Read(ref _errors);
-
-        public TimeSpan SilentFor => Stopwatch.GetElapsedTime(Interlocked.Read(ref _heartbeat));
-
-        public void Stop() => _stopping = true;
-
-        public void Run()
-        {
-            try
-            {
-                Pinned = topology.PinCurrentThread(core);
-                if (options.Stall?.Invoke(core.Index) == true)
-                {
-                    while (!_stopping)
-                    {
-                        Thread.Sleep(20);
-                    }
-
-                    return;
-                }
-
-                // Pic : charge continue sur ce seul cœur.
-                var watch = Stopwatch.StartNew();
-                while (!_stopping && watch.Elapsed < options.Spike)
-                {
-                    Verify();
-                }
-
-                // Chute : le fil dort, le cœur n'a plus rien à faire.
-                var drop = Stopwatch.StartNew();
-                while (!_stopping && drop.Elapsed < options.Drop)
-                {
-                    Thread.Sleep(TimeSpan.FromMilliseconds(Math.Min(25, (options.Drop - drop.Elapsed).TotalMilliseconds + 1)));
-                }
-
-                // Réveil : un calcul vérifié, qui doit revenir avant le délai de gel.
-                if (!_stopping)
-                {
-                    Verify();
-                }
-            }
-            catch (Exception)
-            {
-                // Une exception dans un fil d'arrière-plan fermerait MAUS : elle compte comme une erreur de ce cœur.
-                Interlocked.Increment(ref _errors);
-            }
-            finally
-            {
-                _finished = true;
-            }
-        }
-
-        private void Verify()
-        {
-            var result = kernel();
-            var count = Interlocked.Increment(ref _rounds);
-            if (options.Fault is { } fault)
-            {
-                result = fault(core.Index, count, result);
-            }
-
-            if (result != reference)
-            {
-                Interlocked.Increment(ref _errors);
-            }
-
-            Interlocked.Exchange(ref _heartbeat, Stopwatch.GetTimestamp());
         }
     }
 

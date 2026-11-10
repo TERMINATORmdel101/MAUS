@@ -1,4 +1,5 @@
 using System.Text.Json;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Engine.Broker;
 
@@ -35,21 +36,21 @@ public sealed partial class EngineServer
                 return EngineProtocol.ToElement(await engine.StopFramesAsync(Id(args, "session"), cancellationToken).ConfigureAwait(false));
             case "space":
             {
-                var writes = new List<Task>();
-                var progress = new InlineProgress<long>(files =>
-                {
-                    lock (writes)
-                    {
-                        writes.Add(pipe.WriteAsync(new EngineResponse("progress", EngineProtocol.ToElement(files)), cancellationToken));
-                    }
-                });
+                var progress = new ChannelProgress<long>(pipe, cancellationToken);
                 var report = await engine.ScanSpaceAsync(Arg<string>(args, "root"), progress, cancellationToken).ConfigureAwait(false);
-                await Task.WhenAll(SnapshotOf(writes)).ConfigureAwait(false);
+                await progress.FlushAsync().ConfigureAwait(false);
+                Workshop.SpaceAnalyzer.Compact(report.Root, Workshop.SpaceAnalyzer.MaxChannelEntries);
                 return EngineProtocol.ToElement(report);
             }
 
-            case "console":
-                return EngineProtocol.ToElement(await engine.OpenConsoleAsync(Arg<ConsoleRequest>(args, "request"), cancellationToken).ConfigureAwait(false));
+            case "tool":
+            {
+                var progress = new ChannelProgress<string>(pipe, cancellationToken);
+                var outcome = await engine.RunToolAsync(Arg<ToolRequest>(args, "request"), progress, cancellationToken).ConfigureAwait(false);
+                await progress.FlushAsync().ConfigureAwait(false);
+                return EngineProtocol.ToElement(outcome);
+            }
+
             case "restorepoint.list":
                 return EngineProtocol.ToElement(await engine.ReadRestorePointsAsync(cancellationToken).ConfigureAwait(false));
             case "restorepoint.create":
@@ -60,13 +61,11 @@ public sealed partial class EngineServer
                 return EngineProtocol.ToElement(await engine.GetScheduleAsync(cancellationToken).ConfigureAwait(false));
             case "schedule.set":
                 return EngineProtocol.ToElement(await engine.SetScheduleAsync(OptionalArg<DayOfWeek?>(args, "day"), cancellationToken).ConfigureAwait(false));
-            case "software":
-                return EngineProtocol.ToElement(await engine.ListSoftwareUpdatesAsync(cancellationToken).ConfigureAwait(false));
-            // battery.report n'est pas servi : le rapport de batterie se fait toujours sans droits, par l'interface (0.8.5).
+            // Plus de « software » (0.8.6) : la liste de winget se lit dans la fenêtre, sans droits administrateur.
             case "benchmark":
                 return EngineProtocol.ToElement(await engine.RunBenchmarkAsync(Arg<BenchmarkLaunch>(args, "launch"), cancellationToken).ConfigureAwait(false));
             default:
-                throw new EngineException("Opération inconnue : " + request.Op);
+                throw new EngineException(T("Opération inconnue : {0}", request.Op));
         }
     }
 

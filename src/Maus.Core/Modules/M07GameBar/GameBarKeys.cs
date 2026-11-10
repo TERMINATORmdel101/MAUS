@@ -6,9 +6,9 @@ namespace Maus.Core.Modules.M07GameBar;
 internal static class GameBarKeys
 {
     // Catégories affichées dans l'interface.
-    public const string Recording = "Enregistrement";
-    public const string Overlay = "Superposition Game Bar";
-    public const string GameMode = "Mode Jeu";
+    public static string Recording => T("Enregistrement");
+    public static string Overlay => T("Superposition Game Bar");
+    public static string GameMode => T("Mode Jeu");
     public static string Profile => T("Profil de jeu");
 
     // HKCU : réglages de l'utilisateur courant.
@@ -24,7 +24,6 @@ internal static class GameBarKeys
     public const string GameBarPackage = "Microsoft.XboxGamingOverlay";
     public const string XboxAppPackage = "Microsoft.GamingApp";
     public const string GamingServicesPackage = "Microsoft.GamingServices";
-    public const string IdentityProviderPackage = "Microsoft.XboxIdentityProvider";
 
     /// <summary>Identifiant Microsoft Store de « Game Bar », publiée par Microsoft.</summary>
     public const string GameBarStoreId = "9NZKPSTSNW4P";

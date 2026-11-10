@@ -56,8 +56,11 @@ internal static partial class DefenderExclusionClassifier
     private static readonly HashSet<string> BroadExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         "exe", "dll", "sys", "scr", "com", "bat", "cmd", "ps1", "psm1", "vbs", "vbe", "js", "jse", "wsf", "hta",
-        "msi", "lnk", "zip", "rar", "7z", "iso", "jar", "cpl", "docm", "xlsm", "*",
+        "msi", "lnk", "zip", "rar", "7z", "iso", "jar", "cpl", "docm", "xlsm",
     };
+
+    /// <summary>Programme qui peut lancer n'importe quel contenu : sa signature ne dit rien de ce qu'il exécute.</summary>
+    internal static bool IsBroadProcess(string fileName) => BroadProcesses.Contains(fileName);
 
     private static readonly HashSet<string> BroadProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -74,7 +77,7 @@ internal static partial class DefenderExclusionClassifier
 
     public static bool IsBroad(DefenderExclusion exclusion) => exclusion.Kind switch
     {
-        ExclusionKind.Extension => BroadExtensions.Contains(exclusion.Value.Trim().TrimStart('*').TrimStart('.')),
+        ExclusionKind.Extension => exclusion.Value.Trim().TrimStart('*').TrimStart('.') is var extension && (extension.Length == 0 || BroadExtensions.Contains(extension)),
         ExclusionKind.Process => BroadProcesses.Contains(Path.GetFileName(exclusion.Value.Trim())),
         _ => IsBroadPath(exclusion.Value),
     };

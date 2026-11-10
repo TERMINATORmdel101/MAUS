@@ -31,6 +31,14 @@ public sealed class StorageTests : IDisposable
 
         var report = SpaceAnalyzer.Scan(_root);
 
+        // Le profil d'un autre compte n'est jamais lu : compté comme illisible, ses fichiers n'apparaissent nulle part.
+        var skipped = SpaceAnalyzer.Scan(_root, skip: [Path.Combine(_root, "videos")]);
+        Assert.Equal(5000, skipped.Root.Bytes);
+        Assert.Equal(1, skipped.Inaccessible);
+        Assert.DoesNotContain(skipped.Largest, f => f.Name.EndsWith(".mkv", StringComparison.Ordinal));
+        Assert.True(SpaceAnalyzer.IsUnder(Path.Combine(_root, "videos", "extras"), [Path.Combine(_root, "videos")]));
+        Assert.False(SpaceAnalyzer.IsUnder(Path.Combine(_root, "videos2"), [Path.Combine(_root, "videos")]));
+
         Assert.Equal((3L << 20) + (2L << 20) + 5000, report.Root.Bytes);
         Assert.Equal(7, report.Files);
         Assert.Equal("videos", report.Root.Folders[0].Name);
@@ -61,6 +69,25 @@ public sealed class StorageTests : IDisposable
         Assert.Equal(0, report.Files);
     }
 
+    [Theory]
+    [InlineData(@"C:\Windows", true)]
+    [InlineData("C:/Windows", true)]
+    [InlineData(@"D:\", true)]
+    [InlineData(@"\\serveur\partage", false)]
+    [InlineData("//serveur/partage", false)]
+    [InlineData(@"\/serveur/partage", false)]
+    [InlineData(@"/\serveur\partage", false)]
+    [InlineData(@"\\?\C:\Windows", false)]
+    [InlineData("//?/C:/Windows", false)]
+    [InlineData(@"\\.\C:\Windows", false)]
+    [InlineData("//./C:/Windows", false)]
+    [InlineData(@"\??\C:\Windows", false)]
+    [InlineData(@"\Windows", false)]
+    [InlineData("C:Windows", false)]
+    [InlineData("Windows", false)]
+    public void Only_a_local_folder_can_be_scanned(string root, bool accepted) =>
+        Assert.Equal(accepted, SpaceAnalyzer.IsLocalRoot(root));
+
     [Fact]
     public void Scanning_can_be_stopped()
     {
@@ -86,6 +113,70 @@ public sealed class StorageTests : IDisposable
     {
         Assert.Null(SpaceHints.Describe(@"C:\Users\Alex\Musique"));
     }
+
+    [Fact]
+    public void A_very_deep_tree_goes_through_the_engine_channel()
+    {
+        var root = new SpaceNode { Path = @"C:\", Name = "C:", Bytes = 8L << 30, Files = 80 };
+        var parent = root;
+        for (var i = 0; i < 80; i++)
+        {
+            var child = new SpaceNode { Path = parent.Path + @"\d", Name = "d", Bytes = 8L << 30, Files = 80 };
+            parent.Folders.Add(child);
+            parent = child;
+        }
+
+        SpaceAnalyzer.Compact(root, SpaceAnalyzer.MaxChannelEntries);
+
+        var element = Maus.Core.Engine.Broker.EngineProtocol.ToElement(new SpaceReport(root, [], 80, 81, 0, TimeSpan.Zero));
+        Assert.Equal(System.Text.Json.JsonValueKind.Object, element.ValueKind);
+    }
+
+    [Fact]
+    public void Recycle_bins_of_other_accounts_and_old_profiles_are_set_apart()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "$Recycle.Bin", "S-1-5-21-1"));
+        Directory.CreateDirectory(Path.Combine(_root, "$Recycle.Bin", "S-1-5-21-2"));
+
+        var folders = SpaceAnalyzer.OtherAccountFolders(_root, "S-1-5-21-1");
+
+        Assert.Contains(Path.Combine(_root, "Windows.old", "Users"), folders);
+        Assert.Contains(Path.Combine(_root, "$Recycle.Bin", "S-1-5-21-2"), folders);
+        Assert.DoesNotContain(Path.Combine(_root, "$Recycle.Bin", "S-1-5-21-1"), folders);
+    }
+
+    [Fact]
+    public void A_whole_drive_fits_in_one_message_of_the_engine_and_keeps_its_sizes()
+    {
+        var root = new SpaceNode { Path = @"C:\", Name = "C:" };
+        for (var i = 0; i < 200_000; i++)
+        {
+            var folder = new SpaceNode { Path = $@"C:\Dossier\Sous-dossier éloigné\{i:D6}", Name = $"{i:D6}", Bytes = 1 + (i * 200L), Files = 2 };
+            if (i % 4 == 0)
+            {
+                folder.BigFiles.Add(new SpaceFile(folder.Path + @"\gros.bin", "gros.bin", folder.Bytes));
+            }
+
+            root.Folders.Add(folder);
+            root.Bytes += folder.Bytes;
+            root.Files += folder.Files;
+        }
+
+        root.Folders.Add(new SpaceNode { Path = @"C:\Illisible", Name = "Illisible", Inaccessible = true });
+        var bytes = root.Bytes;
+        SpaceAnalyzer.Compact(root, SpaceAnalyzer.MaxChannelEntries);
+
+        Assert.True(root.Folders.Count + root.Folders.Sum(f => f.BigFiles.Count) <= SpaceAnalyzer.MaxChannelEntries);
+        Assert.Contains(root.Folders, f => f.Inaccessible);
+        Assert.Equal(bytes, root.OtherBytes + root.Folders.Sum(f => f.Bytes));
+        var report = new SpaceReport(root, [], root.Files, 200_001, 1, TimeSpan.FromMinutes(1));
+        var message = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new Maus.Core.Engine.Broker.EngineResponse("result", Maus.Core.Engine.Broker.EngineProtocol.ToElement(report)), Maus.Core.Engine.Broker.EngineProtocol.Json);
+        Assert.True(message.Length < Maus.Core.Engine.Broker.EngineProtocol.MaxMessageBytes, $"{message.Length} octets");
+    }
+
+    [Fact]
+    public void Disk_speed_test_positions_go_past_two_gigabytes() =>
+        Assert.Equal(1L << 31, DiskSpeedTest.BlockOffset(2048));
 
     [Fact]
     public async Task Disk_speed_test_measures_and_cleans_up()

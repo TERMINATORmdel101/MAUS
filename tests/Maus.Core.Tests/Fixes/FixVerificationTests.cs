@@ -53,7 +53,7 @@ public class FixVerificationTests
         var audit = TestContext.Create(registry);
         var journal = new InMemoryJournalStore();
         var engine = new FixEngine(TestFixContext.Create(audit, registry, journal: journal));
-        var change = Change("M04.a", @"SOFTWARE\Test\A");
+        var change = Change("M04.a", @"SOFTWARE\Policies\Microsoft\Windows\DataCollection\Test\A");
         var applied = engine.Apply([change], new ApplyOptions { CreateRestorePoint = false });
 
         // Le piège : comparer aux résultats d'AVANT les corrections (audit de vérification en échec) donnerait « sans effet ».
@@ -87,16 +87,16 @@ public class FixVerificationTests
         var audit = TestContext.Create(registry);
         var journal = new InMemoryJournalStore();
         var engine = new FixEngine(TestFixContext.Create(audit, registry, journal: journal));
-        var a = Change("M04.a", @"SOFTWARE\Test\A");
-        var b = Change("M04.b", @"SOFTWARE\Test\B");
+        var a = Change("M04.a", @"SOFTWARE\Policies\Microsoft\Windows\DataCollection\Test\A");
+        var b = Change("M04.b", @"SOFTWARE\Policies\Microsoft\Windows\DataCollection\Test\B");
         var applied = engine.Apply([a, b], new ApplyOptions { CreateRestorePoint = false });
 
         engine.RecordVerification(applied.Session!.Id, [new VerifiedOutcome(applied.Changes[1], EffectCheck.NoEffect, "sans effet")]);
         var reverted = engine.Revert(applied.Session.Id, changeId: "M04.a");
 
         Assert.True(reverted.Completed);
-        Assert.Null(registry.GetValue(RegistryHive.LocalMachine, @"SOFTWARE\Test\A", "X"));
-        Assert.Equal(0, registry.GetDword(RegistryHive.LocalMachine, @"SOFTWARE\Test\B", "X"));
+        Assert.Null(registry.GetValue(RegistryHive.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\DataCollection\Test\A", "X"));
+        Assert.Equal(0, registry.GetDword(RegistryHive.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\DataCollection\Test\B", "X"));
         var session = journal.Load(applied.Session.Id)!;
         Assert.True(session.CanRevert);
         Assert.Null(session.RevertedAt);

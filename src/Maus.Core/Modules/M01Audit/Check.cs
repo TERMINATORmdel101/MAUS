@@ -108,7 +108,7 @@ internal sealed record ServiceStart(string Name, int? Start, bool Exists, bool D
             return T("{0} : illisible", Name);
         }
 
-        return Exists ? T("{0} : {1}", Name, Label(Start)) : $"{Name} : absent";
+        return Exists ? T("{0} : {1}", Name, Label(Start)) : T("{0} : absent", Name);
     }
 
     public static string Label(int? start) => start switch

@@ -14,7 +14,7 @@ internal sealed class FrameBuilder
     private bool _hasPrevious;
     private long _frame;
 
-    public FrameConstants Build(SceneState state, RenderSize size, double sceneTime, float deltaTime)
+    public FrameConstants Build(SceneState state, RenderSize size, double sceneTime)
     {
         var view = state.Camera.ViewMatrix();
         var aspect = size.Aspect;
@@ -30,7 +30,7 @@ internal sealed class FrameBuilder
         Matrix4x4.Invert(viewProjJittered, out var inverseViewProj);
         Matrix4x4.Invert(view, out var inverseView);
 
-        if (!_hasPrevious || state.Cut)
+        if (!_hasPrevious)
         {
             _previousViewProj = viewProj;
         }
@@ -50,11 +50,9 @@ internal sealed class FrameBuilder
             InvResolution = new Vector2(1f / size.Width, 1f / size.Height),
             Jitter = jitter,
             FrameIndex = _frame % 4096,
-            DeltaTime = deltaTime,
             SunDir = Vector3.Normalize(state.SunDirection),
             Exposure = state.Grade.Exposure,
             SunColor = state.SunColor,
-            SceneTime = (float)sceneTime,
             Params0 = state.Params0,
             Params1 = state.Params1,
             Params2 = state.Params2,

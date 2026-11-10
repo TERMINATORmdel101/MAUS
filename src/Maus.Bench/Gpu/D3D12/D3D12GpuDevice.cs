@@ -33,8 +33,8 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
     private readonly ID3D12CommandAllocator _uploadAllocator;
     private readonly ID3D12GraphicsCommandList _uploadList;
     private readonly List<ID3D12Resource> _uploadStaging = [];
-    private readonly List<(ulong Fence, ID3D12Resource? Resource)> _retired = [];
-    private readonly List<ID3D12Resource> _retirePending = [];
+    private readonly List<(ulong Fence, IDisposable Resource)> _retired = [];
+    private readonly List<IDisposable> _retirePending = [];
     private ulong _fenceValue;
     private int _slot;
     private bool _uploadPending;
@@ -48,6 +48,7 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         _adapter = GpuAdapters.Preferred(_factory);
         var description = _adapter.Description1;
         AdapterName = description.Description.Trim();
+        DriverVersion = GpuAdapters.DriverVersion(_adapter);
         DedicatedVideoMemory = (long)(ulong)description.DedicatedVideoMemory;
         Vortice.Direct3D12.D3D12.D3D12CreateDevice(_adapter, FeatureLevel.Level_11_0, out ID3D12Device? device).CheckError();
         Device = device!;
@@ -58,9 +59,6 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         _queue.Name = "MAUS benchmark";
         _fence = Device.CreateFence(0);
         RootSignature = D3D12RootSignature.Create(Device);
-        DrawIndexedSignature = Device.CreateCommandSignature<ID3D12CommandSignature>(
-            new CommandSignatureDescription(20, [new IndirectArgumentDescription { Type = IndirectArgumentType.DrawIndexed }]),
-            null!);
 
         ShaderHeap = new CpuDescriptorHeap(Device, DescriptorHeapType.ConstantBufferViewShaderResourceViewUnorderedAccessView, 65536);
         TargetHeap = new CpuDescriptorHeap(Device, DescriptorHeapType.RenderTargetView, 4096);
@@ -134,6 +132,8 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
 
     public string AdapterName { get; }
 
+    public string? DriverVersion { get; }
+
     public long DedicatedVideoMemory { get; }
 
     public int OutputWidth { get; }
@@ -155,8 +155,6 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
 
     public ID3D12RootSignature RootSignature { get; }
 
-    public ID3D12CommandSignature DrawIndexedSignature { get; }
-
     public CpuDescriptorHeap ShaderHeap { get; }
 
     public CpuDescriptorHeap TargetHeap { get; }
@@ -174,10 +172,10 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
 
     public ITexture CreateTexture(TextureDesc desc) => new D3D12Texture(this, desc);
 
-    public void UploadTexture(ITexture texture, int mip, int slice, ReadOnlySpan<byte> data, int rowPitch)
+    public void UploadTexture(ITexture texture, int mip, ReadOnlySpan<byte> data, int rowPitch)
     {
         var t = (D3D12Texture)texture;
-        var subresource = (uint)t.Subresource(mip, t.Slices > 1 ? slice : 0);
+        var subresource = (uint)t.Subresource(mip, 0);
         Span<PlacedSubresourceFootPrint> layouts = stackalloc PlacedSubresourceFootPrint[1];
         Span<uint> rows = stackalloc uint[1];
         Span<ulong> rowSizes = stackalloc ulong[1];
@@ -187,17 +185,13 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         staging.Map(0, null, &mapped).CheckError();
         var footprint = layouts[0].Footprint;
         var rowBytes = (int)rowSizes[0];
-        var depth = (int)footprint.Depth;
         fixed (byte* source = data)
         {
-            for (var z = 0; z < depth; z++)
+            for (var y = 0; y < rows[0]; y++)
             {
-                for (var y = 0; y < rows[0]; y++)
-                {
-                    var from = source + ((long)z * rowPitch * rows[0]) + ((long)y * rowPitch);
-                    var to = (byte*)mapped + layouts[0].Offset + ((ulong)z * footprint.RowPitch * rows[0]) + ((ulong)y * footprint.RowPitch);
-                    Buffer.MemoryCopy(from, to, rowBytes, Math.Min(rowBytes, rowPitch));
-                }
+                var from = source + ((long)y * rowPitch);
+                var to = (byte*)mapped + layouts[0].Offset + ((ulong)y * footprint.RowPitch);
+                Buffer.MemoryCopy(from, to, rowBytes, Math.Min(rowBytes, rowPitch));
             }
         }
 
@@ -234,9 +228,9 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         return buffer;
     }
 
-    public IPipeline CreatePipeline(GraphicsPipelineDesc desc) => new D3D12Pipeline(Device, RootSignature, desc);
+    public IPipeline CreatePipeline(GraphicsPipelineDesc desc) => new D3D12Pipeline(this, desc);
 
-    public IComputePipeline CreateComputePipeline(ShaderCode computeShader) => new D3D12ComputePipeline(Device, RootSignature, computeShader);
+    public IComputePipeline CreateComputePipeline(ShaderCode computeShader) => new D3D12ComputePipeline(this, computeShader);
 
     public void BeginFrame()
     {
@@ -305,13 +299,6 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         ReleaseRetired();
     }
 
-    public byte[] CaptureBackBuffer(out int width, out int height)
-    {
-        width = OutputWidth;
-        height = OutputHeight;
-        return ReadTexture(BackBuffer);
-    }
-
     public byte[] ReadTexture(ITexture texture)
     {
         var back = (D3D12Texture)texture;
@@ -347,17 +334,10 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
     }
 
     /// <summary>
-    /// Libère une ressource quand la carte ne peut plus l'utiliser : elle peut encore servir à l'image en cours
+    /// Libère une ressource ou un pipeline quand la carte ne peut plus l'utiliser : il peut encore servir à l'image en cours
     /// d'enregistrement, donc on attend le signal de fin de cette image (pas celui d'une copie intermédiaire).
     /// </summary>
-    public void Retire(object owner, ID3D12Resource? resource)
-    {
-        _ = owner;
-        if (resource is not null)
-        {
-            _retirePending.Add(resource);
-        }
-    }
+    public void Retire(IDisposable resource) => _retirePending.Add(resource);
 
     public void Dispose()
     {
@@ -383,7 +363,7 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
 
         foreach (var (_, resource) in _retired)
         {
-            resource?.Dispose();
+            resource.Dispose();
         }
 
         foreach (var resource in _retirePending)
@@ -414,7 +394,6 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         ShaderHeap.Dispose();
         TargetHeap.Dispose();
         DepthHeap.Dispose();
-        DrawIndexedSignature.Dispose();
         RootSignature.Dispose();
         _swapChain?.Dispose();
         _fence.Dispose();
@@ -494,12 +473,13 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         }
 
         _fence.SetEventOnCompletion(value, _fenceEvent).CheckError();
-        while (!_fenceEvent.WaitOne(500))
+
+        // Le test porte toujours sur la vraie valeur : un signal resté d'une attente précédente est consommé sans effet.
+        while (_fence.CompletedValue < value)
         {
-            DeviceLost.ThrowIfRemoved(Device.DeviceRemovedReason);
-            if (_fence.CompletedValue >= value)
+            if (!_fenceEvent.WaitOne(500))
             {
-                break;
+                DeviceLost.ThrowIfRemoved(Device.DeviceRemovedReason);
             }
         }
     }
@@ -511,7 +491,7 @@ internal sealed unsafe class D3D12GpuDevice : IGpuDevice
         {
             if (_retired[i].Fence <= completed)
             {
-                _retired[i].Resource?.Dispose();
+                _retired[i].Resource.Dispose();
                 _retired.RemoveAt(i);
             }
         }

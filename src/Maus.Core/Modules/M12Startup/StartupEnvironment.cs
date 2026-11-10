@@ -12,8 +12,8 @@ internal interface IStartupEnvironment
     /// <summary>Développe les variables d'environnement (%windir%, %ProgramFiles%…).</summary>
     string Expand(string text);
 
-    /// <summary>Chemin cible d'un raccourci .lnk, ou <c>null</c> s'il est illisible ou sans chemin local.</summary>
-    string? ResolveShortcut(string shortcutPath);
+    /// <summary>Cible (<c>null</c> sans chemin local) et arguments d'un raccourci .lnk, ou <c>null</c> s'il est illisible.</summary>
+    ShortcutInfo? ResolveShortcut(string shortcutPath);
 }
 
 /// <summary>Implémentation réelle, en lecture seule.</summary>
@@ -28,7 +28,7 @@ internal sealed class WindowsStartupEnvironment : IStartupEnvironment
 
     public string Expand(string text) => Environment.ExpandEnvironmentVariables(text);
 
-    public string? ResolveShortcut(string shortcutPath)
+    public ShortcutInfo? ResolveShortcut(string shortcutPath)
     {
         try
         {
@@ -38,7 +38,7 @@ internal sealed class WindowsStartupEnvironment : IStartupEnvironment
                 return null;
             }
 
-            return StartupParsers.ParseShortcutTarget(File.ReadAllBytes(shortcutPath));
+            return StartupParsers.ParseShortcut(File.ReadAllBytes(shortcutPath));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {

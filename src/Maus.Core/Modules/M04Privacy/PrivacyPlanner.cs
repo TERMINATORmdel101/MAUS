@@ -9,7 +9,7 @@ namespace Maus.Core.Modules.M04Privacy;
 /// Étape Plan du Module 4 : lignes « Standard » de la fiche qui passent par le registre. Les stratégies ne sont posées
 /// que sur Pro et plus ; ailleurs, MAUS écrit l'interrupteur de l'utilisateur, celui que change l'application Paramètres.
 /// Recall : stratégie DisableAIDataAnalysis (Pro et plus). Copilot n'a pas de stratégie officielle sur Famille et Pro : renvoi vers Paramètres.
-/// Services (DiagTrack) et tâches planifiées (CEIP) arrivent dans une étape suivante.
+/// Le service DiagTrack et les tâches planifiées CEIP n'ont pas de correction : leurs constats restent de simples informations.
 /// </summary>
 internal static class PrivacyPlanner
 {
@@ -27,6 +27,10 @@ internal static class PrivacyPlanner
         return plan.Changes;
     }
 
+    /// <summary>Stratégies posées aussi sur Famille (décision du 31/10/2026) : la correction le dit.</summary>
+    private static string HomeNote(PlanBuilder plan) =>
+        plan.Windows.IsHomeEdition ? T(" Sur Windows Famille, l'effet de ces stratégies n'est pas garanti.") : string.Empty;
+
     /// <summary>Données de diagnostic, journaux facultatifs, demandes de commentaires.</summary>
     private static void PlanDiagnostics(PlanBuilder plan)
     {
@@ -35,7 +39,7 @@ internal static class PrivacyPlanner
             var level = plan.Windows.IsEnterpriseOrEducation ? 0 : 1;
             plan.Add("M04.diagnostic-data",
                 level == 0 ? T("Couper les données de diagnostic (niveau 0)") : T("Limiter les données de diagnostic à « Requises » (niveau 1)"),
-                plan.Finding("M04.diagnostic-data").Explanation,
+                plan.Finding("M04.diagnostic-data").Explanation + HomeNote(plan),
                 Diagnostic,
                 [Hklm(DataCollectionPolicy, "AllowTelemetry", level)],
                 c => level == 0
@@ -95,11 +99,11 @@ internal static class PrivacyPlanner
         }
 
         plan.AddContentDelivery("M04.settings-suggestions", T("Couper le contenu suggéré dans Paramètres"),
-            ["SubscribedContent-338393Enabled", "SubscribedContent-353694Enabled", "SubscribedContent-353696Enabled"], Offers);
+            PrivacyRegistryChecks.SettingsSuggestionValues, Offers);
         plan.AddContentDelivery("M04.tips-silent-apps", T("Couper les astuces et les installations silencieuses d'applications"),
-            ["SubscribedContent-338389Enabled", "SoftLandingEnabled", "SilentInstalledAppsEnabled"], Tips);
+            PrivacyRegistryChecks.TipsAndSilentAppsValues, Tips);
         plan.AddContentDelivery("M04.lockscreen-tips", T("Couper les astuces de l'écran de verrouillage"),
-            ["RotatingLockScreenOverlayEnabled", "SubscribedContent-338387Enabled"], Tips);
+            PrivacyRegistryChecks.LockScreenTipsValues, Tips);
     }
 
     /// <summary>Recommandations du menu Démarrer, recherche, historique des activités.</summary>
@@ -117,7 +121,7 @@ internal static class PrivacyPlanner
         {
             plan.Add("M04.web-search", T("Couper les suggestions web de la recherche (stratégie DisableSearchBoxSuggestions)"),
                 T("Pose la stratégie qui coupe les suggestions de la zone de recherche. Microsoft ne la documente que pour l'historique de l'Explorateur ; " +
-                "son effet sur les résultats web est rapporté par la presse spécialisée (Tom's Hardware, Pureinfotech). L'interrupteur « Recherches sur le web » de Paramètres reste la méthode préférée."),
+                "son effet sur les résultats web est rapporté par la presse spécialisée (Tom's Hardware, Pureinfotech). L'interrupteur « Recherches sur le web » de Paramètres reste la méthode préférée.") + HomeNote(plan),
                 Search,
                 [Hkcu(ExplorerPolicy, "DisableSearchBoxSuggestions", 1)],
                 c => c with
@@ -144,8 +148,7 @@ internal static class PrivacyPlanner
         if (plan.Deviates("M04.activity-history"))
         {
             plan.Add("M04.activity-history", T("Couper l'historique des activités"),
-                T("Windows n'enregistre plus la trace des applications, fichiers et pages ouverts, et ne l'envoie plus.") +
-                (plan.Windows.IsHomeEdition ? T(" Sur Windows Famille, l'effet de ces stratégies n'est pas garanti.") : string.Empty),
+                T("Windows n'enregistre plus la trace des applications, fichiers et pages ouverts, et ne l'envoie plus.") + HomeNote(plan),
                 Search,
                 [Hklm(SystemPolicy, "EnableActivityFeed", 0), Hklm(SystemPolicy, "PublishUserActivities", 0), Hklm(SystemPolicy, "UploadUserActivities", 0)]);
         }
@@ -156,7 +159,7 @@ internal static class PrivacyPlanner
     {
         if (plan.Deviates("M04.delivery-optimization") && plan.Policies)
         {
-            var sharesOnLanOnly = plan.Finding("M04.delivery-optimization").Current?.StartsWith(PrivacySystemChecks.DescribeDownloadMode(1), StringComparison.Ordinal) == true;
+            var sharesOnLanOnly = plan.Finding("M04.delivery-optimization").Measures?.GetValueOrDefault(PrivacySystemChecks.DownloadModeMeasure) == 1;
             plan.Add("M04.delivery-optimization", T("Télécharger les mises à jour depuis Microsoft uniquement (sans pair-à-pair)"),
                 T("Votre connexion ne sert plus à envoyer des morceaux de mises à jour à d'autres PC."), Downloads,
                 [Hklm(DeliveryOptimizationPolicy, "DODownloadMode", 0)],

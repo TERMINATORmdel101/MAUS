@@ -26,26 +26,26 @@ public class PowerModuleTests
     private static readonly HardwareProfile Desktop = new()
     {
         FormFactor = FormFactor.Desktop,
-        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12, 3700),
+        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12),
     };
 
     private static readonly HardwareProfile X3DDesktop = new()
     {
         FormFactor = FormFactor.Desktop,
-        Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32, 4201),
+        Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32),
     };
 
     private static readonly HardwareProfile HybridDesktop = new()
     {
         FormFactor = FormFactor.Desktop,
-        Cpu = new CpuInfo("13th Gen Intel(R) Core(TM) i7-13700K", HardwareVendor.Intel, 16, 24, 3400),
+        Cpu = new CpuInfo("13th Gen Intel(R) Core(TM) i7-13700K", HardwareVendor.Intel, 16, 24),
     };
 
     private static readonly HardwareProfile Laptop = new()
     {
         FormFactor = FormFactor.Laptop,
         HasBattery = true,
-        Cpu = new CpuInfo("AMD Ryzen 7 5800H with Radeon Graphics", HardwareVendor.Amd, 8, 16, 3200),
+        Cpu = new CpuInfo("AMD Ryzen 7 5800H with Radeon Graphics", HardwareVendor.Amd, 8, 16),
     };
 
     [Fact]
@@ -221,7 +221,7 @@ public class PowerModuleTests
     {
         var registry = new FakeRegistry()
             .Set(RegistryHive.LocalMachine, PowerModule.SchemesKey, "ActiveOverlayAcPowerScheme", "ded574b5-45a0-4f42-8737-46345c09c238");
-        var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced, Capabilities = FakePowerPlatform.Caps(aoAc: true, s3: false, batteries: true) };
+        var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced, Capabilities = FakePowerPlatform.Caps(aoAc: true, s3: false) };
 
         var findings = await Run(platform, Laptop, registry);
 
@@ -248,7 +248,7 @@ public class PowerModuleTests
 
         var ac = Get(findings, "M05.power-mode-ac");
         Assert.Equal(FindingStatus.Improvable, ac.Status);
-        Assert.True(ac.Fixable);
+        Assert.False(ac.Fixable);
         Assert.Equal("Équilibré (réglage par défaut)", ac.Current);
         Assert.Equal("ms-settings:powersleep", ac.SettingsPage);
         var dc = Get(findings, "M05.power-mode-dc");
@@ -483,7 +483,7 @@ public class PowerModuleTests
 
         var capabilities = PowerCapabilities.Parse(buffer);
 
-        Assert.Equal(new PowerCapabilities(false, true, false, true, false, true, true, false), capabilities);
+        Assert.Equal(new PowerCapabilities(true, true, false, true, false), capabilities);
         Assert.Null(PowerCapabilities.Parse(new byte[16]));
     }
 

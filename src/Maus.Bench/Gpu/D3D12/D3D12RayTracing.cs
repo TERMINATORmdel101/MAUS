@@ -121,7 +121,7 @@ internal sealed unsafe class D3D12RayTracing : IRayTracing, IDisposable
             InstanceDescriptions = upload.GPUVirtualAddress,
         };
         var scene = Build(inputs, name, withView: true);
-        _owner.Retire(this, upload);
+        _owner.Retire(upload);
         return scene;
     }
 
@@ -151,7 +151,7 @@ internal sealed unsafe class D3D12RayTracing : IRayTracing, IDisposable
 
         // La structure suivante (la scène) lit celle-ci : barrière d'écriture avant toute lecture.
         commands.List.ResourceBarrier(ResourceBarrier.BarrierUnorderedAccessView(result));
-        _owner.Retire(this, scratch);
+        _owner.Retire(scratch);
 
         CpuDescriptorHandle? view = null;
         if (withView)
@@ -183,7 +183,7 @@ internal sealed class D3D12AccelerationStructure(D3D12GpuDevice owner, ID3D12Res
 
     public void Dispose()
     {
-        owner.Retire(this, Resource);
+        owner.Retire(Resource);
         if (View is { } handle)
         {
             owner.ShaderHeap.Free(handle);

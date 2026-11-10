@@ -33,8 +33,7 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
             dynamic automaticUpdates = instance!;
             dynamic results = automaticUpdates.Results;
             object? lastSearch = results.LastSearchSuccessDate;
-            object? lastInstallation = results.LastInstallationSuccessDate;
-            return new AutomaticUpdatesResults(AsUtc(lastSearch), AsUtc(lastInstallation));
+            return new AutomaticUpdatesResults(AsUtc(lastSearch));
         }
         catch (Exception ex) when (ex is COMException or RuntimeBinderException or UnauthorizedAccessException or InvalidCastException)
         {
@@ -46,14 +45,100 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
         }
     }
 
-    public async Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, TimeSpan timeout, CancellationToken cancellationToken)
+    public IReadOnlyList<UpdateHistoryEntry>? GetHistory(int maxEntries)
+    {
+        var type = Type.GetTypeFromProgID("Microsoft.Update.Session");
+        if (type is null)
+        {
+            return null;
+        }
+
+        object? instance = null;
+        try
+        {
+            instance = Activator.CreateInstance(type);
+            dynamic session = instance!;
+            session.ClientApplicationID = T("MAUS (audit en lecture seule)");
+            dynamic searcher = session.CreateUpdateSearcher();
+            int total = searcher.GetTotalHistoryCount();
+
+            // QueryHistory refuse un nombre nul (WU_E_INVALIDINDEX, Microsoft Learn) : historique vide, rien à demander.
+            if (total <= 0)
+            {
+                return [];
+            }
+
+            var entries = new List<UpdateHistoryEntry>();
+            dynamic collection = searcher.QueryHistory(0, Math.Min(total, maxEntries));
+            int count = collection.Count;
+            for (var i = 0; i < count; i++)
+            {
+                object item = collection[i];
+                if (ToHistoryEntry(item) is { } entry)
+                {
+                    entries.Add(entry);
+                }
+            }
+
+            return entries;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // Lecture d'appoint : toute réponse imprévue de l'interop COM (E_INVALIDARG, E_NOTIMPL, E_POINTER, date illisible…)
+            // donne « non lu » pour ce seul constat, jamais la perte du module.
+            return null;
+        }
+        finally
+        {
+            Release(instance);
+        }
+    }
+
+    /// <summary>Une ligne sans date ni titre ne dit rien d'utilisable : elle est ignorée.</summary>
+    private static UpdateHistoryEntry? ToHistoryEntry(object item)
+    {
+        dynamic entry = item;
+        object? date = entry.Date;
+        string? title = entry.Title;
+        if (AsUtc(date) is not { } dateUtc || string.IsNullOrWhiteSpace(title))
+        {
+            return null;
+        }
+
+        string? updateId = entry.UpdateIdentity.UpdateID;
+        int operation = entry.Operation;
+        int resultCode = entry.ResultCode;
+        int hresult = entry.HResult;
+        int unmapped = entry.UnmappedResultCode;
+        string? client = entry.ClientApplicationID;
+        string? service = entry.ServiceID;
+        return new UpdateHistoryEntry(
+            string.IsNullOrEmpty(updateId) ? title : updateId,
+            title,
+            dateUtc,
+            operation,
+            resultCode,
+            hresult != 0 ? hresult : unmapped,
+            client,
+            service);
+    }
+
+    public async Task<IReadOnlyList<PendingUpdate>> SearchAsync(string criteria, bool online, TimeSpan timeout, CancellationToken cancellationToken)
     {
         // Le fil de recherche reçoit l'annulation : il demande lui-même à l'agent d'interrompre la recherche (RequestAbort),
         // au lieu de la laisser tourner dans Windows après le délai ou l'annulation.
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         stop.CancelAfter(timeout);
         var token = stop.Token;
-        return await RunOnDedicatedThread(() => Search(criteria, token), timeout, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await RunOnDedicatedThread(() => Search(criteria, online, token), timeout, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // La minuterie de la source pourrait sinon toucher une source déjà libérée.
+            stop.Cancel();
+        }
     }
 
     /// <summary>
@@ -102,7 +187,7 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
     /// toutes les 200 ms : à l'annulation ou au délai, <c>RequestAbort</c> l'interrompt dans Windows. Si l'agent refuse la
     /// forme asynchrone, recherche bloquante comme avant.
     /// </summary>
-    private static List<PendingUpdate> Search(string criteria, CancellationToken cancellationToken)
+    private static List<PendingUpdate> Search(string criteria, bool online, CancellationToken cancellationToken)
     {
         var type = Type.GetTypeFromProgID("Microsoft.Update.Session")
             ?? throw new DataSourceUnavailableException("Agent Windows Update absent (Microsoft.Update.Session).");
@@ -113,6 +198,7 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
             dynamic session = instance!;
             session.ClientApplicationID = T("MAUS (audit en lecture seule)");
             dynamic searcher = session.CreateUpdateSearcher();
+            searcher.Online = online;
             dynamic result = SearchWithAbort(searcher, criteria, cancellationToken);
             int resultCode = result.ResultCode;
             if (resultCode is ResultFailed or ResultAborted)
@@ -199,49 +285,18 @@ internal sealed class ComWindowsUpdateAgent : IWindowsUpdateAgent
             }
         }
 
-        var articles = new List<string>();
-        dynamic articleCollection = update.KBArticleIDs;
-        int articleCount = articleCollection.Count;
-        for (var i = 0; i < articleCount; i++)
-        {
-            string? article = articleCollection[i];
-            if (!string.IsNullOrEmpty(article))
-            {
-                articles.Add(article);
-            }
-        }
-
         string? updateId = update.Identity.UpdateID;
         string? title = update.Title;
         string? severity = update.MsrcSeverity;
         int updateType = update.Type;
+        bool browseOnly = update.BrowseOnly;
         return new PendingUpdate(
             updateId ?? title ?? string.Empty,
             title ?? string.Empty,
-            articles,
             categories,
             string.IsNullOrWhiteSpace(severity) ? null : severity,
-            ReadBrowseOnly(item),
+            browseOnly,
             updateType == DriverType);
-    }
-
-    /// <summary><c>IUpdate3.BrowseOnly</c> : absent des agents très anciens, d'où la lecture protégée.</summary>
-    private static bool ReadBrowseOnly(object item)
-    {
-        dynamic update = item;
-        try
-        {
-            bool browseOnly = update.BrowseOnly;
-            return browseOnly;
-        }
-        catch (RuntimeBinderException)
-        {
-            return false;
-        }
-        catch (COMException)
-        {
-            return false;
-        }
     }
 
     /// <summary>Les dates WUA sont en temps universel ; une date vide arrive comme <c>null</c> ou comme objet non daté.</summary>

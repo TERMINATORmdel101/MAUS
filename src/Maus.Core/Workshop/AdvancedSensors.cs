@@ -22,7 +22,6 @@ public enum ReadingGroup
 {
     Cpu,
     Motherboard,
-    Memory,
     Other,
 }
 
@@ -96,7 +95,7 @@ public static class AdvancedReadings
     {
         var cpu = readings.Where(r => r.Group == ReadingGroup.Cpu && r.Kind == ReadingKind.Temperature && r.Value is > 0 and < 150
             && !r.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase)).ToList();
-        return Named(cpu, "Core (Tctl/Tdie)", "Core (Tctl)", "Core (Tdie)", "CPU Package", "Package", "Core Max")
+        return Named(cpu, "Core (Tctl/Tdie)", "Core (Tdie)", "Core (Tctl)", "CPU Package", "Package", "Core Max")
             ?? (cpu.Count > 0 ? cpu.Max(r => r.Value) : null);
     }
 

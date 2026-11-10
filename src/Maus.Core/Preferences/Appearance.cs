@@ -1,4 +1,5 @@
 using System.Globalization;
+using Maus.Core.Hardware;
 using Maus.Core.Platform;
 using Microsoft.Win32;
 
@@ -41,26 +42,17 @@ public enum AnimationChoice
     Off,
 }
 
-/// <summary>Marque d'un composant, pour la teinte « selon vos composants ». Seule une teinte est reprise, jamais un logo.</summary>
-public enum ComponentBrand
+/// <summary>Marques du processeur et de la carte graphique principale, pour la teinte « selon vos composants ». Seule une teinte est reprise, jamais un logo.</summary>
+public sealed record ComponentBrands(HardwareVendor Cpu, HardwareVendor Graphics)
 {
-    Other,
-    Intel,
-    Amd,
-    Nvidia,
-}
-
-/// <summary>Marques du processeur et de la carte graphique principale.</summary>
-public sealed record ComponentBrands(ComponentBrand Cpu, ComponentBrand Graphics)
-{
-    public static ComponentBrands Unknown { get; } = new(ComponentBrand.Other, ComponentBrand.Other);
+    public static ComponentBrands Unknown { get; } = new(HardwareVendor.Other, HardwareVendor.Other);
 
     /// <summary>Marque d'après la chaîne fabricant du CPUID (« GenuineIntel », « AuthenticAMD »).</summary>
-    public static ComponentBrand FromCpuVendor(string? vendor) => vendor switch
+    public static HardwareVendor FromCpuVendor(string? vendor) => vendor switch
     {
-        "GenuineIntel" => ComponentBrand.Intel,
-        "AuthenticAMD" => ComponentBrand.Amd,
-        _ => ComponentBrand.Other,
+        "GenuineIntel" => HardwareVendor.Intel,
+        "AuthenticAMD" => HardwareVendor.Amd,
+        _ => HardwareVendor.Other,
     };
 }
 
@@ -110,7 +102,7 @@ public readonly record struct Rgb(byte R, byte G, byte B)
 /// Déclinaisons d'une couleur d'accentuation, sur le modèle de Windows (trois plus claires, trois plus foncées). Les fonds
 /// portant du texte blanc (thème clair) ou noir (thème sombre) sont ajustés pour un contraste d'au moins 4,5:1 (WCAG AA).
 /// </summary>
-public sealed record AccentVariants(Rgb Base, Rgb Light1, Rgb Light2, Rgb Light3, Rgb Dark1, Rgb Dark2, Rgb Dark3, Rgb OnWhiteText)
+public sealed record AccentVariants(Rgb Base, Rgb Light1, Rgb Light2, Rgb Light3, Rgb Dark1, Rgb Dark2, Rgb Dark3)
 {
     public const double MinimumContrast = 4.5;
 
@@ -127,8 +119,7 @@ public sealed record AccentVariants(Rgb Base, Rgb Light1, Rgb Light2, Rgb Light3
             Lightest(color, 0.7),
             dark1,
             color.Mix(Black, 0.4),
-            color.Mix(Black, 0.6),
-            dark1);
+            color.Mix(Black, 0.6));
     }
 
     /// <summary>Assombrit au moins de <paramref name="minimum"/>, et assez pour porter du texte blanc lisible.</summary>
@@ -187,11 +178,11 @@ public static class AccentPalette
         _ => Maus,
     };
 
-    public static Rgb? Hue(ComponentBrand brand) => brand switch
+    public static Rgb? Hue(HardwareVendor brand) => brand switch
     {
-        ComponentBrand.Intel => IntelHue,
-        ComponentBrand.Amd => AmdHue,
-        ComponentBrand.Nvidia => NvidiaHue,
+        HardwareVendor.Intel => IntelHue,
+        HardwareVendor.Amd => AmdHue,
+        HardwareVendor.Nvidia => NvidiaHue,
         _ => null,
     };
 
@@ -230,7 +221,7 @@ public static class GraphicsBrand
     /// <summary>Classe « Display » de Windows (GUID documenté par Microsoft : System-Defined Device Setup Classes).</summary>
     public const string DisplayClassKey = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}";
 
-    public static ComponentBrand Read(IRegistryReader registry)
+    public static HardwareVendor Read(IRegistryReader registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
 
@@ -248,20 +239,19 @@ public static class GraphicsBrand
         }
         catch (MausAccessDeniedException)
         {
-            return ComponentBrand.Other;
+            return HardwareVendor.Other;
         }
 
         return FromDeviceIds(vendors);
     }
 
     /// <summary>Marque d'après les identifiants PCI (« pci\ven_10de&amp;dev_2484 ») : Nvidia, puis AMD, puis Intel.</summary>
-    public static ComponentBrand FromDeviceIds(IEnumerable<string> deviceIds)
+    public static HardwareVendor FromDeviceIds(IEnumerable<string> deviceIds)
     {
-        var ids = deviceIds.Select(id => id.ToUpperInvariant()).ToList();
-        bool Has(string vendor) => ids.Any(id => id.Contains($"VEN_{vendor}", StringComparison.Ordinal));
-        return Has("10DE") ? ComponentBrand.Nvidia
-            : Has("1002") ? ComponentBrand.Amd
-            : Has("8086") ? ComponentBrand.Intel
-            : ComponentBrand.Other;
+        var vendors = deviceIds.Select(id => GpuClassifier.VendorOf(id, null)).ToHashSet();
+        return vendors.Contains(HardwareVendor.Nvidia) ? HardwareVendor.Nvidia
+            : vendors.Contains(HardwareVendor.Amd) ? HardwareVendor.Amd
+            : vendors.Contains(HardwareVendor.Intel) ? HardwareVendor.Intel
+            : HardwareVendor.Other;
     }
 }

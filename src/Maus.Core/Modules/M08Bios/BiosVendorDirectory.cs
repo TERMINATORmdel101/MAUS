@@ -49,28 +49,9 @@ internal static partial class BiosVendorDirectory
     private static readonly Lazy<IReadOnlyList<BiosVendor>> Catalog =
         new(() => EmbeddedCatalog.Load<BiosVendorCatalog>("m08-bios-vendors.json").Vendors);
 
-    /// <summary>Valeurs de remplissage laissées par les fabricants à la place d'un vrai nom.</summary>
-    private static readonly HashSet<string> Placeholders = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "System manufacturer",
-        "System Product Name",
-        "System Version",
-        "To Be Filled By O.E.M.",
-        "Default string",
-        "O.E.M.",
-        "OEM",
-        "Not Applicable",
-        "Not Specified",
-        "None",
-        "Base Board",
-        "Type1ProductConfigId",
-        "Unknown",
-    };
-
     public static IReadOnlyList<BiosVendor> Vendors => Catalog.Value;
 
-    public static bool IsPlaceholder(string? value) =>
-        string.IsNullOrWhiteSpace(value) || Placeholders.Contains(value.Trim());
+    public static bool IsPlaceholder(string? value) => Hardware.HardwareText.IsPlaceholder(value);
 
     public static BiosVendor? Find(string? manufacturer, IReadOnlyList<BiosVendor> vendors)
     {
@@ -92,10 +73,9 @@ internal static partial class BiosVendorDirectory
         string? systemModel,
         bool isLaptop,
         string? boardManufacturer,
-        string? boardProduct,
-        IReadOnlyList<BiosVendor>? vendors = null)
+        string? boardProduct)
     {
-        vendors ??= Vendors;
+        var vendors = Vendors;
         var systemVendor = Find(systemManufacturer, vendors);
         var hasSystemIdentity = !IsPlaceholder(systemManufacturer) && !IsPlaceholder(systemModel);
         var branded = hasSystemIdentity && (systemVendor?.OemOnly == true || isLaptop);
@@ -104,7 +84,7 @@ internal static partial class BiosVendorDirectory
         {
             var model = systemModel!.Trim();
             var name = systemVendor?.Name ?? systemManufacturer!.Trim();
-            var tool = systemVendor?.OemTool ?? T("l'application de mise à jour fournie par le fabricant du PC");
+            var tool = systemVendor?.OemTool is { } own ? T(own) : T("l'application de mise à jour fournie par le fabricant du PC");
             return new BiosTarget($"{name} {model}", model, true, systemVendor, BuildUrl(systemVendor, model), tool);
         }
 

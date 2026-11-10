@@ -27,6 +27,15 @@ public class ConnectionTestTests
         ConnectionTest.RunAsync(new FakePinger(script), gateway ?? Box, rounds, TimeSpan.Zero, null, CancellationToken.None);
 
     [Fact]
+    public void A_test_stopped_before_any_answer_has_nothing_to_judge()
+    {
+        var nothing = PingStats.From("Box", Box, []);
+        Assert.True(new ConnectionResult(nothing, [nothing], ConnectionVerdict.Offline, Aborted: true).StoppedBeforeFirstMeasure);
+        Assert.False(new ConnectionResult(nothing, [nothing], ConnectionVerdict.Offline, Aborted: false).StoppedBeforeFirstMeasure);
+        Assert.False(new ConnectionResult(nothing, [PingStats.From("Google", Box, [null])], ConnectionVerdict.Offline, Aborted: true).StoppedBeforeFirstMeasure);
+    }
+
+    [Fact]
     public void Stats_give_median_jitter_and_losses()
     {
         var stats = PingStats.From("x", Box, [10, 12, null, 14, 30]);
@@ -44,7 +53,7 @@ public class ConnectionTestTests
         var result = await Run(new() { ["192.168.1.1"] = [1, 2], ["1.1.1.1"] = [12, 13], ["8.8.8.8"] = [15, 14] });
 
         Assert.Equal(ConnectionVerdict.Good, result.Verdict);
-        Assert.Equal("Cloudflare (1.1.1.1)", result.BestInternet!.Label);
+        Assert.Equal("Cloudflare (1.1.1.1)", ConnectionTest.BestInternet(result.Internet)!.Label);
         Assert.False(result.Aborted);
         Assert.Equal(50, result.Gateway!.Sent);
     }
@@ -65,7 +74,7 @@ public class ConnectionTestTests
         var result = await Run(new() { ["192.168.1.1"] = [1], ["1.1.1.1"] = lossy, ["8.8.8.8"] = lossy });
 
         Assert.Equal(ConnectionVerdict.Internet, result.Verdict);
-        Assert.Equal(10, result.BestInternet!.LossPercent);
+        Assert.Equal(10, ConnectionTest.BestInternet(result.Internet)!.LossPercent);
     }
 
     [Fact]
@@ -92,7 +101,19 @@ public class ConnectionTestTests
         var result = await Run(new() { ["192.168.1.1"] = [null] });
 
         Assert.Equal(ConnectionVerdict.Offline, result.Verdict);
-        Assert.NotEmpty(ConnectionTest.Advice(result));
+        Assert.Contains("hors ligne", ConnectionTest.Advice(result), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_box_that_answers_without_internet_is_not_called_offline()
+    {
+        var result = await Run(new() { ["192.168.1.1"] = [1] });
+
+        Assert.Equal(ConnectionVerdict.Offline, result.Verdict);
+        var advice = ConnectionTest.Advice(result);
+        Assert.Contains("La box répond", advice, StringComparison.Ordinal);
+        Assert.Contains("ne peut pas les départager", advice, StringComparison.Ordinal);
+        Assert.DoesNotContain("hors ligne", advice, StringComparison.Ordinal);
     }
 
     [Fact]

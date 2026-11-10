@@ -21,7 +21,6 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     private const string GraphicsDriversKey = @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers";
     private const string WindowsUpdatePolicyKey = @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate";
     private const string DriverSearchingKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\DriverSearching";
-    private const string VideoControllerQuery = "SELECT Name, PNPDeviceID, DriverVersion, DriverDate, InfFilename FROM Win32_VideoController";
 
     /// <summary>
     /// Page « Paramètres graphiques par défaut » (Système > Écran > Graphiques), où se trouve HAGS
@@ -38,17 +37,15 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(15);
 
     private readonly IGpuSchedulingReader _scheduling;
-    private readonly GpuDriverCatalog? _catalog;
 
     public GpuDriverModule()
         : this(new D3dkmtGpuSchedulingReader())
     {
     }
 
-    internal GpuDriverModule(IGpuSchedulingReader scheduling, GpuDriverCatalog? catalog = null)
+    internal GpuDriverModule(IGpuSchedulingReader scheduling)
     {
         _scheduling = scheduling;
-        _catalog = catalog;
     }
 
     public string Id => "M09";
@@ -61,7 +58,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var catalog = _catalog ?? GpuDriverCatalog.Default;
+        var catalog = GpuDriverCatalog.Default;
         var gpus = ReadGpus(context);
         var findings = new List<Finding>();
 
@@ -95,31 +92,15 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
     private static List<GpuDevice> ReadGpus(AuditContext context)
     {
-        var rows = TryQuery(context.Cim, VideoControllerQuery)
-            .Where(r => r.GetString("PNPDeviceID")?.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase) == true)
-            .ToList();
-
-        var infos = context.Hardware.Gpus.Count > 0
-            ? context.Hardware.Gpus
-            : rows.Select(r =>
-            {
-                var name = r.GetString("Name")?.Trim() ?? T("GPU inconnu");
-                var pnp = r.GetString("PNPDeviceID") ?? string.Empty;
-                var vendor = GpuClassifier.VendorOf(pnp, name);
-                return new GpuInfo(name, vendor, r.GetString("DriverVersion"), r.GetDateTime("DriverDate"), pnp, GpuClassifier.IsLikelyIntegrated(vendor, name));
-            }).ToList();
-
         var slugs = new Dictionary<string, int>(StringComparer.Ordinal);
         var result = new List<GpuDevice>();
-        foreach (var info in infos)
+        foreach (var info in context.Hardware.Gpus)
         {
             var baseSlug = info.Vendor == HardwareVendor.Other ? "gpu" : info.Vendor.ToString().ToLowerInvariant();
             var index = slugs[baseSlug] = slugs.GetValueOrDefault(baseSlug) + 1;
-            var row = rows.FirstOrDefault(r => string.Equals(r.GetString("PNPDeviceID"), info.PnpDeviceId, StringComparison.OrdinalIgnoreCase));
             result.Add(new GpuDevice(
                 info,
                 index == 1 ? baseSlug : $"{baseSlug}-{index}",
-                row?.GetString("InfFilename"),
                 ReadDeviceProperties(context.Cim, info.PnpDeviceId)));
         }
 
@@ -153,9 +134,12 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             Id = id,
             Title = title,
             Category = DriverCategory,
-            Status = FindingStatusExtensions.ForDeviation(Severity.High),
-            Severity = Severity.High,
-            Current = T("carte graphique de base Microsoft (carte {0} sans son pilote)", VendorLabel(basic.Vendor)),
+            // Une autre carte a son pilote : le PC reste accéléré, l'écart est moins grave.
+            Status = FindingStatusExtensions.ForDeviation(gpus.Any(g => !g.IsBasicDriver) ? Severity.Medium : Severity.High),
+            Severity = gpus.Any(g => !g.IsBasicDriver) ? Severity.Medium : Severity.High,
+            Current = gpus.Any(g => !g.IsBasicDriver)
+                ? T("{0} : carte graphique de base Microsoft, une autre carte a son pilote", basic.Name)
+                : T("carte graphique de base Microsoft (carte {0} sans son pilote)", VendorLabel(basic.Vendor)),
             Expected = T("pilote du fabricant (NVIDIA, AMD ou Intel)"),
             Explanation = T("La carte graphique fonctionne avec le pilote de secours de Windows : pas d'accélération 3D, jeux inutilisables, " +
                           "fréquence et résolution de l'écran souvent limitées."),
@@ -468,13 +452,16 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
     // ----- Resizable BAR -----
 
+    /// <summary>Taille classique de la fenêtre mémoire sans Resizable BAR ; au-delà, MAUS le déduit actif (annoncé par ThresholdNotes).</summary>
+    internal const int ResizableBarMinMiB = 256;
+
     private static Finding DetectResizableBar(AuditContext context, GpuDriverCatalog catalog, GpuDevice gpu, IReadOnlyList<GpuDevice> all, NvidiaSmiData smi)
     {
         var id = $"M09.resizable-bar.{gpu.Slug}";
         var title = $"Resizable BAR : {gpu.Name}";
         var capable = catalog.IsResizableBarCapable(gpu.Vendor, gpu.Name);
         var explanation = T("Resizable BAR (Smart Access Memory chez AMD) permet au processeur d'accéder à toute la mémoire de la carte graphique d'un coup. " +
-                                   "En moyenne, le gain mesuré est de 1 à 3 %, jusqu'à une dizaine de pour cent dans quelques jeux (et parfois une légère baisse) ; Intel le requiert pour des performances optimales sur Arc.");
+                                   "Le gain dépend des jeux, avec parfois une légère baisse : le benchmark de l'Atelier, lancé avant puis après, le mesure sur votre PC. Intel le requiert pour des performances optimales sur Arc.");
 
         long? barMiB = null;
         if (gpu.Vendor == HardwareVendor.Nvidia)
@@ -492,7 +479,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
                 Title = title,
                 Category = SettingsCategory,
                 Status = FindingStatus.Info,
-                Current = barMiB is > 256 ? T("actif (fenêtre de {0} Mio)", barMiB) : T("non pris en charge par cette carte"),
+                Current = barMiB is > ResizableBarMinMiB ? T("actif (fenêtre de {0} Mio)", barMiB) : T("non pris en charge par cette carte"),
                 Explanation = explanation,
             };
         }
@@ -502,22 +489,25 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             return Finding.Unknown(id, title, T("Taille de la fenêtre mémoire de la carte illisible."), SettingsCategory);
         }
 
-        var active = barMiB > 256;
+        var active = barMiB > ResizableBarMinMiB;
         var vram = ReadVramMiB(context.Registry, gpu);
+        var laptop = context.Hardware.IsLaptop;
         return new Finding
         {
             Id = id,
             Title = title,
             Category = SettingsCategory,
-            Status = active ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Low),
+            Status = active ? FindingStatus.Ok : laptop ? FindingStatus.Info : FindingStatusExtensions.ForDeviation(Severity.Low),
             Severity = Severity.Low,
             Current = active ? T("actif (fenêtre de {0} Mio)", barMiB) : T("inactif (fenêtre de {0} Mio)", barMiB),
             Expected = vram is null ? T("actif") : T("actif (fenêtre proche de la mémoire de la carte, {0} Mio)", vram),
             Explanation = explanation,
             Advice = active
                 ? null
-                : T("Il s'active dans le BIOS : « Above 4G Decoding » et « Re-Size BAR Support » activés, CSM désactivé (démarrage UEFI). " +
-                  "Ces réglages sont guidés, jamais appliqués par MAUS : voir le Module 8."),
+                : laptop
+                    ? T("Sur un portable, ce réglage dépend du fabricant : s'il n'apparaît pas dans le BIOS, il n'y a rien à régler.")
+                    : T("Il s'active dans le BIOS : « Above 4G Decoding » et « Re-Size BAR Support » activés, CSM désactivé (démarrage UEFI). " +
+                      "Ces réglages sont guidés, jamais appliqués par MAUS : voir le Module 8."),
         };
     }
 
@@ -593,25 +583,31 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
     private static async Task<NvidiaSmiData> ReadNvidiaSmiAsync(ICommandRunner commands, CancellationToken cancellationToken)
     {
+        // Délai dépassé : nvidia-smi est bloqué, les appels suivants attendraient autant ; les valeurs ont toutes un repli.
         var query = await RunAsync(commands, NvidiaSmiQueryArguments, cancellationToken).ConfigureAwait(false);
+        if (query.TimedOut)
+        {
+            return NvidiaSmiData.Empty;
+        }
+
         var memory = await RunAsync(commands, NvidiaSmiMemoryArguments, cancellationToken).ConfigureAwait(false);
-        var pcie = await RunAsync(commands, NvidiaSmiPcieArguments, cancellationToken).ConfigureAwait(false);
+        var pcie = memory.TimedOut ? default : await RunAsync(commands, NvidiaSmiPcieArguments, cancellationToken).ConfigureAwait(false);
         return new NvidiaSmiData(
-            query is null ? [] : GpuParsers.ParseNvidiaSmiQuery(query),
-            memory is null ? [] : GpuParsers.ParseNvidiaBar1(memory),
-            pcie is null ? [] : GpuParsers.ParseNvidiaPcie(pcie));
+            query.Output is null ? [] : GpuParsers.ParseNvidiaSmiQuery(query.Output),
+            memory.Output is null ? [] : GpuParsers.ParseNvidiaBar1(memory.Output),
+            pcie.Output is null ? [] : GpuParsers.ParseNvidiaPcie(pcie.Output));
     }
 
-    private static async Task<string?> RunAsync(ICommandRunner commands, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    private static async Task<(string? Output, bool TimedOut)> RunAsync(ICommandRunner commands, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
         try
         {
             var result = await commands.RunAsync("nvidia-smi", arguments, CommandTimeout, cancellationToken).ConfigureAwait(false);
-            return result is { TimedOut: false, ExitCode: 0 } ? result.StandardOutput : null;
+            return (result is { TimedOut: false, ExitCode: 0 } ? result.StandardOutput : null, result.TimedOut);
         }
         catch (Exception ex) when (ex is DataSourceUnavailableException or InvalidOperationException or MausAccessDeniedException)
         {
-            return null;
+            return (null, false);
         }
     }
 
@@ -701,14 +697,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             return null;
         }
 
-        try
-        {
-            return registry.GetString(RegistryHive.LocalMachine, key, name)?.Trim() is { Length: > 0 } value ? value : null;
-        }
-        catch (MausAccessDeniedException)
-        {
-            return null;
-        }
+        return RegistryReaderExtensions.OrNull(() => registry.GetString(RegistryHive.LocalMachine, key, name)?.Trim() is { Length: > 0 } value ? value : null);
     }
 
     private static IReadOnlyList<CimRow> TryQuery(ICimReader cim, string wql)
@@ -759,7 +748,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     }
 
     /// <summary>Carte graphique PCI enrichie des détails WMI et des propriétés de périphérique.</summary>
-    private sealed record GpuDevice(GpuInfo Info, string Slug, string? InfFilename, IReadOnlyDictionary<string, CimRow> Properties)
+    private sealed record GpuDevice(GpuInfo Info, string Slug, IReadOnlyDictionary<string, CimRow> Properties)
     {
         public string Name => Info.Name;
 
@@ -769,7 +758,7 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
         /// <summary>Carte graphique de base Microsoft : pilote de secours <c>display.inf</c>, nom traduit selon la langue.</summary>
         public bool IsBasicDriver =>
-            string.Equals(InfFilename, "display.inf", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(Info.InfFilename, "display.inf", StringComparison.OrdinalIgnoreCase) ||
             Name.Contains("Basic Display", StringComparison.OrdinalIgnoreCase) ||
             Name.Contains("de base Microsoft", StringComparison.OrdinalIgnoreCase);
 

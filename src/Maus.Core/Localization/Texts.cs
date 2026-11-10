@@ -60,6 +60,12 @@ public static class Texts
     public static void Use(string? code)
     {
         code = Languages.Any(l => l.Code == code) ? code! : FromWindows();
+        if (code == Language && (code == "fr" || _current.Count > 0))
+        {
+            // Déjà active : le moteur passe ici à chaque demande, et un fichier de traduction pèse plus de 500 Ko.
+            return;
+        }
+
         _current = code == "fr" ? FrozenDictionary<string, string>.Empty : Load(code).ToFrozenDictionary();
         Language = code;
         Culture = CultureInfo.GetCultureInfo(code switch
@@ -70,14 +76,60 @@ public static class Texts
         });
     }
 
+    /// <summary>Active une langue et règle la culture des fils du processus (nombres, dates) sur la sienne.</summary>
+    public static void UseWithCulture(string? code)
+    {
+        Use(code);
+        CultureInfo.DefaultThreadCurrentCulture = Culture;
+        CultureInfo.DefaultThreadCurrentUICulture = Culture;
+        CultureInfo.CurrentCulture = Culture;
+        CultureInfo.CurrentUICulture = Culture;
+    }
+
     /// <summary>Traduction d'un texte français (le texte lui-même si la traduction manque).</summary>
     public static string T(string french) => _current.TryGetValue(french, out var translated) ? translated : french;
+
+    /// <summary>
+    /// Un compte accordé : <paramref name="one"/> ou <paramref name="many"/>, déjà traduits, avec {0} pour le nombre. Zéro est au
+    /// singulier en français, au pluriel en anglais et en espagnol.
+    /// </summary>
+    public static string Plural(int count, string one, string many)
+    {
+        var text = (Language == "fr" ? count > 1 : count != 1) ? many : one;
+        try
+        {
+            return string.Format(Culture, text, count);
+        }
+        catch (FormatException)
+        {
+            return text;
+        }
+    }
 
     /// <summary>Traduction d'un texte facultatif (catalogues JSON) : <c>null</c> reste <c>null</c>.</summary>
     public static string? Optional(string? french) => french is null ? null : T(french);
 
     /// <summary>Traduction d'un modèle français à trous ({0}, {1}…), puis remplissage dans la culture de la langue active.</summary>
-    public static string T(string french, params object?[] args) => string.Format(Culture, T(french), args);
+    public static string T(string french, params object?[] args)
+    {
+        try
+        {
+            return string.Format(Culture, T(french), args);
+        }
+        catch (FormatException)
+        {
+            // Une traduction mal écrite ne doit pas faire tomber un écran : le français rempli, ou à défaut le texte brut.
+            Diagnostics.Breadcrumbs.Add("texte à trous mal formé : " + french);
+            try
+            {
+                return string.Format(Culture, french, args);
+            }
+            catch (FormatException)
+            {
+                return french;
+            }
+        }
+    }
 
     /// <summary>Toutes les traductions d'une langue (pour les tests de couverture).</summary>
     public static IReadOnlyDictionary<string, string> Load(string code)

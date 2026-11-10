@@ -13,12 +13,19 @@ internal sealed record ApprovalState(bool Enabled, DateTime? DisabledOnUtc);
 /// <summary>Tâche planifiée tierce lancée à l'ouverture de session : chemin dans la bibliothèque et commande.</summary>
 internal sealed record LogonTaskInfo(string Name, string? Command, string TaskPath = @"\", string TaskName = "");
 
+/// <summary>Ce qu'un raccourci .lnk lance : chemin local (<c>null</c> s'il n'y en a pas : application du Store, réseau) et arguments.</summary>
+internal sealed record ShortcutInfo(string? Target, string Arguments);
+
 /// <summary>Analyses sans accès au système utilisées par le module 12.</summary>
 internal static partial class StartupParsers
 {
     private static readonly string[] ScriptHosts = ["wscript.exe", "cscript.exe", "mshta.exe"];
     private static readonly string[] ScriptExtensions = [".vbs", ".vbe", ".js", ".jse", ".ps1", ".hta", ".wsf"];
     private static readonly string[] PowerShellHosts = ["powershell.exe", "pwsh.exe"];
+
+    /// <summary>Une ligne de commande de Windows compte au plus 32 767 caractères, mais une entrée de démarrage reste bien plus courte.</summary>
+    private const int MaxCommandLength = 4096;
+    private const int MaxCommandCuts = 32;
 
     /// <summary>
     /// Valeur <c>StartupApproved</c> : premier octet 02 ou 06 = activé, autre valeur = désactivé ;
@@ -65,7 +72,8 @@ internal static partial class StartupParsers
                 : (text[1..end], text[(end + 1)..].Trim());
         }
 
-        var match = UnquotedExecutable().Match(text);
+        // Texte que tout programme peut écrire dans le registre : la regex ne reçoit qu'une longueur raisonnable.
+        var match = text.Length <= MaxCommandLength ? UnquotedExecutable().Match(text) : Match.Empty;
         if (match.Success)
         {
             return (match.Groups["exe"].Value, match.Groups["args"].Value.TrimStart(',', ' ').Trim());
@@ -73,6 +81,37 @@ internal static partial class StartupParsers
 
         var space = text.IndexOf(' ', StringComparison.Ordinal);
         return space < 0 ? (text, string.Empty) : (text[..space], text[(space + 1)..].Trim());
+    }
+
+    /// <summary>
+    /// Même découpage, mais une commande locale sans guillemets est d'abord essayée comme le fait Windows : coupe à chaque espace, en
+    /// partant de la plus courte, avec « .exe » ajouté à un nom sans extension (Microsoft Learn, CreateProcess, lpApplicationName) ;
+    /// le premier fichier existant l'emporte. Rien n'existe, ou chemin réseau jamais sondé : découpage ordinaire.
+    /// </summary>
+    public static (string Executable, string Arguments) SplitCommand(string? command, Func<string, bool> fileExists)
+    {
+        var text = command?.Trim() ?? string.Empty;
+        if (text.Length is > 0 and <= MaxCommandLength && text[0] != '"' && Path.IsPathFullyQualified(text) && !FinalPath.IsRemote(text))
+        {
+            var cuts = 0;
+            for (var end = text.IndexOf(' ', StringComparison.Ordinal); cuts < MaxCommandCuts; end = text.IndexOf(' ', end + 1), cuts++)
+            {
+                var stop = end < 0 ? text.Length : end;
+                var candidate = text[..stop];
+                candidate = Path.GetExtension(candidate).Length == 0 ? candidate + ".exe" : candidate;
+                if (fileExists(candidate))
+                {
+                    return (candidate, text[stop..].TrimStart(',', ' ').Trim());
+                }
+
+                if (end < 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        return SplitCommand(command);
     }
 
     /// <summary>Nom de fichier d'un chemin, sans lever d'exception sur les caractères invalides.</summary>
@@ -157,15 +196,14 @@ internal static partial class StartupParsers
     }
 
     /// <summary>
-    /// Chemin cible d'un raccourci .lnk (format MS-SHLLINK) : <c>LocalBasePath</c> de la structure LinkInfo,
-    /// suivi de <c>CommonPathSuffix</c>. Renvoie <c>null</c> pour un raccourci sans chemin local (application du Store, réseau).
+    /// Raccourci .lnk (format MS-SHLLINK) : en-tête, liste d'identifiants, LinkInfo, puis chaînes StringData. Renvoie <c>null</c>
+    /// si l'en-tête n'est pas celui d'un raccourci ; une partie absente ou tronquée laisse la cible nulle ou les arguments vides.
     /// </summary>
-    public static string? ParseShortcutTarget(ReadOnlySpan<byte> data)
+    public static ShortcutInfo? ParseShortcut(ReadOnlySpan<byte> data)
     {
         const int headerSize = 0x4C;
         const uint hasLinkTargetIdList = 0x1;
         const uint hasLinkInfo = 0x2;
-        const uint volumeIdAndLocalBasePath = 0x1;
 
         if (data.Length < headerSize || BinaryPrimitives.ReadUInt32LittleEndian(data) != headerSize)
         {
@@ -178,27 +216,84 @@ internal static partial class StartupParsers
         {
             if (data.Length < offset + 2)
             {
-                return null;
+                return new ShortcutInfo(null, string.Empty);
             }
 
             offset += 2 + BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
         }
 
-        if ((flags & hasLinkInfo) == 0 || data.Length < offset + 0x1C)
+        string? target = null;
+        if ((flags & hasLinkInfo) != 0)
         {
-            return null;
+            if (data.Length < offset + 4)
+            {
+                return new ShortcutInfo(null, string.Empty);
+            }
+
+            var size = BinaryPrimitives.ReadUInt32LittleEndian(data[offset..]);
+            if (size < 0x1C || size > data.Length - offset)
+            {
+                return new ShortcutInfo(null, string.Empty);
+            }
+
+            target = ParseLinkInfo(data.Slice(offset, (int)size));
+            offset += (int)size;
         }
 
-        var linkInfo = data[offset..];
-        var linkInfoSize = (int)BinaryPrimitives.ReadUInt32LittleEndian(linkInfo);
+        return new ShortcutInfo(target, ParseShortcutArguments(data, offset, flags));
+    }
+
+    /// <summary>
+    /// Chaînes StringData, dans l'ordre du format : nom, chemin relatif, dossier de travail, arguments, chacune précédée de son
+    /// nombre de caractères sur 2 octets (IsUnicode : 2 octets par caractère, sinon page ANSI du système).
+    /// </summary>
+    private static string ParseShortcutArguments(ReadOnlySpan<byte> data, int offset, uint flags)
+    {
+        const uint hasArguments = 0x20;
+        const uint isUnicode = 0x80;
+        var charSize = (flags & isUnicode) != 0 ? 2 : 1;
+        foreach (var field in new uint[] { 0x4, 0x8, 0x10, hasArguments })
+        {
+            if ((flags & field) == 0)
+            {
+                continue;
+            }
+
+            if (offset < 0 || offset > data.Length - 2)
+            {
+                return string.Empty;
+            }
+
+            var bytes = BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]) * charSize;
+            offset += 2;
+            if (bytes > data.Length - offset)
+            {
+                return string.Empty;
+            }
+
+            if (field == hasArguments)
+            {
+                var text = data.Slice(offset, bytes);
+                return (charSize == 2 ? Encoding.Unicode.GetString(text) : OemEncoding.Ansi.GetString(text)).Trim();
+            }
+
+            offset += bytes;
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary><c>LocalBasePath</c> de la structure LinkInfo, suivi de <c>CommonPathSuffix</c> ; <c>null</c> sans chemin local.</summary>
+    private static string? ParseLinkInfo(ReadOnlySpan<byte> linkInfo)
+    {
+        const uint volumeIdAndLocalBasePath = 0x1;
         var linkInfoHeaderSize = BinaryPrimitives.ReadUInt32LittleEndian(linkInfo[4..]);
         var linkInfoFlags = BinaryPrimitives.ReadUInt32LittleEndian(linkInfo[8..]);
-        if ((linkInfoFlags & volumeIdAndLocalBasePath) == 0 || linkInfoSize > linkInfo.Length || linkInfoSize < 0x1C)
+        if ((linkInfoFlags & volumeIdAndLocalBasePath) == 0)
         {
             return null;
         }
 
-        linkInfo = linkInfo[..linkInfoSize];
         var localBasePathOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(linkInfo[16..]);
         var commonPathSuffixOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(linkInfo[24..]);
         string? basePath = null;
@@ -340,7 +435,7 @@ internal static partial class StartupParsers
 
         var span = data[offset..];
         var end = span.IndexOf((byte)0);
-        return Encoding.Latin1.GetString(end < 0 ? span : span[..end]);
+        return OemEncoding.Ansi.GetString(end < 0 ? span : span[..end]);
     }
 
     [GeneratedRegex(@"^(?<exe>.+?\.(?:exe|com|bat|cmd|vbs|vbe|js|jse|wsf|ps1|hta|scr|lnk))(?=[\s,]|$)(?<args>.*)$", RegexOptions.IgnoreCase)]
@@ -352,6 +447,6 @@ internal static partial class StartupParsers
     [GeneratedRegex(@"\\(?:Temp|Tmp)\\", RegexOptions.IgnoreCase)]
     private static partial Regex TempFolder();
 
-    [GeneratedRegex(@"(?:^|\s)[-/](?:w(?:indowstyle)?\s+h(?:idden)?|e(?:nc(?:odedcommand)?)?\s)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"(?:^|\s)[-/](?:w(?:i[a-z]*)?\s+(?:h|1)|e(?:c|n[a-z]*)?\s)", RegexOptions.IgnoreCase)]
     private static partial Regex HiddenPowerShell();
 }

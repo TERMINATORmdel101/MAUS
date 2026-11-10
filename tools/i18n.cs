@@ -30,6 +30,13 @@ switch (command)
         Console.Out.Write(JsonList(missing) + "\n");
         break;
     case "merge":
+        // Un fichier absent ne doit pas passer pour une fusion réussie sans rien à fusionner.
+        if (!File.Exists(args[2]))
+        {
+            Console.Error.WriteLine("Fichier introuvable : " + args[2]);
+            Environment.Exit(2);
+        }
+
         foreach (var (key, value) in Load(args[2]))
         {
             data[key] = value;
@@ -67,8 +74,8 @@ static HashSet<string> Sources(string root)
     var sep = Path.DirectorySeparatorChar;
     foreach (var file in Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories))
     {
-        var dir = Path.GetDirectoryName(file)!;
-        if (dir.Contains(sep + "obj", StringComparison.Ordinal) || dir.Contains(sep + "bin", StringComparison.Ordinal))
+        var parts = Path.GetRelativePath(root, file).Split(sep);
+        if (parts.Contains("obj") || parts.Contains("bin"))
         {
             continue;
         }
@@ -95,9 +102,11 @@ static IEnumerable<string> CatalogTexts(string root)
         ["m01-audit-rules.json"] = rules,
         ["m04-privacy-rules.json"] = rules,
         ["m06-visual-rules.json"] = rules,
-        ["m08-bios-vendors.json"] = ["vendors[].rescueTool"],
+        ["m08-bios-vendors.json"] = ["vendors[].rescueTool", "vendors[].oemTool"],
         ["m09-gpu-drivers.json"] = ["branches[].label", "branches[].note"],
-        ["m12-startup-catalog.json"] = ["families[].label", "families[].item", "families[].loses", "families[].recommendation"],
+        ["m12-startup-catalog.json"] = ["families[].label", "families[].item", "families[].loses", "families[].recommendation", "apps[].name"],
+        ["intel-memory-controller.json"] = ["[].displayName"],
+        ["hw-safety-limits.json"] = ["memoryVoltage[].source", "cpuMaxTemperature[].source"],
     };
     foreach (var (name, paths) in catalogs)
     {

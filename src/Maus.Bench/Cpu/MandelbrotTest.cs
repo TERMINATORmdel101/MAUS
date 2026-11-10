@@ -5,7 +5,7 @@ namespace Maus.Bench.Cpu;
 
 /// <summary>
 /// Test « Vectoriel » du processeur : plongée dans l'ensemble de Mandelbrot en double précision, calculée par paquets
-/// de nombres (Vector&lt;double&gt; : 2, 4 ou 8 calculs à la fois selon les instructions SSE2, AVX2 ou AVX-512 du
+/// de nombres (Vector&lt;double&gt; : 2 ou 4 calculs à la fois selon les instructions SSE2 ou AVX2 du
 /// processeur) sur tous les cœurs. Les processeurs aux unités vectorielles larges s'y distinguent nettement.
 /// </summary>
 internal sealed class MandelbrotTest : CpuBenchTest
@@ -13,12 +13,26 @@ internal sealed class MandelbrotTest : CpuBenchTest
     // Point de la « vallée des hippocampes », souvent utilisé pour les plongées profondes (coordonnées mathématiques).
     private const double CenterX = -0.743643887037158704752191506114774;
     private const double CenterY = 0.131825904205311970493132056385139;
-    private readonly float[] _smooth;
+
+    // L'affichage lit l'image quatre fois par seconde (BenchmarkRunner.RunCpuTest) : la colorer plus souvent ne se verrait pas.
+    private const double ColorInterval = 0.25;
+    private float[] _smooth = [];
 
     public MandelbrotTest()
         : base(1920, 1080)
     {
+    }
+
+    public override void Prepare()
+    {
+        base.Prepare();
         _smooth = new float[Width * Height];
+    }
+
+    public override void Release()
+    {
+        base.Release();
+        _smooth = [];
     }
 
     public override string Id => "cpu-vector";
@@ -26,10 +40,6 @@ internal sealed class MandelbrotTest : CpuBenchTest
     public override string Title => T("Calcul vectoriel en double précision");
 
     public override string Subtitle => T("Plongée dans l'ensemble de Mandelbrot : {0} calculs à la fois par cœur", Vector<double>.Count);
-
-    public override string Capability => "simd";
-
-    public override string Unit => T("milliards d'itérations par seconde");
 
     public override double UnitScale => 1e9;
 
@@ -40,6 +50,7 @@ internal sealed class MandelbrotTest : CpuBenchTest
         Threads = Environment.ProcessorCount;
         var watch = System.Diagnostics.Stopwatch.StartNew();
         var options = new ParallelOptions { MaxDegreeOfParallelism = Threads };
+        var lastColor = double.NegativeInfinity;
         while (!token.IsCancellationRequested)
         {
             // Zoom continu : ×1,5 par seconde de calcul, plus d'itérations à mesure que les détails s'affinent.
@@ -47,28 +58,23 @@ internal sealed class MandelbrotTest : CpuBenchTest
             var scale = 3.2 / zoom / Width;
             var maxIterations = (int)Math.Min(20000, 600 + (250 * Math.Log2(zoom + 1)));
             var rowsDone = 0L;
-            try
+            Parallel.For(0, Height, options, (y, state) =>
             {
-                Parallel.For(0, Height, options, (y, state) =>
+                if (token.IsCancellationRequested)
                 {
-                    if (token.IsCancellationRequested)
-                    {
-                        state.Stop();
-                        return;
-                    }
+                    state.Stop();
+                    return;
+                }
 
-                    AddWork(RenderRow(y, scale, maxIterations));
-                    Interlocked.Increment(ref rowsDone);
-                });
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+                AddWork(RenderRow(y, scale, maxIterations));
+                Interlocked.Increment(ref rowsDone);
+            });
 
-            if (Interlocked.Read(ref rowsDone) == Height)
+            var seconds = watch.Elapsed.TotalSeconds;
+            if (Interlocked.Read(ref rowsDone) == Height && seconds - lastColor >= ColorInterval)
             {
-                Colorize(watch.Elapsed.TotalSeconds);
+                Colorize(seconds, options);
+                lastColor = seconds;
             }
         }
     }
@@ -128,12 +134,20 @@ internal sealed class MandelbrotTest : CpuBenchTest
         return work;
     }
 
-    private void Colorize(double seconds)
+    /// <summary>Colore l'image sur tous les cœurs, comme le calcul : le temps qu'elle prend suit le nombre de cœurs, et le score reste fidèle.</summary>
+    private void Colorize(double seconds, ParallelOptions options)
     {
         var shift = (float)(seconds * 0.02);
-        for (var i = 0; i < _smooth.Length; i++)
+        Parallel.For(0, Height, options, y => ColorizeRow(y, shift));
+    }
+
+    private void ColorizeRow(int y, float shift)
+    {
+        var image = Image.AsSpan(y * Width * 4, Width * 4);
+        var row = _smooth.AsSpan(y * Width, Width);
+        for (var x = 0; x < row.Length; x++)
         {
-            var v = _smooth[i];
+            var v = row[x];
             Vector3 color;
             if (v < 0)
             {
@@ -150,7 +164,7 @@ internal sealed class MandelbrotTest : CpuBenchTest
                 color *= color * 1.4f;
             }
 
-            BitConverter.TryWriteBytes(Image.AsSpan(i * 4, 4), ToPixel(color));
+            BitConverter.TryWriteBytes(image.Slice(x * 4, 4), ToPixel(color));
         }
     }
 }

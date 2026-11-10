@@ -96,8 +96,6 @@ internal sealed class MirrorHallScene : BenchScene
 
     public override string Subtitle => T("Lancer de rayons matériel (DXR) : reflets à l'infini, verre et cristal, ombres douces et lumière calculées rayon par rayon");
 
-    public override GpuCapability Capability => GpuCapability.RayTracing;
-
     /// <summary>Un peu plus d'une minute : le test vient en plus des cinq scènes et a son propre score.</summary>
     public override double Duration => 64;
 
@@ -526,28 +524,10 @@ internal sealed class MirrorHallScene : BenchScene
 
             var scale = statue.Height / MathF.Max(entry.Max.Y - entry.Min.Y, 0.01f);
             var local = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateRotationY(statue.Yaw * MathF.PI / 180f);
-            var (low, center) = Footprint(entry.Min, entry.Max, local);
+            var (low, center) = BoxFootprint.Of(entry.Min, entry.Max, local);
             var glass = statue.Material is Material.Glass or Material.BlueGlass;
             hall.Place(entry.Mesh, local * Matrix4x4.CreateTranslation(statue.X - center.X, PedestalTop - low, -center.Y), glass ? MaskGlass : MaskSolid, statue.Material);
         }
-    }
-
-    /// <summary>Bas de l'objet tourné (y minimal) et centre de son emprise au sol, d'après les coins de sa boîte.</summary>
-    private static (float Low, Vector2 Center) Footprint(Vector3 boxMin, Vector3 boxMax, Matrix4x4 local)
-    {
-        var low = float.MaxValue;
-        var min = new Vector2(float.MaxValue);
-        var max = new Vector2(float.MinValue);
-        for (var k = 0; k < 8; k++)
-        {
-            var corner = new Vector3((k & 1) == 0 ? boxMin.X : boxMax.X, (k & 2) == 0 ? boxMin.Y : boxMax.Y, (k & 4) == 0 ? boxMin.Z : boxMax.Z);
-            var p = Vector3.Transform(corner, local);
-            low = MathF.Min(low, p.Y);
-            min = Vector2.Min(min, new Vector2(p.X, p.Z));
-            max = Vector2.Max(max, new Vector2(p.X, p.Z));
-        }
-
-        return (low, (min + max) * 0.5f);
     }
 
     private sealed record Statue(string Model, float X, Material Material, float Height, float Yaw);

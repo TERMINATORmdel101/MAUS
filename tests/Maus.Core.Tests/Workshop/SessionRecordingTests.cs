@@ -75,7 +75,7 @@ public class SessionRecordingTests
         var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
         Assert.Equal(3, lines.Length);
-        Assert.StartsWith("Heure;", lines[0], StringComparison.Ordinal);
+        Assert.StartsWith("\"Heure\";", lines[0], StringComparison.Ordinal);
         var time = Start.AddSeconds(1).LocalDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
         Assert.StartsWith(time + ";12,5;50;4800;70;;99;70;2700;200;50", lines[1], StringComparison.Ordinal);
     }

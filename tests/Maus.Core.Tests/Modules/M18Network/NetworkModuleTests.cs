@@ -50,7 +50,7 @@ public class NetworkModuleTests
     [Fact]
     public async Task Weak_wifi_on_2_4_ghz_gets_advice()
     {
-        var wifi = new WifiLink("Maison", 35, 72, 72, 7, 6);
+        var wifi = new WifiLink(35, 72, 72, 7, 6);
 
         var finding = Assert.Single(await Detect(Adapters(Adapter("Wi-Fi", 9, 72_000_000)), wifi));
 
@@ -63,7 +63,7 @@ public class NetworkModuleTests
     [Fact]
     public async Task Good_wifi_6_is_compliant()
     {
-        var wifi = new WifiLink("Maison", 88, 1201, 1201, 10, 36);
+        var wifi = new WifiLink(88, 1201, 1201, 10, 36) { FrequencyMhz = 5180 };
 
         var finding = Assert.Single(await Detect(Adapters(Adapter("Wi-Fi", 9, 1_201_000_000)), wifi));
 
@@ -85,10 +85,11 @@ public class NetworkModuleTests
     [InlineData(10, 1, null)]
     [InlineData(7, 11, "2,4 GHz")]
     [InlineData(8, 44, "5 GHz")]
-    [InlineData(11, 200, "5 GHz")]
+    [InlineData(11, 200, null)]
+    [InlineData(7, 200, "5 GHz")]
     public void The_band_is_only_given_when_certain(int phy, int channel, string? band)
     {
-        Assert.Equal(band, new WifiLink("x", 50, 1, 1, phy, channel).Band);
+        Assert.Equal(band, new WifiLink(50, 1, 1, phy, channel).Band);
     }
 
     [Fact]
@@ -105,7 +106,7 @@ public class NetworkModuleTests
     public async Task Nearby_access_points_are_counted_by_channel_without_their_names_and_the_frequency_gives_the_band()
     {
         // Wi-Fi 6 sur le canal 5 : sans la fréquence, 2,4 GHz et 6 GHz sont indiscernables ; 5975 MHz = 6 GHz.
-        var link = new WifiLink("Maison", 80, 1200, 1200, 10, 5) { FrequencyMhz = 5975 };
+        var link = new WifiLink(80, 1200, 1200, 10, 5) { FrequencyMhz = 5975 };
         var nearby = new List<WifiAccessPoint>
         {
             new("AA0000000001", 40, 5975),

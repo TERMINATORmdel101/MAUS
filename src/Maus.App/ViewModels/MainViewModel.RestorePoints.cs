@@ -33,7 +33,6 @@ public sealed partial class MainViewModel
     public ICommand OpenSystemRestoreCommand => _openSystemRestore ??= new AsyncCommand(() =>
     {
         ShellLauncher.OpenFile(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "rstrui.exe"));
-        return Task.CompletedTask;
     });
 
     private async Task ShowRestorePointsAsync()
@@ -41,34 +40,44 @@ public sealed partial class MainViewModel
         RestorePointsText = T("Lecture des points de restauration…");
         try
         {
-            RestorePointsText = Describe(await EngineHost.Current.ReadRestorePointsAsync(CancellationToken.None));
+            RestorePointsText = Describe(await Engine.ReadRestorePointsAsync(CancellationToken.None));
         }
-        catch (Maus.Core.Engine.Broker.EngineException ex)
+        catch (Exception ex) when (ex is Maus.Core.Engine.Broker.EngineException or System.IO.IOException or UnauthorizedAccessException or InvalidOperationException or System.Runtime.InteropServices.COMException)
         {
-            RestorePointsText = ex.Message;
+            RestorePointsText = Maus.Core.Diagnostics.ErrorText.For(ex);
         }
     }
 
     private async Task CreateManualRestorePointAsync()
     {
-        if (!Confirm(T("Créer un point de restauration ?"),
-                T("Windows va enregistrer l'état actuel du système (réglages, pilotes, programmes), sans vos documents. Cela prend en général moins d'une minute et utilise un peu d'espace disque. Continuer ?")))
+        if (!Confirm(T("Créer un point de restauration ?"), Maus.Core.Reporting.ConfirmationText.Build(
+                T("Windows va enregistrer l'état actuel du système (réglages, pilotes, programmes), sans vos documents. Cela prend en général moins d'une minute et utilise un peu d'espace disque."),
+                undo: T("un point de restauration se supprime dans Windows (Protection du système > Configurer > Supprimer) ; Windows efface aussi les plus anciens de lui-même."))))
         {
             return;
         }
 
         RestorePointsText = T("Création du point de restauration…");
+        IsCreatingRestorePoint = true;
         try
         {
-            var outcome = await EngineHost.Current.CreateRestorePointAsync(CancellationToken.None);
-            var reading = await EngineHost.Current.ReadRestorePointsAsync(CancellationToken.None);
+            var outcome = await Engine.CreateRestorePointAsync(CancellationToken.None);
+            IsCreatingRestorePoint = false;
+            var reading = await Engine.ReadRestorePointsAsync(CancellationToken.None);
             RestorePointsText = outcome.Message + Environment.NewLine + Environment.NewLine + Describe(reading);
         }
-        catch (Maus.Core.Engine.Broker.EngineException ex)
+        catch (Exception ex) when (ex is Maus.Core.Engine.Broker.EngineException or System.IO.IOException or UnauthorizedAccessException or InvalidOperationException or System.Runtime.InteropServices.COMException)
         {
-            RestorePointsText = ex.Message;
+            RestorePointsText = Maus.Core.Diagnostics.ErrorText.For(ex);
+        }
+        finally
+        {
+            IsCreatingRestorePoint = false;
         }
     }
+
+    /// <summary>Un point de restauration est en cours de création : fermer MAUS à ce moment-là pose la question.</summary>
+    public bool IsCreatingRestorePoint { get; private set; }
 
     private static string Describe(Maus.Core.Engine.Broker.RestorePointsReading reading)
     {
@@ -94,7 +103,7 @@ public sealed partial class MainViewModel
             return text.ToString();
         }
 
-        text.AppendLine(T("{0} point(s), du plus récent au plus ancien :", reading.Points.Count));
+        text.AppendLine(Plural(reading.Points.Count, T("{0} point :"), T("{0} points, du plus récent au plus ancien :")));
         foreach (var point in reading.Points.Reverse())
         {
             var when = point.CreatedAt?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? T("date inconnue");

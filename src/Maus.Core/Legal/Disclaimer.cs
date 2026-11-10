@@ -22,11 +22,19 @@ public static class Disclaimer
         T("MAUS est un logiciel libre fourni « tel quel », SANS AUCUNE GARANTIE, ni de bon fonctionnement, ni d'adaptation à votre PC (licence GPL-3.0, articles 15 et 16)."),
         T("Les corrections modifient des réglages de Windows. Les tests poussent le processeur, la mémoire, la carte graphique ou le disque à leur maximum. Même quand une modification ou un test est censé ne poser aucun problème, un incident reste possible : plantage, redémarrage, instabilité, perte de données non enregistrées, ou panne d'un composant déjà fragile."),
         T("Vous lancez les corrections, les réparations et les tests sous votre seule responsabilité. Dans toute la mesure permise par la loi, les auteurs et les contributeurs de MAUS ne sont pas responsables des modifications apportées à Windows, des tests, ni de leurs conséquences."),
-        T("Avant toute correction ou tout test, sauvegardez vos données importantes. MAUS crée un point de restauration et garde les valeurs d'origine pour tout annuler, mais cela ne remplace pas une sauvegarde."),
+        T("Avant toute correction ou tout test, sauvegardez vos données importantes. MAUS propose un point de restauration et garde les valeurs d'origine pour pouvoir les remettre, mais cela ne remplace pas une sauvegarde."),
         T("Ces avertissements ne limitent pas les droits que la loi de votre pays accorde aux consommateurs."),
     ];
 
     public static string Full => string.Join(Environment.NewLine + Environment.NewLine, Paragraphs);
+
+    /// <summary>L'essentiel en trois lignes, pour l'écran d'ouverture (0.8.6) ; le texte complet reste à un clic.</summary>
+    public static IReadOnlyList<string> Summary =>
+    [
+        T("MAUS est un logiciel libre fourni sans aucune garantie (licence GPL-3.0)."),
+        T("Les corrections modifient des réglages de Windows et les tests poussent le matériel à son maximum : vous les lancez sous votre seule responsabilité."),
+        T("Sauvegardez vos données importantes avant toute correction ou tout test : le point de restauration et l'annulation ne remplacent pas une sauvegarde."),
+    ];
 
     /// <summary>Case à cocher du premier lancement.</summary>
     public static string Acceptance => T("J'ai lu ces avertissements et j'utilise MAUS sous ma responsabilité.");

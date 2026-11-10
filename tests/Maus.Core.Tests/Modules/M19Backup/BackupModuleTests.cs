@@ -52,14 +52,20 @@ public class BackupModuleTests
     }
 
     [Fact]
-    public async Task Documents_in_onedrive_count_as_a_backup()
+    public async Task Documents_in_onedrive_are_not_green_and_both_retention_periods_are_given()
     {
-        var registry = ProtectionOn().Set(RegistryHive.CurrentUser, BackupModule.ShellFolders, "Personal", @"C:\Users\Alex\OneDrive\Documents");
+        var registry = ProtectionOn()
+            .Set(RegistryHive.CurrentUser, BackupModule.ShellFolders, "Personal", @"C:\Users\Alex\OneDrive\Documents")
+            .Set(RegistryHive.CurrentUser, BackupModule.OneDriveAccounts + @"\Personal", "UserEmail", "a@exemple.fr");
 
         var finding = await Get("M19.personal-files", registry);
 
-        Assert.Equal(FindingStatus.Ok, finding.Status);
+        Assert.Equal(FindingStatus.Info, finding.Status);
         Assert.Contains("OneDrive (Documents)", finding.Current, StringComparison.Ordinal);
+        Assert.Contains("non lue", finding.Current, StringComparison.Ordinal);
+        Assert.Contains("30 jours avec un compte personnel", finding.Explanation, StringComparison.Ordinal);
+        Assert.Contains("93 jours avec un compte professionnel ou scolaire", finding.Explanation, StringComparison.Ordinal);
+        Assert.Contains("synchronisation", finding.Advice, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,12 +81,14 @@ public class BackupModuleTests
     }
 
     [Fact]
-    public async Task File_history_counts_as_a_backup()
+    public async Task File_history_alone_is_reported_without_being_called_a_working_backup()
     {
         var config = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Windows", "FileHistory", "Configuration", "Config1.xml");
 
         var finding = await Get("M19.personal-files", ProtectionOn(), files: new FakeFiles().AddFile(config));
 
-        Assert.Equal(FindingStatus.Ok, finding.Status);
+        Assert.Equal(FindingStatus.Info, finding.Status);
+        Assert.Contains("non vérifié", finding.Current, StringComparison.Ordinal);
+        Assert.Contains("dernière copie", finding.Advice, StringComparison.Ordinal);
     }
 }

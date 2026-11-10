@@ -21,14 +21,6 @@ internal interface ISignatureVerifier
 
 internal sealed record ScheduledTaskInfo(string Name, bool Enabled);
 
-/// <summary>Lecture des tâches planifiées d'un dossier du Planificateur de tâches.</summary>
-internal interface IScheduledTaskReader
-{
-    /// <exception cref="MausAccessDeniedException">Dossier protégé.</exception>
-    /// <exception cref="DataSourceUnavailableException">Planificateur ou dossier indisponible.</exception>
-    IReadOnlyList<ScheduledTaskInfo> GetTasks(string folderPath);
-}
-
 /// <summary>Appel de <c>WinVerifyTrust</c> (stratégie Authenticode) en mode silencieux, sans contrôle de révocation en ligne.</summary>
 internal sealed partial class WinTrustSignatureVerifier : ISignatureVerifier
 {
@@ -207,56 +199,58 @@ internal sealed partial class WinTrustSignatureVerifier : ISignatureVerifier
     }
 }
 
-/// <summary>Lecture par l'objet COM <c>Schedule.Service</c> (méthodes de lecture uniquement : Connect, GetFolder, GetTasks).</summary>
-internal sealed class ComScheduledTaskReader : IScheduledTaskReader
+/// <summary>Proxy système de WinHTTP.</summary>
+internal interface IWinHttpProxyReader
 {
-    private const int TaskEnumHidden = 1;
+    WinHttpProxy Read();
+}
 
-    public IReadOnlyList<ScheduledTaskInfo> GetTasks(string folderPath)
+/// <summary>
+/// <c>WinHttpGetDefaultProxyConfiguration</c> : une valeur, et non un texte qui change avec la langue de Windows. Les deux
+/// chaînes rendues se libèrent par <c>GlobalFree</c> (documentation de la fonction).
+/// </summary>
+internal sealed partial class WinHttpProxyReader : IWinHttpProxyReader
+{
+    private const uint DefaultProxy = 0;
+    private const uint NoProxy = 1;
+    private const uint NamedProxy = 3;
+
+    public WinHttpProxy Read()
     {
-        var type = Type.GetTypeFromProgID("Schedule.Service")
-            ?? throw new DataSourceUnavailableException(T("Planificateur de tâches indisponible."));
-        object? service = null;
+        var info = default(ProxyInfo);
+        if (!WinHttpGetDefaultProxyConfiguration(ref info))
+        {
+            return new WinHttpProxy(WinHttpProxyKind.Unknown);
+        }
+
         try
         {
-            service = Activator.CreateInstance(type)
-                ?? throw new DataSourceUnavailableException(T("Planificateur de tâches indisponible."));
-            dynamic scheduler = service;
-            scheduler.Connect();
-            dynamic folder = scheduler.GetFolder(folderPath);
-            dynamic tasks = folder.GetTasks(TaskEnumHidden);
-            int count = tasks.Count;
-            var result = new List<ScheduledTaskInfo>(count);
-            for (var i = 1; i <= count; i++)
+            return info.AccessType switch
             {
-                dynamic task = tasks[i];
-                result.Add(new ScheduledTaskInfo((string)task.Name, (bool)task.Enabled));
-            }
-
-            return result;
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            throw new MausAccessDeniedException(T("Lecture des tâches planifiées refusée."), ex);
-        }
-        catch (FileNotFoundException ex)
-        {
-            throw new DataSourceUnavailableException(T("Dossier de tâches planifiées absent."), ex);
-        }
-        catch (COMException ex)
-        {
-            throw new DataSourceUnavailableException(T("Planificateur de tâches illisible."), ex);
-        }
-        catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException ex)
-        {
-            throw new DataSourceUnavailableException(T("Planificateur de tâches illisible."), ex);
+                NamedProxy when Marshal.PtrToStringUni(info.Proxy) is { Length: > 0 } server => new WinHttpProxy(WinHttpProxyKind.Proxy, server),
+                DefaultProxy or NoProxy => new WinHttpProxy(WinHttpProxyKind.Direct),
+                _ => new WinHttpProxy(WinHttpProxyKind.Unknown),
+            };
         }
         finally
         {
-            if (service is not null && Marshal.IsComObject(service))
-            {
-                Marshal.FinalReleaseComObject(service);
-            }
+            GlobalFree(info.Proxy);
+            GlobalFree(info.Bypass);
         }
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ProxyInfo
+    {
+        public uint AccessType;
+        public nint Proxy;
+        public nint Bypass;
+    }
+
+    [LibraryImport("winhttp.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool WinHttpGetDefaultProxyConfiguration(ref ProxyInfo info);
+
+    [LibraryImport("kernel32.dll")]
+    private static partial nint GlobalFree(nint memory);
 }

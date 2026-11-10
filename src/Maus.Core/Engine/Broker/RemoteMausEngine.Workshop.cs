@@ -1,5 +1,6 @@
 using Maus.Core.Fixes;
 using Maus.Core.Workshop;
+using Maus.Core.Workshop.Benchmark;
 using Maus.Core.Workshop.Memory;
 
 namespace Maus.Core.Engine.Broker;
@@ -53,11 +54,20 @@ public sealed partial class RemoteMausEngine
         return report;
     }
 
-    public async Task<ConsoleOutcome> OpenConsoleAsync(ConsoleRequest request, CancellationToken cancellationToken) =>
-        await CallAsync<ConsoleOutcome>("console", new { request }, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
+    public async Task<ToolOutcome> RunToolAsync(ToolRequest request, IProgress<string>? progress, CancellationToken cancellationToken) =>
+        await CallAsync<ToolOutcome>("tool", new { request }, element =>
+        {
+            if (element is { } value)
+            {
+                progress?.Report(value.GetString() ?? string.Empty);
+            }
+        }, cancellationToken).ConfigureAwait(false) ?? throw Empty();
 
     public async Task<RestorePointOutcome> CreateDriverRestorePointAsync(CancellationToken cancellationToken) =>
         await CallAsync<RestorePointOutcome>("restorepoint.driver", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
+
+    public Task<bool> CloseRightsAsync(CancellationToken cancellationToken) =>
+        CallAsync<bool>("engine.close", null, null, cancellationToken);
 
     public async Task<ScheduleState> GetScheduleAsync(CancellationToken cancellationToken) =>
         await CallAsync<ScheduleState>("schedule.get", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
@@ -71,12 +81,6 @@ public sealed partial class RemoteMausEngine
     public async Task<RestorePointOutcome> CreateRestorePointAsync(CancellationToken cancellationToken) =>
         await CallAsync<RestorePointOutcome>("restorepoint.create", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
 
-    public Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken) =>
-        CallAsync<string>("battery.report", null, null, cancellationToken);
-
-    public async Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken) =>
-        await CallAsync<SoftwareListing>("software", null, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
-
-    public async Task<int> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken) =>
-        await CallAsync<int>("benchmark", new { launch }, null, cancellationToken).ConfigureAwait(false);
+    public async Task<BenchmarkOutcome> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken) =>
+        await CallAsync<BenchmarkOutcome>("benchmark", new { launch }, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
 }

@@ -21,6 +21,12 @@ public sealed class FixContext
     /// <summary>MAUS a été élevé avec un autre compte que celui de la session : les réglages du profil sont bloqués.</summary>
     public bool ElevatedAsAnotherUser { get; init; }
 
+    /// <summary>SID du compte de la session, noté dans chaque séance. <c>null</c> si illisible (la séance reste alors sans compte).</summary>
+    public string? UserSid { get; init; }
+
+    /// <summary>Garde sur disque la fréquence des points de restauration le temps de la création ; <c>null</c> : pas de mémoire.</summary>
+    public IRestoreFrequencyMemo? RestoreFrequencyMemo { get; init; }
+
     /// <summary>
     /// Horloge des dates du journal (séance, écriture, annulation). Sans elle, l'heure de l'audit : l'interface réutilise le
     /// dernier audit, dont l'heure peut dater de plusieurs heures.
@@ -40,6 +46,8 @@ public sealed class FixContext
             Journal = FileJournalStore.CreateDefault(),
             SystemRestore = new WmiSystemRestore(audit.Registry),
             ElevatedAsAnotherUser = SessionUser.IsElevatedAsAnotherUser(),
+            UserSid = SessionUser.Sid(),
+            RestoreFrequencyMemo = new FileRestoreFrequencyMemo(FileJournalStore.DefaultDirectory, new WindowsDirectoryProtector()),
             Clock = () => DateTimeOffset.Now,
         };
     }

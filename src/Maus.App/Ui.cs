@@ -5,29 +5,17 @@ namespace Maus.App;
 /// <summary>Textes fixes de l'interface (XAML : <c>{x:Static app:Ui.Nom}</c>), traduits dans la langue active.</summary>
 public static class Ui
 {
-    public static string WindowTitle => T("MAUS — Audit et corrections de Windows");
+    public static string WindowTitle => T("MAUS {0} — Audit et corrections de Windows", Maus.Core.AppVersion.Display);
 
     public static string Tagline => T("MAUS audite d'abord sans rien modifier. Les corrections ne s'appliquent qu'avec votre accord, et chacune peut être annulée.");
 
-    public static string RunAudit => T("Lancer l'audit");
-
-    public static string SeeFindings => T("Voir les constats");
+    public static string SeeFindings => T("Lire les constats");
 
     public static string HomeTools => T("Outils");
 
     public static string OtherTools => T("Autres outils");
 
     public static string FixThis => T("Corriger");
-
-    public static string WelcomeTitle => T("Bienvenue dans MAUS");
-
-    public static string WelcomeStep1 => T("L'audit lit la configuration de votre PC, sans rien modifier.");
-
-    public static string WelcomeStep2 => T("Vous choisissez les corrections à appliquer ; un point de restauration est créé avant.");
-
-    public static string WelcomeStep3 => T("Tout peut être annulé, en entier ou une correction à la fois, dans l'Historique.");
-
-    public static string WelcomeNever => T("MAUS ne touche jamais au BIOS et n'envoie aucune donnée ; il ne modifie que ce que vous lui demandez.");
 
     public static string OpenWebPage => T("Ouvrir la page web");
 
@@ -38,6 +26,10 @@ public static class Ui
     public static string DriversToolsTitle => T("Outils des pilotes");
 
     public static string LiveMeasuresTitle => T("Mesures en direct");
+
+    public static string ProgressLabel => T("Progression");
+
+    public static string AlarmMarginsNote => T("Les limites de température viennent du processeur, de la carte graphique ou de leur fabricant. Les marges autour de ces limites (processeur : 3 °C avant, 5 °C après ; carte graphique : 5 °C avant) et l'alerte de mémoire à 95 % sont choisies par MAUS, sans source publiée.");
 
     public static string DriversListLabel => T("Liste :");
 
@@ -63,13 +55,13 @@ public static class Ui
 
     public static string NavBenchmark => T("Benchmark");
 
-    public static string BenchmarkSubtitle => T("Carte graphique et processeur poussés à fond, en plein écran. Les points se comparent à résolution égale.");
+    public static string BenchmarkSubtitle => T("Carte graphique et processeur poussés à fond, en plein écran. Les points se comparent à résolution égale, avec la même version du benchmark.");
 
     public static string BenchmarkScopeLabel => T("Tests");
 
     public static string BenchmarkStart => T("Lancer le benchmark");
 
-    public static string BenchmarkNone => T("Aucun benchmark lancé pour l'instant. Le résultat s'affichera ici, avec l'historique de vos passes.");
+    public static string BenchmarkNone => T("Aucun benchmark lancé pour l'instant. Le résultat s'affichera ici, avec l'historique de vos mesures.");
 
     public static string BenchmarkLast => T("Dernier résultat");
 
@@ -77,13 +69,21 @@ public static class Ui
 
     public static string BenchmarkCopy => T("Copier le résultat");
 
-    public static string BenchmarkHistoryTitle => T("Historique des passes");
+    public static string BenchmarkHistoryTitle => T("Historique des mesures");
+
+    public static string BenchmarkMarkersNote => T("Les repères (traits verticaux sur la courbe, phrases dans la liste) disent seulement ce qui a changé entre deux mesures, pas pourquoi les points varient. Deux changements au même endroit ne se démêlent pas, et un écart de quelques pour cent d'une mesure à l'autre est normal.");
 
     public static string BenchmarkOpen => T("Ouvrir le benchmark");
 
     public static string BenchmarkImageTitle => T("Image du résultat à partager");
 
     public static string BenchmarkImageDetail => T("Scores, vignettes des scènes et matériel, sans aucune donnée personnelle : à coller sur Discord, un forum ou un réseau social.");
+
+    public static string HistoryReportName => T("Résultat de la dernière annulation");
+
+    public static string BenchmarkImageZoom => T("Voir la carte de score en grand");
+
+    public static string BenchmarkTileHint => T("Voir le détail de ce score");
 
     public static string BenchmarkImageCopy => T("Copier l'image");
 
@@ -93,11 +93,9 @@ public static class Ui
 
     public static string BenchmarkCompareHeading => T("Comparer avec un autre résultat");
 
-    public static string BenchmarkCompareDetail => T("Collez le texte copié par un ami avec le bouton « Copier le résultat » de son MAUS (il contient une ligne MAUS-BENCH-1), ou comparez avec votre passe précédente. Rien n'est envoyé : tout se fait sur votre PC.");
+    public static string BenchmarkCompareDetail => T("Collez le texte copié par un ami avec le bouton « Copier le résultat » de son MAUS (il contient une ligne MAUS-BENCH-1). Rien n'est envoyé : tout se fait sur votre PC.");
 
     public static string BenchmarkCompareButton => T("Comparer");
-
-    public static string BenchmarkComparePrevious => T("Avec ma passe précédente");
 
     public static string BenchmarkCompareTest => T("Test");
 
@@ -147,17 +145,13 @@ public static class Ui
 
     public static string TryMaxRefresh => T("Essayer la fréquence maximale");
 
-    public static string HomeLayoutTitle => T("Accueil et fond de la fenêtre");
+    public static string HomeLayoutTitle => T("Accueil");
 
-    public static string HomeCompleteOption => T("Accueil complet (toutes les cartes)");
+    public static string HomeLayoutNote => T("L'accueil est simple : le score, la prochaine étape et trois outils. Les autres outils restent dans l'Atelier, dans les Corrections et dans la barre de gauche. Le mode technicien (onglet Comportement) montre l'accueil complet.");
 
-    public static string HomeLayoutNote => T("Par défaut, l'accueil est simple : le score, la prochaine étape et trois outils. Les autres outils restent dans « Plus d'outils » et dans l'Atelier : rien n'est retiré.");
+    public static string SymptomsTitle => T("Que se passe-t-il ?");
 
-    public static string MicaOption => T("Fond Mica de Windows 11 (légèrement teinté par le fond d'écran)");
-
-    public static string MicaNote => T("Coupé de lui-même si la transparence est désactivée dans Windows, en contraste élevé, ou avant Windows 11 22H2.");
-
-    public static string MoreTools => T("Plus d'outils");
+    public static string LastAuditNotCurrent => T("Ce n'est pas l'état actuel de votre PC : relancez l'audit pour le voir, et pour le détail de chaque constat.");
 
     public static string GlanceTitle => T("Votre PC en un coup d'œil");
 
@@ -171,17 +165,9 @@ public static class Ui
 
     public static string AllGoodIllustration => T("Tout va bien");
 
-    public static string ShortcutsHint => T("Raccourcis : Ctrl+1 à Ctrl+6 pour changer de partie.");
+    public static string ShortcutsHint => T("Raccourcis : Ctrl+1 à Ctrl+7 pour changer de partie.");
 
     public static string TryMaxRefreshTip => T("Essai sans enregistrement : vous gardez la nouvelle fréquence d'un clic, sinon l'ancienne revient seule après 15 secondes.");
-
-    public static string TestsStability => T("Stabilité");
-
-    public static string TestsStabilityIntro => T("Ces tests font travailler le matériel à fond pour révéler une erreur ou une instabilité. Un seul test à la fois.");
-
-    public static string TestsSpeed => T("Vitesse");
-
-    public static string TestsSpeedIntro => T("Mesures courtes du disque (avec un fichier temporaire, supprimé à la fin) et de la connexion à Internet.");
 
     public static string ByImportance => T("Par importance");
 
@@ -189,7 +175,13 @@ public static class Ui
 
     public static string FindingsBeforeAudit => T("Lancez l'audit : les constats s'afficheront ici, en commençant par ce qui demande votre attention.");
 
-    public static string NothingToHandle => T("Rien à traiter : aucun problème, rien à surveiller et aucune optimisation proposée.");
+    public static string NothingToHandle => T("Rien à traiter : aucun problème relevé, rien à surveiller et aucune optimisation proposée.");
+
+    public static string OnlyOptionalLeft => T("Aucun problème relevé et rien à surveiller. Les optimisations ci-dessous sont facultatives.");
+
+    public static string NothingToHandleInRead => T("Dans ce qui a pu être lu : rien à traiter, aucun problème relevé, rien à surveiller et aucune optimisation proposée.");
+
+    public static string OnlyOptionalLeftInRead => T("Dans ce qui a pu être lu : aucun problème relevé et rien à surveiller. Les optimisations ci-dessous sont facultatives.");
 
     public static string ShowConforming => T("Afficher aussi ce qui est conforme");
 
@@ -219,7 +211,7 @@ public static class Ui
 
     public static string SaveReport => T("Enregistrer le rapport (HTML)");
 
-    public static string SaveReportTip => T("Une page à garder ou à imprimer : ce qui a été vu, ce qui a été changé, et comment l'annuler");
+    public static string SaveReportTip => T("Une page à garder (ce qui a été vu, ce qui a été changé, et comment l'annuler), ou les constats en JSON ou CSV : à choisir en bas de la fenêtre d'enregistrement");
 
     public static string RestartExplorer => T("Redémarrer l'Explorateur");
 
@@ -229,13 +221,27 @@ public static class Ui
 
     public static string TabHistory => T("Historique");
 
+    public static string WhatChangedTitle => T("Qu'est-ce qui a changé ?");
+
+    public static string WhatChangedIntro => T("Quand « ça marchait hier » : ce qui a bougé entre deux audits gardés sur ce PC. MAUS montre ce qui a changé et quand, pas ce qui cause votre souci : une chose apparue au même moment n'en est pas forcément l'origine.");
+
+    public static string WhatChangedCompareLabel => T("Comparer le dernier audit avec :");
+
+    public static string WhatChangedNotesTitle => T("Non comparable : MAUS préfère ne pas conclure");
+
+    public static string WhatChangedCopyLabel => T("Copier cette liste");
+
+    public static string TabFollow => T("Suivi");
+
+    public static string FollowIntro => T("Ce qui a bougé sur ce PC au fil du temps, d'après ce que MAUS a déjà relevé ici. Rien ne part de ce PC.");
+
     public static string Refresh => T("Actualiser");
 
     public static string RevertSession => T("Annuler cette séance");
 
     public static string SessionChanges => T("Corrections de cette séance");
 
-    public static string Revert => T("Annuler");
+    public static string Revert => T("Annuler cette correction");
 
     public static string LaptopTitle => T("MAUS — votre portable");
 
@@ -265,7 +271,7 @@ public static class Ui
 
     public static string AboutVersion => T("Version {0}", Maus.Core.AppVersion.Full);
 
-    public static string AboutMadeBy => T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur. MAUS audite d'abord sans rien modifier ; chaque correction est expliquée, réversible et ne s'applique qu'avec votre accord.");
+    public static string AboutMadeBy => T("Conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur. MAUS audite d'abord sans rien modifier ; chaque correction est expliquée, réversible sauf ce qu'elle signale et ne s'applique qu'avec votre accord.");
 
     public static string AboutLicenseTitle => T("Licence");
 
@@ -273,23 +279,49 @@ public static class Ui
 
     public static string AboutPrivacyTitle => T("Confidentialité");
 
-    public static string AboutPrivacy => T("Aucune télémétrie : MAUS n'envoie rien. Les rapports, les résumés et les relevés restent sur votre PC ; ils ne quittent votre machine que si vous les partagez vous-même, après les avoir relus.");
+    public static string WeeklyNotificationLabel => T("Prévenir après l'audit");
+
+    public static string AuditWhenElevatedOption => T("Lancer l'audit dès que les droits administrateur sont accordés");
+
+    public static string AboutSecurityTitle => T("Sécurité");
+
+    public static string AboutSecurity => T("La fenêtre de MAUS tourne sans droits administrateur. Un moteur séparé les reçoit seulement après votre clic et l'autorisation de Windows ; il n'accepte qu'une liste fermée de 31 opérations, s'arrête après 15 minutes sans demande, et confirme lui-même les actions les plus sensibles. "
+        + "MAUS ne touche jamais au BIOS, aux comptes, aux mots de passe ni aux règles du pare-feu. Le code a été relu et des protections ont été renforcées en 0.8.6 ; une relecture ne prouve pas qu'il ne reste aucun défaut.");
+
+    public static string CheckInstallation => T("Vérifier mon installation");
+
+    public static string AboutSecurityDocument => T("Lire le document de sécurité complet (en anglais)");
+
+    public static string AboutPrivacy => T("Aucune télémétrie : MAUS n'envoie rien à ses auteurs, et n'utilise le réseau que pour une action que vous lancez. Les rapports, les résumés et les relevés restent sur votre PC ; ils ne quittent votre machine que si vous les partagez vous-même, après les avoir relus.");
 
     public static string AboutComponentsTitle => T("Composants et sources");
 
     /// <summary>Composants tiers et sources des données techniques (détail dans THIRD-PARTY-NOTICES, dossier des licences).</summary>
     public static IReadOnlyList<string> AboutComponents =>
     [
+        T("PresentMon 2.6.0 (Intel, MIT) : images par seconde des jeux."),
         T("LibreHardwareMonitorLib 0.9.6 (MPL-2.0) et ses dépendances DiskInfoToolkit, RAMSPDToolkit (MPL-2.0), HidSharp (Apache-2.0) : capteurs avancés, avec le pilote PawnIO que vous installez vous-même."),
-        T("Modules PawnIO.Modules 0.2.11 (LGPL-2.1) : lecture seule du contrôleur mémoire et des puces SPD des barrettes."),
+        T("Modules PawnIO.Modules 0.2.11 (LGPL-2.1) : lecture seulement (avec les commandes que cette lecture exige : voir le document de sécurité) du contrôleur mémoire et des puces SPD des barrettes."),
         T("ZenStates-Core (GPL-3.0), memtest86+, coreboot, CoreFreq et le noyau Linux (GPL-2.0) : emplacements des registres de la mémoire, des faits matériels relus par le code de MAUS."),
-        T("Fiches techniques Intel et AMD, normes JEDEC, documentation Microsoft et NVIDIA : chaque seuil et chaque réglage cité dans l'application renvoie à sa source."),
+        T("Fiches techniques Intel et AMD, normes JEDEC, documentation Microsoft et NVIDIA : chaque limite de sécurité du matériel renvoie à sa source, et un seuil sans source publiée est annoncé comme choisi par MAUS."),
         T(".NET et WPF (MIT) : la base de l'application."),
     ];
 
     public static string ReportProblem => T("Signaler un problème");
 
     public static string ProjectPage => T("Page du projet");
+
+    public static string CheckNewVersion => T("Y a-t-il une nouvelle version ?");
+
+    public static string CheckNewVersionTip => T("Ouvre la page de la dernière version dans votre navigateur. MAUS ne vérifie rien tout seul et n'envoie rien. Sur le Microsoft Store, les mises à jour arrivent toutes seules.");
+
+    public static string RevertEverythingTip => T("Annule toutes les corrections encore en place, de la plus récente à la plus ancienne : à faire avant de désinstaller MAUS pour retrouver vos réglages d'origine. Une valeur changée entre-temps n'est pas écrasée.");
+
+    public static string FindingSearchLabel => T("Chercher un constat");
+
+    public static string FindingSearchEmpty => T("Aucun constat ne contient ce texte.");
+
+    public static string FindingSearchTip => T("Cherche dans le titre, l'explication et l'identifiant de tous les constats, y compris ceux qui sont conformes. Exemple : antivirus, TPM, M01.");
 
     public static string LicensesFolder => T("Licences et sources");
 
@@ -307,8 +339,6 @@ public static class Ui
     public static string DisclaimerTitle => Maus.Core.Legal.Disclaimer.Title;
 
     public static IReadOnlyList<string> DisclaimerParagraphs => Maus.Core.Legal.Disclaimer.Paragraphs;
-
-    public static string DisclaimerAcceptance => Maus.Core.Legal.Disclaimer.Acceptance;
 
     public static string ShowDisclaimer => T("Avertissements");
 
@@ -339,7 +369,7 @@ public static class Ui
         T("Un constat critique limite le score à 49 (« à corriger en priorité »), un constat de gravité importante à 74 (« à améliorer »)."),
         T("Un même sujet contrôlé par deux modules (Secure Boot) ne compte qu'une fois. Un constat indéterminé, informatif ou marqué « voulu » ne coûte rien."),
         T("Un module qui n'a pas pu être vérifié (erreur, délai dépassé) ne retire ni n'ajoute de points : le score est alors dit partiel et n'est pas gardé dans l'historique."),
-        T("C'est un repère de MAUS pour suivre votre PC dans le temps, pas une mesure officielle. Ce barème date du 29/09/2026 : les scores précédents ne se comparent pas."),
+        T("C'est un repère de MAUS pour suivre votre PC dans le temps, pas une mesure officielle. Ce barème date de la 0.8.6 : les scores précédents ne se comparent pas, la courbe repart de là."),
     ];
 
     public static string SlowPcTitle => T("Pourquoi mon PC est lent ?");
@@ -348,9 +378,7 @@ public static class Ui
 
     public static string TestPcTitle => T("Tester mon PC");
 
-    public static string TestPcDetail => T("Stabilité du processeur, de la mémoire vive et de la mémoire vidéo, avec arrêt automatique en cas de surchauffe.");
-
-    public static string FixPcTitle => T("Corriger en un clic");
+    public static string TestPcDetail => T("Stabilité du processeur, de la mémoire vive et de la mémoire vidéo, avec arrêt automatique en cas de surchauffe quand la température et sa limite sont lisibles.");
 
     public static string MyPcTitle => T("Mon matériel");
 
@@ -428,7 +456,9 @@ public static class Ui
 
     public static string DriversGpuTitle => T("Carte graphique : son pilote");
 
-    public static string DriversIntro => T("Redémarrer le pilote répare souvent une image figée, un écran noir ou qui clignote. Retirer et redétecter la carte va plus loin. Sauvegarder puis supprimer le pilote sert à repartir sur une installation propre. Chaque action demande votre accord et s'ouvre dans une fenêtre visible.");
+    public static string DriversIntro => T("Redémarrer le pilote répare souvent une image figée, un écran noir ou qui clignote. Chaque action demande votre accord et s'ouvre dans une fenêtre visible.");
+
+    public static string DriversIntroTechnician => T("Retirer et redétecter la carte va plus loin. Sauvegarder puis supprimer le pilote sert à repartir sur une installation propre.");
 
     public static string RestartDriver => T("Redémarrer le pilote");
 
@@ -474,15 +504,21 @@ public static class Ui
 
     public static string ShowUnsignedDrivers => T("Voir les pilotes non signés");
 
-    public static string DriversDateNote => T("Deux dates ne disent rien de l'âge réel : le 21/06/2006, que Windows donne volontairement à ses pilotes pour que ceux des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017), et le 18/07/1968, date de fondation d'Intel donnée à son « Chipset Device Software » pour qu'il passe après tout autre pilote (Intel, article 000095169). L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.");
+    public static string DriversDateNote => T("Trois dates ne disent rien de l'âge réel : le 21/06/2006, que Windows donne volontairement à ses pilotes pour que ceux des fabricants gardent la priorité (Raymond Chen, Microsoft, « The Old New Thing », 2017), le 18/07/1968, date de fondation d'Intel donnée à son « Chipset Device Software » pour qu'il passe après tout autre pilote (Intel, article 000095169), et le 01/01/1970, début du compteur de temps des programmes, quand un paquet ne donne pas de vraie date. L'âge seul ne dit pas qu'un pilote pose problème : MAUS ne fixe aucun seuil.");
 
     public static string ReadMemory => T("Lire la mémoire");
 
     public static string CopyMemory => T("Copier la fiche");
 
+    public static string ReportMemory => T("Copier et signaler");
+
+    public static string ReportMemoryTip => T("Copie la fiche, sans nom d'utilisateur ni nom du PC, puis ouvre la page de signalement du projet dans votre navigateur : vous y collez la fiche et dites ce que donne CPU-Z ou ZenTimings. MAUS n'envoie rien lui-même.");
+
     public static string MemoryControllerTitle => T("Contrôleur mémoire (réglages appliqués par le BIOS)");
 
     public static string MemoryAppliedTitle => T("Vitesse appliquée et tension de la mémoire");
+
+    public static string ReadMemoryNeedsRights => T("« Lire la mémoire » demande les droits administrateur : cliquez sur « Toutes les fonctionnalités », en haut de la fenêtre.");
 
     public static string MemoryHonest => T("Les timings affichés ici sont ceux réellement appliqués et ceux annoncés par la barrette. Resserrer les timings ou monter la fréquence se fait dans le BIOS : le gain est souvent de quelques pour cent, surtout dans les jeux limités par le processeur, et une instabilité peut corrompre des fichiers. Testez toujours après un changement (Atelier, Tests : mémoire vive).");
 
@@ -494,13 +530,24 @@ public static class Ui
 
     public static string ScoreHistoryTitle => T("Historique des scores");
 
-    public static string ScoreHistoryIntro => T("Chaque test réussi est gardé sur ce PC (rien n'est envoyé) : la courbe montre l'effet d'un réglage, d'un nettoyage ou d'une mise à jour. Un écart de quelques pour cent d'un passage à l'autre est normal.");
+    public static string ScoreHistoryIntro => T("Chaque test réussi est gardé sur ce PC (rien n'est envoyé) : la courbe montre l'effet d'un réglage, d'un nettoyage ou d'une mise à jour. Un écart de quelques pour cent d'une mesure à l'autre est normal.");
 
     public static string WeeklyAudit => T("Audit automatique :");
 
-    public static string WeeklyAuditTip => T("Un audit en lecture seule chaque semaine, sans fenêtre ; MAUS ne se montre que s'il trouve un problème rouge. Rien n'est envoyé.");
+    public static string WeeklyAuditTip => T("Un audit en lecture seule chaque semaine, sans fenêtre ; MAUS se signale selon votre choix (par défaut : seulement un problème rouge). Rien n'est envoyé.");
 
     public static string NotificationTitle => T("MAUS a trouvé un problème");
+
+    public static string GaugeOrangeZone => T("zone orange à 10 °C de la limite (choix de MAUS)");
+
+    /// <summary>Sépare un libellé de sa valeur, selon la typographie de la langue (espace avant les deux-points en français).</summary>
+    public static string LabelSeparator => T("{0} : {1}", string.Empty, string.Empty);
+
+    public static string WeeklyAuditDoneTitle => T("Audit de la semaine terminé");
+
+    public static string ScheduleOutdated => T("L'audit de la semaine ne se lance plus depuis la mise à jour de MAUS : sa tâche pointe encore vers l'ancien dossier.");
+
+    public static string ScheduleMove => T("Remettre en place");
 
     public static string OpenMaus => T("Ouvrir MAUS");
 
@@ -524,6 +571,10 @@ public static class Ui
 
     public static string SectionPc => T("Mon PC");
 
+    public static string SectionSheet => T("Fiche du PC");
+
+    public static string SectionSensors => T("Capteurs");
+
     public static string SectionProcesses => T("Processus");
 
     public static string SectionTests => T("Tests");
@@ -544,7 +595,7 @@ public static class Ui
 
     public static string ColumnMemory => T("Mémoire");
 
-    public static string ColumnDisk => T("Disque");
+    public static string ColumnIo => T("Lectures et écritures");
 
     public static string ColumnGpu => T("GPU");
 
@@ -566,7 +617,7 @@ public static class Ui
 
     public static string CpuTestTitle => T("Processeur : stabilité et performance");
 
-    public static string CpuTestIntro => T("Tous les cœurs calculent des résultats connus d'avance : la moindre erreur trahit un processeur instable (surcadençage, tension trop basse, surchauffe). Le score se compare à vos passages précédents.");
+    public static string CpuTestIntro => T("Tous les cœurs calculent des résultats connus d'avance : la moindre erreur trahit un processeur instable (surcadençage, tension trop basse, surchauffe). Le score se compare à vos mesures précédentes.");
 
     public static string RamTestTitle => T("Mémoire vive : recherche d'erreurs");
 
@@ -646,8 +697,6 @@ public static class Ui
 
     public static string SettingsIntro => T("Vos choix s'appliquent tout de suite et sont gardés pour les prochaines ouvertures de MAUS.");
 
-    public static string AppearanceTitle => T("Apparence");
-
     public static string ThemeLabel => T("Thème");
 
     public static string AccentLabel => T("Couleurs");
@@ -655,6 +704,114 @@ public static class Ui
     public static string AccentNote => T("Seules les couleurs des boutons et de la sélection changent. Les couleurs des constats gardent leur sens : vert conforme, bleu à optimiser, or à surveiller, rouge problème.");
 
     public static string AnimationsTitle => T("Animations");
+
+    public static string HelpTipsOption => T("Afficher les petits messages d'aide au survol");
+
+    public static string LevelQuick => T("Rapide");
+
+    public static string LevelNormal => T("Normal");
+
+    public static string LevelLong => T("Long");
+
+    public static string MoreOptions => T("Plus d'options");
+
+    public static string FullCheckStart => T("Tout tester");
+
+    public static string FullCheckIntro => T("Processeur, mémoire vive, mémoire vidéo et disque, l'un après l'autre : une seule confirmation, et tous les résultats au même endroit.");
+
+    public static string FineTuningShow => T("Afficher le test cœur par cœur et le programme Curve Optimizer");
+
+    public static string TileCpu => T("Processeur");
+
+    public static string TileRam => T("Mémoire");
+
+    public static string TileGpu => T("Carte graphique");
+
+    public static string TileDisk => T("Disque");
+
+    public static string TileNet => T("Réseau");
+
+    public static string TileDevices => T("Écran et périphériques");
+
+    public static string TipTileCpu => T("Vérifie que le processeur calcule sans erreur, même à pleine charge.");
+
+    public static string TipTileRam => T("Cherche les erreurs dans la mémoire vive.");
+
+    public static string TipTileGpu => T("Vérifie la mémoire de la carte graphique et mesure ses performances.");
+
+    public static string TipTileDisk => T("Mesure la vitesse de vos disques.");
+
+    public static string TipTileNet => T("Mesure la latence et la stabilité de votre connexion.");
+
+    public static string TipTileDevices => T("Vérifie l'écran, le clavier, la souris et les haut-parleurs.");
+
+    public static string OpenTest => T("Ouvrir le test");
+
+    public static string StartOrStop => T("Lancer ou arrêter");
+
+    public static string ScreenTestTitle => T("Écran : pixels morts et dégradés");
+
+    public static string ScreenTestIntro => T("Plein écran, une couleur à la fois : elle ne change que lorsque vous cliquez. Échap pour quitter.");
+
+    public static string InputTestTitle => T("Clavier et souris");
+
+    public static string InputTestIntro => T("Chaque touche qui répond, le rythme réel de la souris et les doubles clics involontaires. Seulement dans sa fenêtre, rien n'est enregistré.");
+
+    public static string SpeakerTestTitle => T("Haut-parleurs");
+
+    public static string SpeakerTestIntro => T("Un son à gauche, à droite, puis des deux côtés, pour vérifier le branchement.");
+
+    public static string SoundLeft => T("Gauche");
+
+    public static string SoundRight => T("Droite");
+
+    public static string SoundBoth => T("Les deux");
+
+    public static string BatteryTestTitle => T("Batterie : autonomie réelle");
+
+    public static string BatteryTestIntro => T("10 minutes de mesure, chargeur débranché, pour estimer l'autonomie à votre usage. C'est une estimation : Windows arrondit le niveau au pour cent.");
+
+    public static string WifiWalkTitle => T("Balade Wi-Fi");
+
+    public static string WifiWalkIntro => T("Marchez dans la maison avec le portable : la courbe montre le signal en direct et où il faiblit.");
+
+    public static string UsbTestTitle => T("Clé USB : vraie capacité");
+
+    public static string UsbTestIntro => T("Détecte les clés contrefaites : écrit sur toute la place libre, relit, puis retire ses fichiers. Vos fichiers ne sont pas touchés.");
+
+    public static string BeforeAfterTitle => T("Avant et après, en vrai");
+
+    public static string BeforeAfterIntro => T("Pour chaque séance de corrections qui peut toucher au démarrage : les démarrages mesurés par Windows avant et après, avec le temps habituel et l'écart. Si les écarts se chevauchent, MAUS le dit.");
+
+    public static string HealthLogTitle => T("Carnet de santé du PC");
+
+    public static string HealthLogIntro => T("Une ligne datée à chaque audit, comparée uniquement à ce PC lui-même. Aucune prédiction de panne, aucun seuil : MAUS suit les nombres que ses constats vous disent de surveiller.");
+
+    public static string CoolingTestTitle => T("Refroidissement");
+
+    public static string CoolingTestIntro => T("Mesure la montée en température sous charge et le retour au calme, puis compare avec la dernière fois. Peut révéler un ventilateur encrassé ou une pâte thermique fatiguée.");
+
+    public static string CombinedTestTitle => T("Charge combinée");
+
+    public static string CombinedTestIntro => T("Le processeur et la mémoire vidéo travaillent en même temps : utile si le PC gèle en jeu. La puissance de calcul de la carte graphique se teste avec le benchmark.");
+
+    public static string SaveCheck => T("Enregistrer le contrôle technique");
+
+    public static string TipSaveCheck => T("Une page qui réunit le dernier audit et les résultats des tests, sans donnée personnelle : pratique pour acheter ou vendre un PC.");
+
+    public static string TipNeedsAudit => T("Disponible après le premier audit. Lancez-le depuis l'accueil.");
+
+    public static string MoreDetails => T("Plus de détails");
+
+    public static string FixesMoreTools => T("Autres outils et réglages");
+
+    public static string TipScore => T("Note de 0 à 100, calculée à partir des constats de l'audit. C'est un repère.");
+
+    public static string TipLimitedMode => T("MAUS regarde sans rien modifier. Les options grisées ont besoin de votre accord.");
+
+    public static string TipAllFeatures => T("Windows demandera votre autorisation. Chaque action reste confirmée avant de s'appliquer.");
+
+    public static string TipSafetyGauge => T("Plus le repère va vers le rouge, plus la mesure approche de sa limite.");
 
     public static string AnimationsNote => T("Transitions entre les pages, apparition des cartes, jauge du score. « Comme Windows » suit le réglage Accessibilité > Effets visuels > Effets d'animation.");
 
@@ -677,6 +834,14 @@ public static class Ui
     public static string LimitedModeBanner => T("Mode limité : les options grisées ont besoin des droits administrateur.");
 
     public static string EnableAllFeatures => T("Toutes les fonctionnalités");
+
+    public static string WindowsUndidTitle => T("Windows a-t-il défait mes réglages ?");
+
+    public static string WindowsUndidIntro => T("Après une mise à jour de Windows : vos corrections tiennent-elles ? MAUS compare son journal au dernier audit, sans rien relancer tout seul.");
+
+    public static string CloseRights => T("Refermer les droits");
+
+    public static string CloseRightsTip => T("Arrête le moteur administrateur de MAUS tout de suite : MAUS repasse en mode limité. Vous pourrez rouvrir les droits à tout moment.");
 
     public static string EngineSecurityStop => T("Un programme a essayé de commander le moteur administrateur de MAUS. Par sécurité, le moteur s'est arrêté : ses droits administrateur sont refermés et rien n'a été exécuté pour ce programme.") + Environment.NewLine + Environment.NewLine
         + T("Faites une analyse avec Sécurité Windows (Protection contre les virus et menaces). MAUS reste utilisable en mode limité.");
@@ -709,17 +874,73 @@ public static class Ui
 
     public static string MonitorTestsHint => T("Pendant un test de stabilité, gardez un œil sur les températures, la consommation, les fréquences et les erreurs matérielles dans une fenêtre à part, même par-dessus un jeu.");
 
-    public static string CalibrationTitle => T("Tension réglée dans le BIOS (pour étalonner la mesure)");
-
-    public static string FindInputs => T("Chercher l'entrée");
-
-    public static string UseInput => T("Utiliser cette entrée");
-
-    public static string ForgetCalibration => T("Oublier l'étalonnage");
-
     public static string CompareTitle => T("Comparer avec une lecture précédente");
 
     public static string StartRecording => T("Démarrer le relevé");
 
     public static string StopRecording => T("Arrêter le relevé");
+
+    public static string KeptRefreshTitle => T("Fréquences d'écran gardées");
+
+    public static string CompareWith => T("Comparer avec l'audit du");
+
+    public static string ReadinessTitle => T("Avant une mise à jour");
+
+    public static string ReadinessIntro => T("Aucune mise à jour n'est sans risque. MAUS ne les installe pas et ne les bloque pas ; il vous aide à les faire au bon moment.");
+
+    public static string ModulesChoiceNote => T("Un module décoché n'est plus vérifié : le score devient partiel et il n'est pas gardé dans l'historique. L'audit de la semaine reste complet. Le moteur demande confirmation.");
+
+    public static string ApplyStepsTitle => T("Déroulement des corrections");
+
+    public static string ZoomLabel => T("Taille de l'affichage");
+
+    public static string ZoomNote => T("Recommandé : Normal. Vaut pour la fenêtre principale ; Ctrl + molette change la taille, Ctrl + 0 revient à 100 %.");
+
+    public static string WhyItMatters => T("Pourquoi ça compte");
+
+    public static string JourneyTitle => T("Votre parcours");
+
+    public static string AuditProgressList => T("Avancement de l'audit, module par module");
+
+    public static string SettingsTabAppearance => T("Apparence");
+
+    public static string SettingsTabBehavior => T("Comportement");
+
+    public static string ThemeNote => T("Recommandé : « Comme Windows ». MAUS suit alors le thème clair ou sombre de Windows.");
+
+    public static string TechnicianTitle => T("Mode technicien");
+
+    public static string TechnicianOption => T("Afficher partout les détails techniques");
+
+    public static string TechnicianNote => T("Déplie d'office les détails techniques : identifiant du constat, valeur lue et attendue, clé écrite, message d'origine de Windows. Donne aussi l'accueil complet et les actions avancées du pilote graphique. Recommandé : désactivé, sauf pour un technicien.");
+
+    public static string OfferAllFeaturesNote => T("Recommandé : activé. MAUS s'ouvre toujours sans droits administrateur ; la demande d'autorisation de Windows ne vient qu'après votre clic.");
+
+    public static string AuditWhenElevatedNote => T("Recommandé : désactivé. Activé, l'audit (lecture seule) démarre de lui-même dès que les droits sont accordés, sans nouvelle demande d'autorisation.");
+
+    public static string MonitorOnTopNote => T("Recommandé : désactivé, sauf pendant un test ou un jeu en fenêtre.");
+
+    public static string BestFixesTitle => T("Ce qui rapporte le plus de points");
+
+    public static string BestFixesTip => T("Estimation selon le barème du score. « Corriger » coche la correction : rien n'est appliqué avant votre confirmation.");
+
+    public static string AllGreen => T("Tout est au vert : aucun point à traiter, aucun contrôle indéterminé.");
+
+    public static string FindingFilterLabel => T("Quels constats afficher");
+
+    public static string FamilyFilterLabel => T("Quelle famille afficher");
+
+    public static string FilterHidesAll => T("Aucun constat ne correspond à ce filtre, mais d'autres restent à traiter : changez le filtre pour les voir.");
+
+    public static string RevertTodayTip => T("Annule toutes les corrections faites aujourd'hui, de la plus récente à la plus ancienne. Une valeur changée entre-temps n'est pas écrasée.");
+
+    public static string CopyMarkdown => T("Copier pour un forum");
+
+    public static string CopyMarkdownTip => T("Le même texte, mis en forme en Markdown (Reddit, GitHub, Discord…)");
+
+    public static string BenchmarkRankingTitle => T("Mon classement");
+
+    public static string BenchmarkRankingIntro => T("Vos mesures qui se comparent à la dernière (même édition, même résolution). Changez un réglage, relancez le benchmark, et comparez.");
+
+    public static string BenchmarkRankingCompare => T("Comparer à la dernière");
 }

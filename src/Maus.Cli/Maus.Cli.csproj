@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
+    <StartupHookSupport>false</StartupHookSupport>
     <AssemblyName>maus</AssemblyName>
     <RootNamespace>Maus.Cli</RootNamespace>
   </PropertyGroup>
@@ -11,6 +12,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Maus.Core\Maus.Core.csproj" />
     <ProjectReference Include="..\Maus.Bench\Maus.Bench.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Maus.Core.Tests" />
   </ItemGroup>
 
 </Project>

@@ -62,7 +62,7 @@ public static class ShellLauncher
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         try
         {
-            using var _ = Process.Start(new ProcessStartInfo(Path.Combine(windows, "explorer.exe"), arguments) { UseShellExecute = false });
+            using var _ = Process.Start(new ProcessStartInfo(Path.Combine(windows, "explorer.exe"), arguments) { UseShellExecute = false, WorkingDirectory = Maus.Core.Platform.SystemTool.WorkingFolder });
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
         {

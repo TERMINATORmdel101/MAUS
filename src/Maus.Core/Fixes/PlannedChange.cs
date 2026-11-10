@@ -60,6 +60,12 @@ public sealed record PlannedChange
 
     public required IReadOnlyList<SettingWrite> Writes { get; init; }
 
+    /// <summary>
+    /// Question à poser dans la fenêtre du moteur avant d'écrire, pour ce qu'une correction ordinaire ne touche pas (logiciel de
+    /// sécurité lancé au démarrage) ; <c>null</c> pour une correction ordinaire.
+    /// </summary>
+    public string? EngineQuestion { get; init; }
+
     /// <summary>Au moins une écriture vise le profil de l'utilisateur de la session.</summary>
     public bool IsUserScoped => Writes.Any(w => w.Key.IsUserScoped);
 }

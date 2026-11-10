@@ -6,6 +6,7 @@
     <Project Path="src/Maus.Core/Maus.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Maus.App.Tests/Maus.App.Tests.csproj" />
     <Project Path="tests/Maus.Core.Tests/Maus.Core.Tests.csproj" />
   </Folder>
 </Solution>

@@ -13,7 +13,7 @@ public class ComWindowsUpdateAgentTests
     [Fact]
     public async Task Search_runs_on_its_own_thread_and_returns_its_result()
     {
-        PendingUpdate[] updates = [new("id", "Mise à jour", [], [], null, false, false)];
+        PendingUpdate[] updates = [new("id", "Mise à jour", [], null, false, false)];
         string? threadName = null;
 
         var result = await ComWindowsUpdateAgent.RunOnDedicatedThread(
@@ -59,7 +59,7 @@ public class ComWindowsUpdateAgentTests
     internal static IReadOnlyList<PendingUpdate> ReadThroughNullPointer()
     {
         string? missing = null;
-        return [new(missing!.Trim(), "Mise à jour", [], [], null, false, false)];
+        return [new(missing!.Trim(), "Mise à jour", [], null, false, false)];
     }
 
     [Fact]

@@ -10,7 +10,48 @@ public sealed class SafetyGauge : FrameworkElement
     public static readonly DependencyProperty MaximumProperty = Register(nameof(Maximum), 100.0);
     public static readonly DependencyProperty ElevatedProperty = Register(nameof(Elevated), 70.0);
     public static readonly DependencyProperty DangerProperty = Register(nameof(Danger), 90.0);
-    public static readonly DependencyProperty ValueProperty = Register(nameof(Value), 0.0);
+    public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
+        nameof(Value), typeof(double), typeof(SafetyGauge), new FrameworkPropertyMetadata(0.0, OnValueChanged));
+
+    /// <summary>Couleur du repère : suit le thème, et redemande le dessin quand il change.</summary>
+    private static readonly DependencyProperty MarkerBrushProperty = DependencyProperty.Register(
+        "MarkerBrush", typeof(Brush), typeof(SafetyGauge), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public SafetyGauge() => SetResourceReference(MarkerBrushProperty, "TextFillColorPrimaryBrush");
+
+    /// <summary>Position affichée du repère : elle glisse jusqu'à la nouvelle valeur au lieu de sauter.</summary>
+    private static readonly DependencyProperty ShownValueProperty = Register("ShownValue", 0.0);
+
+    private static void OnValueChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        var gauge = (SafetyGauge)element;
+        if (!gauge.IsLoaded || !Appearance.Motion.IsEnabled)
+        {
+            gauge.BeginAnimation(ShownValueProperty, null);
+            gauge.SetValue(ShownValueProperty, (double)e.NewValue);
+            return;
+        }
+
+        gauge.BeginAnimation(ShownValueProperty, new System.Windows.Media.Animation.DoubleAnimation((double)e.NewValue, new Duration(TimeSpan.FromMilliseconds(450))));
+    }
+
+    /// <summary>Couleur progressive : vert, puis or en approchant du seuil, puis rouge.</summary>
+    private Color Heat(double value)
+    {
+        static Color Mix(Color a, Color b, double t) => Color.FromRgb(
+            (byte)(a.R + ((b.R - a.R) * t)), (byte)(a.G + ((b.G - a.G) * t)), (byte)(a.B + ((b.B - a.B) * t)));
+
+        var green = ((SolidColorBrush)Palette.Green).Color;
+        var gold = ((SolidColorBrush)Palette.Gold).Color;
+        var red = ((SolidColorBrush)Palette.Red).Color;
+        if (value <= Elevated)
+        {
+            var low = Math.Clamp((value - Minimum) / Math.Max(1, Elevated - Minimum), 0, 1);
+            return Mix(green, gold, low * low);
+        }
+
+        return Mix(gold, red, Math.Clamp((value - Elevated) / Math.Max(1, Danger - Elevated), 0, 1));
+    }
 
     public double Minimum
     {
@@ -63,8 +104,16 @@ public sealed class SafetyGauge : FrameworkElement
         drawingContext.DrawRectangle(Palette.Red, null, new Rect(X(Danger), barTop, Math.Max(0, ActualWidth - X(Danger)), barHeight));
         drawingContext.Pop();
 
-        var marker = X(Value);
-        var foreground = (Brush?)TryFindResource("TextFillColorPrimaryBrush") ?? Brushes.Black;
+        var shown = (double)GetValue(ShownValueProperty);
+        var marker = X(shown);
+        var foreground = (Brush?)GetValue(MarkerBrushProperty) ?? Brushes.Black;
+        if (!SystemParameters.HighContrast)
+        {
+            var dot = new SolidColorBrush(Heat(shown));
+            dot.Freeze();
+            drawingContext.DrawEllipse(dot, new Pen(foreground, 1), new Point(Math.Clamp(marker, 4, ActualWidth - 4), 8), 5, 5);
+        }
+
         drawingContext.DrawRoundedRectangle(foreground, null, new Rect(Math.Clamp(marker - 1.5, 0, ActualWidth - 3), 0, 3, 16), 1.5, 1.5);
     }
 

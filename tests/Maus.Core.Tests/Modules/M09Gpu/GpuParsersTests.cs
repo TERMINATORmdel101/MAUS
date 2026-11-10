@@ -48,7 +48,6 @@ public class GpuParsersTests
         Assert.Equal(2, gpus.Count);
         Assert.Equal(1, gpus[0].BusNumber);
         Assert.Equal("617.14", gpus[0].DriverVersion);
-        Assert.Equal("NVIDIA GeForce RTX 2080 Ti", gpus[0].Name);
         Assert.Equal(10, gpus[1].BusNumber);
     }
 

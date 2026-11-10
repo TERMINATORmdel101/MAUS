@@ -28,6 +28,10 @@ if (Test-Path $files) { Remove-Item -Recurse -Force $files }
 dotnet publish (Join-Path $root 'src\Maus.App\Maus.App.csproj') -c Release -r win-x64 --self-contained true -o $files --disable-build-servers -nologo
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué (code $LASTEXITCODE)" }
 
+# Empreinte du programme, affichée par « Vérifier mon installation » : à publier avec la version.
+$program = (Get-FileHash -Algorithm SHA256 (Join-Path $files 'MAUS.dll')).Hash
+"$program  MAUS.dll" | Out-File -Encoding ascii (Join-Path $out "MAUS-$version-programme.sha256")
+
 & $Iscc --quiet-progress "--define=AppVersion=$version" "--define=SourceDir=$files" "--define=OutputDir=$out" (Join-Path $PSScriptRoot 'MAUS.iss')
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup a échoué (code $LASTEXITCODE)" }
 

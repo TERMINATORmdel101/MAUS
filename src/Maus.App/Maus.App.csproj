@@ -4,6 +4,9 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
+    <StartupHookSupport>false</StartupHookSupport>
+    <!-- Publication autonome : MAUS.exe est le lanceur natif de MAUS, qui retire les variables de .NET avant de le démarrer. -->
+    <AppHostSourcePath Condition="'$(SelfContained)' == 'true'">$(MSBuildProjectDirectory)\obj\MausHost\MausHost.exe</AppHostSourcePath>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>MAUS</AssemblyName>
@@ -20,9 +23,35 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Maus.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Maus.Core\Maus.Core.csproj" />
     <ProjectReference Include="..\Maus.Bench\Maus.Bench.csproj" />
   </ItemGroup>
+
+  <!-- Précompilation à la publication (ouverture plus rapide). Restent compilées à la volée : Maus.Core et Maus.Bench, dont
+       l'empreinte gardée ci-dessous est celle d'avant la publication, et tout ce qui sert au benchmark, pour ne changer aucune mesure ; et la grosse bibliothèque du SDK Windows (32 Mo de plus pour rien). -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' and '$(Configuration)' == 'Release'">
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(PublishReadyToRun)' == 'true'">
+    <PublishReadyToRunExclude Include="Maus.Core.dll;Maus.Bench.dll;Vortice.Direct2D1.dll;Vortice.Direct3D11.dll;Vortice.Direct3D12.dll;Vortice.D3DCompiler.dll;Vortice.DXGI.dll;Vortice.DirectX.dll;Vortice.Mathematics.dll;SharpGen.Runtime.dll;SharpGen.Runtime.COM.dll;Microsoft.Windows.SDK.NET.dll" />
+  </ItemGroup>
+
+  <!-- Empreintes des bibliothèques de MAUS, gardées dans MAUS.dll à la compilation (« Vérifier mon installation », À propos). -->
+  <Target Name="EmbedLibraryHashes" BeforeTargets="GetAssemblyAttributes" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <_MausLibrary Include="@(ReferencePath)" Condition="'%(Filename)' == 'Maus.Core' or '%(Filename)' == 'Maus.Bench'" />
+    </ItemGroup>
+    <GetFileHash Files="@(_MausLibrary)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_MausLibraryHash" />
+    </GetFileHash>
+    <ItemGroup>
+      <AssemblyMetadata Include="Sha256.%(_MausLibraryHash.Filename)" Value="%(_MausLibraryHash.FileHash)" />
+    </ItemGroup>
+  </Target>
 
   <!-- Licences livrées avec l'application : celle de MAUS, les composants tiers et le texte de la LGPL-2.1 des modules PawnIO. -->
   <ItemGroup>
@@ -35,5 +64,18 @@
     <None Include="..\..\third-party\PresentMon\PresentMon.exe" Link="PresentMon\PresentMon.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\third-party\PresentMon\LICENSE.txt" Link="licenses\PresentMon-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- Sans Visual C++, la publication échoue : jamais de paquet avec le lanceur standard. -->
+  <Target Name="BuildMausHost" BeforeTargets="ResolveFrameworkReferences"
+          Condition="'$(SelfContained)' == 'true' and !$(MSBuildProjectName.EndsWith('_wpftmp'))"
+          Inputs="$(MSBuildProjectDirectory)\Host\MausHost.cpp" Outputs="$(AppHostSourcePath)">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\obj\MausHost" />
+    <Exec ConsoleToMSBuild="true" StandardOutputImportance="low"
+          Command="&quot;$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_MausVisualStudio" />
+    </Exec>
+    <Exec StandardOutputImportance="low"
+          Command="call &quot;$(_MausVisualStudio)\VC\Auxiliary\Build\vcvars64.bat&quot; &gt;nul &amp;&amp; cl /nologo /utf-8 /W4 /WX /O2 /MT /GS /sdl /guard:cf /Brepro /Fo&quot;$(MSBuildProjectDirectory)\obj\MausHost\MausHost.obj&quot; /Fe&quot;$(AppHostSourcePath)&quot; &quot;$(MSBuildProjectDirectory)\Host\MausHost.cpp&quot; user32.lib /link /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /guard:cf /CETCOMPAT /MANIFEST:NO /Brepro" />
+  </Target>
 
 </Project>

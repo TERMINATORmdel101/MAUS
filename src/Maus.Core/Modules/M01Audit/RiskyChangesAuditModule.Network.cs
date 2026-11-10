@@ -14,7 +14,7 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Check HostsCheck => new("M01.hosts", T("Fichier hosts bloquant Microsoft"), NetworkCategory, Severity.High, Fixable: true);
 
-    private static Check ProxyCheck => new("M01.proxy", T("Proxy imposé"), NetworkCategory, Severity.High, Fixable: true, SettingsPage: ProxyPage);
+    private static Check ProxyCheck => new("M01.proxy", T("Proxy imposé"), NetworkCategory, Severity.High, SettingsPage: ProxyPage);
 
     private Finding DetectHosts(AuditContext context)
     {
@@ -35,13 +35,13 @@ public sealed partial class RiskyChangesAuditModule
 
         var hosts = entries.Select(e => e.HostName).Distinct(StringComparer.OrdinalIgnoreCase);
         return HostsCheck.Deviation(
-            T("{0} ligne(s) visant Microsoft : {1}", entries.Count, Join(hosts)),
+            Plural(entries.Count, T("{0} ligne visant Microsoft"), T("{0} lignes visant Microsoft")) + " : " + Join(hosts),
             expected,
             explanation,
-            T("Retirer seulement les lignes qui visent des domaines de Microsoft (MAUS en gardera une copie .bak) ; les autres lignes restent intactes."));
+            T("Retirez seulement les lignes qui visent des domaines de Microsoft, après avoir gardé une copie du fichier ; laissez les autres lignes intactes."));
     }
 
-    private static Finding DetectProxy(IRegistryReader registry, string? winHttpOutput, bool managed)
+    private static Finding DetectProxy(IRegistryReader registry, WinHttpProxy system, bool managed)
     {
         var explanation = T("Un proxy fait passer votre navigation par un autre ordinateur, qui peut la lire ou la modifier. " +
             "Il est parfois installé par un logiciel publicitaire ou malveillant, parfois par un outil de filtrage, un VPN ou une entreprise.");
@@ -49,7 +49,6 @@ public sealed partial class RiskyChangesAuditModule
         var enabled = registry.GetDword(Hkcu, InternetSettingsKey, "ProxyEnable") == 1;
         var server = registry.GetString(Hkcu, InternetSettingsKey, "ProxyServer");
         var script = registry.GetString(Hkcu, InternetSettingsKey, "AutoConfigURL");
-        var system = WinHttpProxyParser.Parse(winHttpOutput);
 
         var found = new List<string>();
         if (enabled && IsSet(server))
@@ -79,7 +78,7 @@ public sealed partial class RiskyChangesAuditModule
                 expected,
                 explanation,
                 T("Si vous n'avez pas installé vous-même ce proxy (VPN, contrôle parental, outil de développement…), " +
-                "le désactiver dans Paramètres > Réseau et Internet > Proxy ; MAUS demandera confirmation avant de toucher au proxy système."));
+                "le désactiver dans Paramètres > Réseau et Internet > Proxy. MAUS ne touche pas au proxy système (WinHTTP) : il se retire par la commande netsh winhttp reset proxy, en administrateur."));
 
             // La page Proxy des Paramètres montre le proxy de l'utilisateur et le script, jamais le proxy système (WinHTTP) :
             // pas de bouton quand celui-ci est le seul trouvé.
@@ -88,7 +87,7 @@ public sealed partial class RiskyChangesAuditModule
         }
 
         return system.Kind == WinHttpProxyKind.Unknown
-            ? ProxyCheck.Unknown(T("Aucun proxy pour l'utilisateur, mais la réponse de « netsh winhttp show proxy » (proxy système) est illisible."))
+            ? ProxyCheck.Unknown(T("Aucun proxy pour l'utilisateur, mais le proxy système (WinHTTP) n'a pas pu être lu."))
             : ProxyCheck.Compliant(expected, expected, explanation);
     }
 }

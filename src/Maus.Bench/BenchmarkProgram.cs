@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using Maus.Bench.Cpu;
@@ -21,13 +22,24 @@ namespace Maus.Bench;
 ///   --capture DOSSIER        rendu hors écran de quelques images (--times 5,20,40 ; --size 1920x1080) en PNG
 ///   --duration-scale X       durées multipliées par X (essais rapides)
 ///   --result FICHIER         résultats en JSON
+///   --output DOSSIER         dossier de sortie créé par le moteur : la passe (report.json) et son image (share.png), rien d'autre
+/// Avec les droits administrateur, le benchmark n'écrit rien dans le profil de l'utilisateur : --result, --screenshots et
+/// --capture y sont refusés, et sans --output la passe n'est pas gardée (0.8.6).
 /// </summary>
 public static partial class BenchmarkProgram
 {
     public static int Run(string[] args)
     {
         _ = SetProcessDpiAwarenessContext(-4);
-        var options = BenchOptions.Parse(args);
+
+        // Une passe dure une douzaine de minutes sans clavier ni souris : l'écran et le PC restent éveillés, jusqu'à la fin de ce processus.
+        _ = SetThreadExecutionState(0x80000003);
+        if (!BenchOptions.TryParse(args, out var options, out var invalid))
+        {
+            Console.Error.WriteLine(invalid);
+            return 2;
+        }
+
         Maus.Core.Localization.Texts.Use(options.Language);
         try
         {
@@ -44,20 +56,12 @@ public static partial class BenchmarkProgram
                 stoppedForSafety = runner.StoppedForSafety;
             }
 
-            // Les passes d'essai (accélérées ou fermées automatiquement) ne vont pas dans l'historique de l'utilisateur.
-            if (report.Tests.Count > 0 && !options.IsTrial)
-            {
-                var store = BenchmarkHistoryStore.CreateDefault();
-                store.Add(report);
-                store.PruneImages();
-            }
-
             if (options.ResultFile is { } file)
             {
                 File.WriteAllText(file, BenchmarkHistoryStore.Serialize(report));
             }
 
-            // 5 = arrêt de sécurité (chaleur), 3 = carte perdue.
+            // 5 = arrêt de sécurité (chaleur, ou température qui n'est plus lue), 3 = carte perdue.
             return stoppedForSafety ? 5 : report.Error is null ? 0 : 3;
         }
         catch (DeviceLostException ex)
@@ -136,7 +140,7 @@ public static partial class BenchmarkProgram
                     {
                         var t = Math.Max(0, time - ((warmup - 1 - k) / 60.0));
                         var frameWatch = Stopwatch.StartNew();
-                        RenderFrame(device, context, post, builder, scene, t, 1f / 60f, options.CameraOverride);
+                        RenderFrame(device, context, post, builder, scene, t, options.CameraOverride);
                         if (k < warmup - 1)
                         {
                             device.Present();
@@ -159,7 +163,7 @@ public static partial class BenchmarkProgram
         return 0;
     }
 
-    internal static void RenderFrame(IGpuDevice device, SceneContext context, PostProcess post, FrameBuilder builder, BenchScene scene, double time, float deltaTime, CameraPose? cameraOverride = null, float fade = 0f, ITexture? snapshot = null)
+    internal static void RenderFrame(IGpuDevice device, SceneContext context, PostProcess post, FrameBuilder builder, BenchScene scene, double time, CameraPose? cameraOverride = null, float fade = 0f, ITexture? snapshot = null)
     {
         var state = scene.Evaluate(time);
         if (fade > 0f)
@@ -172,13 +176,8 @@ public static partial class BenchmarkProgram
             state = state with { Camera = camera };
         }
 
-        if (state.Cut)
-        {
-            post.ResetHistory();
-        }
-
         device.BeginFrame();
-        var frame = builder.Build(state, context.Size, time, deltaTime);
+        var frame = builder.Build(state, context.Size, time);
         context.Frame = frame;
         var cmd = device.Commands;
         cmd.SetConstants(0, frame);
@@ -186,6 +185,9 @@ public static partial class BenchmarkProgram
         cmd.SetConstants(0, frame);
         post.Run(cmd, state.Grade, state.Temporal, scene.HasOverlay ? target => scene.RenderOverlay(context, target) : null, snapshot);
     }
+
+    [LibraryImport("kernel32.dll")]
+    private static partial uint SetThreadExecutionState(uint flags);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -229,7 +231,7 @@ internal sealed record BenchOptions
     public bool RayTracing { get; init; } = true;
 
     /// <summary>Passe d'essai (accélérée ou fermée automatiquement) : rien n'est gardé dans l'historique de l'utilisateur.</summary>
-    public bool IsTrial => DurationScale < 1 || AutoClose;
+    public bool IsTrial => DurationScale < 1 || AutoClose || Scenes.Count > 0;
 
     /// <summary>Dossier des captures de contrôle prises pendant une vraie passe (une par test et le bilan).</summary>
     public string? ScreenshotFolder { get; init; }
@@ -237,7 +239,62 @@ internal sealed record BenchOptions
     /// <summary>Caméra imposée (repérages pour les captures) : x,y,z,cibleX,cibleY,cibleZ[,champ].</summary>
     public CameraPose? CameraOverride { get; init; }
 
-    public static BenchOptions Parse(string[] args)
+    /// <summary>
+    /// Dossier de sortie créé par le moteur (<see cref="BenchmarkOutput"/>) : la passe et son image y vont, et nulle part ailleurs.
+    /// </summary>
+    public string? OutputFolder { get; init; }
+
+    /// <summary>Lit les options ; une option mal écrite (nombre, taille, caméra) rend faux et la raison, jamais un plantage.</summary>
+    public static bool TryParse(string[] args, [NotNullWhen(true)] out BenchOptions? options, out string? error) =>
+        TryParse(args, Environment.IsPrivilegedProcess, out options, out error);
+
+    /// <param name="elevated">Droits administrateur du processus, injectés pour les tests.</param>
+    internal static bool TryParse(string[] args, bool elevated, [NotNullWhen(true)] out BenchOptions? options, out string? error)
+    {
+        BenchOptions parsed;
+        try
+        {
+            parsed = Parse(args);
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException or IndexOutOfRangeException)
+        {
+            options = null;
+            error = ex.Message;
+            return false;
+        }
+
+        if (parsed.Refusal(args.Contains("--output", StringComparer.OrdinalIgnoreCase), elevated) is { } refusal)
+        {
+            options = null;
+            error = refusal;
+            return false;
+        }
+
+        options = parsed;
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Dossier de sortie mal formé, ou écriture demandée ailleurs que dans ce dossier alors qu'il est donné ou que le processus a
+    /// les droits administrateur : aucun processus élevé n'écrit dans le profil de l'utilisateur.
+    /// </summary>
+    private string? Refusal(bool output, bool elevated)
+    {
+        if (output && !BenchmarkOutput.IsValidFolder(OutputFolder))
+        {
+            return Maus.Core.Localization.Texts.T("Dossier de sortie du benchmark refusé : seul un dossier créé par MAUS sous {0} est accepté.", BenchmarkOutput.Root);
+        }
+
+        if ((output || elevated) && (ResultFile is not null || ScreenshotFolder is not null || CaptureFolder is not null))
+        {
+            return Maus.Core.Localization.Texts.T("Avec les droits administrateur ou un dossier de sortie, le benchmark n'écrit nulle part ailleurs : --result, --screenshots et --capture sont refusés.");
+        }
+
+        return null;
+    }
+
+    private static BenchOptions Parse(string[] args)
     {
         string? Value(string flag)
         {
@@ -302,6 +359,7 @@ internal sealed record BenchOptions
         return options with
         {
             ResultFile = Value("--result"),
+            OutputFolder = Value("--output"),
             Language = Value("--lang"),
             ScreenshotFolder = Value("--screenshots"),
             Only = Value("--only")?.ToLowerInvariant(),

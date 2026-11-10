@@ -31,6 +31,10 @@ public class HardwareHealthModuleTests
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.free-space"));
         Assert.Null(findings.Single(f => f.Id == "M11.free-space").SettingsPage);
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.firmware-throttling"));
+        var throttling = findings.Single(f => f.Id == "M11.firmware-throttling");
+        Assert.Equal("Bridage du processeur noté par Windows", throttling.Title);
+        Assert.Equal("aucune alerte de bridage notée par Windows en 30 jours", throttling.Current);
+        Assert.Contains("Aucune alerte ne prouve pas", throttling.Explanation, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Info, Status(findings, "M11.benchmark"));
         Assert.Contains("Atelier", findings.Single(f => f.Id == "M11.benchmark").Title, StringComparison.Ordinal);
         Assert.Equal("sain · SSD NVMe · 465,8 Go", findings.Single(f => f.Id == "M11.disk-0-health").Current);
@@ -68,7 +72,7 @@ public class HardwareHealthModuleTests
 
         var trim = findings.Single(f => f.Id == "M11.trim");
         Assert.Equal(FindingStatus.Warning, trim.Status);
-        Assert.True(trim.Fixable);
+        Assert.False(trim.Fixable);
     }
 
     [Fact]
@@ -124,6 +128,27 @@ public class HardwareHealthModuleTests
     }
 
     [Fact]
+    public async Task Measures_keep_what_was_read_and_nothing_else()
+    {
+        var hdd = Row(("DeviceId", "0"), ("FriendlyName", "HDD"), ("MediaType", (ushort)3), ("BusType", (ushort)11), ("HealthStatus", (ushort)0));
+        var ssdRead = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Wear", (byte)10), ("ReadErrorsUncorrected", 0UL)));
+        var ssdNoErrorCounter = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Wear", (byte)10)));
+        var hddRead = Context(hdd, trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Wear", (byte)0), ("ReadErrorsUncorrected", 2UL)));
+
+        var ssd = (await Detect(ssdRead)).Single(f => f.Id == "M11.disk-0-reliability");
+        Assert.Equal(10, ssd.Measures![Maus.Core.Workshop.MeasureHistory.Wear]);
+        Assert.Equal(0, ssd.Measures[Maus.Core.Workshop.MeasureHistory.Errors]);
+        Assert.Equal("CT500P2SSD8", ssd.MeasuredItem);
+
+        Assert.False((await Detect(ssdNoErrorCounter)).Single(f => f.Id == "M11.disk-0-reliability").Measures!.ContainsKey(Maus.Core.Workshop.MeasureHistory.Errors));
+
+        // Un disque à plateaux n'a pas d'usure : ce n'est pas 0 %.
+        var plates = (await Detect(hddRead)).Single(f => f.Id == "M11.disk-0-reliability");
+        Assert.False(plates.Measures!.ContainsKey(Maus.Core.Workshop.MeasureHistory.Wear));
+        Assert.Equal(2, plates.Measures[Maus.Core.Workshop.MeasureHistory.Errors]);
+    }
+
+    [Fact]
     public async Task Reliability_counters_without_admin_rights_are_unknown()
     {
         var cim = BaseCim(NvmeDisk()).Throw(HardwareHealthModule.ReliabilityQuery, new MausAccessDeniedException("refusé"), CimScopes.Storage);
@@ -151,6 +176,56 @@ public class HardwareHealthModuleTests
 
         Assert.DoesNotContain(findings, f => f.Id == "M11.disk-0-reliability");
         Assert.Equal(FindingStatus.Ok, Status(findings, "M11.disk-0-nvme"));
+    }
+
+    [Fact]
+    public async Task Nvme_log_gives_the_only_wear_verdict_and_the_only_wear_measure()
+    {
+        var worn = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Wear", (byte)85), ("Temperature", (byte)40), ("TemperatureMax", (byte)70), ("ReadErrorsUncorrected", 0UL)));
+
+        var findings = await Detect(worn, Healthy);
+
+        var windows = findings.Single(f => f.Id == "M11.disk-0-reliability");
+        Assert.Equal(FindingStatus.Ok, windows.Status);
+        Assert.DoesNotContain("usure", windows.Current, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("usure", windows.Expected, StringComparison.OrdinalIgnoreCase);
+        Assert.False(windows.Measures!.ContainsKey(Maus.Core.Workshop.MeasureHistory.Wear));
+        Assert.Equal(40, windows.Measures[Maus.Core.Workshop.MeasureHistory.Temperature]);
+
+        var written = findings.Where(f => f.Measures?.ContainsKey(Maus.Core.Workshop.MeasureHistory.Wear) == true).ToList();
+        Assert.Equal("M11.disk-0-nvme", Assert.Single(written).Id);
+        Assert.Equal(Healthy.PercentageUsed, written[0].Measures![Maus.Core.Workshop.MeasureHistory.Wear]);
+    }
+
+    [Fact]
+    public async Task Nvme_log_keeps_the_windows_temperature_and_read_error_verdicts()
+    {
+        var broken = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Wear", (byte)10), ("ReadErrorsUncorrected", 3UL)));
+        var hot = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Temperature", (byte)75), ("TemperatureMax", (byte)70)));
+
+        Assert.Equal(FindingStatus.Problem, Status(await Detect(broken, Healthy), "M11.disk-0-reliability"));
+        Assert.Equal(FindingStatus.Problem, Status(await Detect(hot, Healthy), "M11.disk-0-reliability"));
+    }
+
+    [Fact]
+    public async Task Windows_wear_alone_on_a_read_nvme_log_adds_no_finding()
+    {
+        var findings = await Detect(Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Wear", (byte)85))), Healthy);
+
+        Assert.DoesNotContain(findings, f => f.Id == "M11.disk-0-reliability");
+    }
+
+    [Fact]
+    public async Task Health_log_still_reads_the_disk_from_the_nvme_finding()
+    {
+        var worn = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Wear", (byte)85), ("Temperature", (byte)40), ("ReadErrorsUncorrected", 0UL)));
+        var findings = await Detect(worn, Healthy);
+
+        var entry = Maus.Core.Follow.HealthLog.FromAudit([new ModuleResult("M11", "M11", findings, TimeSpan.Zero)], [], new DateTimeOffset(2026, 11, 2, 8, 0, 0, TimeSpan.Zero), weekly: false, elevated: true);
+
+        var disk = Assert.Single(entry!.Disks!);
+        Assert.Equal(Maus.Core.Follow.HealthLog.SourceNvme, disk.Source);
+        Assert.Equal(Healthy.PercentageUsed, disk.WearPercent);
     }
 
     [Fact]
@@ -235,9 +310,9 @@ public class HardwareHealthModuleTests
         Assert.Equal('C', HealthParsers.DriveLetterOf(@"C:\Windows"));
         Assert.Null(HealthParsers.DriveLetterOf('\0'));
         Assert.Null(HealthParsers.DriveLetterOf(null));
-        Assert.Equal("DDR4", HealthParsers.MemoryTypeLabel(26));
-        Assert.Equal("DDR5", HealthParsers.MemoryTypeLabel(34));
-        Assert.Null(HealthParsers.MemoryTypeLabel(0));
+        Assert.Equal("DDR4", Maus.Core.Modules.M10Memory.MemorySpeeds.TypeName(26));
+        Assert.Equal("DDR5", Maus.Core.Modules.M10Memory.MemorySpeeds.TypeName(34));
+        Assert.Null(Maus.Core.Modules.M10Memory.MemorySpeeds.TypeName(0));
         Assert.Equal("465,8 Go", HealthParsers.FormatGigabytes(500_107_862_016));
     }
 
@@ -261,7 +336,7 @@ public class HardwareHealthModuleTests
         public NvmeHealthLog? Read(int diskNumber) => log;
     }
 
-    private static NvmeHealthLog Healthy => new(0, 31, 100, 10, 2, 20_000_000, 37, 27, 0);
+    private static NvmeHealthLog Healthy => new(0, 31, 100, 10, 2, 20_000_000, 37, 0);
 
     [Fact]
     public async Task Healthy_nvme_log_is_compliant_and_shows_the_drive_values()

@@ -5,7 +5,7 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.Core.Modules.M09Gpu;
 
 /// <summary>Une ligne de <c>nvidia-smi --query-gpu=pci.bus_id,driver_version,name</c>.</summary>
-internal sealed record NvidiaSmiGpu(int? BusNumber, string DriverVersion, string Name);
+internal sealed record NvidiaSmiGpu(int? BusNumber, string DriverVersion);
 
 /// <summary>
 /// Largeur du lien PCIe d'une carte NVIDIA, lue dans <c>nvidia-smi --query-gpu=pci.bus_id,pcie.link.width.current,pcie.link.width.max</c>.
@@ -60,7 +60,7 @@ internal static partial class GpuParsers
             var fields = line.Split(',', 3, StringSplitOptions.TrimEntries);
             if (fields.Length == 3 && ParseVersion(fields[1]) is not null)
             {
-                gpus.Add(new NvidiaSmiGpu(ParseBusNumber(fields[0]), fields[1], fields[2]));
+                gpus.Add(new NvidiaSmiGpu(ParseBusNumber(fields[0]), fields[1]));
             }
         }
 
@@ -140,6 +140,7 @@ internal static partial class GpuParsers
     /// <summary>Génération PCIe d'après <c>DEVPKEY_PciDevice_*LinkSpeed</c> (1 = 2,5 GT/s, 2 = 5 GT/s, 3 = 8 GT/s…).</summary>
     public static string PcieGeneration(long? speed) => speed switch
     {
+        // Débits des générations PCI Express (PCI-SIG) : simple libellé, aucun constat n'en dépend.
         1 => "Gen1 (2,5 GT/s)",
         2 => "Gen2 (5 GT/s)",
         3 => "Gen3 (8 GT/s)",

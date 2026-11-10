@@ -26,6 +26,30 @@ public class PrivacyFixTests
     }
 
     [Fact]
+    public async Task Home_edition_round_trip_returns_to_the_initial_state_and_warns_about_the_policies()
+    {
+        var registry = WindowsDefaults();
+        var audit = TestContext.Create(registry, windows: new WindowsInfo("Windows 11 Famille", "Core", "25H2", 26200, 1000));
+
+        var (plan, _) = await Fixes.RoundTrip.AssertAsync(new PrivacyModule(), audit, registry);
+
+        Assert.All(plan.Where(c => c.Id is "M04.diagnostic-data" or "M04.web-search" or "M04.activity-history"),
+            c => Assert.Contains("n'est pas garanti", c.Description, StringComparison.Ordinal));
+        Assert.Contains(plan, c => c.Id == "M04.diagnostic-data");
+    }
+
+    [Fact]
+    public async Task Enterprise_edition_round_trip_returns_to_the_initial_state()
+    {
+        var registry = WindowsDefaults();
+        var audit = TestContext.Create(registry, windows: new WindowsInfo("Windows 11 Entreprise", "Enterprise", "25H2", 26200, 1000));
+
+        var (plan, _) = await Fixes.RoundTrip.AssertAsync(new PrivacyModule(), audit, registry);
+
+        Assert.DoesNotContain("n'est pas garanti", plan.Single(c => c.Id == "M04.diagnostic-data").Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Recall_snapshots_are_blocked_by_policy_with_a_warning_and_restored_by_deleting_it()
     {
         var registry = WindowsDefaults();

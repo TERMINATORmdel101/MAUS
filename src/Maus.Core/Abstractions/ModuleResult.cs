@@ -1,12 +1,14 @@
 namespace Maus.Core;
 
 /// <summary>Résultat complet d'un module après détection.</summary>
+/// <param name="NotChosen">Le module n'a pas été lancé parce que l'utilisateur ne l'a pas choisi : ce n'est pas une panne (<paramref name="Error"/> en donne la raison).</param>
 public sealed record ModuleResult(
     string ModuleId,
     string Title,
     IReadOnlyList<Finding> Findings,
     TimeSpan Duration,
-    string? Error = null)
+    string? Error = null,
+    bool NotChosen = false)
 {
     /// <summary>Pire verdict du module ; une erreur d'exécution compte comme « indéterminé ».</summary>
     public FindingStatus WorstStatus

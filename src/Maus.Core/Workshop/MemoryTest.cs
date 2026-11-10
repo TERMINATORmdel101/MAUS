@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace Maus.Core.Workshop;
 
-public sealed record MemoryTestOptions(long Bytes, int Passes = 1)
+public sealed record MemoryTestOptions(long Bytes)
 {
     /// <summary>Pour les tests : altère un bloc après écriture (bloc, numéro de motif) pour simuler une barrette défaillante.</summary>
     internal SpanAction? Fault { get; init; }
@@ -17,7 +17,6 @@ public sealed record MemoryTestProgress(double Percent, string Step, long Errors
 public sealed record MemoryTestResult(
     long TestedBytes,
     long Errors,
-    IReadOnlyList<long> FirstErrorOffsets,
     double? CopyGigabytesPerSecond,
     double? LatencyNanoseconds,
     TimeSpan Duration,
@@ -38,7 +37,6 @@ public sealed record MemoryTestResult(
 public static unsafe class MemoryTest
 {
     private const long ChunkBytes = 64L * 1024 * 1024;
-    private const int MaxRecordedErrors = 16;
 
     /// <summary>Test plus rapide : la moitié de la mémoire libre, au moins 256 Mo (sans plafond : 16, 24, 32, 64 Go…).</summary>
     public static long SuggestedBytes(long availableBytes) => Math.Max(availableBytes / 2, 256L << 20);
@@ -65,7 +63,6 @@ public static unsafe class MemoryTest
         var clock = Stopwatch.StartNew();
         var chunks = new List<(nint Pointer, long Bytes)>();
         long errors = 0;
-        var offsets = new List<long>();
         var aborted = false;
         string? abortReason = null;
         try
@@ -91,58 +88,51 @@ public static unsafe class MemoryTest
                 (Localization.Texts.T("motif pseudo-aléatoire"), (index, seed) => Mix((ulong)index + seed)),
                 (Localization.Texts.T("motif inversé"), (index, seed) => ~((ulong)index ^ seed)),
             };
-            var steps = options.Passes * patterns.Length;
+            var steps = patterns.Length;
             var step = 0;
-            for (var pass = 0; pass < options.Passes; pass++)
+            const ulong seed = 0xA5A5_5A5A_0F0F_F0F0UL;
+            for (var p = 0; p < patterns.Length; p++)
             {
-                var seed = 0xA5A5_5A5A_0F0F_F0F0UL + (ulong)pass;
-                for (var p = 0; p < patterns.Length; p++)
+                cancellationToken.ThrowIfCancellationRequested();
+                var (name, value) = patterns[p];
+                long baseIndex = 0;
+                var chunkIndex = 0;
+                foreach (var (pointer, bytes) in chunks)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var (name, value) = patterns[p];
-                    long baseIndex = 0;
-                    var chunkIndex = 0;
-                    foreach (var (pointer, bytes) in chunks)
+                    // Avancement tous les 1 Go : avec 32 ou 64 Go, un motif dure plus d'une minute.
+                    if (++chunkIndex % 16 == 0)
                     {
-                        // Avancement tous les 1 Go : avec 32 ou 64 Go, un motif dure plus d'une minute.
-                        if (++chunkIndex % 16 == 0)
-                        {
-                            progress?.Report(new MemoryTestProgress(100.0 * (step + ((double)chunkIndex / chunks.Count)) / steps, name, errors));
-                        }
+                        progress?.Report(new MemoryTestProgress(100.0 * (step + ((double)chunkIndex / chunks.Count)) / steps, name, errors));
+                    }
 
-                        var span = new Span<ulong>((void*)pointer, (int)(bytes / 8));
-                        for (var i = 0; i < span.Length; i++)
-                        {
-                            span[i] = value(baseIndex + i, seed);
-                        }
+                    var span = new Span<ulong>((void*)pointer, (int)(bytes / 8));
+                    for (var i = 0; i < span.Length; i++)
+                    {
+                        span[i] = value(baseIndex + i, seed);
+                    }
 
-                        fault?.Invoke(span, p);
-                        for (var i = 0; i < span.Length; i++)
+                    fault?.Invoke(span, p);
+                    for (var i = 0; i < span.Length; i++)
+                    {
+                        if (span[i] != value(baseIndex + i, seed))
                         {
-                            if (span[i] != value(baseIndex + i, seed))
-                            {
-                                errors++;
-                                if (offsets.Count < MaxRecordedErrors)
-                                {
-                                    offsets.Add((baseIndex + i) * 8);
-                                }
-                            }
-                        }
-
-                        baseIndex += span.Length;
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        // Arrêt automatique en cas de surchauffe (alarme « danger » des capteurs), vérifié à chaque bloc de 64 Mo.
-                        if (abortCheck?.Invoke() is { } reason)
-                        {
-                            abortReason = reason;
-                            throw new OperationCanceledException(reason);
+                            errors++;
                         }
                     }
 
-                    step++;
-                    progress?.Report(new MemoryTestProgress(100.0 * step / steps, name, errors));
+                    baseIndex += span.Length;
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // Arrêt automatique en cas de surchauffe (alarme « danger » des capteurs), vérifié à chaque bloc de 64 Mo.
+                    if (abortCheck?.Invoke() is { } reason)
+                    {
+                        abortReason = reason;
+                        throw new OperationCanceledException(reason);
+                    }
                 }
+
+                step++;
+                progress?.Report(new MemoryTestProgress(100.0 * step / steps, name, errors));
             }
         }
         catch (OperationCanceledException)
@@ -160,7 +150,7 @@ public static unsafe class MemoryTest
         var tested = chunks.Sum(c => c.Bytes);
         var (bandwidth, latency) = aborted ? (null, null) : Measure(Math.Min(tested, 256L << 20));
         clock.Stop();
-        return new MemoryTestResult(tested, errors, offsets, bandwidth, latency, clock.Elapsed, aborted, abortReason);
+        return new MemoryTestResult(tested, errors, bandwidth, latency, clock.Elapsed, aborted, abortReason);
     }
 
     /// <summary>Débit de copie (Go/s) et latence d'accès aléatoire (ns, parcours de pointeurs dans un grand tableau).</summary>

@@ -15,6 +15,9 @@ public sealed class VisualEffectsModule : IFixableModule
     /// <summary>Personnalisation > Barre des tâches (Microsoft Learn, « Launch Windows Settings ») : interrupteur « Widgets ».</summary>
     internal const string TaskbarSettingsPage = "ms-settings:taskbar";
 
+    /// <summary>Paquet « Windows Web Experience Pack », qui porte les Widgets (nom relevé sur le PC du porteur le 1/11/2026).</summary>
+    private const string WidgetsPackage = "MicrosoftWindows.Client.WebExperience";
+
     private static string Category => T("Effets désactivés");
 
     /// <summary>Effets pilotés par SystemParametersInfo : code GET, libellé Windows, valeur attendue.</summary>
@@ -85,13 +88,13 @@ public sealed class VisualEffectsModule : IFixableModule
 
         var findings = new List<Finding>(RegistryRuleEvaluator.EvaluateAll(Rules.Value, context.Registry))
         {
-            DetectWidgets(context.Registry, context.Windows),
+            DetectWidgets(context.Registry, context.Packages, context.Windows),
             DetectMinimizeAnimation(context.SystemParameters),
         };
 
-        if (VisualEffectDefaults.Read(context.Registry, SpiSetters).Count > 0)
+        if (VisualEffectDefaults.Detect(context.Registry, context.SystemParameters, SpiSetters) is { } defaults)
         {
-            findings.Add(VisualEffectDefaults.Detect(context.Registry, context.SystemParameters, SpiSetters));
+            findings.Add(defaults);
         }
 
         foreach (var effect in SpiEffects)
@@ -189,14 +192,15 @@ public sealed class VisualEffectsModule : IFixableModule
     /// Les Widgets sont coupés soit par la stratégie <c>AllowNewsAndInterests</c> (Pro et plus), soit par <c>TaskbarDa</c>,
     /// que le pilote UCPD protège en écriture sur les builds récents.
     /// </summary>
-    private static Finding DetectWidgets(IRegistryReader registry, WindowsInfo windows)
+    private static Finding DetectWidgets(IRegistryReader registry, IPackageInventory packages, WindowsInfo windows)
     {
         var title = T("Widgets désactivés");
         try
         {
             var policy = registry.GetDword(RegistryHive.LocalMachine, @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests");
             var taskbar = registry.GetDword(RegistryHive.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarDa");
-            var disabled = policy == 0 || taskbar == 0;
+            var missing = IsWidgetsPackageMissing(packages);
+            var disabled = policy == 0 || taskbar == 0 || missing;
             return new Finding
             {
                 Id = "M06.widgets",
@@ -204,7 +208,7 @@ public sealed class VisualEffectsModule : IFixableModule
                 Category = T("Barre des tâches"),
                 Status = disabled ? FindingStatus.Ok : FindingStatus.Improvable,
                 Severity = Severity.Low,
-                Current = disabled ? T("désactivés") : T("actifs"),
+                Current = missing ? T("non installés") : disabled ? T("désactivés") : T("actifs"),
                 Expected = T("désactivés"),
                 Explanation = T("Le panneau Widgets charge du contenu en ligne en arrière-plan (actualités, météo, publicités)."),
                 Advice = disabled ? null : T("Désactiver les Widgets par la stratégie AllowNewsAndInterests (Pro et plus) ou dans Paramètres > Barre des tâches."),
@@ -215,6 +219,19 @@ public sealed class VisualEffectsModule : IFixableModule
         catch (MausAccessDeniedException)
         {
             return Finding.AdminRequired("M06.widgets", title, T("Barre des tâches"));
+        }
+    }
+
+    /// <summary>Vrai seulement si l'inventaire a répondu sans le paquet : illisible, les Widgets sont supposés présents.</summary>
+    private static bool IsWidgetsPackageMissing(IPackageInventory packages)
+    {
+        try
+        {
+            return !packages.GetUserPackages().Any(p => p.Name.Equals(WidgetsPackage, StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException or System.Runtime.InteropServices.COMException)
+        {
+            return false;
         }
     }
 

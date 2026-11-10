@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 
 namespace Maus.Core.Platform;
 
@@ -24,6 +25,28 @@ public static partial class SessionUser
 
         return !string.Equals(sessionUser, Environment.UserName, StringComparison.OrdinalIgnoreCase)
             || (!string.IsNullOrEmpty(sessionDomain) && !string.Equals(sessionDomain, Environment.UserDomainName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>SID de la personne assise devant l'écran ; à défaut, celui du compte du processus.</summary>
+    public static string? Sid()
+    {
+        var sessionUser = Query(UserName);
+        if (!string.IsNullOrEmpty(sessionUser))
+        {
+            try
+            {
+                var domain = Query(DomainName);
+                var account = string.IsNullOrEmpty(domain) ? new NTAccount(sessionUser) : new NTAccount(domain, sessionUser);
+                return account.Translate(typeof(SecurityIdentifier)).Value;
+            }
+            catch (SystemException ex) when (ex is IdentityNotMappedException or not OutOfMemoryException)
+            {
+                Diagnostics.Breadcrumbs.Add("compte de la session illisible (" + ex.GetType().Name + ")");
+            }
+        }
+
+        using var self = WindowsIdentity.GetCurrent();
+        return self.User?.Value;
     }
 
     private static string? Query(int infoClass)

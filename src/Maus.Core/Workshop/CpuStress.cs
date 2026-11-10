@@ -67,7 +67,7 @@ public static class CpuStress
     };
 
     /// <summary>Calcul d'un tour pour ce mode (le mélange du test processeur pour <see cref="CpuStressMode.Automatic"/>).</summary>
-    public static Func<ulong> Kernel(CpuStressMode mode) => mode == CpuStressMode.Automatic ? () => CpuTest.Round(0) : () => Round(mode);
+    public static Func<ulong> Kernel(CpuStressMode mode) => () => Round(mode);
 
     /// <summary>Un tour de charge déterministe pour ce mode ; un mode non pris en charge retombe sur SSE2.</summary>
     internal static ulong Round(CpuStressMode mode) => mode switch

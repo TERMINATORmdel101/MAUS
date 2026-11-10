@@ -2,6 +2,7 @@ using System.Text;
 using Maus.Core.Hardware;
 using Maus.Core.Modules.M08Bios;
 using Maus.Core.Platform;
+using Maus.Core.Reporting;
 using Microsoft.Win32;
 
 namespace Maus.Core.Tests.Modules.M08Bios;
@@ -17,12 +18,12 @@ public class BiosModuleTests
         Model = "MS-7B17",
         BoardManufacturer = MsiBoard,
         BoardProduct = "MPG Z390 GAMING PRO CARBON (MS-7B17)",
-        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12, 3700),
+        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12),
     };
 
     private static readonly HardwareProfile RaptorLake = MsiDesktop with
     {
-        Cpu = new CpuInfo("13th Gen Intel(R) Core(TM) i9-13900K", HardwareVendor.Intel, 24, 32, 3000),
+        Cpu = new CpuInfo("13th Gen Intel(R) Core(TM) i9-13900K", HardwareVendor.Intel, 24, 32),
     };
 
     [Fact]
@@ -104,6 +105,29 @@ public class BiosModuleTests
         Assert.Equal(Severity.High, microcode.Severity);
         Assert.Equal("0x11D", microcode.Current);
         Assert.Contains("000102331", microcode.Advice);
+    }
+
+    [Fact]
+    public async Task Raptor_lake_of_model_191_is_not_compared_to_0x12F()
+    {
+        var registry = Registry().Set(RegistryHive.LocalMachine, BiosModule.CpuKey, "Identifier", "Intel64 Family 6 Model 191 Stepping 5");
+
+        var findings = await Detect(Context(RaptorLake, registry: registry, microcode: [0x3E, 0x00, 0x00, 0x00]));
+
+        Assert.DoesNotContain(findings, f => f.Id == "M08.intel-microcode");
+        var microcode = Single(findings, "M08.microcode");
+        Assert.Equal(FindingStatus.Info, microcode.Status);
+        Assert.Equal("0x3E", microcode.Current);
+    }
+
+    [Fact]
+    public async Task Raptor_lake_of_model_183_stays_compared_to_0x12F()
+    {
+        var registry = Registry().Set(RegistryHive.LocalMachine, BiosModule.CpuKey, "Identifier", "Intel64 Family 6 Model 183 Stepping 1");
+
+        var findings = await Detect(Context(RaptorLake, registry: registry, microcode: [0x3E, 0x00, 0x00, 0x00]));
+
+        Assert.Equal(FindingStatus.Problem, Single(findings, "M08.intel-microcode").Status);
     }
 
     [Fact]
@@ -231,36 +255,271 @@ public class BiosModuleTests
         Assert.Equal(FindingStatus.Unknown, Single(legacy, "M08.dbdefault").Status);
     }
 
+    private const string VolumeId = @"\\?\Volume{11111111-2222-3333-4444-555555555555}\";
+    private const string KeyId = "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}";
+    private const string KeyIdShown = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE";
+
+    /// <summary>Disque système avec BitLocker, tel que Windows le décrit ; <paramref name="pin"/> : un protecteur TPM + PIN existe.</summary>
+    private static FakeCim Volume(uint protection, uint conversion, uint percent = 100, bool pin = false, string[]? recovery = null, FakeCim? cim = null)
+    {
+        var query = BitLockerState.VolumeQuery(VolumeId);
+        return (cim ?? BaseCim(new DateTime(2026, 5, 1)))
+            .Answer(BiosModule.BitLockerQuery, CimScopes.BitLocker,
+                new Dictionary<string, object?> { ["DeviceID"] = @"\\?\Volume{other}\", ["DriveLetter"] = "D:", ["ProtectionStatus"] = 0u, ["VolumeType"] = 1u },
+                new Dictionary<string, object?> { ["DeviceID"] = VolumeId, ["DriveLetter"] = "C:", ["ProtectionStatus"] = protection, ["VolumeType"] = 0u })
+            .AnswerMethod(query, BitLockerState.ConversionMethod,
+                new Dictionary<string, object?> { ["ConversionStatus"] = conversion, ["EncryptionPercentage"] = percent, ["ReturnValue"] = 0u },
+                CimScopes.BitLocker)
+            .AnswerMethod(query, BitLockerState.ProtectorsMethod, parameters => new Dictionary<string, object?>
+            {
+                ["ReturnValue"] = 0u,
+                ["VolumeKeyProtectorID"] = (uint)parameters!["KeyProtectorType"]! switch
+                {
+                    3 => recovery ?? [KeyId],
+                    4 when pin => ["{99999999-0000-0000-0000-000000000000}"],
+                    _ => Array.Empty<string>(),
+                },
+            }, CimScopes.BitLocker);
+    }
+
+    private static string AllTexts(Finding finding) =>
+        string.Join(' ', finding.Current, finding.Explanation, finding.Advice, finding.Callout, finding.SideNote, finding.ScreenOnlyNote);
+
     [Fact]
-    public async Task Bitlocker_active_gives_recovery_key_advice()
+    public async Task Bitlocker_active_says_a_key_exists_and_never_that_it_is_saved()
+    {
+        var findings = await Detect(Context(MsiDesktop, cim: Volume(1, 1)));
+
+        var bitlocker = Single(findings, "M08.bitlocker");
+        Assert.Equal(FindingStatus.Info, bitlocker.Status);
+        Assert.Equal("disque chiffré, protection active", bitlocker.Current);
+        Assert.Contains("Une clé de récupération existe", bitlocker.Advice);
+        Assert.Contains("vérifiez que vous l'avez", bitlocker.Advice);
+        Assert.Contains(BitLockerState.RecoveryKeyHelpUrl, bitlocker.Advice);
+        Assert.Contains(KeyIdShown, bitlocker.ScreenOnlyNote);
+        Assert.DoesNotContain(KeyIdShown, bitlocker.Advice);
+        Assert.DoesNotContain("sauvegardée", AllTexts(bitlocker), StringComparison.OrdinalIgnoreCase);
+        Assert.False(bitlocker.Fixable);
+    }
+
+    [Fact]
+    public async Task Bitlocker_only_calls_the_documented_reads_and_never_a_method_that_reads_the_key()
+    {
+        var cim = Volume(1, 1);
+
+        await Detect(Context(MsiDesktop, cim: cim));
+
+        Assert.Equal(
+            new[] { BitLockerState.ConversionMethod, BitLockerState.ProtectorsMethod },
+            cim.InvokedMethods.Distinct().Order(StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(2u, 37u, "partiellement chiffré (37 %), chiffrement en cours")]
+    [InlineData(3u, 37u, "partiellement chiffré (37 %), déchiffrement en cours")]
+    [InlineData(4u, 37u, "partiellement chiffré (37 %), chiffrement en pause")]
+    [InlineData(5u, 37u, "partiellement chiffré (37 %), déchiffrement en pause")]
+    [InlineData(1u, 100u, "disque chiffré, protection non active")]
+    [InlineData(0u, 0u, "disque non chiffré")]
+    public async Task Bitlocker_protection_off_tells_how_much_of_the_disk_is_encrypted(uint conversion, uint percent, string expected)
+    {
+        var findings = await Detect(Context(MsiDesktop, cim: Volume(0, conversion, percent)));
+
+        Assert.Equal(expected, Single(findings, "M08.bitlocker").Current);
+    }
+
+    [Fact]
+    public async Task Bitlocker_conversion_unread_does_not_claim_the_disk_is_clear()
     {
         var cim = BaseCim(new DateTime(2026, 5, 1))
-            .Answer(BiosModule.BitLockerQuery, CimScopes.BitLocker,
-                new Dictionary<string, object?> { ["DriveLetter"] = "D:", ["ProtectionStatus"] = 0u, ["VolumeType"] = 1u },
-                new Dictionary<string, object?> { ["DriveLetter"] = "C:", ["ProtectionStatus"] = 1u, ["VolumeType"] = 0u });
+            .Answer(BiosModule.BitLockerQuery, CimScopes.BitLocker, new Dictionary<string, object?> { ["DeviceID"] = VolumeId, ["DriveLetter"] = "C:", ["ProtectionStatus"] = 0u });
+
+        var bitlocker = Single(await Detect(Context(MsiDesktop, cim: cim)), "M08.bitlocker");
+
+        Assert.Contains("partiellement chiffré", bitlocker.Current);
+        Assert.Null(bitlocker.ScreenOnlyNote);
+    }
+
+    [Fact]
+    public async Task Bitlocker_without_recovery_password_says_so_without_inventing_a_key()
+    {
+        var bitlocker = Single(await Detect(Context(MsiDesktop, cim: Volume(1, 1, recovery: []))), "M08.bitlocker");
+
+        Assert.Contains("aucune clé de récupération", bitlocker.Advice);
+        Assert.DoesNotContain("Une clé de récupération existe", bitlocker.Advice);
+        Assert.Null(bitlocker.ScreenOnlyNote);
+    }
+
+    [Fact]
+    public async Task Bitlocker_callout_when_active_on_every_finding_that_talks_about_updating_the_bios()
+    {
+        var cim = Volume(1, 1, cim: BaseCim(new DateTime(2024, 6, 7)));
+
+        var findings = await Detect(Context(MsiDesktop, biosDate: new DateTime(2024, 6, 7), cim: cim));
+
+        foreach (var id in new[] { "M08.bitlocker", "M08.bios-age", "M08.update-method" })
+        {
+            var callout = Single(findings, id).Callout;
+            Assert.Contains("BitLocker est actif", callout);
+            Assert.Contains(BitLockerState.RecoveryKeyHelpUrl, callout);
+            Assert.Contains("manage-bde -protectors -disable C: -rc 2", callout);
+            Assert.Contains("MAUS ne suspend rien lui-même et ne touche pas au BIOS.", callout);
+            Assert.Contains("Sur un Windows modifié ou allégé, ce réglage peut être absent ou se comporter autrement : gardez d'abord votre clé.", callout);
+            Assert.DoesNotContain("TPM + PIN", callout);
+        }
+
+        Assert.Null(Single(findings, "M08.board").Callout);
+        Assert.DoesNotContain(findings, f => f.Fixable && f.Id == "M08.bitlocker");
+    }
+
+    [Fact]
+    public async Task Bitlocker_callout_is_stronger_with_a_tpm_and_pin_protector()
+    {
+        var callout = Single(await Detect(Context(MsiDesktop, cim: Volume(1, 1, pin: true))), "M08.bitlocker").Callout;
+
+        Assert.Contains("À faire absolument", callout);
+        Assert.Contains("TPM + PIN", callout);
+    }
+
+    [Fact]
+    public async Task Bitlocker_callout_absent_when_inactive()
+    {
+        var off = await Detect(Context(MsiDesktop, biosDate: new DateTime(2024, 6, 7), cim: Volume(0, 0, 0, cim: BaseCim(new DateTime(2024, 6, 7)))));
+        Assert.DoesNotContain(off, f => f.Callout is not null);
+        Assert.Null(Single(off, "M08.bitlocker").SideNote);
+        Assert.Null(Single(off, "M08.bitlocker").Advice);
+
+        var cim = BaseCim(new DateTime(2026, 5, 1))
+            .Throw(BiosModule.BitLockerQuery, new DataSourceUnavailableException("absent") { IsAbsent = true }, CimScopes.BitLocker);
+        var unavailable = await Detect(Context(MsiDesktop, cim: cim));
+        Assert.Equal("non disponible sur ce PC", Single(unavailable, "M08.bitlocker").Current);
+        Assert.DoesNotContain(unavailable, f => f.Callout is not null);
+    }
+
+    [Fact]
+    public async Task Bitlocker_is_not_read_when_windows_does_not_answer_and_keeps_the_callout()
+    {
+        // Délai, service WMI arrêté, fournisseur en panne : rien ne dit que BitLocker est absent.
+        var cim = BaseCim(new DateTime(2026, 5, 1))
+            .Throw(BiosModule.BitLockerQuery, new DataSourceUnavailableException("délai dépassé"), CimScopes.BitLocker);
 
         var findings = await Detect(Context(MsiDesktop, cim: cim));
 
         var bitlocker = Single(findings, "M08.bitlocker");
-        Assert.Equal(FindingStatus.Info, bitlocker.Status);
-        Assert.Equal("protection active", bitlocker.Current);
-        Assert.Contains("https://aka.ms/myrecoverykey", bitlocker.Advice);
-        Assert.True(bitlocker.Fixable);
+        Assert.Equal(FindingStatus.Unknown, bitlocker.Status);
+        Assert.Equal("non lu : Windows ne répond pas", bitlocker.Current);
+        Assert.Contains("n'a pas pu lire l'état de BitLocker", bitlocker.Callout);
+        Assert.Contains($"manage-bde -protectors -disable {BitLockerState.SystemDrive} -rc 2", bitlocker.Callout);
+        Assert.NotNull(Single(findings, "M08.update-method").Callout);
+        Assert.Null(bitlocker.SideNote);
     }
 
     [Fact]
-    public async Task Bitlocker_unavailable_or_off_is_informative()
+    public async Task Bitlocker_encrypted_disk_with_an_unknown_protection_state_does_not_say_inactive()
+    {
+        var bitlocker = Single(await Detect(Context(MsiDesktop, cim: Volume(2, 1))), "M08.bitlocker");
+
+        Assert.Equal("disque chiffré, état de la protection non lu", bitlocker.Current);
+        Assert.Contains("n'a pas pu lire l'état de BitLocker", bitlocker.Callout);
+    }
+
+    [Theory]
+    [InlineData("D:", "D:")]
+    [InlineData("e:", "E:")]
+    [InlineData("C:\\", "C:")]
+    [InlineData("", "C:")]
+    [InlineData(null, "C:")]
+    public void Bitlocker_drive_letter_is_checked_before_it_reaches_the_command(string? letter, string expected) =>
+        Assert.Equal(expected, BitLockerState.ValidDrive(letter));
+
+    [Fact]
+    public void Bitlocker_default_drive_is_the_system_drive()
+    {
+        var root = Path.GetPathRoot(Environment.SystemDirectory)!;
+
+        Assert.Equal(root[..2].ToUpperInvariant(), BitLockerState.SystemDrive);
+    }
+
+    [Fact]
+    public async Task Bitlocker_callout_stays_general_when_the_state_could_not_be_read()
     {
         var cim = BaseCim(new DateTime(2026, 5, 1))
-            .Throw(BiosModule.BitLockerQuery, new DataSourceUnavailableException("absent"), CimScopes.BitLocker);
-        var unavailable = await Detect(Context(MsiDesktop, cim: cim));
-        Assert.Equal("non disponible sur ce PC", Single(unavailable, "M08.bitlocker").Current);
+            .Throw(BiosModule.BitLockerQuery, new MausAccessDeniedException("refusé"), CimScopes.BitLocker);
 
-        var off = BaseCim(new DateTime(2026, 5, 1))
-            .Answer(BiosModule.BitLockerQuery, CimScopes.BitLocker, new Dictionary<string, object?> { ["DriveLetter"] = "C:", ["ProtectionStatus"] = 0u });
-        var findings = await Detect(Context(MsiDesktop, cim: off));
-        Assert.Equal("protection désactivée", Single(findings, "M08.bitlocker").Current);
-        Assert.False(Single(findings, "M08.bitlocker").Fixable);
+        var findings = await Detect(Context(MsiDesktop, cim: cim));
+
+        var bitlocker = Single(findings, "M08.bitlocker");
+        Assert.Equal(FindingStatus.Unknown, bitlocker.Status);
+        Assert.Contains("droits administrateur", bitlocker.Explanation);
+        Assert.Contains("n'a pas pu lire l'état de BitLocker", bitlocker.Callout);
+        Assert.Contains("S'il est actif", bitlocker.Callout);
+        Assert.DoesNotContain("BitLocker est actif sur ce disque", bitlocker.Callout);
+        Assert.NotNull(Single(findings, "M08.update-method").Callout);
+        Assert.Null(bitlocker.SideNote);
+        Assert.Null(bitlocker.ScreenOnlyNote);
+    }
+
+    [Fact]
+    public async Task Bitlocker_choice_note_informs_without_acting()
+    {
+        var bitlocker = Single(await Detect(Context(MsiDesktop, cim: Volume(1, 1))), "M08.bitlocker");
+
+        Assert.Contains("c'est votre choix", bitlocker.SideNote);
+        Assert.Contains("MAUS ne désactive rien lui-même", bitlocker.SideNote);
+        Assert.Contains("quelqu'un qui emporte le PC ou le disque lit les fichiers", bitlocker.SideNote);
+        Assert.Contains("déconseillé sur un portable", bitlocker.SideNote);
+        Assert.Contains("c'est long et le PC doit rester allumé", bitlocker.SideNote);
+        Assert.Contains(BitLockerState.DisableProcedureUrl, bitlocker.SideNote);
+        Assert.DoesNotMatch(@"\d\s*%", bitlocker.SideNote);
+        Assert.False(bitlocker.Fixable);
+        Assert.Equal(FindingStatus.Info, bitlocker.Status);
+    }
+
+    [Fact]
+    public async Task Bitlocker_key_identifier_stays_out_of_every_export_but_reaches_the_screen()
+    {
+        var findings = await Detect(Context(MsiDesktop, cim: Volume(1, 1)));
+        var module = new ModuleResult("M08", "BIOS", findings, TimeSpan.Zero);
+        var report = AuditReport.Create(Context(MsiDesktop), [module]);
+        var privacy = new PrivacyFilter(null, null, null);
+        var text = new StringWriter();
+
+        TextReport.Write(report, text, useColor: false);
+
+        Assert.DoesNotContain(KeyIdShown, text.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(KeyIdShown, report.ToJson(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(KeyIdShown, report.ToJson(privacy), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(KeyIdShown, FindingsCsv.Build(report, privacy), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(KeyIdShown, HtmlReport.Build(new HtmlReportInput { After = report }), StringComparison.OrdinalIgnoreCase);
+
+        // Le moteur la transmet bien à l'interface : le masquage ne vaut que pour les fichiers.
+        var bitlocker = Single(findings, "M08.bitlocker");
+        var sent = Maus.Core.Engine.Broker.EngineProtocol.FromElement<Finding>(Maus.Core.Engine.Broker.EngineProtocol.ToElement(bitlocker));
+        Assert.Contains(KeyIdShown, sent!.ScreenOnlyNote);
+    }
+
+    [Fact]
+    public async Task Bitlocker_suspend_step_reaches_every_readable_report_but_never_the_key_identifier()
+    {
+        var findings = await Detect(Context(MsiDesktop, cim: Volume(1, 1)));
+        var module = new ModuleResult("M08", "BIOS", findings, TimeSpan.Zero);
+        var report = AuditReport.Create(Context(MsiDesktop), [module]);
+        var privacy = new PrivacyFilter(null, null, null);
+        var text = new StringWriter();
+        TextReport.Write(report, text, useColor: false);
+        var html = HtmlReport.Build(new HtmlReportInput { After = report, Privacy = privacy });
+        var csv = FindingsCsv.Build(report, privacy);
+
+        foreach (var written in new[] { text.ToString(), html, csv })
+        {
+            Assert.Contains("manage-bde -protectors -disable C: -rc 2", written, StringComparison.Ordinal);
+            Assert.Contains("MAUS ne suspend rien lui-m", written, StringComparison.Ordinal);
+            Assert.Contains(BitLockerState.DisableProcedureUrl, written, StringComparison.Ordinal);
+            Assert.DoesNotContain(KeyIdShown, written, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Une ligne par constat dans le tableau : l'encadré reste dans la cellule du conseil.
+        Assert.Equal(report.Modules.Sum(m => m.Findings.Count) + 1, csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Length);
     }
 
     [Fact]
@@ -286,7 +545,7 @@ public class BiosModuleTests
             FormFactor = FormFactor.Laptop,
             Manufacturer = "LENOVO",
             Model = "21K5",
-            Cpu = new CpuInfo("AMD Ryzen 7 7840U", HardwareVendor.Amd, 8, 16, 3300),
+            Cpu = new CpuInfo("AMD Ryzen 7 7840U", HardwareVendor.Amd, 8, 16),
         };
         var cim = BaseCim(new DateTime(2026, 1, 1), boardManufacturer: "LENOVO", boardProduct: "21K5CTO1WW");
 

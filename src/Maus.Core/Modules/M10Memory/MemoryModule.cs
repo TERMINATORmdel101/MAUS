@@ -102,12 +102,12 @@ public sealed partial class MemoryModule : IAuditModule
                 Id = SpeedId,
                 Title = SpeedTitle,
                 Category = SpeedCategory,
-                Status = aboveJedec ? FindingStatus.Ok : FindingStatus.Unknown,
+                Status = aboveJedec ? FindingStatus.Info : FindingStatus.Unknown,
                 Current = $"{configured} MT/s",
                 Expected = T("vitesse annoncée par la référence"),
                 Explanation = aboveJedec
-                    ? T("La mémoire tourne au-delà de la vitesse standard JEDEC maximale ({0} MT/s en DDR{1}) : " +
-                      "un profil XMP/EXPO ou un réglage manuel est donc actif.", maxJedec, generation)
+                    ? T("La mémoire tourne au-delà des vitesses standard courantes ({0} MT/s en DDR{1}) : " +
+                      "un profil XMP/EXPO ou un réglage manuel est probablement actif.", maxJedec, generation)
                     : T("Référence non reconnue ({0}) : impossible de connaître la vitesse annoncée. " +
                       "MAUS ne conclut jamais que XMP/EXPO est désactivé sans la connaître.", Quote(unknownParts)),
                 Advice = aboveJedec ? null : T("Comparez avec la vitesse inscrite sur l'étiquette de la barrette ou sur la facture (par exemple DDR4-3200 ou DDR5-6000)."),
@@ -133,7 +133,9 @@ public sealed partial class MemoryModule : IAuditModule
             return Speed(FindingStatus.Ok, Severity.Low, $"{configured} MT/s", expected,
                 (allJedec
                     ? T("Barrettes standard (JEDEC) : elles tournent à leur vitesse nominale sans profil à activer.")
-                    : T("La mémoire tourne à la vitesse annoncée : le profil XMP/EXPO est actif.")) + partial);
+                    : slowest.Part.IsJedec
+                        ? T("La barrette la plus lente fixe la vitesse, et elle est standard (JEDEC) : aucun profil n'est nécessaire.")
+                        : T("La mémoire tourne à la vitesse annoncée : le profil XMP/EXPO est actif.")) + partial);
         }
 
         if (allJedec)
@@ -167,7 +169,7 @@ public sealed partial class MemoryModule : IAuditModule
             Current = T("{0} MT/s (vitesse standard JEDEC)", configured),
             Expected = expected,
             Explanation = T("Votre mémoire est vendue pour {0} MT/s mais fonctionne à {1} MT/s : sans profil XMP ou EXPO, " +
-                "elle démarre à sa vitesse standard. Le gain d'un profil est souvent de quelques pour cent, parfois plus de 10 % dans les jeux limités par le processeur ; il varie selon les jeux et les applications.", rated, configured) + partial,
+                "elle démarre à sa vitesse standard. Le gain dépend des jeux et des applications : le benchmark de l'Atelier, lancé avant puis après, le mesure sur votre PC.", rated, configured) + partial,
             Advice = ProfileAdvice(hardware, generation),
         };
     }
@@ -222,6 +224,12 @@ public sealed partial class MemoryModule : IAuditModule
         var explanation = T("Le processeur lit la mémoire par deux canaux en parallèle. Avec une seule barrette, ou deux sur le même canal, la bande passante " +
             "est divisée par deux : c'est très pénalisant pour une puce graphique intégrée (iGPU ou APU) et sensible dans les jeux.");
         var slots = string.Join(", ", dimms.Select(d => d.Slot));
+        if (hardware.IsVirtualMachine)
+        {
+            return Channel(FindingStatus.Info, Severity.Info, T("mémoire virtuelle : canaux sans objet"), null,
+                T("Ce PC est une machine virtuelle : ses barrettes sont simulées, leur répartition entre canaux ne dit rien du matériel réel."));
+        }
+
         if (dimms.Any(d => MemorySpeeds.IsLowPower(d.SmbiosType)))
         {
             return Channel(FindingStatus.Info, Severity.Info, T("mémoire soudée ({0} puce(s) déclarée(s))", dimms.Count), null,
@@ -281,7 +289,7 @@ public sealed partial class MemoryModule : IAuditModule
         }
 
         const string id = "M10.mixed-kit";
-        const string title = "Barrettes identiques";
+        var title = T("Barrettes identiques");
         var parts = dimms.Select(d => d.PartNumber).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var capacities = dimms.Select(d => d.CapacityBytes).OfType<long>().Distinct().ToList();
         var mixed = parts.Count > 1 || capacities.Count > 1;
@@ -454,6 +462,7 @@ public sealed partial class MemoryModule : IAuditModule
             var part = MemoryPartDecoder.Decode(partNumber);
             var smbiosType = row.GetInt64("SMBIOSMemoryType");
             var generation = MemorySpeeds.Generation(smbiosType) ?? part?.Generation;
+            var speeds = MemorySpeeds.FromRow(row, generation);
             return new Dimm(
                 index,
                 locator ?? bank ?? $"n° {index}",
@@ -461,16 +470,13 @@ public sealed partial class MemoryModule : IAuditModule
                 row.GetInt64("Capacity"),
                 smbiosType,
                 generation,
-                ToSpeed(row.GetInt64("ConfiguredClockSpeed"), generation),
-                ToSpeed(row.GetInt64("Speed"), generation),
+                speeds.Configured,
+                speeds.Rated,
                 partNumber,
                 Clean(row.GetString("Manufacturer")),
                 DimmSlotParser.ChannelOf(locator, bank),
                 part);
         }
-
-        private static int? ToSpeed(long? raw, int? generation) =>
-            raw is > 0 and < 100_000 ? MemorySpeeds.ToTransfersPerSecond(generation, (int)raw.Value) : null;
 
         /// <summary>Retire les espaces de remplissage et les valeurs vides laissées par certains BIOS.</summary>
         private static string? Clean(string? value)
@@ -481,6 +487,7 @@ public sealed partial class MemoryModule : IAuditModule
                 || trimmed.Equals("Undefined", StringComparison.OrdinalIgnoreCase)
                 || trimmed.Equals("Not Specified", StringComparison.OrdinalIgnoreCase)
                 || trimmed.All(c => c == '0')
+                || System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^(?:Array\d+_PartNumber\d+|PartNum\d+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
                     ? null
                     : trimmed;
         }

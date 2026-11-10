@@ -20,7 +20,10 @@ public sealed class PawnIoSpdSource : ISpdSource
     /// <summary>Verrou partagé par les outils de surveillance pour ne pas se marcher dessus sur le bus SMBus.</summary>
     private const string SmbusMutexName = @"Global\Access_SMBUS.HTP.Method";
 
-    /// <summary>Attente maximale du bus : au-delà, un autre programme le garde et la lecture ramperait (2 s par octet).</summary>
+    /// <summary>Verrou que la détection des bus prend aussi : la bibliothèque l'attendrait sans limite.</summary>
+    private const string PciMutexName = @"Global\Access_PCI";
+
+    /// <summary>Attente maximale du bus : au-delà, un autre programme le garde, et la bibliothèque l'attendrait sans limite à chaque octet.</summary>
     private static readonly TimeSpan BusWait = TimeSpan.FromSeconds(10);
 
     /// <summary>Attente maximale d'une lecture des puces (celle qu'on lance ou celle déjà en cours).</summary>
@@ -30,7 +33,8 @@ public sealed class PawnIoSpdSource : ISpdSource
 
     /// <summary>
     /// Lecture partagée : « Mon PC » et « Mémoire » attendent la même, et le résultat sert jusqu'à la fermeture de MAUS
-    /// (les barrettes ne changent pas sans redémarrer le PC). Une lecture qui a échoué est refaite à la demande suivante.
+    /// (les barrettes ne changent pas sans redémarrer le PC). Une lecture qui a échoué, n'a rien trouvé ou a rendu une puce
+    /// abîmée est refaite à la demande suivante.
     /// </summary>
     private static Task<List<SpdImage>>? s_read;
 
@@ -39,7 +43,7 @@ public sealed class PawnIoSpdSource : ISpdSource
         Task<List<SpdImage>> read;
         lock (ReadGate)
         {
-            if (s_read is null || s_read.IsFaulted || s_read.IsCanceled)
+            if (s_read is null || s_read.IsFaulted || s_read.IsCanceled || (s_read.IsCompletedSuccessfully && !IsComplete(s_read.Result)))
             {
                 s_read = Task.Run(ReadLocked);
             }
@@ -62,17 +66,19 @@ public sealed class PawnIoSpdSource : ISpdSource
         return read.Result;
     }
 
+    /// <summary>Une lecture vide ou dont une puce a une somme de contrôle fausse n'est pas gardée : un octet mal lu ne dit rien.</summary>
+    internal static bool IsComplete(IReadOnlyList<SpdImage> images) =>
+        images.Count > 0 && images.All(image => SpdDecoder.Decode(image) is { ChecksumOk: true });
+
     private static List<SpdImage> ReadLocked()
     {
-        // Le verrou du bus d'abord : la bibliothèque de lecture le reprend à chaque octet, sans l'attendre plus de 2 secondes ;
-        // le tenir nous-mêmes pendant toute la lecture évite qu'elle rampe si un autre programme s'en sert.
+        // Le verrou du bus d'abord : la bibliothèque de lecture le reprend à chaque octet et l'attendrait sans limite ;
+        // le tenir nous-mêmes pendant toute la lecture borne cette attente, et un verrou se reprend sans attendre sur le même fil.
         using var smbus = OpenMutex(SmbusMutexName);
         var locked = TryAcquire(smbus, BusWait);
         if (smbus is not null && !locked)
         {
-            throw new SmbusBusyException(Platform.SingleInstance.OtherInterfaceProcesses() > 0
-                ? T("Le bus des barrettes est gardé par un autre MAUS qui tourne encore, peut-être sans fenêtre visible (une ancienne version restée ouverte). Fermez-le : Gestionnaire des tâches, onglet Détails, « MAUS.exe », Fin de tâche ; puis relancez la lecture.")
-                : T("Le bus des barrettes est occupé par un autre programme (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère…). Fermez-le, puis relancez la lecture."));
+            throw new SmbusBusyException(T("Le bus des barrettes est occupé par un autre programme (une autre fenêtre de MAUS, HWiNFO, CPU-Z, un logiciel d'éclairage RGB ou de la carte mère…). Fermez-le, puis relancez la lecture."));
         }
 
         // Horloge système à 1 ms pendant la lecture : la bibliothèque attend chaque échange par pauses de 0,25 ms, que
@@ -85,7 +91,7 @@ public sealed class PawnIoSpdSource : ISpdSource
             if (SMBusManager.RegisteredSMBuses.Count == 0)
             {
                 Step("bus SMBus : détection");
-                SMBusManager.DetectSMBuses();
+                DetectBuses();
             }
 
             Step($"bus SMBus : {SMBusManager.RegisteredSMBuses.Count} trouvé(s)");
@@ -99,7 +105,11 @@ public sealed class PawnIoSpdSource : ISpdSource
                         continue;
                     }
 
-                    var length = accessor.MemoryType() is SPDMemoryType.SPD_DDR5_SDRAM or SPDMemoryType.SPD_LPDDR5_SDRAM ? 1024 : 512;
+                    // « SPD Write Disable » actif (BIOS Intel) : la bibliothèque changerait de page par un appel de procédure, que
+                    // le garde-fou refuse et qu'elle ne signale pas. Seul le début de la puce est alors lisible.
+                    var ddr5 = accessor.MemoryType() is SPDMemoryType.SPD_DDR5_SDRAM or SPDMemoryType.SPD_LPDDR5_SDRAM;
+                    var firstPageOnly = ddr5 && bus.HasSPDWriteProtection;
+                    var length = firstPageOnly ? SpdDecoder.FirstPageBytes : ddr5 ? 1024 : 512;
                     Step($"barrette à l'adresse 0x{address:X2} : lecture de {length} octets");
                     var bytes = new byte[length];
                     for (var i = 0; i < length; i++)
@@ -107,7 +117,15 @@ public sealed class PawnIoSpdSource : ISpdSource
                         bytes[i] = accessor.At((ushort)i);
                     }
 
-                    images.Add(new SpdImage(accessor.Index, bytes, Safe(accessor.GetModuleManufacturerString), Safe(accessor.GetDRAMManufacturerString)));
+                    images.Add(firstPageOnly
+                        ? new SpdImage(accessor.Index, bytes, FirstPageOnly: true)
+                        : new SpdImage(accessor.Index, bytes, Safe(accessor.GetModuleManufacturerString), Safe(accessor.GetDRAMManufacturerString)));
+                    // Page 0 remise maintenant, sous le verrou : le finaliseur de la bibliothèque ne tourne pas à la fermeture, et il
+                    // attendrait le verrou du bus sans limite.
+                    _ = accessor.At(0);
+#pragma warning disable CA1816
+                    GC.SuppressFinalize(accessor);
+#pragma warning restore CA1816
                     Step($"barrette à l'adresse 0x{address:X2} : lue");
                 }
             }
@@ -123,13 +141,37 @@ public sealed class PawnIoSpdSource : ISpdSource
         }
     }
 
-    /// <summary>Journal des étapes (diagnostic), fourni par l'appelant ; rien par défaut.</summary>
-    public static Action<string>? StepLog { get; set; }
+    private static void Step(string step) => Diagnostics.Breadcrumbs.Add("mémoire : " + step);
 
-    private static void Step(string step)
+    /// <summary>
+    /// Détection des bus, sous le verrou PCI qu'elle prend aussi (attente bornée ici). Aucun bus et un module refusé par le
+    /// pilote : la vraie raison remonte, au lieu d'une liste vide.
+    /// </summary>
+    private static void DetectBuses()
     {
-        Diagnostics.Breadcrumbs.Add(step);
-        StepLog?.Invoke(step);
+        using var pci = OpenMutex(PciMutexName);
+        var locked = TryAcquire(pci, BusWait);
+        if (pci is not null && !locked)
+        {
+            throw new SmbusBusyException(T("Le bus PCI est gardé par un autre programme de surveillance : fermez-le, puis relancez la lecture."));
+        }
+
+        try
+        {
+            SMBusManager.DetectSMBuses();
+        }
+        finally
+        {
+            if (locked)
+            {
+                pci!.ReleaseMutex();
+            }
+        }
+
+        if (SMBusManager.RegisteredSMBuses.Count == 0 && DriverManager.Driver is SpdBusDriver { LastFailure: { } failure })
+        {
+            throw new InvalidOperationException(failure);
+        }
     }
 
     /// <summary>Pilote SMBus de MAUS (modules PawnIO officiels, écritures filtrées), chargé une fois par session.</summary>
@@ -203,6 +245,12 @@ public sealed class PawnIoSmnReader : ISmnReader, IDisposable
     public uint Read(uint address)
     {
         var locked = PawnIoSpdSource.TryAcquire(_pci, TimeSpan.FromSeconds(5));
+        if (_pci is not null && !locked)
+        {
+            // Adresse puis valeur : deux accès que personne ne doit couper, sinon la valeur est fausse.
+            throw new SmbusBusyException(T("Le bus PCI est gardé par un autre programme de surveillance : fermez-le, puis relancez la lecture."));
+        }
+
         try
         {
             return _module.ReadSmn(address);
@@ -253,15 +301,12 @@ public sealed class PawnIoPmTableReader : IPmTableReader, IDisposable
 /// </summary>
 public static class PawnIoMemoryDetails
 {
-    /// <summary>
-    /// Lit la fiche mémoire. <paramref name="log"/> reçoit chaque étape (journal de diagnostic
-    /// <c>%LOCALAPPDATA%\MAUS\logs\lecture-memoire.txt</c>, utile si une lecture bloque).
-    /// </summary>
+    /// <summary>Lit la fiche mémoire. <paramref name="log"/> reçoit chaque étape (traces de diagnostic, utiles si une lecture bloque).</summary>
+    /// <param name="windowsMemoryType">Type de mémoire déclaré par le BIOS à Windows, si connu : il sert quand aucune puce SPD n'est lue.</param>
     /// <param name="windowsSpeedMts">Vitesse appliquée que le BIOS déclare à Windows, pour contrôler l'horloge du contrôleur Intel.</param>
-    public static MemoryDetailReport Read(CpuIdInfo? cpu, bool? ddr5Hint, Action<string>? log = null, int? windowsSpeedMts = null)
+    public static MemoryDetailReport Read(CpuIdInfo? cpu, string? windowsMemoryType, Action<string>? log = null, int? windowsSpeedMts = null)
     {
         log ??= _ => { };
-        PawnIoSpdSource.StepLog = log;
         log($"processeur : {cpu?.Vendor} famille 0x{cpu?.Family:X} modèle 0x{cpu?.Model:X2}");
         ISpdSource spd = new LoggedSpdSource(new PawnIoSpdSource(), log);
         if (cpu is { IsIntel: true })
@@ -272,19 +317,19 @@ public static class PawnIoMemoryDetails
                 () => Logged(log, "module IntelMCHBAR", () => new PawnIoMchbarReader()),
                 () => Logged(log, "module IntelMSR", () => new PawnIoMsrReader()),
                 windowsSpeedMts);
-            var report = MemoryDetails.Read(spd, null, null, ddr5Hint, intel);
+            var report = MemoryDetails.Read(spd, null, null, windowsMemoryType, intel);
             log($"contrôleur Intel : {(report.Intel is { } i ? $"{i.Timings.Count} timings, canaux {string.Join(",", i.Channels)}" : "non lu")}");
             return report;
         }
 
         if (cpu is not { IsAmd: true, Family: >= 0x17 })
         {
-            return MemoryDetails.Read(spd, null, null, ddr5Hint);
+            return MemoryDetails.Read(spd, null, null, windowsMemoryType);
         }
 
         using var smn = Logged(log, "module AMDFamily17", () => new PawnIoSmnReader());
         using var pm = Logged(log, "module RyzenSMU", () => new PawnIoPmTableReader());
-        return MemoryDetails.Read(spd, smn, pm, ddr5Hint);
+        return MemoryDetails.Read(spd, smn, pm, windowsMemoryType);
     }
 
     private static T Logged<T>(Action<string> log, string step, Func<T> open)
@@ -323,7 +368,4 @@ public static class PawnIoMemoryDetails
             }
         }
     }
-
-    /// <summary>Message si PawnIO manque : la fiche détaillée en a besoin.</summary>
-    public static string DriverRequired => T("La fiche mémoire détaillée lit la puce SPD des barrettes et les registres du contrôleur mémoire : il faut le pilote PawnIO (Atelier, En direct) et MAUS en administrateur.");
 }

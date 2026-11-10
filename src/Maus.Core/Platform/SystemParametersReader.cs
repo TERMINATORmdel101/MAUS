@@ -37,12 +37,20 @@ public sealed partial class Win32SystemParametersReader : ISystemParametersReade
 
     public bool? GetMinimizeAnimation()
     {
-        var info = new AnimationInfo { Size = (uint)Marshal.SizeOf<AnimationInfo>() };
-        return SystemParametersInfoW(SpiGet.Animation, info.Size, ref info, 0) ? info.MinAnimate != 0 : null;
+        var info = new SpiAnimation.AnimationInfo { Size = (uint)Marshal.SizeOf<SpiAnimation.AnimationInfo>() };
+        return SpiAnimation.SystemParametersInfoW(SpiGet.Animation, info.Size, ref info, 0) ? info.MinAnimate != 0 : null;
     }
 
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SystemParametersInfoW(uint action, uint param, ref int value, uint winIni);
+}
+
+/// <summary>Structure <c>ANIMATIONINFO</c> et déclaration de <c>SystemParametersInfoW</c> qui la prend, communes à la lecture et à l'écriture.</summary>
+internal static partial class SpiAnimation
+{
     [StructLayout(LayoutKind.Sequential)]
-    private struct AnimationInfo
+    internal struct AnimationInfo
     {
         public uint Size;
         public int MinAnimate;
@@ -50,9 +58,5 @@ public sealed partial class Win32SystemParametersReader : ISystemParametersReade
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SystemParametersInfoW(uint action, uint param, ref int value, uint winIni);
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SystemParametersInfoW(uint action, uint param, ref AnimationInfo value, uint winIni);
+    internal static partial bool SystemParametersInfoW(uint action, uint param, ref AnimationInfo value, uint winIni);
 }

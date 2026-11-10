@@ -5,6 +5,7 @@ using Maus.App.Appearance;
 using Maus.Core;
 using Maus.Core.Diagnostics;
 using Maus.Core.Preferences;
+using Maus.Core.Reporting;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels;
@@ -12,12 +13,34 @@ namespace Maus.App.ViewModels;
 /// <summary>Une ligne de la carte « Votre PC en un coup d'œil » : composant, nom lu par l'audit et couleur d'état.</summary>
 public sealed record GlanceItem(string Label, string Value, Tone Tone, string Icon)
 {
-    public string AccessibleName => Label + " : " + Value;
+    public override string ToString() => AccessibleName;
+
+    public string AccessibleName => Label + " : " + Value + " · " + State;
+
+    /// <summary>L'état en mot et en pictogramme : la couleur n'est jamais le seul signal.</summary>
+    public string State => Labels.Of(Status);
+
+    public string StateIcon => StatusGlyphs.Of(Status);
+
+    private FindingStatus Status => Tone switch
+    {
+        Tone.Rose => FindingStatus.Problem,
+        Tone.Sand => FindingStatus.Warning,
+        Tone.Blue => FindingStatus.Improvable,
+        Tone.Mint => FindingStatus.Ok,
+        _ => FindingStatus.Unknown,
+    };
+}
+
+/// <summary>Une correction proposée sous le score : ce qu'elle rapporte, et le bouton qui la coche.</summary>
+public sealed record BestFixRow(string Title, string Gain, System.Windows.Input.ICommand Fix)
+{
+    public override string ToString() => Title;
 }
 
 /// <summary>
-/// Accueil simple ou complet (0.8.4, demande du porteur « moins chargé, plus joli ») : choix d'affichage seulement, rien
-/// n'est retiré ; score qui se remplit à la fin de l'audit ; « Quoi de neuf » en carte ; carte « Votre PC en un coup d'œil »
+/// Accueil simple, ou complet en mode technicien (0.8.6, un seul interrupteur) : rien n'est retiré, seulement rangé dans
+/// l'Atelier, les Corrections et la barre de gauche ; score qui se remplit à la fin de l'audit ; « Quoi de neuf » en carte ; carte « Votre PC en un coup d'œil »
 /// faite avec ce que l'audit a déjà lu (aucune nouvelle lecture du système).
 /// </summary>
 public sealed partial class MainViewModel
@@ -25,10 +48,9 @@ public sealed partial class MainViewModel
     private const int ScoreAnimationMilliseconds = 900;
     private double _displayedScore = -1;
     private DispatcherTimer? _scoreTimer;
-    private bool _appearanceHooked;
-    private bool _homeComplete = AppearanceManager.Current.HomeComplete;
+    private bool _homeComplete = AppearanceManager.Current.TechnicianMode;
 
-    /// <summary>Accueil complet (toutes les cartes, comme avant) ; sinon l'accueil simple recommandé.</summary>
+    /// <summary>Accueil complet (toutes les cartes), réservé au mode technicien ; sinon l'accueil simple.</summary>
     public bool IsHomeComplete => _homeComplete;
 
     public bool IsHomeSimple => !IsHomeComplete;
@@ -42,35 +64,14 @@ public sealed partial class MainViewModel
     /// <summary>Cartes d'outils sur une ligne : trois dans l'accueil simple, quatre dans le complet.</summary>
     public int ToolColumns => IsHomeComplete ? 4 : 3;
 
-    /// <summary>« Plus d'outils » ouvert ; l'état est gardé d'une ouverture de MAUS à l'autre.</summary>
-    public bool IsMoreToolsOpen
-    {
-        get => AppearanceManager.Current.HomeMoreToolsOpen;
-        set
-        {
-            if (value != IsMoreToolsOpen)
-            {
-                AppearanceManager.Remember(AppearanceManager.Current with { HomeMoreToolsOpen = value });
-                SaveDisplayChoice(p => p with { HomeMoreToolsOpen = value });
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    /// <summary>Score affiché (anneau et chiffre) : il monte jusqu'au score à la fin de l'audit, sauf si les animations sont coupées.</summary>
-    public double DisplayedScore => _displayedScore;
+    /// <summary>
+    /// Score affiché (anneau et chiffre) : il monte jusqu'au score à la fin de l'audit, sauf si les animations sont coupées.
+    /// Avant tout audit dans cette fenêtre : celui du dernier audit gardé, en gris (<see cref="IsPastScore"/>), ou rien.
+    /// </summary>
+    public double DisplayedScore => HasScore ? _displayedScore : _pastScore;
 
     /// <summary>Tant que les choix d'affichage changent ailleurs (Paramètres), l'accueil suit.</summary>
-    private void HookAppearance()
-    {
-        if (_appearanceHooked)
-        {
-            return;
-        }
-
-        _appearanceHooked = true;
-        AppearanceManager.Changed += OnAppearanceChanged;
-    }
+    private void HookAppearance() => AppearanceManager.Changed += OnAppearanceChanged;
 
     private void UnhookAppearance()
     {
@@ -80,8 +81,8 @@ public sealed partial class MainViewModel
 
     private void OnAppearanceChanged(object? sender, EventArgs e)
     {
-        _homeComplete = AppearanceManager.Current.HomeComplete;
-        foreach (var name in new[] { nameof(IsHomeComplete), nameof(IsHomeSimple), nameof(ShowSeeFindingsButton), nameof(ShowRerunButton), nameof(ToolColumns), nameof(IsMoreToolsOpen) })
+        _homeComplete = AppearanceManager.Current.TechnicianMode;
+        foreach (var name in new[] { nameof(IsHomeComplete), nameof(IsHomeSimple), nameof(ShowSeeFindingsButton), nameof(ShowRerunButton), nameof(ToolColumns), nameof(ShowDriverCard) })
         {
             OnPropertyChanged(name);
         }
@@ -101,6 +102,82 @@ public sealed partial class MainViewModel
         }).Forget("accueil : enregistrement d'un choix d'affichage");
 
     /// <summary>Fait monter le score affiché jusqu'au nouveau score (environ une seconde, en ralentissant à la fin).</summary>
+    /// <summary>Les corrections qui rapportent le plus, calculées sur le dernier audit.</summary>
+    public ObservableCollection<BestFixRow> BestFixes { get; } = [];
+
+    public bool HasBestFixes => BestFixes.Count > 0;
+
+    /// <summary>« 64 → 71 (+7) » après des corrections ; vide dès l'audit suivant.</summary>
+    public string ScoreDeltaText { get; private set; } = string.Empty;
+
+    public bool HasScoreDelta => ScoreDeltaText.Length > 0;
+
+    /// <summary>Audit complet, et ni constat à traiter ni contrôle indéterminé.</summary>
+    public bool IsAllGreen { get; private set; }
+
+    /// <summary>État des pilotes graphiques en une ligne ; vide si l'audit n'en a lu aucun.</summary>
+    public string DriverLine { get; private set; } = string.Empty;
+
+    public bool ShowDriverCard => IsHomeComplete && DriverLine.Length > 0;
+
+    /// <summary>Page officielle du fabricant, donnée par le constat d'un pilote à vérifier.</summary>
+    public Uri? DriverPage { get; private set; }
+
+    public bool HasDriverPage => DriverPage is not null;
+
+    private ICommand? _openDriverPage;
+
+    public ICommand OpenDriverPageCommand => _openDriverPage ??= new AsyncCommand(() =>
+    {
+        if (DriverPage is { } page)
+        {
+            ShellLauncher.OpenUrl(page);
+        }
+    });
+
+    /// <summary>Corrections à proposer, état des pilotes et « tout est vert » après un audit ou un changement de constat.</summary>
+    private void RefreshHomeInsights()
+    {
+        BestFixes.Clear();
+        foreach (var gain in HealthScore.BestGains(_results, f => ChangesFor(f).Any()))
+        {
+            var finding = gain.Finding;
+            BestFixes.Add(new BestFixRow(
+                finding.Title,
+                gain.Points switch
+                {
+                    1 => T("environ +1 point"),
+                    > 0 => T("environ +{0} points", gain.Points),
+                    _ => T("à corriger pour lever le plafond du score"),
+                },
+                new AsyncCommand(() =>
+                {
+                    ((IFindingActions)this).Fix(finding);
+                })));
+        }
+
+        var findings = _results.SelectMany(r => r.Findings).ToList();
+        DriverLine = HealthScore.DriverLine(findings) ?? string.Empty;
+        DriverPage = findings
+            .Where(f => f.Id.StartsWith("M09.driver.", StringComparison.Ordinal) && f.Status != FindingStatus.Ok)
+            .Select(f => LinkText.FirstLink(f.Advice))
+            .FirstOrDefault(link => link is not null);
+        IsAllGreen = HasAudit && !IsScorePartial && NothingToHandle && findings.All(f => f.Status != FindingStatus.Unknown);
+        ScoreDeltaText = string.Empty;
+        foreach (var name in new[] { nameof(HasBestFixes), nameof(DriverLine), nameof(ShowDriverCard), nameof(DriverPage), nameof(HasDriverPage), nameof(IsAllGreen), nameof(ScoreDeltaText), nameof(HasScoreDelta) })
+        {
+            OnPropertyChanged(name);
+        }
+    }
+
+    /// <summary>Après des corrections : montre le passage d'un score à l'autre à côté de l'anneau, qui avance déjà de lui-même.</summary>
+    private void ShowScoreDelta(int before, int after)
+    {
+        ScoreDeltaText = T("{0} → {1} ({2:+0;-0;=})", before, after, after - before);
+        OnPropertyChanged(nameof(ScoreDeltaText));
+        OnPropertyChanged(nameof(HasScoreDelta));
+    }
+
     private void AnimateScore(int target)
     {
         _scoreTimer?.Stop();
@@ -149,7 +226,7 @@ public sealed partial class MainViewModel
     public void ShowWhatsNewFor(string version)
     {
         _whatsNewVersion = version;
-        _whatsNew = Views.WhatsNewWindow.For(version);
+        _whatsNew = Views.VersionNotes.For(version);
         OnPropertyChanged(nameof(WhatsNewLines));
         OnPropertyChanged(nameof(ShowWhatsNew));
         OnPropertyChanged(nameof(WhatsNewTitle));
@@ -201,7 +278,7 @@ public sealed partial class MainViewModel
     {
         if (!string.IsNullOrWhiteSpace(hardware.Cpu.Name) && hardware.Cpu != Maus.Core.Hardware.CpuInfo.Unknown)
         {
-            yield return new(T("Processeur"), hardware.Cpu.Name.Trim(), ToneOf(findings, "M16.cpu", "M08."), "");
+            yield return new(T("Processeur"), hardware.Cpu.Name.Trim(), ToneOf(findings, "M16.cpu", "M08.intel-microcode"), "");
         }
 
         var gpu = hardware.Gpus.FirstOrDefault(g => !g.IsIntegrated) ?? (hardware.Gpus.Count > 0 ? hardware.Gpus[0] : null);

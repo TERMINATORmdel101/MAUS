@@ -18,8 +18,7 @@ internal static class DisplayParsers
             HdrSupported: (value & 0x10) != 0 || mode == AdvancedColorMode.Hdr,
             HdrActive: mode == AdvancedColorMode.Hdr,
             Encoding: ToEncoding(encoding),
-            BitsPerColorChannel: (int)bitsPerChannel,
-            ActiveMode: mode);
+            BitsPerColorChannel: (int)bitsPerChannel);
     }
 
     /// <summary>

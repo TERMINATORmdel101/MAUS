@@ -51,7 +51,6 @@ internal sealed record DeviceGuardState(
 internal sealed record VbsConfiguration(
     int? MemoryIntegrityEnabled,
     int? MemoryIntegrityLocked,
-    int? VbsEnabled,
     int? VbsLocked,
     int? PolicyVbs,
     int? PolicyMemoryIntegrity)

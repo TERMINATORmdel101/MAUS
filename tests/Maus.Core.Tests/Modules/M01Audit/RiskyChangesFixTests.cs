@@ -32,6 +32,52 @@ public class RiskyChangesFixTests
         return pc;
     }
 
+    private static readonly string[] OtherServices = ["UsoSvc", "WaaSMedicSvc", "BITS", "TrustedInstaller", "Audiosrv", "WSearch", "WinDefend", "mpssvc"];
+
+    [Fact]
+    public async Task Every_kind_of_fix_round_trips_and_only_writes_allowed_keys()
+    {
+        const string Wow = @"SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion";
+        var pc = Debloated();
+        foreach (var name in OtherServices)
+        {
+            pc.Services[name] = 4;
+        }
+
+        pc.Registry
+            .Set(Hklm, M01Pc.UxSettings, "PauseUpdatesExpiryTime", "2046-01-01T00:00:00Z")
+            .Set(Hklm, @"SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection", "DisableRealtimeMonitoring", 1)
+            .Set(RegistryHive.CurrentUser, M01Pc.Winlogon, "Shell", @"C:\ProgramData\x\evil.exe")
+            .Set(Hklm, M01Pc.Winlogon, "Userinit", @"C:\Windows\system32\userinit.exe,C:\ProgramData\x\evil.exe,")
+            .Set(Hklm, Wow + @"\Windows", "AppInit_DLLs", @"C:\ProgramData\x\evil32.dll")
+            .Set(Hklm, Wow + @"\Windows", "LoadAppInit_DLLs", 1)
+            .Set(Hklm, M01Pc.Ifeo + @"\sethc.exe", "Debugger", @"C:\x\cmd.exe")
+            .Set(Hklm, Wow + @"\Image File Execution Options\sethc.exe", "Debugger", @"C:\x\cmd.exe");
+        var audit = pc.CreateContext();
+
+        var (plan, _) = await Maus.Core.Tests.Fixes.RoundTrip.AssertAsync(pc.Module, audit, pc.Registry);
+
+        // Le même programme détourné sous les deux clés ne donne qu'une correction, qui les remet toutes les deux.
+        Assert.Equal(2, plan.Single(c => c.Id == "M01.ifeo-debugger.sethc.exe").Writes.Count);
+        Assert.Contains(plan, c => c.Id == "M01.wu-pause");
+        Assert.Contains(plan, c => c.Id == "M01.defender-realtime");
+        Assert.Equal(3, plan.Single(c => c.Id == "M01.winlogon").Writes.Count);
+        Assert.All(OtherServices, name => Assert.Contains(plan, c => c.Id.EndsWith("." + name, StringComparison.Ordinal)));
+        Assert.All(plan.SelectMany(c => c.Writes), w => Assert.True(SettingAllowlist.Allows(w.Key), w.Key.Describe()));
+    }
+
+    [Fact]
+    public async Task No_fix_ever_targets_ucpd()
+    {
+        var pc = new M01Pc();
+        pc.Services["UCPD"] = 4;
+        var audit = pc.CreateContext();
+
+        var plan = pc.Module.Plan(audit, await pc.Module.DetectAsync(audit, CancellationToken.None));
+
+        Assert.DoesNotContain(plan.SelectMany(c => c.Writes), w => (w.Key.Path ?? string.Empty).Contains("UCPD", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public async Task Debloated_pc_round_trip_returns_to_the_initial_state()
     {

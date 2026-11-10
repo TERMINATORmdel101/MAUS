@@ -10,7 +10,10 @@
         <Style TargetType="TextBlock" BasedOn="{StaticResource MausText}" />
     </Window.Resources>
     <StackPanel Margin="18">
-        <TextBlock Text="{x:Static app:Ui.NotificationTitle}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <!-- Le titre mène au résumé de cet audit, comme « Ouvrir MAUS » : carte « Dernier audit » de l'accueil. -->
+        <TextBlock FontSize="{StaticResource FontSizeCardTitle}" FontWeight="SemiBold" TextWrapping="Wrap">
+            <Hyperlink Click="OnOpen" ToolTip="{x:Static app:Ui.OpenMaus}"><Run x:Name="TitleText" /></Hyperlink>
+        </TextBlock>
         <TextBlock x:Name="Message" Margin="0,8,0,14" TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.Later}" Margin="0,0,8,0" Click="OnLater" />

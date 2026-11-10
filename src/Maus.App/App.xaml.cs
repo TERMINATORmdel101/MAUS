@@ -19,6 +19,12 @@ public partial class App : Application
     {
         ArgumentNullException.ThrowIfNull(e);
 
+        // Processus élevé (moteur, fenêtre, benchmark) : rien de ce qu'il lit ou lance ne dépend de l'environnement du compte.
+        if (Environment.IsPrivilegedProcess)
+        {
+            SystemPaths.ResetEnvironment();
+        }
+
         // Filet de sécurité : fil de l'interface, autres fils (l'erreur ferme MAUS, la trace reste) et tâches jamais attendues.
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
@@ -30,26 +36,37 @@ public partial class App : Application
 
         base.OnStartup(e);
 
-        if (e.Args.Length >= 4 && e.Args[0].Equals(EngineArgument, StringComparison.OrdinalIgnoreCase))
+        if (e.Args.Length > 0 && e.Args[0].Equals(EngineArgument, StringComparison.OrdinalIgnoreCase))
         {
             // Moteur administrateur (0.8.0) : aucune fenêtre ; il sert l'interface qui l'a lancé, puis s'arrête avec elle.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // Jamais une fenêtre à la place d'un moteur mal lancé.
+            if (e.Args.Length != 4)
+            {
+                Shutdown(2);
+                return;
+            }
+
             RunEngineAsync(e.Args[1], e.Args[2], e.Args[3]).Forget("moteur", _ => Shutdown(1));
             return;
         }
 
         if (e.Args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase))
         {
-            // Audit planifié : lancé avec les droits administrateur, il lit les choix lui-même (le benchmark reçoit sa langue).
+            // Audit planifié : sans droits depuis la 0.8.6, il lit les choix lui-même (le benchmark reçoit sa langue).
             Breadcrumbs.Add("audit hebdomadaire : protections de Windows (" + string.Join(", ", ProcessHardening.HardenEngine()) + ")");
-            var own = FilePreferencesStore.CreateDefault().Load();
+            if (ProcessElevation.IsElevated())
+            {
+                // Tâche d'une version précédente, pas encore recréée.
+                Breadcrumbs.Add(CrashLog.UseProtectedFolder() ? "audit hebdomadaire : journal de diagnostic protégé" : "audit hebdomadaire : journal de diagnostic en mémoire seulement");
+            }
+
+            var own = ScheduledAuditPreferences();
             UseLanguage(own.Language);
             AppearanceManager.DetectComponents();
             AppearanceManager.Apply(own);
-        }
 
-        if (e.Args.Contains(ScheduledAudit.Argument, StringComparer.OrdinalIgnoreCase))
-        {
             // Audit planifié : pas de fenêtre, sauf si un problème rouge mérite d'être signalé.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
@@ -64,6 +81,11 @@ public partial class App : Application
             // Lancé par le moteur, il a les droits administrateur : mêmes protections de Windows que le moteur.
             var hardening = ProcessElevation.IsElevated() ? ProcessHardening.HardenEngine() : ProcessHardening.HardenInterface();
             Breadcrumbs.Add("benchmark : protections de Windows (" + string.Join(", ", hardening) + ")");
+            if (ProcessElevation.IsElevated())
+            {
+                Breadcrumbs.Add(CrashLog.UseProtectedFolder() ? "benchmark : journal de diagnostic protégé" : "benchmark : journal de diagnostic en mémoire seulement");
+            }
+
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Shutdown(Maus.Bench.BenchmarkProgram.Run(e.Args[1..]));
             return;
@@ -71,24 +93,51 @@ public partial class App : Application
 
         s_interactive = true;
 
+        // Les protections ci-dessous refusent les bibliothèques venues du réseau, dont celles de WPF si MAUS.exe y est rangé :
+        // mieux vaut le dire que laisser MAUS tomber plus loin. La protection reste, moteur compris.
+        if (Environment.ProcessPath is { } executable && FinalPath.IsOnNetworkDrive(executable))
+        {
+            UseLanguage(null);
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Views.QuestionWindow.Inform("MAUS", Texts.T("MAUS doit être lancé depuis un disque de ce PC, pas depuis le réseau : copiez son dossier sur ce PC, puis relancez-le."), Views.QuestionTone.Warning);
+            Shutdown(3);
+            return;
+        }
+
         // Protections de Windows sur la fenêtre de MAUS (bibliothèques venues du réseau ou d'intégrité basse refusées).
-        Breadcrumbs.Add("fenêtre : protections de Windows (" + string.Join(", ", ProcessHardening.HardenInterface()) + ")");
+        Breadcrumbs.Add("fenêtre : protections de Windows (" + string.Join(", ", ProcessElevation.IsElevated() ? ProcessHardening.HardenElevatedWindow() : ProcessHardening.HardenInterface()) + ")");
+        if (ProcessElevation.IsElevated())
+        {
+            // MAUS lancé « en tant qu'administrateur » : son journal de diagnostic va, comme celui du moteur, dans le dossier protégé,
+            // ou nulle part sur le disque si ce dossier ne peut pas être protégé.
+            Breadcrumbs.Add(CrashLog.UseProtectedFolder() ? "fenêtre administrateur : journal de diagnostic protégé" : "fenêtre administrateur : journal de diagnostic en mémoire seulement");
+
+            // Moteur précédent tué en pleine mesure de latence : sa session du noyau, restée ouverte, est refermée.
+            Task.Run(EtwDriverLatencyTracer.CloseLeftoverSession).Forget("latence : session précédente");
+        }
+
 
         // MAUS s'arrête quand sa fenêtre principale se ferme, même si une fenêtre annexe traîne encore.
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
+        // La question d'un autre MAUS bloqué arrive avant la lecture des choix : dans la langue de Windows.
+        UseLanguage(null);
         if (!AcquireSingleInstance())
         {
             Shutdown(0);
             return;
         }
 
+        // Écran de démarrage : le logo s'affiche tout de suite, pendant que la fenêtre principale se prépare.
+        SplashScreen? splash = new SplashScreen(typeof(App).Assembly, "Assets/splash.png");
+        splash.Show(autoClose: false);
+
         // 0.8.1 : aucune autorisation demandée à l'ouverture ; le moteur administrateur attend la première action qui en a besoin.
         EngineHost.Configure();
 
         // Le moteur s'est coupé lui-même après des connexions refusées : l'utilisateur est prévenu (rien d'autre n'est fait).
         EngineHost.StoppedForSecurity += (_, _) => Dispatcher.InvokeAsync(() =>
-            MessageBox.Show(Ui.EngineSecurityStop, "MAUS", MessageBoxButton.OK, MessageBoxImage.Warning));
+            Views.QuestionWindow.Inform("MAUS", Ui.EngineSecurityStop, Views.QuestionTone.Warning));
         var preferences = LoadPreferences();
         // Fichier des choix d'affichage absent : toute première ouverture (pas de « Quoi de neuf »).
         s_firstOpening = (EngineHost.Preferences as SplitPreferencesStore)?.State == PreferencesFileState.Absent;
@@ -96,15 +145,11 @@ public partial class App : Application
         AppearanceManager.DetectComponents();
         AppearanceManager.Apply(preferences);
 
-        // Écran de démarrage : le logo s'affiche tout de suite, pendant que la fenêtre principale se prépare.
-        SplashScreen? splash = new SplashScreen(typeof(App).Assembly, "Assets/splash.png");
-        splash.Show(autoClose: false);
-
         if (MustAskDisclaimer(preferences))
         {
             splash.Close(TimeSpan.Zero);
             splash = null;
-            if (!AskDisclaimer())
+            if (!AskWelcome(preferences))
             {
                 Shutdown(0);
                 return;
@@ -113,8 +158,9 @@ public partial class App : Application
             ShutdownMode = ShutdownMode.OnMainWindowClose;
         }
 
-        ShowMainWindow(splash);
+        // Avant la fenêtre : un démarrage figé se note aussi.
         UiWatchdog.Start(Dispatcher);
+        ShowMainWindow(splash);
     }
 
     /// <summary>
@@ -138,9 +184,7 @@ public partial class App : Application
     /// <summary>Le processus moteur : sert le canal privé jusqu'à la fermeture de l'interface, puis rend tout à Windows.</summary>
     private async Task RunEngineAsync(string pipe, string clientPid, string keyFingerprint)
     {
-        if (!System.Text.RegularExpressions.Regex.IsMatch(pipe, "^MAUS-[0-9a-f]{32}$")
-            || !int.TryParse(clientPid, NumberStyles.None, CultureInfo.InvariantCulture, out var pid)
-            || !Maus.Core.Engine.Broker.EngineKey.IsFingerprint(keyFingerprint))
+        if (!Maus.Core.Engine.Broker.EngineCommandLine.TryParse(pipe, clientPid, keyFingerprint, out var pid))
         {
             Shutdown(2);
             return;
@@ -148,11 +192,17 @@ public partial class App : Application
 
         // Protections de Windows sur le moteur, avant toute demande (Maus.Core.Platform.ProcessHardening).
         Breadcrumbs.Add("moteur : protections de Windows (" + string.Join(", ", ProcessHardening.HardenEngine()) + ")");
+        // Journal de diagnostic du moteur dans %ProgramData%\MAUS\logs, réservé aux administrateurs (0.8.6) ; jamais dans le profil.
+        Breadcrumbs.Add(CrashLog.UseProtectedFolder() ? "moteur : journal de diagnostic protégé" : "moteur : journal de diagnostic en mémoire seulement");
         var engine = new Maus.Core.Engine.Broker.LocalMausEngine
         {
             ProtectedProcessId = pid,
-            Confirmation = new Maus.Core.Engine.Broker.WindowsEngineConfirmation(),
+            // Questions du moteur dans sa propre fenêtre, sur ce fil (0.8.6) ; sans elle, la réponse est « Non ».
+            Confirmation = new EngineConfirmationPrompt(),
         };
+
+        // Moteur précédent tué en pleine mesure de latence : sa session du noyau, restée ouverte, est refermée.
+        Task.Run(EtwDriverLatencyTracer.CloseLeftoverSession).Forget("latence : session précédente");
         var server = new Maus.Core.Engine.Broker.EngineServer(engine, pipe, pid, keyFingerprint);
         try
         {
@@ -160,15 +210,16 @@ public partial class App : Application
         }
         finally
         {
-            await Task.Run(engine.Dispose).ConfigureAwait(true);
-
-            // Arrêt par sécurité : le code de sortie permet à l'interface de prévenir l'utilisateur.
-            Shutdown(server.StoppedForSecurity ? Maus.Core.Engine.Broker.EngineServer.SecurityStopExitCode : 0);
+            // Arrêt par sécurité : le code de sortie permet à l'interface de prévenir l'utilisateur, même si la fermeture se passe mal.
+            var code = server.StoppedForSecurity ? Maus.Core.Engine.Broker.EngineServer.SecurityStopExitCode : 0;
+            await Maus.Core.Engine.Broker.EngineServer.ReleaseWithinAsync(engine.Dispose, TimeSpan.FromSeconds(15)).ConfigureAwait(true);
+            Shutdown(code);
         }
     }
 
     /// <summary>Tenu tant que MAUS est ouvert (signale aux lancements suivants qu'une fenêtre existe déjà).</summary>
     private static Mutex? s_singleInstance;
+    private static int s_crashing;
 
     /// <summary>Une fenêtre de MAUS est (ou va être) affichée : une erreur fatale s'annonce par un message.</summary>
     private static volatile bool s_interactive;
@@ -180,8 +231,17 @@ public partial class App : Application
     /// <returns><c>true</c> si ce MAUS peut afficher sa fenêtre.</returns>
     private static bool AcquireSingleInstance()
     {
-        s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
-        return first || TakeOverFromWindowlessInstance();
+        try
+        {
+            s_singleInstance = new Mutex(true, @"Local\MAUS.FenetrePrincipale", out var first);
+            return first || TakeOverFromWindowlessInstance();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Verrou créé par un MAUS lancé en administrateur : ce MAUS-ci ne peut ni l'ouvrir ni le fermer.
+            Maus.Core.Platform.SingleInstance.BringExistingToFront();
+            return false;
+        }
     }
 
     /// <summary>
@@ -192,29 +252,49 @@ public partial class App : Application
         preferences.DisclaimerAccepted < Maus.Core.Legal.Disclaimer.Version
         && (EngineHost.Preferences as SplitPreferencesStore)?.State != PreferencesFileState.Unavailable;
 
+    /// <summary>Choix du mode fait sur l'écran d'ouverture (0.8.6) ; <c>null</c> = pas proposé, la fenêtre habituelle le fera.</summary>
+    private static bool? s_welcomeChoice;
+
     /// <summary>
-    /// Avertissements au premier lancement (et après chaque changement de fond du texte).
+    /// Écran d'ouverture du premier lancement (et après chaque changement de fond des avertissements) : avertissements et
+    /// choix du mode en une seule fenêtre (0.8.6).
     /// </summary>
-    /// <returns><c>false</c> si l'utilisateur ne les accepte pas : MAUS doit alors se fermer.</returns>
-    private bool AskDisclaimer()
+    /// <returns><c>false</c> si l'utilisateur n'accepte pas les avertissements : MAUS doit alors se fermer.</returns>
+    private bool AskWelcome(UserPreferences preferences)
     {
         // Pendant cette fenêtre, fermer celle-ci ne doit pas être pris pour la fermeture de MAUS par Windows.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        if (new Views.DisclaimerWindow().ShowDialog() != true)
+        var answer = Views.WelcomeWindow.Ask(offerModes: EngineHost.OnDemand is not null && preferences.OfferAllFeatures);
+        if (!answer.Accepted)
         {
             return false;
         }
 
+        s_welcomeChoice = answer.AllFeatures;
+
+        // Accord non enregistré : les avertissements reviendront au prochain lancement, MAUS s'ouvre quand même.
+        TrySavePreferences(p => p with
+        {
+            DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version,
+            OfferAllFeatures = !answer.DontAskAgain && p.OfferAllFeatures,
+        });
+        return true;
+    }
+
+    /// <summary>
+    /// Enregistre un choix de l'ouverture. Un échec (fichier tenu par un antivirus, dossier refusé, moteur absent) ne doit
+    /// jamais interrompre l'ouverture de MAUS : le choix sera simplement redemandé au prochain lancement.
+    /// </summary>
+    private static void TrySavePreferences(Func<UserPreferences, UserPreferences> change)
+    {
         try
         {
-            EngineHost.Preferences.Update(p => p with { DisclaimerAccepted = Maus.Core.Legal.Disclaimer.Version });
+            EngineHost.Preferences.Update(change);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Maus.Core.Engine.Broker.EngineException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Maus.Core.Fixes.JournalUnsafeException or Maus.Core.Engine.Broker.EngineException)
         {
-            // Accord non enregistré : les avertissements reviendront au prochain lancement, MAUS s'ouvre quand même.
+            Maus.Core.Diagnostics.Breadcrumbs.Add("choix de l'ouverture non enregistré");
         }
-
-        return true;
     }
 
     /// <summary>
@@ -229,13 +309,27 @@ public partial class App : Application
             return false;
         }
 
-        var answer = MessageBox.Show(
-            Texts.T("Un autre MAUS est déjà en cours d'exécution, mais sans fenêtre : il est sans doute bloqué, et il peut empêcher la lecture de la mémoire. Le fermer et ouvrir celui-ci ?"),
-            "MAUS",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.Yes);
-        if (answer != MessageBoxResult.Yes)
+        // Il démarre ou il se termine peut-être : on lui laisse un instant avant de le dire bloqué.
+        try
+        {
+            if (s_singleInstance!.WaitOne(TimeSpan.FromSeconds(3)))
+            {
+                return true;
+            }
+        }
+        catch (AbandonedMutexException)
+        {
+            return true;
+        }
+
+        if (Maus.Core.Platform.SingleInstance.BringExistingToFront())
+        {
+            return false;
+        }
+
+        // Tout début de l'ouverture : les préférences ne sont pas encore lues, le thème par défaut suffit pour cette question.
+        AppearanceManager.Apply(UserPreferences.Default);
+        if (!Views.QuestionWindow.Ask(Texts.T("Un autre MAUS est déjà ouvert"), Texts.T("Un autre MAUS est déjà en cours d'exécution, mais sans fenêtre : il est sans doute bloqué, et il peut empêcher la lecture de la mémoire. Le fermer et ouvrir celui-ci ?"), Views.QuestionTone.Warning, yesIsDefault: true))
         {
             return false;
         }
@@ -261,20 +355,25 @@ public partial class App : Application
         ArgumentNullException.ThrowIfNull(e);
 
         base.OnExit(e);
+        EngineHost.Close();
         PresentMonCapture.WaitForBackgroundStops(TimeSpan.FromSeconds(8));
         Environment.Exit(e.ApplicationExitCode);
     }
 
     private static void ShowMainWindow(SplashScreen? splash = null)
     {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         var window = new MainWindow();
+        Breadcrumbs.Add("fenêtre : créée en " + clock.ElapsedMilliseconds + " ms");
+        window.Loaded += (_, _) => Breadcrumbs.Add("fenêtre : Loaded à " + clock.ElapsedMilliseconds + " ms");
+        window.ContentRendered += (_, _) => Breadcrumbs.Add("fenêtre : ContentRendered à " + clock.ElapsedMilliseconds + " ms");
         Current.MainWindow = window;
         if (splash is not null)
         {
             // L'écran de démarrage s'efface en douceur une fois la fenêtre dessinée. Secours : une fenêtre ouverte réduite
             // n'est pas dessinée tout de suite, l'écran de démarrage ne doit pas rester affiché pour autant.
             var closed = false;
-            var fallback = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            var fallback = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             void CloseSplash(TimeSpan fade)
             {
                 fallback.Stop();
@@ -291,6 +390,7 @@ public partial class App : Application
         }
 
         window.Show();
+        Breadcrumbs.Add("fenêtre : Show terminé à " + clock.ElapsedMilliseconds + " ms");
 
         // Une fois la fenêtre dessinée : les nouveautés d'une nouvelle version, puis (MAUS sans droits administrateur) la
         // proposition d'activer toutes les fonctionnalités. La demande d'autorisation de Windows ne vient qu'après « Oui ».
@@ -308,6 +408,11 @@ public partial class App : Application
 
     private static async Task StartupDialogsAsync()
     {
+        if (Current.MainWindow?.DataContext is ViewModels.MainViewModel opened)
+        {
+            opened.CheckScheduleAtOpeningAsync().Forget("audit hebdomadaire : lecture à l'ouverture");
+        }
+
         var preferences = LoadPreferences();
         if (!string.Equals(preferences.LastSeenVersion, AppVersion.Display, StringComparison.Ordinal))
         {
@@ -317,17 +422,17 @@ public partial class App : Application
                 home.ShowWhatsNewFor(AppVersion.Display);
             }
 
-            try
-            {
-                await Task.Run(() => EngineHost.Preferences.Update(p => p with { LastSeenVersion = AppVersion.Display }));
-            }
-            catch (Exception ex) when (ex is IOException or Maus.Core.Engine.Broker.EngineException or Maus.Core.Fixes.JournalUnsafeException)
-            {
-                // Non enregistré : les nouveautés reviendront à la prochaine ouverture.
-            }
+            // Non enregistré : les nouveautés reviendront à la prochaine ouverture.
+            await Task.Run(() => TrySavePreferences(p => p with { LastSeenVersion = AppVersion.Display }));
         }
 
-        if (EngineHost.OnDemand is not null && preferences.OfferAllFeatures)
+        if (s_welcomeChoice is { } chosenOnWelcome)
+        {
+            // Le mode a été choisi sur l'écran d'ouverture : pas de seconde fenêtre.
+            s_welcomeChoice = null;
+            await ElevateIfWantedAsync(chosenOnWelcome);
+        }
+        else if (EngineHost.OnDemand is not null && preferences.OfferAllFeatures)
         {
             await OfferAllFeaturesAsync();
         }
@@ -338,16 +443,16 @@ public partial class App : Application
         var (accept, dontAskAgain) = Views.ElevationOfferWindow.Ask();
         if (dontAskAgain)
         {
-            try
-            {
-                await Task.Run(() => EngineHost.Preferences.Update(p => p with { OfferAllFeatures = false }));
-            }
-            catch (Exception ex) when (ex is IOException or Maus.Core.Engine.Broker.EngineException or Maus.Core.Fixes.JournalUnsafeException)
-            {
-                // Choix non enregistré : la proposition reviendra à la prochaine ouverture.
-            }
+            // Choix non enregistré : la proposition reviendra à la prochaine ouverture.
+            await Task.Run(() => TrySavePreferences(p => p with { OfferAllFeatures = false }));
         }
 
+        await ElevateIfWantedAsync(accept);
+    }
+
+    /// <summary>« Toutes les fonctionnalités » choisi : la demande d'autorisation de Windows vient maintenant, et seulement maintenant.</summary>
+    private static async Task ElevateIfWantedAsync(bool accept)
+    {
         if (accept && EngineHost.OnDemand is { } onDemand)
         {
             try
@@ -356,48 +461,106 @@ public partial class App : Application
             }
             catch (Maus.Core.Engine.Broker.EngineException ex)
             {
-                MessageBox.Show(ex.Message, "MAUS", MessageBoxButton.OK, MessageBoxImage.Information);
+                Views.QuestionWindow.Inform("MAUS", ex.Message, Views.QuestionTone.Information);
             }
         }
     }
 
     /// <summary>
     /// Audit hebdomadaire lancé par le Planificateur de tâches : lecture seule, score gardé dans l'historique (sauf score
-    /// partiel), notification seulement s'il y a un problème rouge, avec les modules non vérifiés. Rien n'est envoyé.
+    /// partiel), résumé gardé pour la carte « Dernier audit », notification seulement s'il y a un problème rouge, avec les
+    /// modules non vérifiés. Rien n'est envoyé.
     /// </summary>
+    /// <summary>Sans droits, le fichier protégé ne se lit pas : ses choix sont recopiés dans celui de l'utilisateur à chaque enregistrement.</summary>
+    private static UserPreferences ScheduledAuditPreferences() => ProcessElevation.IsElevated()
+        ? FilePreferencesStore.CreateDefault().Load()
+        : new FilePreferencesStore(FilePreferencesStore.UserDirectory, new UserDirectoryProtector()).Load();
+
     private async Task RunScheduledAuditAsync()
     {
         try
         {
-            var context = await Task.Run(AuditContext.CreateDefault);
-            var results = await AuditEngine.CreateWithBuiltInModules().RunAsync(context);
-
-            // Un score partiel (module en erreur ou en délai dépassé) n'est pas enregistré : il paraîtrait meilleur que la réalité.
-            if (ScoreTrends.HealthEntry(results, DateTimeOffset.Now) is { } entry)
-            {
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        BenchmarkHistory.CreateHealth().Add(entry);
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        // Historique non écrit : sans conséquence pour l'audit.
-                    }
-                });
-            }
-
-            var problems = ScheduledAudit.WorthNotifying(results);
-            if (problems.Count == 0)
+            if (ProcessElevation.IsElevated() && await TaskSchedulerClient.DropRightsOfOldTaskAsync())
             {
                 Shutdown(0);
                 return;
             }
 
-            var notification = new Views.NotificationWindow(ScheduledAudit.NotificationText(problems, results));
+            // Personne n'a cliqué : aucun accès réseau (Windows Update lu d'après sa dernière recherche, pas de liste winget).
+            var preferences = ScheduledAuditPreferences();
+            var context = await Task.Run(() => AuditContext.CreateDefault().WithoutNetwork().WithPreferences(preferences));
+            var results = await AuditEngine.CreateWithBuiltInModules().RunAsync(context);
+
+            // Un score partiel (module en erreur ou en délai dépassé, ou contrôles réservés aux administrateurs non lus) n'est pas
+            // enregistré : il paraîtrait meilleur que la réalité.
+            var complete = ProcessElevation.IsElevated();
+            if (complete && ScoreTrends.HealthEntry(results, DateTimeOffset.Now) is { } entry)
+            {
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        BenchmarkHistory.CreateHealth().Add(entry with { Kind = ScoreTrends.WeeklyHealthKind });
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException)
+                    {
+                        // Historique non écrit, ou fichier du profil abîmé : jamais une raison de se taire.
+                    }
+                });
+            }
+
+            // La notification mène à ce résumé : marqué « semaine » (sans réseau), il ne se compare pas aux audits lancés à la main.
+            if (Maus.Core.Reporting.AuditSnapshot.ForWeeklyAudit(results, context.Windows.FullBuild, DateTimeOffset.Now, complete) is { } summary)
+            {
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        Maus.Core.Reporting.AuditSnapshotStore.CreateDefault().Add(summary);
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException)
+                    {
+                        // Résumé non écrit : la notification dit quand même ce qu'elle a trouvé.
+                    }
+                });
+            }
+
+            // Le carnet de santé note ce qui se lit sans droits ; rien de lisible, pas de ligne.
+            await Task.Run(() =>
+            {
+                try
+                {
+                    Maus.Core.Follow.HealthLogStore.CreateDefault().AddAudit(results, DateTimeOffset.Now, weekly: true, elevated: complete);
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // Ligne non écrite : la notification dit quand même ce qu'elle a trouvé.
+                }
+            });
+
+            var problems = ScheduledAudit.WorthNotifying(results);
+            var level = context.Preferences.WeeklyNotification;
+            if (level == WeeklyNotification.Never || (problems.Count == 0 && level != WeeklyNotification.Always))
+            {
+                Shutdown(0);
+                return;
+            }
+
+            // Le score n'est cité que s'il est complet (même règle que l'historique).
+            int? score = complete && Maus.Core.Reporting.HealthScore.UncheckedModules(results).Count == 0 ? Maus.Core.Reporting.HealthScore.Compute(results) : null;
+            var text = problems.Count == 0 ? ScheduledAudit.SummaryText(score)
+                : (score is { } value ? Texts.T("Score : {0} sur 100.", value) + Environment.NewLine : string.Empty) + ScheduledAudit.NotificationText(problems, results);
+            var notification = new Views.NotificationWindow(problems.Count == 0 ? Ui.WeeklyAuditDoneTitle : Ui.NotificationTitle, text);
+            // Écrite avant d'afficher : Windows arrête la tâche au bout de 30 minutes, sans laisser le temps de l'écrire ensuite.
+            var missedAlert = problems.Count > 0 ? Maus.Core.Reporting.MissedAlertNote.CreateDefault() : null;
+            missedAlert?.Write(DateTimeOffset.Now, problems.Count);
             notification.Closed += (_, _) =>
             {
+                if (notification.Answered)
+                {
+                    missedAlert?.Clear();
+                }
+
                 if (notification.OpenRequested)
                 {
                     OpenAfterScheduledAudit();
@@ -417,13 +580,22 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// « Ouvrir » après l'audit hebdomadaire : l'audit tourne avec les droits administrateur de la tâche, mais la fenêtre de
-    /// MAUS ne doit jamais en hériter (principe de la 0.8.x). MAUS est relancé normalement, sans droits, par l'Explorateur
-    /// (comme un double-clic) ; ce processus administrateur s'arrête. L'utilisateur choisit ensuite « Toutes les
-    /// fonctionnalités » s'il veut corriger.
+    /// « Ouvrir » après l'audit hebdomadaire : MAUS est relancé normalement, sans droits, par l'Explorateur (comme un
+    /// double-clic), même si la tâche date d'une version qui lui donnait des droits ; ce processus s'arrête. L'utilisateur
+    /// choisit ensuite « Toutes les fonctionnalités » s'il veut corriger. La fenêtre s'ouvre sur l'accueil, où est le résumé
+    /// de cet audit, même si l'utilisateur l'avait laissée ailleurs.
     /// </summary>
     private void OpenAfterScheduledAudit()
     {
+        try
+        {
+            new FilePreferencesStore(FilePreferencesStore.UserDirectory, new UserDirectoryProtector()).Update(p => p with { LastTab = 0 });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Maus.Core.Fixes.JournalUnsafeException)
+        {
+            Breadcrumbs.Add("onglet d'ouverture non enregistré après l'audit de la semaine");
+        }
+
         if (Environment.ProcessPath is { } exe)
         {
             ShellLauncher.OpenFile(exe);
@@ -433,27 +605,33 @@ public partial class App : Application
     }
 
     /// <summary>Active la langue choisie (ou celle de Windows), y compris pour les dates et les nombres.</summary>
-    public static void UseLanguage(string? code)
-    {
-        Texts.Use(code);
-        CultureInfo.DefaultThreadCurrentCulture = Texts.Culture;
-        CultureInfo.DefaultThreadCurrentUICulture = Texts.Culture;
-        CultureInfo.CurrentCulture = Texts.Culture;
-        CultureInfo.CurrentUICulture = Texts.Culture;
-    }
+    public static void UseLanguage(string? code) => Texts.UseWithCulture(code);
 
     /// <summary>Change de langue : la fenêtre est recréée dans la nouvelle langue, puis l'audit est relancé s'il avait été fait.</summary>
     public static void SwitchLanguage(string code, bool rerunAudit)
     {
         UseLanguage(code);
         var old = Current.MainWindow;
+
+        // La nouvelle fenêtre reprend la place et l'onglet de celle qu'elle remplace.
+        if (old is MainWindow { DataContext: ViewModels.MainViewModel view } oldWindow)
+        {
+            AppearanceManager.Remember(AppearanceManager.Current with
+            {
+                MainWindow = oldWindow.CurrentPlacement(),
+                LastTab = view.SelectedTab,
+                LastWorkshopSection = view.Workshop.Section,
+            });
+        }
+
         var window = new MainWindow();
         Current.MainWindow = window;
         window.Show();
         old?.Close();
-        if (rerunAudit && window.DataContext is ViewModels.MainViewModel model && model.RunAuditCommand.CanExecute(null))
+        // Moteur arrêté : cet audit se fait sans droits, il ne demande aucune autorisation.
+        if (rerunAudit && window.DataContext is ViewModels.MainViewModel model && model.RerunAuditForLanguageCommand.CanExecute(null))
         {
-            model.RunAuditCommand.Execute(null);
+            model.RerunAuditForLanguageCommand.Execute(null);
         }
     }
 
@@ -463,6 +641,14 @@ public partial class App : Application
     /// </summary>
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        // Une seconde erreur pendant le message de la première : notée seulement, MAUS s'arrête déjà.
+        if (Interlocked.Exchange(ref s_crashing, 1) != 0)
+        {
+            CrashLog.Write(e.Exception, "Seconde erreur pendant l'arrêt de MAUS");
+            e.Handled = true;
+            return;
+        }
+
         var logPath = CrashLog.Write(e.Exception, "Erreur sur le fil de l'interface : MAUS s'arrête");
         ShowCrashMessage(e.Exception, logPath);
         e.Handled = true;

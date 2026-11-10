@@ -1,10 +1,11 @@
 using System.Runtime.InteropServices;
+using Maus.Core.Platform;
 
 namespace Maus.Core.Modules.M14Display;
 
 /// <summary>
 /// Lecture de la configuration d'affichage par <c>QueryDisplayConfig</c>, <c>DisplayConfigGetDeviceInfo</c>,
-/// <c>EnumDisplaySettingsExW</c> et <c>EnumDisplayDevicesW</c> (user32.dll). Aucune fonction d'écriture
+/// <c>EnumDisplaySettingsExW</c> (déclarée dans <see cref="DisplayRefresh"/>) et <c>EnumDisplayDevicesW</c> (user32.dll). Aucune fonction d'écriture
 /// (<c>SetDisplayConfig</c>, <c>ChangeDisplaySettingsEx</c>) n'est déclarée ici.
 /// </summary>
 internal sealed unsafe partial class Win32DisplayConfigReader : IDisplayConfigReader
@@ -12,7 +13,6 @@ internal sealed unsafe partial class Win32DisplayConfigReader : IDisplayConfigRe
     private const uint QdcOnlyActivePaths = 0x2;
     private const uint QdcVirtualModeAware = 0x10;
     private const int ErrorInsufficientBuffer = 122;
-    private const uint EnumCurrentSettings = unchecked((uint)-1);
     private const uint DisplayInterlaced = 0x2;
     private const int MaxModes = 4096;
 
@@ -155,33 +155,27 @@ internal sealed unsafe partial class Win32DisplayConfigReader : IDisplayConfigRe
 
     private static (int Width, int Height)? ReadCurrentMode(string sourceName)
     {
-        var mode = new DevMode { Size = (ushort)sizeof(DevMode) };
-        fixed (char* name = sourceName)
-        {
-            return EnumDisplaySettingsExW(name, EnumCurrentSettings, &mode, 0) != 0
-                ? ((int)mode.PelsWidth, (int)mode.PelsHeight)
-                : null;
-        }
+        var mode = new DevModeW { Size = DevModeW.NativeSize };
+        return DisplayRefresh.EnumDisplaySettingsExW(sourceName, DisplayRefresh.EnumCurrentSettings, ref mode, 0) != 0
+            ? ((int)mode.PelsWidth, (int)mode.PelsHeight)
+            : null;
     }
 
     /// <summary>Modes acceptés par l'écran (sans <c>EDS_RAWMODE</c>), hors modes entrelacés.</summary>
     private static List<DisplayMode> ReadModes(string sourceName)
     {
         var modes = new HashSet<DisplayMode>();
-        fixed (char* name = sourceName)
+        for (uint index = 0; index < MaxModes; index++)
         {
-            for (uint index = 0; index < MaxModes; index++)
+            var mode = new DevModeW { Size = DevModeW.NativeSize };
+            if (DisplayRefresh.EnumDisplaySettingsExW(sourceName, index, ref mode, 0) == 0)
             {
-                var mode = new DevMode { Size = (ushort)sizeof(DevMode) };
-                if (EnumDisplaySettingsExW(name, index, &mode, 0) == 0)
-                {
-                    break;
-                }
+                break;
+            }
 
-                if ((mode.DisplayFlags & DisplayInterlaced) == 0 && mode.DisplayFrequency > 1)
-                {
-                    modes.Add(new DisplayMode((int)mode.PelsWidth, (int)mode.PelsHeight, (int)mode.DisplayFrequency));
-                }
+            if ((mode.DisplayFlags & DisplayInterlaced) == 0 && mode.DisplayFrequency > 1)
+            {
+                modes.Add(new DisplayMode((int)mode.PelsWidth, (int)mode.PelsHeight, (int)mode.DisplayFrequency));
             }
         }
 
@@ -313,26 +307,6 @@ internal sealed unsafe partial class Win32DisplayConfigReader : IDisplayConfigRe
         public int ActiveColorMode;
     }
 
-    /// <summary><c>DEVMODEW</c> (220 octets), seuls les champs d'affichage sont nommés.</summary>
-    [StructLayout(LayoutKind.Explicit, Size = 220)]
-    private struct DevMode
-    {
-        [FieldOffset(68)]
-        public ushort Size;
-
-        [FieldOffset(172)]
-        public uint PelsWidth;
-
-        [FieldOffset(176)]
-        public uint PelsHeight;
-
-        [FieldOffset(180)]
-        public uint DisplayFlags;
-
-        [FieldOffset(184)]
-        public uint DisplayFrequency;
-    }
-
     /// <summary><c>DISPLAY_DEVICEW</c> (840 octets).</summary>
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct DisplayDevice
@@ -353,9 +327,6 @@ internal sealed unsafe partial class Win32DisplayConfigReader : IDisplayConfigRe
 
     [LibraryImport("user32.dll")]
     private static partial int DisplayConfigGetDeviceInfo(DeviceInfoHeader* requestPacket);
-
-    [LibraryImport("user32.dll")]
-    private static partial int EnumDisplaySettingsExW(char* deviceName, uint modeNum, DevMode* devMode, uint flags);
 
     [LibraryImport("user32.dll")]
     private static partial int EnumDisplayDevicesW(char* device, uint devNum, DisplayDevice* displayDevice, uint flags);

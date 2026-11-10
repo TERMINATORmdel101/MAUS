@@ -31,7 +31,7 @@ public enum Tone
 public static class Pastel
 {
     /// <summary>Fond, contour et encre en thème clair, puis en thème sombre (RGB).</summary>
-    private static readonly Dictionary<Tone, (uint Fill, uint Stroke, uint Ink, uint DarkFill, uint DarkStroke, uint DarkInk)> Colors = new()
+    internal static readonly Dictionary<Tone, (uint Fill, uint Stroke, uint Ink, uint DarkFill, uint DarkStroke, uint DarkInk)> Colors = new()
     {
         [Tone.Blue] = (0xE4ECFF, 0xC3D3F7, 0x1E3F8F, 0x1F2940, 0x34466F, 0xAFC6FF),
         [Tone.Rose] = (0xFCE6EA, 0xF2C3CC, 0x9A1830, 0x3A2229, 0x5F3843, 0xFFB8C4),
@@ -42,11 +42,25 @@ public static class Pastel
         [Tone.Grey] = (0xEEF0F3, 0xD6DAE1, 0x474D5A, 0x2B2E34, 0x41454E, 0xC9CED8),
     };
 
+    /// <summary>Texte d'un contrôle grisé (RGB), en clair puis en sombre : distinct du texte normal, au moins 4,5:1 sur tous les fonds.</summary>
+    internal const uint DisabledText = 0x5F6470;
+
+    /// <inheritdoc cref="DisabledText"/>
+    internal const uint DarkDisabledText = 0xA8ADB8;
+
+    /// <summary>Textes grisés du thème Fluent : chacun a sa propre clé, toutes réglées sur le même gris trop pâle.</summary>
+    private static readonly string[] FluentDisabledText =
+    [
+        "TextFillColorDisabledBrush", "ButtonForegroundDisabled", "CardForegroundDisabled", "CheckBoxForegroundUncheckedDisabled", "ComboBoxForegroundDisabled",
+        "DataGridHeaderForegroundDisabled", "ExpanderHeaderDisabledForeground", "FrameMenuItemForegroundDisabled", "HyperlinkButtonForegroundDisabled",
+        "HyperlinkForegroundDisabled", "RadioButtonForegroundDisabled", "RepeatButtonForegroundDisabled", "StatusBarItemForegroundDisabled",
+        "TextControlForegroundDisabled", "TimePickerButtonForegroundDisabled", "ToggleButtonForegroundDisabled", "ToggleSwitchContentForegroundDisabled",
+    ];
+
     private static readonly Dictionary<Tone, (SolidColorBrush Fill, SolidColorBrush Stroke, SolidColorBrush Ink)> Brushes =
         Enum.GetValues<Tone>().ToDictionary(t => t, _ => (new SolidColorBrush(), new SolidColorBrush(), new SolidColorBrush()));
 
     /// <summary>Fond de la page, à peine teinté (thème clair) ; transparent en thème sombre, qui garde le fond de Windows.</summary>
-    public static SolidColorBrush Page { get; } = new();
 
     static Pastel() => Use(dark: false, highContrast: false);
 
@@ -87,7 +101,25 @@ public static class Pastel
             resources["Pastel" + tone + "Ink"] = Copy(ink);
         }
 
-        resources["PastelPage"] = Copy(Page);
+        // Le gris du thème Fluent (36 % d'opacité) tombe sous 2:1 sur les fonds pastel. Contraste élevé : Windows impose le sien.
+        if (highContrast)
+        {
+            resources["MausDisabledText"] = SystemColors.GrayTextBrush;
+            foreach (var key in FluentDisabledText)
+            {
+                resources.Remove(key);
+            }
+        }
+        else
+        {
+            var disabled = new SolidColorBrush(Rgb(dark ? DarkDisabledText : DisabledText));
+            disabled.Freeze();
+            resources["MausDisabledText"] = disabled;
+            foreach (var key in FluentDisabledText)
+            {
+                resources[key] = disabled;
+            }
+        }
     }
 
     private static void Use(bool dark, bool highContrast)
@@ -108,7 +140,6 @@ public static class Pastel
             ink.Color = Rgb(dark ? c.DarkInk : c.Ink);
         }
 
-        Page.Color = highContrast ? SystemColors.WindowColor : dark ? System.Windows.Media.Colors.Transparent : Rgb(0xF7F8FC);
     }
 
     /// <summary>Copie figée, pour les ressources (le pinceau d'origine reste recolorable).</summary>

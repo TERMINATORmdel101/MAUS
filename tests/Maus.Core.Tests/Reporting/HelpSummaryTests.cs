@@ -17,7 +17,7 @@ public class HelpSummaryTests
             FormFactor = FormFactor.Desktop,
             BoardManufacturer = "ASUSTeK COMPUTER INC.",
             BoardProduct = "ROG STRIX B650-A GAMING WIFI",
-            Cpu = new CpuInfo("AMD Ryzen 7 7800X3D 8-Core Processor", HardwareVendor.Amd, 8, 16, 4200),
+            Cpu = new CpuInfo("AMD Ryzen 7 7800X3D 8-Core Processor", HardwareVendor.Amd, 8, 16),
             Gpus = [new GpuInfo("NVIDIA GeForce RTX 4070", HardwareVendor.Nvidia, "32.0.15.6094", new DateTime(2026, 9, 12), "PCI\\VEN_10DE", false)],
         },
         true,

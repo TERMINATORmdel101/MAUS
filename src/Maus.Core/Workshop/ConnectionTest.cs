@@ -66,17 +66,14 @@ public enum ConnectionVerdict
     /// <summary>Souci au-delà de la box (ligne, fournisseur d'accès).</summary>
     Internet,
 
-    /// <summary>Aucune réponse d'Internet (hors ligne, ou ping bloqué par un pare-feu).</summary>
+    /// <summary>Aucune réponse d'Internet au ping (PC hors ligne, souci au-delà d'une box qui répond, ou ping bloqué par un pare-feu).</summary>
     Offline,
 }
 
 public sealed record ConnectionResult(PingStats? Gateway, IReadOnlyList<PingStats> Internet, ConnectionVerdict Verdict, bool Aborted)
 {
-    /// <summary>Meilleure des cibles Internet : le moins de pertes, puis la latence la plus basse.</summary>
-    public PingStats? BestInternet => Internet
-        .OrderBy(s => s.LossPercent)
-        .ThenBy(s => s.Median ?? double.MaxValue)
-        .FirstOrDefault();
+    /// <summary>Test arrêté avant la première série de réponses : il n'y a rien à juger.</summary>
+    public bool StoppedBeforeFirstMeasure => Aborted && (Gateway?.Sent ?? 0) == 0 && Internet.All(s => s.Sent == 0);
 }
 
 /// <summary>
@@ -189,6 +186,9 @@ public static class ConnectionTest
         ConnectionVerdict.Internet => T("Le réseau local va bien : le souci est au-delà de la box (ligne ou fournisseur d'accès). "
             + "Un téléchargement en cours (mise à jour, jeu, vidéo) peut aussi provoquer ces écarts. Refaites le test à un autre moment ; "
             + "si cela persiste, signalez-le à votre fournisseur avec ces chiffres."),
+        _ when result.Gateway is { Answered: true } => T("La box répond, mais aucun serveur d'Internet ne répond au ping. Le souci peut venir de la box, "
+            + "de la ligne ou du fournisseur d'accès, et ce test ne peut pas les départager ; un pare-feu qui bloque le ping donne le même résultat. "
+            + "Redémarrez la box et refaites le test ; si cela persiste, signalez-le à votre fournisseur."),
         _ => T("Aucune réponse d'Internet : le PC semble hors ligne, ou un pare-feu bloque le ping. "
             + "Vérifiez la connexion dans Paramètres > Réseau et Internet."),
     };
@@ -197,9 +197,17 @@ public static class ConnectionTest
     public static string References => T("Repères (latence) : fibre souvent 5 à 20 ms, ADSL 20 à 50 ms, 4G/5G 30 à 60 ms, Starlink 25 à 60 ms. "
         + "Ce test mesure la stabilité, pas le débit.");
 
+    /// <summary>Les seuils du verdict et les repères ne viennent pas d'une norme : l'écran le dit.</summary>
+    public static string ThresholdNote => T("Seuils de ce bilan : pertes {0:0} %, box {1:0} ms de latence ou de gigue, Internet {2:0} ms de latence ou {3:0} ms de gigue. Ces seuils et les repères ci-dessus sont choisis par MAUS, sans source publiée.",
+        LossThreshold, LocalLatencyThreshold, InternetLatencyThreshold, InternetJitterThreshold);
+
+    /// <summary>Meilleure des cibles Internet : le moins de pertes, puis la latence la plus basse.</summary>
+    internal static PingStats? BestInternet(IReadOnlyList<PingStats> internet) =>
+        internet.OrderBy(s => s.LossPercent).ThenBy(s => s.Median ?? double.MaxValue).FirstOrDefault();
+
     internal static ConnectionVerdict Judge(PingStats? gateway, IReadOnlyList<PingStats> internet)
     {
-        var best = internet.OrderBy(s => s.LossPercent).ThenBy(s => s.Median ?? double.MaxValue).FirstOrDefault();
+        var best = BestInternet(internet);
         if (best is null || !best.Answered)
         {
             return gateway is { Answered: true } && IsUnstable(gateway, LocalLatencyThreshold, LocalLatencyThreshold)

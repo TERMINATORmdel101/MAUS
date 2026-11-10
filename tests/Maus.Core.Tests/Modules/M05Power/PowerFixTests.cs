@@ -12,14 +12,17 @@ public class PowerFixTests
     {
         FormFactor = FormFactor.Laptop,
         HasBattery = true,
-        Cpu = new CpuInfo("AMD Ryzen 7 5800H with Radeon Graphics", HardwareVendor.Amd, 8, 16, 3200),
+        Cpu = new CpuInfo("AMD Ryzen 7 5800H with Radeon Graphics", HardwareVendor.Amd, 8, 16),
     };
 
     private static readonly HardwareProfile Desktop = new()
     {
         FormFactor = FormFactor.Desktop,
-        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12, 3700),
+        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12),
     };
+
+    private static FakeRegistry RegistryWithHighPerformance() =>
+        new FakeRegistry().Set(RegistryHive.LocalMachine, $@"{PowerModule.SchemesKey}\{PowerSchemes.HighPerformance:D}", "FriendlyName", "Haute performance");
 
     [Fact]
     public async Task Laptop_returns_to_balanced_and_fast_startup_is_disabled_then_restored()
@@ -28,7 +31,7 @@ public class PowerFixTests
         var platform = new FakePowerPlatform
         {
             ActiveScheme = PowerSchemes.HighPerformance,
-            Capabilities = FakePowerPlatform.Caps(hiberFile: true, batteries: true),
+            Capabilities = FakePowerPlatform.Caps(hiberFile: true),
         };
         var audit = TestContext.Create(registry, hardware: Laptop);
 
@@ -45,7 +48,7 @@ public class PowerFixTests
     public async Task Desktop_high_performance_is_offered_but_not_preselected()
     {
         var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced };
-        var audit = TestContext.Create(hardware: Desktop);
+        var audit = TestContext.Create(RegistryWithHighPerformance(), hardware: Desktop);
         var module = new PowerModule(platform);
 
         var plan = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None));
@@ -57,9 +60,37 @@ public class PowerFixTests
     }
 
     [Fact]
+    public async Task Desktop_without_high_performance_is_not_offered_a_scheme_it_cannot_use()
+    {
+        // Mode supprimé : ni dans le registre, et le mode actif est déjà la cible de repli.
+        var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced };
+        var audit = TestContext.Create(hardware: Desktop);
+        var module = new PowerModule(platform);
+
+        Assert.DoesNotContain(module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None)), c => c.Id == "M05.power-plan");
+
+        // Autre mode actif : retour à « Utilisation normale », jamais vers le mode absent.
+        platform.ActiveScheme = PowerSchemes.PowerSaver;
+        var scheme = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None)).Single(c => c.Id == "M05.power-plan");
+        Assert.Equal(PowerSchemes.Balanced.ToString("D"), scheme.Writes.Single().Value!.Data);
+    }
+
+    [Fact]
+    public async Task Powercfg_list_wins_over_the_registry_key()
+    {
+        // Clé présente, mais mode absent de la liste : le constat le dit, la correction ne le propose pas.
+        var commands = new FakeCommands().Answer("powercfg /list", "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced) *\n");
+        var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced };
+        var audit = TestContext.Create(RegistryWithHighPerformance(), commands: commands, hardware: Desktop);
+        var module = new PowerModule(platform);
+
+        Assert.DoesNotContain(module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None)), c => c.Id == "M05.power-plan");
+    }
+
+    [Fact]
     public async Task Missing_scheme_fails_cleanly_and_keeps_the_current_one()
     {
-        var registry = new FakeRegistry();
+        var registry = RegistryWithHighPerformance();
         var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced };
         platform.InstalledSchemes.Remove(PowerSchemes.HighPerformance);
         var audit = TestContext.Create(registry, hardware: Desktop);
@@ -80,7 +111,7 @@ public class LaptopPowerChoiceTests
     {
         FormFactor = FormFactor.Laptop,
         HasBattery = true,
-        Cpu = new CpuInfo("AMD Ryzen 7 5800H with Radeon Graphics", HardwareVendor.Amd, 8, 16, 3200),
+        Cpu = new CpuInfo("AMD Ryzen 7 5800H with Radeon Graphics", HardwareVendor.Amd, 8, 16),
     };
 
     private static async Task<IReadOnlyList<Finding>> Detect(Maus.Core.Preferences.LaptopPowerChoice choice, string ac, string dc)
@@ -88,7 +119,7 @@ public class LaptopPowerChoiceTests
         var registry = new FakeRegistry()
             .Set(RegistryHive.LocalMachine, PowerModule.SchemesKey, "ActiveOverlayAcPowerScheme", ac)
             .Set(RegistryHive.LocalMachine, PowerModule.SchemesKey, "ActiveOverlayDcPowerScheme", dc);
-        var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced, Capabilities = FakePowerPlatform.Caps(batteries: true) };
+        var platform = new FakePowerPlatform { ActiveScheme = PowerSchemes.Balanced, Capabilities = FakePowerPlatform.Caps() };
         var audit = TestContext.Create(registry, hardware: Laptop)
             .WithPreferences(Maus.Core.Preferences.UserPreferences.Default with { LaptopPower = choice });
         return await new PowerModule(platform).DetectAsync(audit, CancellationToken.None);

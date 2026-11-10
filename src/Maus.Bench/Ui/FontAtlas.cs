@@ -115,7 +115,7 @@ internal sealed class FontAtlas : IDisposable
             }
 
             var texture = device.CreateTexture(TextureDesc.Image(AtlasWidth, atlasHeight, PixelFormat.R8Unorm, "Police de l'interface"));
-            device.UploadTexture(texture, 0, 0, pixels, AtlasWidth);
+            device.UploadTexture(texture, 0, pixels, AtlasWidth);
             var atlas = new FontAtlas(texture, metrics.Ascent / unitsPerEm, metrics.Descent / unitsPerEm);
             for (var i = 0; i < rendered.Count; i++)
             {

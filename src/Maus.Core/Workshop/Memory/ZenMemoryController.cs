@@ -217,7 +217,7 @@ public static class ZenMemoryController
         return new LiveMemoryTimings(ddr5, channels.Select(c => c.Index).ToList(), mclk, (int)Math.Round(mclk * 2), timings, settings, differ);
     }
 
-    private readonly record struct PmLayout(uint Version, int Size, int Fclk, int Uclk, int Mclk, int Soc, int Vddp, int VddgIod, int VddgCcd);
+    internal readonly record struct PmLayout(uint Version, int Size, int Fclk, int Uclk, int Mclk, int Soc, int Vddp, int VddgIod, int VddgCcd);
 
     // version, taille, FCLK, UCLK, MCLK, VDDCR_SOC, VDDP, VDDG IOD, VDDG CCD (-1 = absent). Source : ZenStates-Core, PowerTable.cs.
     private static readonly PmLayout[] Layouts =
@@ -297,11 +297,11 @@ public static class ZenMemoryController
     ];
 
     /// <summary>Disposition de la table PM pour cette version : exacte, sinon celle de la famille (marquée « générique »).</summary>
-    internal static (PmLayoutInfo Layout, bool Generic)? LayoutFor(uint version)
+    internal static (PmLayout Layout, bool Generic)? LayoutFor(uint version)
     {
         if (Layouts.FirstOrDefault(l => l.Version == version) is { Size: > 0 } exact)
         {
-            return (Info(exact), false);
+            return (exact, false);
         }
 
         uint? generic = (version >> 16) switch
@@ -315,12 +315,8 @@ public static class ZenMemoryController
             0x62 => 0x000620,
             _ => null,
         };
-        return generic is { } g && Layouts.FirstOrDefault(l => l.Version == g) is { Size: > 0 } layout ? (Info(layout), true) : null;
+        return generic is { } g && Layouts.FirstOrDefault(l => l.Version == g) is { Size: > 0 } layout ? (layout, true) : null;
     }
-
-    internal readonly record struct PmLayoutInfo(int Size, int Fclk, int Uclk, int Mclk, int Soc, int Vddp, int VddgIod, int VddgCcd);
-
-    private static PmLayoutInfo Info(PmLayout l) => new(l.Size, l.Fclk, l.Uclk, l.Mclk, l.Soc, l.Vddp, l.VddgIod, l.VddgCcd);
 
     /// <summary>FCLK, UCLK, MCLK et tensions SoC / VDDP / VDDG ; <c>null</c> si la version de table est inconnue ou illisible.</summary>
     public static MemoryClocks? ReadClocks(IPmTableReader pm)

@@ -24,15 +24,17 @@ public sealed class HardwareHealthModule : IAuditModule
     private static string BenchmarkCategory => T("Mini-benchmark");
 
     /// <summary>Seuil maison d'usure d'un SSD (fiche technique, Module 11).</summary>
-    private const int WearWarningPercent = 80;
+    internal const int WearWarningPercent = 80;
 
-    private const double FreeSpaceWarningRatio = 0.15;
-    private const long ReadLatencyProblemMs = 10_000;
+    internal const double FreeSpaceWarningRatio = 0.15;
+    internal const long ReadLatencyProblemMs = 10_000;
+    internal const int FirmwareThrottlingEventId = 37;
+    internal const int FirmwareThrottlingDays = 30;
 
     /// <summary>Page « Recommandations de nettoyage » du Stockage (Microsoft Learn, « Launch Windows Settings »).</summary>
     internal const string CleanupRecommendationsPage = "ms-settings:storagerecommendations";
 
-    private static readonly string[] TrimArguments = ["behavior", "query", "DisableDeleteNotify"];
+    internal static readonly string[] TrimArguments = ["behavior", "query", "DisableDeleteNotify"];
 
     /// <summary>Bus NVMe dans <c>MSFT_PhysicalDisk.BusType</c>.</summary>
     private const long NvmeBus = 17;
@@ -68,10 +70,11 @@ public sealed class HardwareHealthModule : IAuditModule
             findings.Add(DetectSystemDisk(context.Cim, disks, systemLetter));
             findings.AddRange(disks.Select(DetectDiskHealth));
             // Un SSD NVMe dont le journal de santé a été lu : ses compteurs Windows absents ne sont pas une inconnue à signaler
-            // (« ce disque ne transmet pas ses compteurs » était faux, le journal NVMe donne l'usure, les erreurs et les heures).
+            // (« ce disque ne transmet pas ses compteurs » était faux, le journal NVMe donne l'usure, les erreurs et les heures),
+            // et son usure n'a qu'un verdict, celui du journal : le seuil maison des compteurs Windows ne s'y ajoute pas.
             var nvme = disks.Where(d => d.BusType == NvmeBus).Select(d => (Disk: d, Finding: DetectNvmeHealth(d))).Where(x => x.Finding is not null).ToList();
             var covered = nvme.Select(x => ReliabilityId(x.Disk)).ToHashSet(StringComparer.Ordinal);
-            findings.AddRange(DetectReliability(context.Cim, disks).Where(f => f.Status != FindingStatus.Unknown || !covered.Contains(f.Id)));
+            findings.AddRange(DetectReliability(context.Cim, disks, covered).Where(f => f.Status != FindingStatus.Unknown || !covered.Contains(f.Id)));
             findings.AddRange(nvme.Select(x => x.Finding!));
         }
 
@@ -192,7 +195,7 @@ public sealed class HardwareHealthModule : IAuditModule
         var (status, label, advice) = disk.HealthStatus switch
         {
             0 => (FindingStatus.Ok, T("sain"), (string?)null),
-            1 => (FindingStatus.Warning, "avertissement",
+            1 => (FindingStatus.Warning, T("avertissement"),
                 T("Sauvegardez vos données importantes dès maintenant et surveillez ce disque : Windows y a détecté un début d'anomalie.")),
             2 => (FindingStatus.Problem, T("défaillant"),
                 T("Sauvegardez immédiatement vos données : Windows considère ce disque comme défaillant. Prévoyez son remplacement.")),
@@ -297,6 +300,8 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = status,
             Severity = status == FindingStatus.Problem ? Severity.High : Severity.Medium,
             Current = current,
+            Measures = ReliabilityMeasures(log.PercentageUsed, log.TemperatureCelsius, (long)Math.Min(log.MediaErrors, long.MaxValue)),
+            MeasuredItem = disk.Name,
             Expected = T("aucune alerte du disque, réserve au-dessus du seuil du fabricant"),
             Explanation = T("Un SSD NVMe tient lui-même un journal de santé : réserve de cellules de remplacement, usure estimée par le fabricant, heures d'utilisation, erreurs. "
                 + "L'usure estimée peut dépasser 100 % sans que le disque soit en panne : c'est la fin de l'endurance garantie."),
@@ -304,7 +309,7 @@ public sealed class HardwareHealthModule : IAuditModule
         };
     }
 
-    private static List<Finding> DetectReliability(ICimReader cim, IReadOnlyList<PhysicalDiskInfo> disks)
+    private static List<Finding> DetectReliability(ICimReader cim, IReadOnlyList<PhysicalDiskInfo> disks, HashSet<string> nvmeCovered)
     {
         const string id = "M11.disk-reliability";
         var title = T("Usure, erreurs et température des disques");
@@ -322,21 +327,44 @@ public sealed class HardwareHealthModule : IAuditModule
             return [Finding.Unknown(id, title, T("Les compteurs de fiabilité des disques sont indisponibles sur ce PC."), StorageCategory)];
         }
 
-        return disks.Select(disk => DetectDiskReliability(disk, rows.FirstOrDefault(r => r.GetString("DeviceId") == disk.DeviceId))).ToList();
+        return disks.Select(disk => DetectDiskReliability(disk, rows.FirstOrDefault(r => r.GetString("DeviceId") == disk.DeviceId), nvmeCovered.Contains(ReliabilityId(disk)))).ToList();
     }
 
     private static string ReliabilityId(PhysicalDiskInfo disk) => $"M11.disk-{Slug(disk.DeviceId)}-reliability";
 
-    private static Finding DetectDiskReliability(PhysicalDiskInfo disk, CimRow? row)
+    private static Dictionary<string, double>? ReliabilityMeasures(long? wear, long? temperature, long? errors)
+    {
+        var measures = new Dictionary<string, double>();
+        if (wear is { } used)
+        {
+            measures[Workshop.MeasureHistory.Wear] = used;
+        }
+
+        // Zéro erreur lue est une vraie valeur : seul un compteur absent reste vide.
+        if (errors is >= 0 and var count)
+        {
+            measures[Workshop.MeasureHistory.Errors] = count;
+        }
+
+        if (temperature is > 0 and var celsius)
+        {
+            measures[Workshop.MeasureHistory.Temperature] = celsius;
+        }
+
+        return measures.Count == 0 ? null : measures;
+    }
+
+    private static Finding DetectDiskReliability(PhysicalDiskInfo disk, CimRow? row, bool wearInNvmeLog)
     {
         var id = ReliabilityId(disk);
-        var title = T("Usure, erreurs et température du disque {0}", disk.Name);
+        var title = wearInNvmeLog ? T("Erreurs et température du disque {0}", disk.Name) : T("Usure, erreurs et température du disque {0}", disk.Name);
         if (row is null)
         {
             return Finding.Unknown(id, title, T("Ce disque ne transmet pas ses compteurs de fiabilité (fréquent pour les disques USB ou derrière un contrôleur RAID)."), StorageCategory);
         }
 
-        var wear = row.GetInt64("Wear");
+        // L'usure n'a de sens que pour un SSD, et un disque à plateaux n'en a pas (ce n'est pas 0 %) ; celle d'un NVMe au journal lu est jugée et notée par le constat du journal.
+        var wear = disk.IsSsd && !wearInNvmeLog ? row.GetInt64("Wear") : null;
         var temperature = row.GetInt64("Temperature");
         var temperatureMax = row.GetInt64("TemperatureMax");
         var readErrors = row.GetInt64("ReadErrorsUncorrected");
@@ -346,7 +374,7 @@ public sealed class HardwareHealthModule : IAuditModule
         var shown = new List<string>();
         var problems = new List<string>();
         var warnings = new List<string>();
-        if (disk.IsSsd && wear is not null)
+        if (wear is not null)
         {
             shown.Add(T("usure {0} %", wear));
             if (wear >= WearWarningPercent)
@@ -402,9 +430,16 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = deviating ? FindingStatusExtensions.ForDeviation(severity) : FindingStatus.Ok,
             Severity = severity,
             Current = string.Join(" · ", shown),
-            Expected = T("usure < {0} %, aucune erreur non corrigée, température sous la limite", WearWarningPercent),
-            Explanation = T("Compteurs tenus par le disque lui-même : usure des cellules (SSD), erreurs de lecture non corrigées, "
-                + "température et temps de réponse. Ils annoncent souvent une panne avant qu'elle ne survienne."),
+            Measures = ReliabilityMeasures(wear, temperature, readErrors),
+            MeasuredItem = disk.Name,
+            Expected = wearInNvmeLog
+                ? T("aucune erreur non corrigée, température sous la limite")
+                : T("usure < {0} %, aucune erreur non corrigée, température sous la limite", WearWarningPercent),
+            Explanation = wearInNvmeLog
+                ? T("Compteurs tenus par le disque lui-même : erreurs de lecture non corrigées, température et temps de réponse. "
+                    + "L'usure de ce SSD est jugée par son journal de santé NVMe.")
+                : T("Compteurs tenus par le disque lui-même : usure des cellules (SSD), erreurs de lecture non corrigées, "
+                    + "température et temps de réponse. Ils annoncent souvent une panne avant qu'elle ne survienne."),
             Advice = deviating
                 ? T("À surveiller : {0}. Sauvegardez vos données importantes", string.Join(", ", problems.Concat(warnings)))
                     + (problems.Count > 0 ? T(" sans attendre et prévoyez le remplacement du disque.") : T(" et prévoyez le remplacement du disque à moyen terme."))
@@ -446,9 +481,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Explanation = T("TRIM indique au SSD quels blocs sont libérés. Sans lui, le SSD ralentit en écriture au fil du temps et s'use plus vite."),
             Advice = enabled || !hasSsd
                 ? null
-                : T("Réactiver TRIM (commande fsutil behavior set DisableDeleteNotify 0), puis lancer une optimisation du lecteur. "
-                    + "Une prochaine version le proposera, avec retour arrière possible."),
-            Fixable = !enabled && hasSsd,
+                : T("Réactiver TRIM (commande fsutil behavior set DisableDeleteNotify 0), puis lancer une optimisation du lecteur."),
         };
     }
 
@@ -511,9 +544,9 @@ public sealed class HardwareHealthModule : IAuditModule
         }
 
         var speeds = modules
-            .Select(m => m.GetInt64("ConfiguredClockSpeed") is > 0 and var configured ? configured : m.GetInt64("Speed"))
-            .OfType<long>()
-            .Where(s => s > 0)
+            .Select(m => Maus.Core.Modules.M10Memory.MemorySpeeds.FromRow(m, Maus.Core.Modules.M10Memory.MemorySpeeds.Generation(m.GetInt64("SMBIOSMemoryType"))))
+            .Select(s => s.Configured ?? s.Rated)
+            .OfType<int>()
             .ToList();
         if (modules.Count == 0 || speeds.Count == 0)
         {
@@ -525,7 +558,7 @@ public sealed class HardwareHealthModule : IAuditModule
             modules.Select(m => (m.GetString("DeviceLocator"), m.GetString("BankLabel"))).ToList());
         var gigabytesPerSecond = channels * mts * 8 / 1000d;
         var capacity = modules.Sum(m => m.GetInt64("Capacity") ?? 0);
-        var type = modules.Select(m => HealthParsers.MemoryTypeLabel(m.GetInt64("SMBIOSMemoryType"))).FirstOrDefault(t => t is not null);
+        var type = modules.Select(m => Maus.Core.Modules.M10Memory.MemorySpeeds.TypeName(m.GetInt64("SMBIOSMemoryType"))).FirstOrDefault(t => t is not null);
         var description = T("{0} barrette(s)", modules.Count)
             + (capacity > 0 ? T(", {0} au total", HealthParsers.FormatGigabytes(capacity)) : string.Empty)
             + (type is null ? string.Empty : $" ({type})");
@@ -547,11 +580,11 @@ public sealed class HardwareHealthModule : IAuditModule
     private static Finding DetectFirmwareThrottling(AuditContext context)
     {
         const string id = "M11.firmware-throttling";
-        var title = T("Processeur non bridé par le firmware");
+        var title = T("Bridage du processeur noté par Windows");
         IReadOnlyList<EventRecordInfo> events;
         try
         {
-            events = context.EventLogs.Query("System", ProcessorPowerProvider, [37], context.Now.DateTime.AddDays(-30), maxEvents: 100);
+            events = context.EventLogs.Query("System", ProcessorPowerProvider, [FirmwareThrottlingEventId], context.Now.DateTime.AddDays(-FirmwareThrottlingDays), maxEvents: 100);
         }
         catch (MausAccessDeniedException)
         {
@@ -572,11 +605,14 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = !throttled ? FindingStatus.Ok : laptop ? FindingStatus.Info : FindingStatusExtensions.ForDeviation(Severity.Medium),
             Severity = Severity.Medium,
             Current = throttled
-                ? T("{0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("d", Culture))
-                : T("aucune alerte en 30 jours"),
+                ? events.Count >= 100
+                    ? T("au moins {0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("d", Culture))
+                    : T("{0} alerte(s) en 30 jours, la dernière le {1}", events.Count, events.Max(e => e.TimeCreated).ToString("d", Culture))
+                : T("aucune alerte de bridage notée par Windows en 30 jours"),
             Expected = T("aucune alerte"),
-            Explanation = T("Windows note (événement 37 de Kernel-Processor-Power) chaque fois que le BIOS limite la vitesse du processeur : "
-                + "surchauffe, limite de puissance ou alimentation insuffisante.")
+            Explanation = T("Windows note (événement 37 de Kernel-Processor-Power) que le firmware limite la vitesse du processeur, sans en donner la cause : "
+                + "surchauffe, limite de puissance ou alimentation insuffisante sont des pistes. Aucune alerte ne prouve pas que le processeur "
+                + "n'a jamais ralenti : Windows ne note que ce que le firmware lui signale.")
                 + (laptop ? T(" Sur un portable, c'est souvent normal sur batterie ou avec un chargeur peu puissant.") : string.Empty),
             Advice = throttled
                 ? T("Vérifiez la ventilation (poussière, pâte thermique), puis le plan d'alimentation (Module 5) et la version du BIOS (Module 8).")
@@ -592,16 +628,11 @@ public sealed class HardwareHealthModule : IAuditModule
         Status = FindingStatus.Info,
         Current = T("non lancé (audit seul)"),
         Explanation = T("« Ce test ne rend pas votre PC plus rapide : il vérifie qu'il fonctionne comme prévu. » "
-            + "Les tests du processeur, de la mémoire vive et de la mémoire vidéo se lancent depuis l'Atelier (onglet Tests), avec arrêt automatique en cas de surchauffe, "
+            + "Les tests du processeur, de la mémoire vive et de la mémoire vidéo se lancent depuis l'Atelier (onglet Tests), avec arrêt automatique en cas de surchauffe quand la température et sa limite sont lisibles, "
             + "et leurs résultats sont gardés pour comparer avant et après optimisation. L'audit se limite aux indicateurs passifs ci-dessus. "
             + "La température interne du processeur n'est pas lue par l'audit : l'Atelier peut la lire avec le pilote PawnIO, installé seulement si vous le demandez."),
         Advice = T("En attendant, les causes de lenteur les plus fréquentes sont vérifiées par les Modules 5 (alimentation), 10 (mémoire) et 12 (démarrage)."),
     };
 
-    private static string Slug(string value)
-    {
-        var chars = value.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray();
-        var slug = new string(chars).Trim('-');
-        return slug.Length == 0 ? "x" : slug;
-    }
+    private static string Slug(string value) => FindingSlug.Of(value);
 }

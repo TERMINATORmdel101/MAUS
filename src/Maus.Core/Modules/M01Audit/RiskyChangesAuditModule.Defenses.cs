@@ -13,15 +13,20 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Check UacPromptCheck => new("M01.uac-prompt", T("Demande de confirmation de l'UAC"), DefensesCategory, Severity.High, Fixable: true);
 
-    private static Check FirewallCheck => new("M01.firewall", "Pare-feu Windows", DefensesCategory, Severity.Critical, Fixable: true, SettingsPage: WindowsSecurityPage);
+    private static Check FirewallCheck => new("M01.firewall", T("Pare-feu Windows"), DefensesCategory, Severity.Critical, Fixable: true, SettingsPage: WindowsSecurityPage);
+
+    /// <summary>Codes de profil, tels que les donne MSFT_NetFirewallProfile en majuscules : le libellé ne se calcule qu'à l'affichage.</summary>
+    private const string DomainProfile = "DOMAIN";
+    private const string PrivateProfile = "PRIVATE";
+    private const string PublicProfile = "PUBLIC";
 
     /// <summary>Clés de stratégie par profil ; « StandardProfile » est l'ancien nom du profil privé.</summary>
-    private static readonly (string Key, string Label)[] FirewallPolicyProfiles =
+    private static readonly (string Key, string Profile)[] FirewallPolicyProfiles =
     [
-        ("DomainProfile", T("domaine")),
-        ("PrivateProfile", T("privé")),
-        ("StandardProfile", T("privé")),
-        ("PublicProfile", "public"),
+        ("DomainProfile", DomainProfile),
+        ("PrivateProfile", PrivateProfile),
+        ("StandardProfile", PrivateProfile),
+        ("PublicProfile", PublicProfile),
     ];
 
     private static Finding DetectUacPrompt(IRegistryReader registry)
@@ -75,11 +80,11 @@ public sealed partial class RiskyChangesAuditModule
 
         var off = new SortedSet<string>(StringComparer.Ordinal);
         var byPolicy = false;
-        foreach (var (key, label) in FirewallPolicyProfiles)
+        foreach (var (key, profile) in FirewallPolicyProfiles)
         {
             if (context.Registry.GetDword(Hklm, FirewallPolicyKey + key, "EnableFirewall") == 0)
             {
-                off.Add(label);
+                off.Add(profile);
                 byPolicy = true;
             }
         }
@@ -90,7 +95,7 @@ public sealed partial class RiskyChangesAuditModule
             // Enabled vaut 0 (non), 1 (oui) ou 2 (non configuré, donc actif par défaut).
             if (row.GetBool("Enabled") == false)
             {
-                off.Add(FirewallProfileLabel(row.GetString("Name")));
+                off.Add(row.GetString("Name")?.Trim().ToUpperInvariant() ?? string.Empty);
             }
         }
 
@@ -104,7 +109,7 @@ public sealed partial class RiskyChangesAuditModule
             return FirewallCheck.Compliant(T("activé sur les 3 profils"), expected, explanation);
         }
 
-        var current = T("coupé sur le(s) profil(s) : {0}{1}", string.Join(", ", off), (byPolicy ? T(" (par une stratégie)") : string.Empty));
+        var current = T("coupé sur le(s) profil(s) : {0}{1}", string.Join(", ", off.Select(FirewallProfileLabel)), (byPolicy ? T(" (par une stratégie)") : string.Empty));
         if (SecurityProduct.ActiveThirdParty(firewalls) is { } thirdParty)
         {
             return FirewallCheck.Neutral(
@@ -116,17 +121,18 @@ public sealed partial class RiskyChangesAuditModule
         var advice = T("Supprimer les stratégies EnableFirewall éventuelles, puis réactiver le pare-feu pour tous les profils dans Sécurité Windows > Pare-feu et protection du réseau.");
 
         // Le profil « domaine » ne sert que sur un réseau d'entreprise : coupé seul sur un PC personnel, le risque est limité.
-        var onlyDomain = off.Count == 1 && off.Contains(T("domaine"));
+        var onlyDomain = off.Count == 1 && off.Contains(DomainProfile);
         return onlyDomain && !context.Hardware.IsManaged
             ? FirewallCheck.Deviation(current, expected, T("Le profil « domaine » ne sert que sur un réseau d'entreprise, mais sa désactivation trahit souvent un script de « nettoyage ». ") + explanation, advice, Severity.Medium)
             : FirewallCheck.Deviation(current, expected, explanation, advice);
     }
 
-    private static string FirewallProfileLabel(string? name) => name?.Trim().ToUpperInvariant() switch
+    private static string FirewallProfileLabel(string code) => code switch
     {
-        "DOMAIN" => T("domaine"),
-        "PRIVATE" => T("privé"),
-        "PUBLIC" => T("public"),
-        _ => name ?? T("inconnu"),
+        DomainProfile => T("domaine"),
+        PrivateProfile => T("privé"),
+        PublicProfile => T("public"),
+        "" => T("inconnu"),
+        _ => code,
     };
 }

@@ -35,13 +35,10 @@ internal enum EffectivePowerMode
 
 /// <summary>Champs utiles de <c>SYSTEM_POWER_CAPABILITIES</c>.</summary>
 internal sealed record PowerCapabilities(
-    bool LidPresent,
     bool SystemS3,
-    bool SystemS4,
     bool HiberFilePresent,
     bool UpsPresent,
     bool AoAc,
-    bool SystemBatteriesPresent,
     bool BatteriesAreShortTerm)
 {
     /// <summary>Taille de <c>SYSTEM_POWER_CAPABILITIES</c> en octets.</summary>
@@ -49,19 +46,16 @@ internal sealed record PowerCapabilities(
 
     /// <summary>
     /// Lit la structure native octet par octet (winnt.h, Windows 10 et plus) :
-    /// LidPresent 2, SystemS3 5, SystemS4 6, HiberFilePresent 8, UpsPresent 12, AoAc 20, SystemBatteriesPresent 30, BatteriesAreShortTerm 31.
+    /// SystemS3 5, HiberFilePresent 8, UpsPresent 12, AoAc 20, BatteriesAreShortTerm 31.
     /// </summary>
     public static PowerCapabilities? Parse(ReadOnlySpan<byte> buffer) =>
         buffer.Length < 32
             ? null
             : new PowerCapabilities(
-                LidPresent: buffer[2] != 0,
                 SystemS3: buffer[5] != 0,
-                SystemS4: buffer[6] != 0,
                 HiberFilePresent: buffer[8] != 0,
                 UpsPresent: buffer[12] != 0,
                 AoAc: buffer[20] != 0,
-                SystemBatteriesPresent: buffer[30] != 0,
                 BatteriesAreShortTerm: buffer[31] != 0);
 }
 

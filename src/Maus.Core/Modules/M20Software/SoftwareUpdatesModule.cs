@@ -5,7 +5,8 @@ namespace Maus.Core.Modules.M20Software;
 
 /// <summary>
 /// Module 20 — Mises à jour des logiciels : la liste de <c>winget upgrade</c> (catalogue communautaire de Microsoft),
-/// en lecture seule. La mise à jour se fait à la demande, logiciel par logiciel, dans une fenêtre visible.
+/// en lecture seule et toujours sans droits administrateur. La mise à jour se fait à la demande, logiciel par logiciel,
+/// dans une fenêtre visible.
 /// </summary>
 public sealed class SoftwareUpdatesModule : IAuditModule
 {
@@ -54,6 +55,22 @@ public sealed class SoftwareUpdatesModule : IAuditModule
 
         const string id = "M20.software-updates";
         var title = T("Logiciels à mettre à jour");
+
+        // winget interroge ses sources sur Internet : jamais sans un clic de l'utilisateur.
+        if (context.Offline)
+        {
+            return [Finding.Unknown(id, title, T("Pas de réseau pendant l'audit de la semaine : la liste des logiciels à mettre à jour se lit quand vous lancez l'audit vous-même."), Category)];
+        }
+
+        // winget est un outil propre au compte de l'utilisateur : jamais lancé avec les droits administrateur (0.8.6). Quand
+        // c'est le moteur qui fait l'audit, la fenêtre lit elle-même la liste, sans droits, et remplace ce constat
+        // (OnDemandMausEngine) ; une fenêtre lancée en administrateur n'a pas d'autre processus pour le faire.
+        if (context.IsElevated)
+        {
+            return [Finding.Unknown(id, title, T("Cet audit a les droits administrateur, et winget, outil propre à votre compte, n'est jamais lancé avec ces droits. "
+                + "Pour voir les logiciels à mettre à jour, ouvrez MAUS normalement (sans « Exécuter en tant qu'administrateur »), puis lancez l'audit."), Category)];
+        }
+
         string? winget;
         try
         {

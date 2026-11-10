@@ -73,6 +73,7 @@ public sealed class PresentMonCapture : IDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
+            WorkingDirectory = Platform.SystemTool.WorkingFolder,
         };
         // Le compositeur de Windows et MAUS ne sont jamais le jeu : PresentMon ne les suit pas (moins de lignes à écrire et à lire).
         foreach (var argument in new[] { "--output_stdout", "--v1_metrics", "--no_console_stats", "--stop_existing_session", "--session_name", sessionName, "--exclude", "dwm.exe", "--exclude", "MAUS.exe" })
@@ -113,13 +114,31 @@ public sealed class PresentMonCapture : IDisposable
 
             Breadcrumbs.Add(what);
         });
+        Track(task);
+        task.Forget("PresentMon : arrêt en arrière-plan");
+    }
+
+    /// <summary>Arrêt demandé par l'interface : comme les arrêts en arrière-plan, il compte parmi ceux à laisser finir.</summary>
+    public Task<FrameSummary?> StopTracked()
+    {
+        var task = Task.Run(() =>
+        {
+            using (this)
+            {
+                return Stop();
+            }
+        });
+        Track(task);
+        return task;
+    }
+
+    private static void Track(Task task)
+    {
         lock (s_stopping)
         {
             s_stopping.RemoveAll(t => t.IsCompleted);
             s_stopping.Add(task);
         }
-
-        task.Forget("PresentMon : arrêt en arrière-plan");
     }
 
     /// <summary>
@@ -157,7 +176,7 @@ public sealed class PresentMonCapture : IDisposable
                 _process.Kill(entireProcessTree: true);
             }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or AggregateException or System.ComponentModel.Win32Exception)
         {
             // Déjà terminé.
         }
@@ -174,7 +193,7 @@ public sealed class PresentMonCapture : IDisposable
                 _process.WaitForExit(3000);
             }
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or AggregateException or System.ComponentModel.Win32Exception)
         {
             // Déjà terminé.
         }
@@ -196,7 +215,7 @@ public sealed class PresentMonCapture : IDisposable
 
         try
         {
-            var start = new ProcessStartInfo(ExecutablePath) { UseShellExecute = false, CreateNoWindow = true };
+            var start = new ProcessStartInfo(ExecutablePath) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Platform.SystemTool.WorkingFolder };
             start.ArgumentList.Add("--terminate_existing_session");
             start.ArgumentList.Add("--session_name");
             start.ArgumentList.Add(sessionName);

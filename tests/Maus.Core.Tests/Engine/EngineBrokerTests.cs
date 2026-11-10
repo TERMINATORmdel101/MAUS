@@ -174,7 +174,7 @@ public sealed class EngineBrokerTests
         var server = new EngineServer(local, name, Environment.ProcessId, key.Fingerprint()).RunAsync(stop.Token);
         try
         {
-            var ping = key.SignRequest(JsonSerializer.Serialize(new EngineRequest("ping", "fr", Sequence: 1), EngineProtocol.Json));
+            var ping = key.SignRequest(JsonSerializer.SerializeToUtf8Bytes(new EngineRequest("ping", "fr", Sequence: 1), EngineProtocol.Json));
 
             // Avant la présentation de la clé, même une demande bien signée est refusée.
             Assert.Null(await RawCallAsync(name, ping));
@@ -205,7 +205,7 @@ public sealed class EngineBrokerTests
         try
         {
             Assert.NotNull(await RawCallAsync(name, key.Introduction()));
-            var ping = key.SignRequest(JsonSerializer.Serialize(new EngineRequest("ping", "fr", Sequence: 1), EngineProtocol.Json));
+            var ping = key.SignRequest(JsonSerializer.SerializeToUtf8Bytes(new EngineRequest("ping", "fr", Sequence: 1), EngineProtocol.Json));
 
             // Première fois : servie, et la réponse est signée pour la demande n° 1 seulement.
             var answer = await RawCallAsync(name, ping);
@@ -217,12 +217,12 @@ public sealed class EngineBrokerTests
             Assert.Null(await RawCallAsync(name, ping));
 
             // Texte modifié après la signature (autre numéro) : refusé sans réponse.
-            var modified = ping with { Body = ping.Body.Replace("\"sequence\":1", "\"sequence\":2", StringComparison.Ordinal) };
+            var modified = ping with { Body = JsonSerializer.SerializeToUtf8Bytes(new EngineRequest("ping", "fr", Sequence: 2), EngineProtocol.Json) };
             Assert.NotEqual(ping.Body, modified.Body);
             Assert.Null(await RawCallAsync(name, modified));
 
             // Nouveau numéro, bien signé : servi (deux refus seulement, sous le seuil d'arrêt par sécurité).
-            var next = key.SignRequest(JsonSerializer.Serialize(new EngineRequest("ping", "fr", Sequence: 2), EngineProtocol.Json));
+            var next = key.SignRequest(JsonSerializer.SerializeToUtf8Bytes(new EngineRequest("ping", "fr", Sequence: 2), EngineProtocol.Json));
             Assert.NotNull(await RawCallAsync(name, next));
         }
         finally
@@ -262,7 +262,7 @@ public sealed class EngineBrokerTests
         try
         {
             await EngineProtocol.WriteAsync(pipe, message, CancellationToken.None);
-            return await EngineProtocol.ReadAsync<SignedMessage>(pipe, CancellationToken.None);
+            return await EngineProtocol.ReadAsync(pipe, CancellationToken.None);
         }
         catch (IOException)
         {

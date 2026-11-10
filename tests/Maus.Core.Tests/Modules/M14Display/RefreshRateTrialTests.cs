@@ -4,6 +4,18 @@ namespace Maus.Core.Tests.Modules.M14Display;
 
 public class RefreshRateTrialTests
 {
+    /// <summary>Lecture réelle, sans rien changer : la structure DEVMODEW commune doit donner des valeurs sensées (ou rien, sans écran).</summary>
+    [Fact]
+    public void Shared_display_mode_structure_reads_sane_values()
+    {
+        Assert.True(Maus.Core.Platform.DisplayRefresh.PrimaryHz() is null or (> 1 and < 1000));
+
+        foreach (var path in new Win32DisplayConfigReader().ReadActivePaths() ?? [])
+        {
+            Assert.All(path.Modes, mode => Assert.True(mode.Width > 0 && mode.Height > 0 && mode.RefreshHz is > 1 and < 1000));
+        }
+    }
+
     private static DisplayPath Screen(double refresh, int width = 3440, int height = 1440) => new()
     {
         MonitorName = "AW3423DWF",
@@ -74,6 +86,54 @@ public class RefreshRateTrialTests
         Assert.False(trial.Started);
         Assert.Throws<InvalidOperationException>(() => trial.Keep());
         Assert.Equal(15, RefreshRateTrial.ConfirmDelay.TotalSeconds);
+    }
+
+    [Fact]
+    public void Going_back_restores_the_old_rate_and_never_overwrites_a_later_change()
+    {
+        var kept = new Maus.Core.Preferences.KeptRefreshRate(@"\\.\DISPLAY1", "Écran", 2560, 1440, 60, 144, DateTimeOffset.UnixEpoch);
+        var screen = Screen(144, 2560, 1440) with { SourceName = kept.SourceName, Modes = [new DisplayMode(2560, 1440, 60), new DisplayMode(2560, 1440, 144)] };
+
+        var writer = new FakeWriter();
+        var done = RefreshRateUndo.Run(kept, [screen], writer);
+        Assert.True(done.Finished);
+        Assert.Equal(["keep 2560x1440 60"], writer.Calls);
+
+        // Fréquence changée depuis, dans Windows : laissée telle quelle.
+        var changed = new FakeWriter();
+        Assert.True(RefreshRateUndo.Run(kept, [screen with { RefreshHz = 120 }], changed).Finished);
+        Assert.Empty(changed.Calls);
+
+        // Écran débranché : rien ne change, l'entrée reste.
+        var absent = new FakeWriter();
+        Assert.False(RefreshRateUndo.Run(kept, [], absent).Finished);
+        Assert.Empty(absent.Calls);
+    }
+
+    [Theory]
+    [InlineData(75)]
+    [InlineData(500)]
+    public void Going_back_writes_only_a_rate_that_windows_lists_for_this_screen(int noted)
+    {
+        var kept = new Maus.Core.Preferences.KeptRefreshRate(@"\\.\DISPLAY1", "Écran", 2560, 1440, noted, 144, DateTimeOffset.UnixEpoch);
+        var screen = Screen(144, 2560, 1440) with { SourceName = kept.SourceName, Modes = [new DisplayMode(2560, 1440, 60), new DisplayMode(2560, 1440, 144), new DisplayMode(1920, 1080, 75)] };
+        var writer = new FakeWriter();
+
+        Assert.False(RefreshRateUndo.Run(kept, [screen], writer).Finished);
+
+        Assert.Empty(writer.Calls);
+    }
+
+    [Fact]
+    public void Going_back_takes_the_listed_rate_close_to_the_note()
+    {
+        var kept = new Maus.Core.Preferences.KeptRefreshRate(@"\\.\DISPLAY1", "Écran", 1440, 2560, 60, 144, DateTimeOffset.UnixEpoch);
+        var screen = Screen(144, 1440, 2560) with { SourceName = kept.SourceName, Modes = [new DisplayMode(2560, 1440, 59), new DisplayMode(2560, 1440, 144)] };
+        var writer = new FakeWriter();
+
+        Assert.True(RefreshRateUndo.Run(kept, [screen], writer).Finished);
+
+        Assert.Equal(["keep 1440x2560 59"], writer.Calls);
     }
 
     private sealed class FakeWriter : IDisplayModeWriter

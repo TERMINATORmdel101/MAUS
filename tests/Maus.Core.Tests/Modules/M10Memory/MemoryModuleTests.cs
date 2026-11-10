@@ -13,14 +13,14 @@ public class MemoryModuleTests
     {
         FormFactor = FormFactor.Desktop,
         BoardManufacturer = "Micro-Star International Co., Ltd.",
-        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12, 3700),
+        Cpu = new CpuInfo("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", HardwareVendor.Intel, 6, 12),
         Gpus = [new GpuInfo("NVIDIA GeForce RTX 2080 Ti", HardwareVendor.Nvidia, null, null, @"PCI\VEN_10DE", false)],
     };
 
     private static readonly HardwareProfile Am5Desktop = IntelDesktop with
     {
         BoardManufacturer = "ASUSTeK COMPUTER INC.",
-        Cpu = new CpuInfo("AMD Ryzen 7 7800X3D 8-Core Processor", HardwareVendor.Amd, 8, 16, 4200),
+        Cpu = new CpuInfo("AMD Ryzen 7 7800X3D 8-Core Processor", HardwareVendor.Amd, 8, 16),
     };
 
     [Fact]
@@ -113,13 +113,22 @@ public class MemoryModuleTests
     }
 
     [Fact]
+    public async Task Virtual_machine_has_no_channels_to_judge()
+    {
+        var findings = await Detect(IntelDesktop with { Manufacturer = "Microsoft Corporation", Model = "Virtual Machine" },
+            Dimm("M0", "BANK 0", null, 3200, 3200));
+
+        Assert.Equal(FindingStatus.Info, Single(findings, "M10.dual-channel").Status);
+    }
+
+    [Fact]
     public async Task Unknown_part_number_above_jedec_speed_means_profile_active()
     {
         var findings = await Detect(IntelDesktop,
             Dimm("ChannelA-DIMM1", "BANK 1", "MYSTERY-RAM", 3600, 3600),
             Dimm("ChannelB-DIMM1", "BANK 3", null, 3600, 3600));
 
-        Assert.Equal(FindingStatus.Ok, Single(findings, "M10.xmp").Status);
+        Assert.Equal(FindingStatus.Info, Single(findings, "M10.xmp").Status);
     }
 
     [Fact]

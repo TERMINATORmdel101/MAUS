@@ -33,9 +33,11 @@ public interface IJournalStore
 
     /// <returns>La séance, ou <c>null</c> si elle est absente, abîmée, écrite par une version plus récente de MAUS ou non fiable.</returns>
     /// <exception cref="JournalUnreadableException">Le fichier existe mais reste illisible.</exception>
+    /// <exception cref="JournalUnsafeException">Le dossier du journal n'est pas sûr : rien n'a été lu.</exception>
     JournalSession? Load(string id);
 
     /// <summary>Séances lisibles, de la plus récente à la plus ancienne.</summary>
+    /// <exception cref="JournalUnsafeException">Le dossier du journal n'est pas sûr : rien n'a été lu.</exception>
     IReadOnlyList<JournalSession> List();
 
     /// <summary>Comme <see cref="List"/>, avec le nombre de séances qui n'ont pas pu être lues.</summary>
@@ -49,7 +51,26 @@ public interface IDirectoryProtector
     /// <exception cref="JournalUnsafeException">Dossier impossible à sécuriser (lien symbolique, propriétaire étranger…).</exception>
     void EnsureProtected(string directory);
 
-    /// <summary>Le fichier appartient-il à SYSTEM ou aux Administrateurs ?</summary>
+    /// <summary>
+    /// Avant une lecture : vrai si le dossier existe et qu'il est bien protégé ; faux s'il n'y a rien à lire. Un dossier absent
+    /// n'est pas créé pour autant.
+    /// </summary>
+    /// <exception cref="JournalUnsafeException">Dossier impossible à sécuriser : il ne doit pas être lu.</exception>
+    bool EnsureReadable(string directory)
+    {
+        if (!System.IO.Directory.Exists(directory))
+        {
+            return false;
+        }
+
+        EnsureProtected(directory);
+        return true;
+    }
+
+    /// <summary>
+    /// Le fichier est-il sûr : propriétaire SYSTEM ou Administrateurs, aucun droit d'écriture pour un autre compte, un seul
+    /// nom sur le disque ?
+    /// </summary>
     bool IsTrusted(string file);
 
     /// <summary>
@@ -79,7 +100,7 @@ public sealed class FileJournalStore(string directory, IDirectoryProtector prote
     private readonly ConcurrentDictionary<string, bool> _known = new(StringComparer.Ordinal);
 
     public static string DefaultDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "MAUS", "journal");
+        Path.Combine(SystemPaths.MausData, "journal");
 
     public string Directory { get; } = directory;
 
@@ -96,7 +117,15 @@ public sealed class FileJournalStore(string directory, IDirectoryProtector prote
             GuardExisting(session.Id, path);
         }
 
-        AtomicFile.WriteAllText(path, JsonSerializer.Serialize(session, JsonOptions), protector.ProtectFile);
+        try
+        {
+            AtomicFile.WriteAllText(path, JsonSerializer.Serialize(session, JsonOptions), protector.ProtectFile);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new JournalUnsafeException(T("Impossible d'écrire le journal des corrections : {0}", ex.Message), ex);
+        }
+
         _known[session.Id] = true;
     }
 
@@ -104,7 +133,7 @@ public sealed class FileJournalStore(string directory, IDirectoryProtector prote
     {
         ArgumentNullException.ThrowIfNull(id);
 
-        if (!IsValidId(id))
+        if (!IsValidId(id) || !protector.EnsureReadable(Directory))
         {
             return null;
         }
@@ -130,7 +159,7 @@ public sealed class FileJournalStore(string directory, IDirectoryProtector prote
     /// <summary>Un fichier douteux (propriétaire étranger) est ignoré ; un fichier illisible est compté, jamais rejoué ni réécrit.</summary>
     public JournalListing Browse()
     {
-        if (!System.IO.Directory.Exists(Directory))
+        if (!protector.EnsureReadable(Directory))
         {
             return new JournalListing([], 0);
         }

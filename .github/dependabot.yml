@@ -1,0 +1,31 @@
+# Propose chaque semaine les nouvelles versions, regroupées en une seule demande par famille (actions GitHub, NuGet) : les
+# alertes de GitHub ne couvrent pas les actions épinglées par empreinte. Rien n'est fusionné seul. Les montées de version
+# majeure restent des demandes à part, à relire une par une. Une nouvelle version d'un paquet NuGet doit aussi être
+# reportée dans packages.lock.json : sinon les tests de GitHub refusent la demande (restauration verrouillée).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-github:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: nuget
+    # La racine suit Maus.slnx (src et tests) ; l'outil du paquet Microsoft Store n'est pas dans la solution.
+    directories:
+      - /
+      - /installer/msix
+    schedule:
+      interval: weekly
+    groups:
+      bibliotheques-nuget:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

@@ -486,3 +486,15 @@ $RECYCLE.BIN/
 
 # Version compilée pour les tests
 publish/
+
+# Secrets, certificats et clés de signature : jamais dans le dépôt, qui est public. Le .pfx est déjà exclu plus haut, et la
+# ligne « *.snk » du modèle y est en commentaire.
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pvk
+*.snk
+*.jks
+*.keystore

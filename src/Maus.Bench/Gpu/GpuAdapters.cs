@@ -41,10 +41,26 @@ internal static class GpuAdapters
         throw new InvalidOperationException("Aucune carte graphique compatible avec Direct3D n'a été trouvée.");
     }
 
+    /// <summary>
+    /// Version du pilote de la carte (IDXGIAdapter::CheckInterfaceSupport avec IDXGIDevice : Microsoft réserve cet appel aux
+    /// interfaces de cette génération, il échoue avec celles de Direct3D 11 et 12). Une lecture impossible n'arrête pas la passe.
+    /// </summary>
+    public static string? DriverVersion(IDXGIAdapter adapter)
+    {
+        try
+        {
+            return adapter.CheckInterfaceSupport(typeof(IDXGIDevice).GUID, out long version).Success ? Maus.Core.Workshop.Benchmark.BenchmarkMarkers.DriverVersionText(version) : null;
+        }
+        catch (SharpGenException)
+        {
+            return null;
+        }
+    }
+
     private static bool IsSoftware(IDXGIAdapter1 adapter) => (adapter.Description1.Flags & AdapterFlags.Software) != 0;
 }
 
-/// <summary>Benchmark arrêté par sécurité : température au-delà du seuil donné par la carte ou le processeur.</summary>
+/// <summary>Benchmark arrêté par sécurité : température au-delà du seuil donné par la carte ou le processeur, ou température qui n'est plus lue.</summary>
 public sealed class SafetyStopException(string message) : Exception(message)
 {
 }

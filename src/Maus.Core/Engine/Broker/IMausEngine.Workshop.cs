@@ -1,6 +1,6 @@
 using Maus.Core.Fixes;
-using Maus.Core.Modules.M20Software;
 using Maus.Core.Workshop;
+using Maus.Core.Workshop.Benchmark;
 using Maus.Core.Workshop.Memory;
 
 namespace Maus.Core.Engine.Broker;
@@ -27,18 +27,11 @@ public sealed record SensorReading(SensorSnapshot Snapshot, SensorState State);
 /// <summary>Processus lus par le moteur (tous les comptes, chemins complets).</summary>
 public sealed record ProcessReading(IReadOnlyList<RawProcess> Processes, IReadOnlyDictionary<int, double> GpuPercent);
 
-/// <summary>Fenêtres de commande visibles que le moteur sait ouvrir ; il construit lui-même chaque ligne de commande.</summary>
-public enum ConsoleKind
+/// <summary>Tâches que le moteur sait lancer, sans cmd.exe ; il construit lui-même chaque liste d'arguments.</summary>
+public enum ToolKind
 {
     /// <summary>DISM /RestoreHealth puis SFC /scannow.</summary>
     Repair,
-
-    /// <summary>winget upgrade des logiciels choisis (identifiants vérifiés).</summary>
-    WingetUpgrade,
-
-    PawnIoInstall,
-
-    PawnIoUninstall,
 
     /// <summary>Action pnputil sur le pilote de la carte graphique désignée par son identifiant d'instance.</summary>
     DriverAction,
@@ -47,21 +40,19 @@ public enum ConsoleKind
     DriverRestore,
 }
 
-public sealed record ConsoleRequest(
-    ConsoleKind Kind,
-    IReadOnlyList<string>? PackageIds = null,
+public sealed record ToolRequest(
+    ToolKind Kind,
     GraphicsDriverAction? Action = null,
     string? InstanceId = null,
     string? Backup = null);
 
-/// <summary>Fenêtre ouverte ou non, et ce que l'utilisateur doit savoir (dossier de sauvegarde utilisé, outil absent…).</summary>
-public sealed record ConsoleOutcome(bool Opened, string? Message = null);
+/// <summary>Tâche lancée ou non, et le résultat à montrer à l'utilisateur.</summary>
+public sealed record ToolOutcome(bool Ran, string? Message = null);
 
-/// <summary>Tâche de l'audit de la semaine : jour, programme lancé, et pourquoi elle ne peut pas être créée d'ici.</summary>
-public sealed record ScheduleState(DayOfWeek? Day, string? Command, string? Refusal, string? CommandRefusal);
-
-/// <summary>Logiciels à mettre à jour par winget.</summary>
-public sealed record SoftwareListing(bool WingetFound, IReadOnlyList<SoftwareUpdate> Updates);
+/// <summary>Tâche de l'audit de la semaine : jour, programme lancé, et ce que l'interface doit en dire.</summary>
+/// <param name="OfAnotherAccount">La tâche n'est pas celle que MAUS a posée pour ce compte : la remplacer ne se fait pas sans le dire.</param>
+/// <param name="KeepsOldRights">Tâche de ce compte, posée par une version précédente qui lui donnait les droits administrateur : l'interface propose de la recréer sans eux.</param>
+public sealed record ScheduleState(DayOfWeek? Day, string? Command, bool OfAnotherAccount = false, bool KeepsOldRights = false);
 
 /// <summary>Réglages d'une passe du benchmark choisis dans la page : valeurs vérifiées par le moteur.</summary>
 public sealed record BenchmarkLaunch(string Api, string Resolution, string Scope, bool RayTracing, string Language);
@@ -100,7 +91,8 @@ public partial interface IMausEngine
 
     Task<SpaceReport> ScanSpaceAsync(string root, IProgress<long>? progress, CancellationToken cancellationToken);
 
-    Task<ConsoleOutcome> OpenConsoleAsync(ConsoleRequest request, CancellationToken cancellationToken);
+    /// <param name="progress">Reçoit chaque ligne écrite par l'outil.</param>
+    Task<ToolOutcome> RunToolAsync(ToolRequest request, IProgress<string>? progress, CancellationToken cancellationToken);
 
     /// <summary>Point de restauration avant la suppression d'un pilote graphique, créé puis relu.</summary>
     Task<RestorePointOutcome> CreateDriverRestorePointAsync(CancellationToken cancellationToken);
@@ -111,19 +103,21 @@ public partial interface IMausEngine
     /// <summary>Point de restauration demandé par l'utilisateur, créé puis relu (comme avant une correction).</summary>
     Task<RestorePointOutcome> CreateRestorePointAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Referme tout de suite les droits administrateur : le moteur s'arrête. Renvoie <c>false</c> si rien n'est à refermer, ou
+    /// si une autre demande est en cours (elle va jusqu'au bout). Sans moteur à part, rien à faire.
+    /// </summary>
+    Task<bool> CloseRightsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+
     Task<ScheduleState> GetScheduleAsync(CancellationToken cancellationToken);
 
     /// <summary>Crée (jour donné) ou retire (<c>null</c>) la tâche de l'audit de la semaine ; renvoie l'erreur, ou <c>null</c>.</summary>
     Task<string?> SetScheduleAsync(DayOfWeek? day, CancellationToken cancellationToken);
 
-    Task<SoftwareListing> ListSoftwareUpdatesAsync(CancellationToken cancellationToken);
-
     /// <summary>
-    /// Rapport de batterie de Windows (<c>powercfg /batteryreport</c>), écrit dans le dossier des rapports de MAUS ; chemin du
-    /// fichier, ou <c>null</c> si Windows n'a pas pu le faire (pas de batterie).
+    /// Lance le benchmark dans sa fenêtre plein écran et attend sa fin. Sans droits administrateur, le benchmark garde lui-même
+    /// sa passe dans le profil, et seul son code de sortie revient. Avec ces droits (moteur), il n'écrit rien dans le profil :
+    /// la passe et son image reviennent à la fenêtre, qui les garde elle-même, sans droits (0.8.6).
     /// </summary>
-    Task<string?> CreateBatteryReportAsync(CancellationToken cancellationToken);
-
-    /// <summary>Lance le benchmark dans sa fenêtre plein écran et attend sa fin ; renvoie son code de sortie.</summary>
-    Task<int> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken);
+    Task<BenchmarkOutcome> RunBenchmarkAsync(BenchmarkLaunch launch, CancellationToken cancellationToken);
 }

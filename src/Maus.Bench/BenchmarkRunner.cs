@@ -33,26 +33,37 @@ internal sealed class BenchmarkRunner : IDisposable
     private readonly List<SharePicture> _pictures = [];
     private readonly SharePictureStore _pictureStore = new();
     private readonly BenchmarkSafetyStop _safety = new();
+    private readonly BenchmarkRecorder _recorder;
+    private bool _recordDone;
 
-    /// <summary>Le benchmark s'est arrêté pour la chaleur (code de sortie à part pour l'Atelier).</summary>
+    /// <summary>Ce que la passe est devenue (historique, dossier de sortie du moteur, rien) ; <c>null</c> avant la fin.</summary>
+    private BenchmarkRecord? _record;
+
+    /// <summary>Le benchmark s'est arrêté par sécurité : chaleur, ou température qui n'est plus lue (code de sortie à part pour l'Atelier).</summary>
     public bool StoppedForSafety { get; private set; }
     private readonly string _cpuName = CpuName();
+    private readonly string? _windowsBuild = WindowsBuild();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly BenchmarkSensorSampler _sensors;
     private double _fps;
     private string? _rayTracingNote;
     private readonly Queue<float> _recentFrames = new();
+    private List<(string Id, string Title)> _plan = [];
 
     public BenchmarkRunner(BenchOptions options)
     {
         _options = options;
+
+        // Avec les droits administrateur, rien n'est écrit dans le profil de l'utilisateur : seulement dans le dossier de
+        // sortie donné par le moteur (0.8.6).
+        _recorder = new BenchmarkRecorder(options.OutputFolder, Environment.IsPrivilegedProcess, options.IsTrial, options.ScreenshotFolder, BenchmarkHistoryStore.CreateDefault);
         _window = new BenchWindow("MAUS Benchmark");
         _device = BenchmarkProgram.CreateDevice(options.Api, _window.Handle, _window.Width, _window.Height);
         _post = new PostProcess(_device, _shaders, options.RenderSize);
         _font = FontAtlas.Create(_device);
         _ui = new UiRenderer(_device, _shaders, _font);
         _logo = LoadLogo(_device);
-        _sensors = BenchmarkSensorSampler.ForThisPc(_device.AdapterName);
+        _sensors = BenchmarkSensorSampler.ForThisPc(_device.AdapterName, _cpuName);
         _window.HideCursor();
     }
 
@@ -61,6 +72,7 @@ internal sealed class BenchmarkRunner : IDisposable
         IReadOnlyList<BenchScene> scenes = _options.Only == "cpu" ? [] : KeepRayTracingIfPossible(BenchmarkProgram.CreateScenes(_options.Scenes));
         IReadOnlyList<CpuBenchTest> cpuTests = _options.Only == "gpu" ? [] : BenchmarkProgram.CreateCpuTests(_options.Scenes);
         var total = scenes.Count + cpuTests.Count;
+        _plan = [.. scenes.Select(s => (s.Id, s.Title)), .. cpuTests.Select(c => (c.Id, c.Title))];
         var minutes = ((scenes.Sum(s => s.Duration + WarmupSeconds + 2) + cpuTests.Sum(t => t.Duration + 2)) * _options.DurationScale) + 10;
         string? error = null;
         var completed = false;
@@ -106,6 +118,12 @@ internal sealed class BenchmarkRunner : IDisposable
         {
             // Plantage du pilote signalé par un appel ordinaire : les résultats déjà mesurés sont gardés.
             error = DeviceLost.From(ex).Message;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // Toute autre panne : les résultats déjà mesurés restent gardés, avec la raison de l'arrêt.
+            Maus.Core.Diagnostics.CrashLog.Write(ex, "benchmark");
+            error = ex.Message;
         }
 
         return Finish(completed, error);
@@ -154,15 +172,56 @@ internal sealed class BenchmarkRunner : IDisposable
         }
     }
 
+    private string ApiName => _device.Api == GpuApi.Direct3D11 ? "Direct3D 11" : "Direct3D 12";
+
     private BenchmarkReport Finish(bool completed, string? error)
     {
         var report = Report(completed, error);
-        if (error is null)
+        var show = error is null;
+        if (show)
         {
-            report = report with { Image = ShowResults(report) };
+            try
+            {
+                report = report with { Image = PrepareImage(report) };
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // La passe est finie : une image impossible à dessiner ne doit pas la perdre.
+                Maus.Core.Diagnostics.CrashLog.Write(ex, "image du résultat du benchmark");
+                show = false;
+            }
+        }
+
+        // Enregistrée avant le bilan : il annonce des résultats enregistrés, et une carte perdue sur cet écran ne coûte rien.
+        Record(report);
+        if (show)
+        {
+            try
+            {
+                ShowResults(report);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                Maus.Core.Diagnostics.CrashLog.Write(ex, "bilan du benchmark");
+            }
         }
 
         return report;
+    }
+
+    /// <summary>
+    /// Garde la passe, une seule fois : dans l'historique, ou dans le dossier de sortie du moteur (<see cref="BenchmarkRecorder"/>).
+    /// Les passes d'essai (accélérées ou fermées automatiquement) ne sont pas gardées.
+    /// </summary>
+    private void Record(BenchmarkReport report)
+    {
+        if (_recordDone)
+        {
+            return;
+        }
+
+        _recordDone = true;
+        _record = _recorder.Record(report);
     }
 
     private BenchmarkReport Report(bool completed, string? error)
@@ -173,11 +232,15 @@ internal sealed class BenchmarkRunner : IDisposable
         return new BenchmarkReport
         {
             Date = DateTimeOffset.Now,
-            Api = _device.Api == GpuApi.Direct3D11 ? "Direct3D 11" : "Direct3D 12",
+            Edition = BenchmarkScoring.CurrentEdition,
+            Api = ApiName,
             Gpu = _device.AdapterName,
             Cpu = _cpuName,
+            GpuDriver = _device.DriverVersion,
+            WindowsBuild = _windowsBuild,
             Threads = Environment.ProcessorCount,
             RenderResolution = string.Create(CultureInfo.InvariantCulture, $"{_options.RenderSize.Width}×{_options.RenderSize.Height}"),
+            DisplayResolution = string.Create(CultureInfo.InvariantCulture, $"{_device.OutputWidth}×{_device.OutputHeight}"),
             Tests = [.. _results],
             GpuScore = Math.Round(gpu),
             CpuScore = Math.Round(cpu),
@@ -217,7 +280,7 @@ internal sealed class BenchmarkRunner : IDisposable
 
             _ui.Text("MAUS BENCHMARK", cx, _ui.Height * 0.47f, 74 * s, UiColors.White(fade), bold: true, TextAlign.Center, glow: 0.35f);
             _ui.Text(duration, cx, _ui.Height * 0.47f + (96 * s), 26 * s, UiColors.Grey(fade), align: TextAlign.Center);
-            var api = _device.Api == GpuApi.Direct3D11 ? "Direct3D 11" : "Direct3D 12";
+            var api = ApiName;
             _ui.Text($"{_device.AdapterName}  ·  {api}  ·  {_cpuName}", cx, _ui.Height * 0.47f + (150 * s), 20 * s, UiColors.Blue(fade), align: TextAlign.Center);
             _ui.Text(T("Ne touchez à rien pendant la mesure. Échap pour arrêter."), cx, _ui.Height - (90 * s), 19 * s, UiColors.Grey(0.8f * fade), align: TextAlign.Center);
             _ui.Flush(cmd);
@@ -231,7 +294,11 @@ internal sealed class BenchmarkRunner : IDisposable
     {
         // Chargement (non mesuré), à l'intérieur d'une image : une scène peut y préparer ses données par la carte.
         var context = new SceneContext(_device, _shaders, _post) { Light = _options.Light };
-        DrawMessage(T("Chargement : {0}", scene.Title), index, total, () => scene.Load(context));
+        if (!Interlude(scene.Title, scene.Subtitle, index, total, gpu: true, () => scene.Load(context)))
+        {
+            return false;
+        }
+
         _device.WaitIdle();
         _post.ResetHistory();
         _builder.Reset();
@@ -286,7 +353,7 @@ internal sealed class BenchmarkRunner : IDisposable
             var progress = Math.Clamp((elapsed - WarmupSeconds) / duration, 0, 1);
             var snap = !snapped && progress >= 0.55;
             snapped |= snap;
-            BenchmarkProgram.RenderFrame(_device, context, _post, _builder, scene, sceneTime, (float)frameSeconds, fade: (float)Math.Max(fadeIn, fadeOut), snapshot: snap ? snapshot : null);
+            BenchmarkProgram.RenderFrame(_device, context, _post, _builder, scene, sceneTime, fade: (float)Math.Max(fadeIn, fadeOut), snapshot: snap ? snapshot : null);
             RememberFrame(frameSeconds);
             if (elapsed < WarmupSeconds)
             {
@@ -320,9 +387,8 @@ internal sealed class BenchmarkRunner : IDisposable
         _results.Add(new BenchmarkTestResult(
             scene.Id,
             scene is MirrorHallScene ? "rt" : "gpu",
-            scene.Capability.ToString().ToLowerInvariant(),
             Math.Round(fps, 2),
-            T("images par seconde"),
+            BenchmarkTexts.Unit(scene.Id),
             Math.Round(BenchmarkScoring.TestScore(fps, BenchReference.For(scene.Id, _options))),
             BenchmarkScoring.Low1Fps(frameTimes) is { } low ? Math.Round(low, 2) : null)
         {
@@ -333,9 +399,16 @@ internal sealed class BenchmarkRunner : IDisposable
 
     private bool RunCpuTest(CpuBenchTest test, int index, int total)
     {
+        if (!Interlude(test.Title, test.Subtitle, index, total, gpu: false, null))
+        {
+            return false;
+        }
+
+        // Avant le calcul et le début de la mesure : la réservation des images ne compte pas dans le temps mesuré.
+        test.Prepare();
         var picture = _device.CreateTexture(TextureDesc.Image(test.Width, test.Height, PixelFormat.Rgba8Unorm, test.Title));
         using var cancel = new CancellationTokenSource();
-        var worker = Task.Factory.StartNew(() => test.Run(cancel.Token), cancel.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        var worker = Task.Factory.StartNew(() => test.Run(cancel.Token), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         var duration = test.Duration * _options.DurationScale;
         var start = _clock.Elapsed.TotalSeconds;
         var measureFrom = 2.0;
@@ -378,7 +451,7 @@ internal sealed class BenchmarkRunner : IDisposable
                 // L'image du processeur est envoyée quatre fois par seconde : l'affichage ne lui vole presque rien.
                 if (elapsed >= nextUpload)
                 {
-                    _device.UploadTexture(picture, 0, 0, test.Image, test.Width * 4);
+                    _device.UploadTexture(picture, 0, test.Image, test.Width * 4);
                     nextUpload = elapsed + 0.25;
                 }
 
@@ -420,7 +493,6 @@ internal sealed class BenchmarkRunner : IDisposable
                 _results.Add(new BenchmarkTestResult(
                     test.Id,
                     "cpu",
-                    test.Capability,
                     Math.Round(value, 3),
                     test.Unit,
                     Math.Round(BenchmarkScoring.TestScore(value, BenchReference.For(test.Id, _options))))
@@ -428,23 +500,165 @@ internal sealed class BenchmarkRunner : IDisposable
                     Sensors = sensors,
                 });
             }
+
+            test.Release();
         }
 
         return !aborted;
     }
 
-    private void DrawMessage(string message, int index, int total, Action? during = null)
+    /// <summary>
+    /// Entre deux tests (rien n'est mesuré ici) : le titre du test qui arrive, les tests déjà passés avec leur image et leur score.
+    /// L'écran arrive en une seconde, puis reste affiché pendant le chargement, qui bloque le dessin.
+    /// </summary>
+    private bool Interlude(string title, string subtitle, int index, int total, bool gpu, Action? during)
     {
-        _window.Pump();
-        _device.BeginFrame();
-        during?.Invoke();
+        var pictures = new Dictionary<string, ITexture>();
+        var length = 1.1 * Math.Min(1, _options.DurationScale * 4);
+        var start = _clock.Elapsed.TotalSeconds;
+        try
+        {
+            while (_clock.Elapsed.TotalSeconds - start < length)
+            {
+                if (!_window.Pump())
+                {
+                    return false;
+                }
+
+                ThrowIfTooHot();
+                _device.BeginFrame();
+                LoadPictures(pictures);
+                DrawInterlude(title, subtitle, index, total, gpu, (float)((_clock.Elapsed.TotalSeconds - start) / length), pictures);
+                _device.Present();
+                Thread.Sleep(10);
+            }
+
+            if (!_window.Pump())
+            {
+                return false;
+            }
+
+            _device.BeginFrame();
+            during?.Invoke();
+            LoadPictures(pictures);
+            DrawInterlude(title, subtitle, index, total, gpu, 1f, pictures);
+            Screenshot("chargement-" + index.ToString(CultureInfo.InvariantCulture), true);
+            _device.Present();
+            return true;
+        }
+        finally
+        {
+            _device.WaitIdle();
+            foreach (var picture in pictures.Values)
+            {
+                picture.Dispose();
+            }
+        }
+    }
+
+    private void LoadPictures(Dictionary<string, ITexture> pictures)
+    {
+        foreach (var picture in _pictures.Where(p => !pictures.ContainsKey(p.Id) && File.Exists(p.File)))
+        {
+            var pixels = File.ReadAllBytes(picture.File);
+            if (pixels.Length == ShareCard.CellWidth * ShareCard.CellHeight * 4)
+            {
+                var texture = _device.CreateTexture(TextureDesc.Image(ShareCard.CellWidth, ShareCard.CellHeight, PixelFormat.Rgba8Unorm, "Vignette"));
+                _device.UploadTexture(texture, 0, pixels, ShareCard.CellWidth * 4);
+                pictures[picture.Id] = texture;
+            }
+        }
+    }
+
+    private void DrawInterlude(string title, string subtitle, int index, int total, bool gpu, float progress, Dictionary<string, ITexture> pictures)
+    {
         var cmd = _device.Commands;
-        cmd.Clear(_device.BackBuffer, new ColorF(0.012f, 0.014f, 0.022f, 1f));
+        cmd.Clear(_device.BackBuffer, new ColorF(0.014f, 0.018f, 0.03f, 1f));
         var s = _ui.Scale;
-        _ui.Text(message, _ui.Width / 2, (_ui.Height / 2) - (20 * s), 34 * s, UiColors.White(), bold: true, TextAlign.Center);
-        _ui.Text(T("Test {0} sur {1}", index, total), _ui.Width / 2, (_ui.Height / 2) + (30 * s), 20 * s, UiColors.Grey(), align: TextAlign.Center);
+        var cx = _ui.Width / 2f;
+        var ease = 1f - MathF.Pow(1f - Math.Clamp(progress * 1.6f, 0f, 1f), 3f);
+        var accent = gpu ? UiColors.Blue() : UiColors.Mint();
+
+        // Les couleurs de l'image du résultat, et un léger halo derrière le titre.
+        for (var i = 0; i < 16; i++)
+        {
+            var grow = i * 22 * s;
+            _ui.Rect(cx - (520 * s) - grow, (250 * s) - grow, (1040 * s) + (2 * grow), (280 * s) + (2 * grow), new Vector4(accent.X, accent.Y, accent.Z, 0.0045f * ease), (140 * s) + grow);
+        }
+
+        var quarter = _ui.Width / 4f;
+        _ui.Rect(0, 0, quarter, 6 * s, UiColors.Blue(0.9f));
+        _ui.Rect(quarter, 0, quarter, 6 * s, UiColors.Rose(0.9f));
+        _ui.Rect(quarter * 2, 0, quarter, 6 * s, UiColors.Mint(0.9f));
+        _ui.Rect(quarter * 3, 0, quarter, 6 * s, UiColors.Sand(0.9f));
+
+        // Le test qui arrive : le titre monte en apparaissant.
+        var y = (250 * s) + ((1f - ease) * 26 * s);
+        _ui.Text(T("Test {0} sur {1}", index, total).ToUpperInvariant(), cx, y, 20 * s, new Vector4(accent.X, accent.Y, accent.Z, ease), bold: true, TextAlign.Center);
+        _ui.Text(title, cx, y + (34 * s), 76 * s, UiColors.White(ease), bold: true, TextAlign.Center, glow: 0.35f);
+        _ui.Text(subtitle, cx, y + (132 * s), 26 * s, UiColors.Grey(ease), align: TextAlign.Center);
+
+        // La barre du déroulé : un segment par test, celui qui arrive se remplit.
+        var barWidth = 720 * s;
+        var gap = 6 * s;
+        var segment = (barWidth - (gap * (total - 1))) / total;
+        var barX = cx - (barWidth / 2);
+        var barY = y + (196 * s);
+        for (var i = 0; i < total; i++)
+        {
+            var x = barX + (i * (segment + gap));
+            _ui.Rect(x, barY, segment, 6 * s, UiColors.White(0.13f), 3 * s);
+            var fill = i < index - 1 ? 1f : i == index - 1 ? Math.Clamp(progress, 0f, 1f) : 0f;
+            if (fill > 0f)
+            {
+                _ui.Rect(x, barY, segment * fill, 6 * s, i == index - 1 ? accent : UiColors.Mint(0.9f), 3 * s);
+            }
+        }
+
+        _ui.Text(T("Préparation du test…"), cx, barY + (18 * s), 18 * s, UiColors.Grey(0.85f * ease), align: TextAlign.Center);
+
+        // Les tests du déroulé : image et score de ceux qui sont passés, le nom seul pour les autres.
+        const float Margin = 60f;
+        var cellGap = 14 * s;
+        var cellWidth = MathF.Min(280 * s, ((_ui.Width - (2 * Margin * s)) - (cellGap * (_plan.Count - 1))) / Math.Max(1, _plan.Count));
+        var cellHeight = cellWidth * 9f / 16f;
+        var rowWidth = (cellWidth * _plan.Count) + (cellGap * (_plan.Count - 1));
+        var rowY = _ui.Height - (150 * s) - cellHeight;
+        for (var i = 0; i < _plan.Count; i++)
+        {
+            var (id, name) = _plan[i];
+            var x = cx - (rowWidth / 2) + (i * (cellWidth + cellGap));
+            var appear = Math.Clamp((progress * 2f) - (i * 0.06f), 0f, 1f);
+            var current = i == index - 1;
+            _ui.Rect(x - (2 * s), rowY - (2 * s), cellWidth + (4 * s), cellHeight + (4 * s), current ? new Vector4(accent.X, accent.Y, accent.Z, 0.9f * appear) : UiColors.White(0.1f * appear), 9 * s);
+            _ui.Rect(x, rowY, cellWidth, cellHeight, new Vector4(0.03f, 0.04f, 0.065f, appear), 8 * s);
+            if (pictures.TryGetValue(id, out var picture))
+            {
+                _ui.Flush(cmd);
+                _ui.Image(picture, x, rowY, cellWidth, cellHeight, appear);
+                _ui.Flush(cmd);
+            }
+
+            var size = MathF.Min(16 * s, 16 * s * cellWidth / MathF.Max(1f, _ui.Measure(name, 16 * s) + (16 * s)));
+            _ui.Text(name, x + (cellWidth / 2), rowY + cellHeight + (10 * s), size, (current ? UiColors.White(appear) : UiColors.Grey(0.8f * appear)), bold: current, TextAlign.Center);
+            if (_results.FirstOrDefault(r => r.Id == id) is { } result)
+            {
+                _ui.Rect(x, rowY + cellHeight - (36 * s), cellWidth, 36 * s, UiColors.Ink(0.6f * appear));
+                _ui.Text(result.Score.ToString("N0", Culture), x + cellWidth - (10 * s), rowY + cellHeight - (31 * s), 22 * s, UiColors.White(appear), bold: true, TextAlign.Right);
+            }
+        }
+
+        // Bas de l'écran : le matériel et ce que lisent les capteurs pendant la pause.
+        var bottom = _ui.Height - (58 * s);
+        _ui.Text(T("Échap pour arrêter"), Margin * s, bottom, 16 * s, UiColors.Grey(0.7f * ease));
+        var hardware = gpu ? _device.AdapterName : _cpuName;
+        if (BenchmarkSensorText.Live(_sensors.Latest, gpu ? "gpu" : "cpu") is { } live)
+        {
+            hardware += "  ·  " + live;
+        }
+
+        _ui.Text(hardware, _ui.Width - (Margin * s), bottom, 16 * s, UiColors.Grey(0.7f * ease), align: TextAlign.Right);
         _ui.Flush(cmd);
-        _device.Present();
     }
 
     /// <summary>Titre de la scène en grand au centre, comme le générique d'un film, pendant la mise en route.</summary>
@@ -515,7 +729,7 @@ internal sealed class BenchmarkRunner : IDisposable
         _ui.Rect(margin, barY, (float)((_ui.Width - (2 * margin)) * progress), 6 * s, gpu ? UiColors.Blue() : UiColors.Mint(), 3 * s);
         var state = warmup ? T("Mise en route (non mesurée)") : T("Mesure en cours");
         _ui.Text(T("Test {0} sur {1}", index, total) + "  ·  " + state, margin, barY - (28 * s), 16 * s, UiColors.Grey());
-        var hardware = gpu ? _device.AdapterName + "  ·  " + (_device.Api == GpuApi.Direct3D11 ? "Direct3D 11" : "Direct3D 12") : _cpuName;
+        var hardware = gpu ? _device.AdapterName + "  ·  " + ApiName : _cpuName;
         _ui.Text(hardware, right, barY - (28 * s), 16 * s, UiColors.Grey(), align: TextAlign.Right);
 
         // Temps des 180 dernières images : une barre par image, les à-coups sautent aux yeux.
@@ -538,17 +752,27 @@ internal sealed class BenchmarkRunner : IDisposable
                 _ui.Rect(gx + ((180 - frames.Length + i) * width), gy + graphH - h, MathF.Max(width - (0.5f * s), 1f), h, color);
             }
 
-            _ui.Text(T("carte : {0} ms par image", frames[^1].ToString("0.0", Culture)), gx, gy - (30 * s), 14 * s, UiColors.Grey(0.85f));
+            _ui.Text(T("image entière : {0} ms", frames[^1].ToString("0.0", Culture)), gx, gy - (30 * s), 14 * s, UiColors.Grey(0.85f));
         }
     }
 
-    /// <summary>Bilan à l'écran jusqu'à Entrée ; rend le chemin de l'image du résultat enregistrée (ou <c>null</c>).</summary>
-    private string? ShowResults(BenchmarkReport report)
+    /// <summary>Dessine et enregistre l'image du résultat, dans une image de la carte ; rend son chemin (ou <c>null</c>).</summary>
+    private string? PrepareImage(BenchmarkReport report)
     {
+        _device.BeginFrame();
+        var image = SaveShareImage(report);
+        _device.Commands.Clear(_device.BackBuffer, new ColorF(0.012f, 0.014f, 0.022f, 1f));
+        _device.Present();
+        return image;
+    }
+
+    /// <summary>Bilan à l'écran jusqu'à Entrée.</summary>
+    private void ShowResults(BenchmarkReport report)
+    {
+        // Après Échap, le bilan partiel doit s'afficher : la demande d'arrêt a déjà servi.
+        _window.ResetClose();
         var (strongest, weakest) = BenchmarkScoring.Extremes(report.Tests);
         var shown = _clock.Elapsed.TotalSeconds;
-        string? image = null;
-        var imagePending = true;
         while (_window.Pump())
         {
             if (_window.ConfirmPressed || (_options.AutoClose && _clock.Elapsed.TotalSeconds - shown > 4))
@@ -558,13 +782,6 @@ internal sealed class BenchmarkRunner : IDisposable
 
             _device.BeginFrame();
             var cmd = _device.Commands;
-            if (imagePending)
-            {
-                imagePending = false;
-                image = SaveShareImage(report);
-                shown = _clock.Elapsed.TotalSeconds;
-            }
-
             cmd.Clear(_device.BackBuffer, new ColorF(0.012f, 0.014f, 0.022f, 1f));
             var s = _ui.Scale;
             var cx = _ui.Width / 2f;
@@ -586,9 +803,10 @@ internal sealed class BenchmarkRunner : IDisposable
                 : report.GpuScore > 0
                     ? (report.GpuScore, T("score de la carte graphique en {0}", ResolutionName(_options.RenderSize)))
                     : (report.CpuScore, T("score du processeur"));
-            _ui.Text(Points(headline * reveal), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
+            _ui.Text(BenchmarkTexts.Points(headline * reveal), cx, y, 110 * s, UiColors.White(), bold: true, TextAlign.Center, glow: 0.4f);
             y += 130 * s;
             _ui.Text(caption, cx, y, 18 * s, UiColors.Grey(), align: TextAlign.Center);
+            _ui.Text(BenchmarkTexts.EditionNote(report), cx, y + (26 * s), 15 * s, UiColors.Grey(0.8f), align: TextAlign.Center);
             y += 60 * s;
 
             // Carte graphique à gauche ; à droite le processeur, puis le lancer de rayons (score à part) en dessous.
@@ -607,7 +825,7 @@ internal sealed class BenchmarkRunner : IDisposable
             }
 
             var bottom = _ui.Height - (150 * s);
-            var warnings = new[] { ShortWarning(gpuTests, "gpu"), ShortWarning(cpuTests, "cpu") }.OfType<string>().ToList();
+            var warnings = new[] { ShortWarning([.. gpuTests, .. rtTests], "gpu"), ShortWarning(cpuTests, "cpu") }.OfType<string>().ToList();
             for (var w = 0; w < warnings.Count; w++)
             {
                 _ui.Text(warnings[w], cx, bottom - (44 * s) - ((warnings.Count - 1 - w) * 28 * s), 18 * s, UiColors.Rose(0.95f), align: TextAlign.Center);
@@ -615,32 +833,33 @@ internal sealed class BenchmarkRunner : IDisposable
 
             if (strongest is not null && weakest is not null && strongest.Id != weakest.Id)
             {
-                _ui.Text(T("Point fort : {0}", TestName(strongest.Id)), cx, bottom, 22 * s, UiColors.Mint(), bold: true, TextAlign.Center);
-                _ui.Text(T("Point faible : {0}", TestName(weakest.Id)), cx, bottom + (34 * s), 22 * s, UiColors.Rose(), bold: true, TextAlign.Center);
+                _ui.Text(T("Le plus rapide : {0}", BenchmarkTexts.Name(strongest.Id)), cx, bottom, 22 * s, UiColors.Mint(), bold: true, TextAlign.Center);
+                _ui.Text(T("Le moins rapide : {0}", BenchmarkTexts.Name(weakest.Id)), cx, bottom + (34 * s), 22 * s, UiColors.Sand(), bold: true, TextAlign.Center);
             }
 
-            var hint = image is not null
-                ? T("Entrée pour fermer. Résultats et image à partager enregistrés dans MAUS (page Benchmark).")
-                : T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark).");
+            var hint = _record == BenchmarkRecord.Failed
+                ? T("Entrée pour fermer. L'historique de MAUS est illisible : ces résultats n'y ont pas été enregistrés.")
+                : _record == BenchmarkRecord.NotKept
+                ? T("Entrée pour fermer. Avec les droits administrateur, ces résultats ne sont pas enregistrés : lancez le benchmark depuis MAUS pour les garder.")
+                : report.Image is not null
+                    ? T("Entrée pour fermer. Résultats et image à partager enregistrés dans MAUS (page Benchmark).")
+                    : T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark).");
             _ui.Text(hint, cx, _ui.Height - (56 * s), 17 * s, UiColors.Grey(0.85f), align: TextAlign.Center);
             _ui.Flush(cmd);
             Screenshot("results", age > 2.2);
             _device.Present();
             Thread.Sleep(10);
         }
-
-        return image;
     }
 
     /// <summary>
     /// Image du résultat à partager : dans le dossier des images de MAUS pour une vraie passe, dans le dossier des captures
-    /// pour un essai (rien n'est laissé dans les fichiers de l'utilisateur).
+    /// pour un essai (rien n'est laissé dans les fichiers de l'utilisateur), dans le dossier de sortie quand le moteur l'a
+    /// lancé, et nulle part avec les droits administrateur sans ce dossier (<see cref="BenchmarkRecorder.ImagePathFor"/>).
     /// </summary>
     private string? SaveShareImage(BenchmarkReport report)
     {
-        var path = _options.IsTrial
-            ? (_options.ScreenshotFolder is { } folder ? Path.Combine(folder, "share.png") : null)
-            : BenchmarkHistoryStore.CreateDefault().ImagePathFor(report.Date);
+        var path = _recorder.ImagePathFor(report.Date);
         if (report.Tests.Count == 0 || path is null)
         {
             return null;
@@ -671,17 +890,14 @@ internal sealed class BenchmarkRunner : IDisposable
         // images lentes restent dans la page Benchmark de MAUS.
         _ui.Rect(x, y, width, (86 * s) + (tests.Count * 74 * s), new Vector4(1, 1, 1, 0.05f), 18 * s);
         _ui.Text(title, x + (24 * s), y + (20 * s), 20 * s, accent, bold: true);
-        _ui.Text(Points(score * reveal), x + width - (24 * s), y + (12 * s), 40 * s, UiColors.White(), bold: true, TextAlign.Right);
+        _ui.Text(BenchmarkTexts.Points(score * reveal), x + width - (24 * s), y + (12 * s), 40 * s, UiColors.White(), bold: true, TextAlign.Right);
         var rowY = y + (70 * s);
         var max = Math.Max(15000, tests.Count > 0 ? tests.Max(t => t.Score) * 1.1 : 1);
         foreach (var test in tests)
         {
-            _ui.Text(TestName(test.Id), x + (24 * s), rowY, 17 * s, UiColors.White(0.92f));
-            _ui.Text(Points(test.Score), x + width - (24 * s), rowY, 17 * s, UiColors.White(0.92f), bold: true, TextAlign.Right);
-            var detail = test.Device != "cpu"
-                ? T("{0} images/s", test.Value.ToString("0.0", Culture))
-                : test.Value.ToString("0.00", Culture) + " " + test.Unit;
-            _ui.Text(detail, x + (24 * s), rowY + (40 * s), 14 * s, UiColors.Grey(0.85f));
+            _ui.Text(BenchmarkTexts.Name(test.Id), x + (24 * s), rowY, 17 * s, UiColors.White(0.92f));
+            _ui.Text(BenchmarkTexts.Points(test.Score), x + width - (24 * s), rowY, 17 * s, UiColors.White(0.92f), bold: true, TextAlign.Right);
+            _ui.Text(BenchmarkTexts.Measure(test), x + (24 * s), rowY + (40 * s), 14 * s, UiColors.Grey(0.85f));
             var barW = width - (48 * s);
             _ui.Rect(x + (24 * s), rowY + (26 * s), barW, 8 * s, UiColors.White(0.1f), 4 * s);
             _ui.Rect(x + (24 * s), rowY + (26 * s), (float)(barW * Math.Min(1, test.Score / max) * reveal), 8 * s, accent, 4 * s);
@@ -721,7 +937,6 @@ internal sealed class BenchmarkRunner : IDisposable
             : T("Processeur à sa limite de température ({0} °C) : il a ralenti pour se protéger", summary.LimitTemperatureC ?? 0);
     }
 
-    private static string Points(double score) => score > 0 ? score.ToString("N0", Culture) : "—";
 
     internal static string ResolutionName(RenderSize size) => size.Height switch
     {
@@ -729,20 +944,6 @@ internal sealed class BenchmarkRunner : IDisposable
         >= 1440 => "1440p",
         >= 1080 => "1080p",
         _ => T("720p léger"),
-    };
-
-    internal static string TestName(string id) => id switch
-    {
-        "fractal" => T("Forge fractale (calcul)"),
-        "materials" => T("Cabinet de curiosités (textures)"),
-        "galaxy" => T("Collision galactique (bande passante)"),
-        "ring" => T("Anneau de la géante (géométrie)"),
-        "battle" => T("Champ de bataille (effets)"),
-        "raytracing" => T("Galerie des glaces (lancer de rayons)"),
-        "cpu-render" => T("Rendu sur tous les cœurs"),
-        "cpu-single" => T("Rendu sur un seul cœur"),
-        "cpu-vector" => T("Calcul vectoriel"),
-        _ => id,
     };
 
     private static ITexture? LoadLogo(IGpuDevice device)
@@ -755,8 +956,21 @@ internal sealed class BenchmarkRunner : IDisposable
 
         var (pixels, width, height) = ImageFile.LoadRgba(stream);
         var texture = device.CreateTexture(TextureDesc.Image(width, height, PixelFormat.Rgba8Unorm, "Logo"));
-        device.UploadTexture(texture, 0, 0, pixels, width * 4);
+        device.UploadTexture(texture, 0, pixels, width * 4);
         return texture;
+    }
+
+    /// <summary>Lu une fois, avant toute mesure. Une lecture impossible n'arrête pas la passe : le bilan n'aura simplement pas ce champ.</summary>
+    private static string? WindowsBuild()
+    {
+        try
+        {
+            return BenchmarkMarkers.WindowsBuildText(new Maus.Core.Platform.WindowsRegistryReader());
+        }
+        catch (Maus.Core.Platform.MausAccessDeniedException)
+        {
+            return null;
+        }
     }
 
     private static string CpuName()
@@ -776,7 +990,8 @@ internal sealed class BenchmarkRunner : IDisposable
 /// <summary>
 /// Mesures de la machine de référence (Core i7-8700K, GeForce RTX 2080 Ti, Direct3D 12) : chaque test y vaut 10 000
 /// points. Les scènes de la carte graphique ont une référence par résolution (1080p, 1440p, 4K) : les points ne se
-/// comparent qu'à résolution égale. Valeurs mesurées par le projet sur cette machine (étalonnage du benchmark).
+/// comparent qu'à résolution égale. Valeurs mesurées par le projet sur cette machine (étalonnage du benchmark). Pour les
+/// remesurer : une passe complète à vitesse réelle par résolution, dont on reprend la mesure brute de chaque test.
 /// </summary>
 internal static class BenchReference
 {
@@ -806,26 +1021,30 @@ internal static class BenchReference
 
     private static readonly Dictionary<string, double> At2160 = new(StringComparer.Ordinal)
     {
-        ["ring"] = 30.29,
-        ["battle"] = 11.88,
-        ["galaxy"] = 15.22,
-        ["materials"] = 16.49,
-        ["fractal"] = 6.31,
-        ["raytracing"] = 15.47,
+        // Édition 4 : passes complètes du 02/11/2026 sur la machine de référence (moyenne de deux passes).
+        ["ring"] = 30.73,
+        ["battle"] = 11.91,
+        ["galaxy"] = 15.67,
+        ["materials"] = 16.53,
+        ["fractal"] = 6.47,
+        ["raytracing"] = 15.85,
     };
 
     /// <summary>1440p, et tests du processeur (indépendants de la résolution).</summary>
     private static readonly Dictionary<string, double> Values = new(StringComparer.Ordinal)
     {
-        ["ring"] = 34.08,
-        ["battle"] = 23.8,
-        ["galaxy"] = 28.05,
-        ["materials"] = 35.98,
-        ["fractal"] = 13.93,
-        ["raytracing"] = 31.21,
-        ["cpu-render"] = 6.703,
-        ["cpu-single"] = 0.695,
-        ["cpu-vector"] = 1.016,
+        // Édition 4 : passe complète du 02/11/2026 sur la machine de référence, et cpu-vector, qui a changé avec elle.
+        ["ring"] = 33.92,
+        ["battle"] = 23.77,
+        ["galaxy"] = 29.21,
+        ["materials"] = 35.58,
+        ["fractal"] = 16.91,
+        ["raytracing"] = 31.81,
+        // Processeur : passe complète du 19/10/2026 sur la machine de référence, à vitesse réelle et dans l'ordre du benchmark.
+        // Revérifié le 01/11/2026 (26,69 ; 2,77 ; 4,45). Les anciennes valeurs donnaient environ 40 000 points à cette machine.
+        ["cpu-render"] = 25.961,
+        ["cpu-single"] = 2.778,
+        ["cpu-vector"] = 8.74,
     };
 
     public static double For(string id, BenchOptions options)

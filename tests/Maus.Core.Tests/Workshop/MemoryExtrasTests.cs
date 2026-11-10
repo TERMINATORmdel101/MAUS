@@ -1,7 +1,6 @@
 using System.Globalization;
 using Maus.Core.Workshop;
 using Maus.Core.Workshop.Memory;
-using Microsoft.Win32;
 
 namespace Maus.Core.Tests.Workshop;
 
@@ -26,7 +25,7 @@ public class MemoryExtrasTests
     private static MemoryDetailReport Report(IntelMemoryReport intel) => new([], null, null, [], intel);
 
     private static readonly IReadOnlyList<MemorySlotConfiguration> Slots =
-        [new MemorySlotConfiguration("ChannelA-DIMM1", "3200 Series", "Patriot", 8L << 30, 3467, 3200, 1.25, "DDR4")];
+        [new MemorySlotConfiguration("ChannelA-DIMM1", "3200 Series", "Patriot", 8L << 30, 3467, 1.25, "DDR4")];
 
     [Fact]
     public void Snapshot_keeps_clocks_settings_timings_and_modules_with_a_one_line_summary()
@@ -35,8 +34,8 @@ public class MemoryExtrasTests
 
         Assert.Equal("DDR4-3467 · 16-19-19-39 · 2N", snapshot.Summary);
         Assert.Contains(snapshot.Values, v => v is { Key: "tCL", Value: "16" });
-        Assert.Contains(snapshot.Values, v => v.Key == "Débit mémoire" && v.Value == "3467 MT/s");
-        Assert.Contains(snapshot.Values, v => v.Key == "Tension mesurée" && v.Value == "1.452 V");
+        Assert.Contains(snapshot.Values, v => v.Key == "DCLK" && v.Value == "3467 MT/s");
+        Assert.Contains(snapshot.Values, v => v.Key == "voltage" && v.Value == "1.452 V");
         Assert.Contains(snapshot.Values, v => v.Value == "Patriot 3200 Series");
     }
 
@@ -52,6 +51,8 @@ public class MemoryExtrasTests
         Assert.Contains(new MemoryDifference("tCL", "16", "15"), differences);
         Assert.Contains(new MemoryDifference("tRFC", "607", "560"), differences);
         Assert.Contains("tCL : 16 → 15", MemorySnapshot.Describe(differences), StringComparison.Ordinal);
+        Assert.Equal(string.Join(Environment.NewLine, "Tension mesurée : 1.452 V → —", "Vitesse appliquée (DIMM 1) : — → 3200 MT/s", "Gear Down : activé → désactivé"),
+            MemorySnapshot.Describe([new MemoryDifference("voltage", "1.452 V", null), new MemoryDifference("slot.speed:DIMM 1", null, "3200 MT/s"), new MemoryDifference("Gear Down", "on", "off")]));
         Assert.StartsWith("Aucune différence", MemorySnapshot.Describe(MemorySnapshot.Compare(before, before)), StringComparison.Ordinal);
     }
 
@@ -77,39 +78,6 @@ public class MemoryExtrasTests
         {
             Directory.Delete(directory, recursive: true);
         }
-    }
-
-    [Fact]
-    public void Calibration_offers_only_anonymous_inputs_matching_the_bios_voltage()
-    {
-        IReadOnlyList<HardwareReading> readings =
-        [
-            new("Nuvoton NCT6797D", ReadingGroup.Motherboard, "Vcore", ReadingKind.Voltage, 1.44),
-            new("Nuvoton NCT6797D", ReadingGroup.Motherboard, "Voltage #5", ReadingKind.Voltage, 0.726),
-            new("Nuvoton NCT6797D", ReadingGroup.Motherboard, "Voltage #7", ReadingKind.Voltage, 1.12),
-            new("Nuvoton NCT6797D", ReadingGroup.Motherboard, "Voltage #11", ReadingKind.Voltage, 1.448),
-        ];
-
-        var candidates = DramVoltageCalibrations.Candidates(readings, 1.45);
-
-        Assert.Equal(["Voltage #11", "Voltage #5"], candidates.Select(c => c.Reading.Name).Order(StringComparer.Ordinal));
-        Assert.Equal(2, candidates.Single(c => c.Reading.Name == "Voltage #5").Factor);
-        Assert.Empty(DramVoltageCalibrations.Candidates(readings, 5));
-
-        var calibration = new DramVoltageCalibration("Micro-Star International Co., Ltd. MPG Z390 GAMING PRO CARBON (MS-7B17)", "Nuvoton NCT6797D", "Voltage #5", 2, 1.45, Monday);
-        Assert.Equal(1.452, DramVoltageCalibrations.Apply(readings, calibration, calibration.Board)!.Value, 3);
-        Assert.Null(DramVoltageCalibrations.Apply(readings, calibration, "ASUS PRIME Z390-A"));
-    }
-
-    [Fact]
-    public void Board_name_comes_from_the_bios_registry_key()
-    {
-        var registry = new FakeRegistry()
-            .Set(RegistryHive.LocalMachine, @"HARDWARE\DESCRIPTION\System\BIOS", "BaseBoardManufacturer", "Micro-Star International Co., Ltd.")
-            .Set(RegistryHive.LocalMachine, @"HARDWARE\DESCRIPTION\System\BIOS", "BaseBoardProduct", "MPG Z390 GAMING PRO CARBON (MS-7B17)");
-
-        Assert.Equal("Micro-Star International Co., Ltd. MPG Z390 GAMING PRO CARBON (MS-7B17)", DramVoltageCalibrations.Board(registry));
-        Assert.Null(DramVoltageCalibrations.Board(new FakeRegistry()));
     }
 
     [Fact]

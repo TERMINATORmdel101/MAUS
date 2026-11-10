@@ -23,7 +23,8 @@ public class ScoreTrendsTests
 
         Assert.NotNull(entry);
         Assert.Equal(ScoreTrends.HealthKind, entry.Kind);
-        Assert.InRange(entry.Score, 0, 99);
+        // Un problème important plafonne le score à 74 (HealthScore.HighCap).
+        Assert.Equal(74, entry.Score);
         Assert.Equal("1/0/1", entry.Detail);
     }
 
@@ -91,5 +92,40 @@ public class ScoreTrendsTests
         Assert.Equal($"Score stable depuis le {date} (2 audits).", ScoreTrends.DescribeHealth([At(80, 0), At(80, 1)]));
         Assert.Equal($"En hausse de 6 points depuis le {date}.", ScoreTrends.DescribeHealth([At(80, 0), At(84, 1), At(86, 2)]));
         Assert.Equal($"En baisse d'1 point depuis le {date}.", ScoreTrends.DescribeHealth([At(80, 0), At(79, 1)]));
+    }
+
+    /// <summary>Le barème a changé en 0.8.6 : le même PC ne doit pas paraître « en hausse » à cause d'une version de MAUS.</summary>
+    [Fact]
+    public void A_change_of_scale_is_not_told_as_a_progress_of_the_pc()
+    {
+        var date = Day.LocalDateTime.ToString("d", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+        BenchmarkEntry Before(double score, int day) => new(ScoreTrends.PreviousHealthKind, score, true, Day.AddDays(day));
+        BenchmarkEntry After(double score, int day) => new(ScoreTrends.HealthKind, score, true, Day.AddDays(day));
+
+        Assert.Empty(ScoreTrends.Series([Before(85, 0)], ScoreTrends.HealthKind));
+        Assert.Equal([92], ScoreTrends.Series([Before(85, 0), After(92, 1)], ScoreTrends.HealthKind).Select(e => e.Score));
+        Assert.DoesNotContain("hausse", ScoreTrends.DescribeHealthHistory([Before(85, 0), After(92, 1)]), StringComparison.Ordinal);
+        Assert.Contains("barème a changé", ScoreTrends.DescribeHealthHistory([Before(85, 0), After(92, 1)]), StringComparison.Ordinal);
+        Assert.Contains("barème a changé", ScoreTrends.DescribeHealthHistory([Before(85, 0)]), StringComparison.Ordinal);
+        Assert.Equal($"En hausse de 3 points depuis le {date}.", ScoreTrends.DescribeHealthHistory([Before(85, 0), After(89, 0), After(92, 1)]));
+        Assert.Equal("Score de santé (barème précédent)", ScoreTrends.Label(ScoreTrends.PreviousHealthKind));
+        Assert.Equal("/100", ScoreTrends.Unit(ScoreTrends.PreviousHealthKind));
+        Assert.False(ScoreTrends.IsPossible(ScoreTrends.PreviousHealthKind, 150));
+    }
+
+    [Fact]
+    public void Each_disk_and_graphics_card_has_its_own_curve()
+    {
+        BenchmarkEntry[] entries =
+        [
+            new(ScoreTrends.DiskKind(@"C:\"), 500, true, Day),
+            new(ScoreTrends.DiskKind(@"D:\"), 100, true, Day),
+            new("disk-read", 50, true, Day),
+        ];
+
+        Assert.Equal([500.0], ScoreTrends.Series(entries, ScoreTrends.DiskKind(@"C:\")).Select(e => e.Score));
+        Assert.Equal(ScoreTrends.Unit("disk-read"), ScoreTrends.Unit(ScoreTrends.DiskKind(@"C:\")));
+        Assert.Equal(ScoreTrends.Unit("vram"), ScoreTrends.Unit(ScoreTrends.VramKind("Carte")));
+        Assert.EndsWith("Carte", ScoreTrends.Label(ScoreTrends.VramKind("Carte")), StringComparison.Ordinal);
     }
 }

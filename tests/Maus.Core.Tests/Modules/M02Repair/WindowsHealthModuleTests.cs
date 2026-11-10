@@ -54,6 +54,21 @@ public class WindowsHealthModuleTests
             CancellationToken.None);
 
     [Fact]
+    public async Task Requested_restarts_and_updates_are_listed_without_any_personal_path()
+    {
+        var logs = new FakeEventLogs().Add("System", "User32", 1074, Now.LocalDateTime.AddDays(-2), new Dictionary<string, string> { ["param1"] = @"C:\Users\Paul\Outil\maj.exe (PC-DE-PAUL)" }, level: 4);
+        var cim = HealthyCim().Answer(Maus.Core.Modules.M03Updates.WindowsUpdateModule.QfeQuery, new Dictionary<string, object?> { ["HotFixID"] = "KB5000001", ["InstalledOn"] = Now.LocalDateTime.AddDays(-3).ToString("M/d/yyyy", System.Globalization.CultureInfo.InvariantCulture) });
+
+        var recent = Get(await Detect(logs, cim: cim), "M02.recent-events");
+
+        Assert.Equal(FindingStatus.Info, recent.Status);
+        Assert.Contains("arrêts ou redémarrages demandés : 1", recent.Current, StringComparison.Ordinal);
+        Assert.Contains("maj.exe", recent.Explanation, StringComparison.Ordinal);
+        Assert.Contains("KB5000001", recent.Explanation, StringComparison.Ordinal);
+        Assert.DoesNotContain("Paul", recent.Explanation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Healthy_pc_has_no_warning()
     {
         var findings = await Detect();
@@ -100,6 +115,26 @@ public class WindowsHealthModuleTests
 
         // Des erreurs matérielles suffisent à recommander le test de la mémoire.
         Assert.NotNull(Get(findings, "M02.memory-test").Advice);
+    }
+
+    [Fact]
+    public async Task Whea_event_2_corrected_error_is_counted()
+    {
+        var logs = new FakeEventLogs().Add(SystemLog, WindowsHealthModule.WheaProvider, 2, DaysAgo(1), level: 3);
+
+        var corrected = Get(await Detect(logs), "M02.whea-corrected");
+
+        Assert.Equal(FindingStatus.Warning, corrected.Status);
+        Assert.Contains("ID 2 : 1", corrected.Current, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Whea_lists_do_not_overlap_and_the_real_log_accepts_each_of_them()
+    {
+        Assert.Empty(WindowsHealthModule.WheaFatalIds.Intersect(WindowsHealthModule.WheaCorrectedIds));
+
+        // Le vrai journal refuse une requête de plus de 21 identifiants : une liste trop longue se lirait « illisible ».
+        Assert.NotNull(WindowsHealthModule.QueryWhea(new Maus.Core.Platform.WindowsEventLogReader(), DateTime.Now.AddDays(-1), 1));
     }
 
     [Fact]
@@ -170,7 +205,10 @@ public class WindowsHealthModuleTests
         Assert.Equal(FindingStatus.Warning, shutdowns.Status);
         Assert.Contains("3 arrêts brutaux", shutdowns.Current, StringComparison.Ordinal);
         Assert.Contains("1 arrêt forcé", shutdowns.Current, StringComparison.Ordinal);
-        Assert.Contains("2 coupures", shutdowns.Current, StringComparison.Ordinal);
+        Assert.Contains("2 arrêts sans cause notée", shutdowns.Current, StringComparison.Ordinal);
+        Assert.DoesNotContain("coupure", shutdowns.Current, StringComparison.Ordinal);
+        Assert.Contains("ce peut être une coupure de courant", shutdowns.Explanation, StringComparison.Ordinal);
+        Assert.Contains("surcadençage, la mémoire et la surchauffe", shutdowns.Explanation, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M02.bluescreens").Status);
     }
 
@@ -212,7 +250,7 @@ public class WindowsHealthModuleTests
         Assert.Contains("Ntfs 55", disk.Current, StringComparison.Ordinal);
         Assert.Contains(@"\Device\Harddisk1\DR6", disk.Current, StringComparison.Ordinal);
         Assert.Contains("Module 11", disk.Advice, StringComparison.Ordinal);
-        Assert.True(disk.Fixable);
+        Assert.False(disk.Fixable);
     }
 
     [Fact]
@@ -301,7 +339,7 @@ public class WindowsHealthModuleTests
 
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.StartsWith("3,2 / 10", finding.Current, StringComparison.Ordinal);
-        Assert.Contains("Observateur de fiabilité", finding.Advice, StringComparison.Ordinal);
+        Assert.Contains("Moniteur de fiabilité", finding.Advice, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -334,8 +372,8 @@ public class WindowsHealthModuleTests
         var empty = Get(await Detect(cim: silent), "M02.wmi");
 
         Assert.Equal(FindingStatus.Warning, broken.Status);
-        Assert.True(broken.Fixable);
-        Assert.Contains("prochaine version", broken.Advice, StringComparison.Ordinal);
+        Assert.False(broken.Fixable);
+        Assert.Contains("winmgmt", broken.Advice, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Warning, empty.Status);
     }
 
@@ -349,8 +387,8 @@ public class WindowsHealthModuleTests
         var finding = Get(await Detect(cim: cim), "M02.volume-dirty");
 
         Assert.Equal(FindingStatus.Warning, finding.Status);
-        Assert.True(finding.Fixable);
-        Assert.Contains("chkdsk", finding.Advice, StringComparison.Ordinal);
+        Assert.False(finding.Fixable);
+        Assert.Contains("Redémarrez", finding.Advice, StringComparison.Ordinal);
     }
 
     [Fact]

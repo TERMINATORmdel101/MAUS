@@ -18,6 +18,10 @@ public static class RoundTrip
         Assert.All(plan, c => Assert.Equal(module.Id, c.ModuleId));
         Assert.Equal(plan.Count, plan.Select(c => c.Id).Distinct().Count());
 
+        // La clé de la fréquence des points de restauration reste vide après coup : elle existe donc dès le départ.
+        registry.EnsureKey(Microsoft.Win32.RegistryHive.LocalMachine, RestorePointCreator.FrequencyKey.Path!);
+        var registryBefore = registry.Snapshot();
+
         var engine = new FixEngine(TestFixContext.Create(audit, registry, parameters, power: power, tasks: tasks));
         var applied = engine.Apply(plan, new ApplyOptions());
         Assert.False(applied.Blocked, applied.BlockedReason);
@@ -39,6 +43,9 @@ public static class RoundTrip
         Assert.Equal(
             before.Select(f => (f.Id, f.Status, f.Current)),
             restored.Select(f => (f.Id, f.Status, f.Current)));
+
+        // Ce que Detect ne lit pas compte aussi : valeurs, types et clés reviennent à l'identique.
+        Assert.Equal(registryBefore, registry.Snapshot());
         return (plan, applied);
     }
 }

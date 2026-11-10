@@ -2,6 +2,7 @@ using Maus.Core.Fixes;
 using Maus.Core.Platform;
 using Maus.Core.Preferences;
 using Maus.Core.Workshop;
+using Maus.Core.Workshop.Benchmark;
 
 namespace Maus.Core.Tests.Platform;
 
@@ -213,6 +214,51 @@ public sealed class StoredFilesTests : IDisposable
         Assert.Equal(original, File.ReadAllText(path));
         history.Add(second);
         Assert.Equal(2, history.Load().Count);
+    }
+
+    [Fact]
+    public void Benchmark_history_is_never_rewritten_from_an_unreadable_file()
+    {
+        var path = PathOf("benchmark-history.json");
+        var first = new BenchmarkReport { Date = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero) };
+        new BenchmarkHistoryStore(path).Add(first);
+        var original = File.ReadAllText(path);
+        var store = new BenchmarkHistoryStore(path, Wait);
+
+        using (Lock(path))
+        {
+            Assert.Empty(store.Load());
+            Assert.ThrowsAny<IOException>(() => store.Add(first with { Date = first.Date.AddDays(1) }));
+        }
+
+        Assert.Equal(original, File.ReadAllText(path));
+        Assert.Single(store.Load());
+    }
+
+    [Fact]
+    public void Truncated_benchmark_history_keeps_its_images_and_is_copied_before_it_restarts()
+    {
+        var path = PathOf("benchmark-history.json");
+        File.WriteAllText(path, "[{ \"date\": \"2026");
+        var store = new BenchmarkHistoryStore(path, Wait);
+        Directory.CreateDirectory(store.ImagesFolder);
+        var image = Path.Combine(store.ImagesFolder, "MAUS-benchmark-20260101-000000.png");
+        File.WriteAllText(image, "png");
+
+        store.PruneImages();
+        Assert.True(File.Exists(image));
+        Assert.Empty(store.Load());
+
+        // Un chemin invalide dans l'historique ne fait pas tomber le benchmark après sa mesure.
+        File.WriteAllText(path, """[{ "date": "2026-01-01T00:00:00+00:00", "image": "" }, { "date": "2026-01-02T00:00:00+00:00", "image": "a\u0000b" }]""");
+        store.PruneImages();
+        Assert.False(File.Exists(image));
+        File.WriteAllText(image, "png");
+        File.WriteAllText(path, "[{ \"date\": \"2026");
+
+        store.Add(new BenchmarkReport { Date = DateTimeOffset.Now });
+        Assert.Single(Copies("benchmark-history.json"));
+        Assert.Single(store.Load());
     }
 
     [Fact]

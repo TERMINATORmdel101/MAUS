@@ -4,7 +4,10 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Workshop.Memory;
 
-/// <summary>Une valeur d'une fiche mémoire enregistrée : libellé (« tCL », « Horloge mémoire ») et valeur affichée.</summary>
+/// <summary>
+/// Une valeur d'une fiche mémoire enregistrée : clé et valeur neutres (« tCL », « slot.speed:DIMM 1 », « on »), traduites
+/// seulement à l'affichage. Une comparaison ne dépend donc jamais de la langue de MAUS.
+/// </summary>
 public sealed record MemoryValue(string Key, string Value);
 
 /// <summary>Écart entre deux fiches : valeur avant, valeur après (<c>null</c> si absente d'un côté).</summary>
@@ -16,6 +19,13 @@ public sealed record MemoryDifference(string Key, string? Before, string? After)
 /// </summary>
 public sealed record MemorySnapshot
 {
+    private const string CommandRateKey = "CommandRate";
+    private const string VoltageKey = "voltage";
+    private const string SlotSpeedKey = "slot.speed:";
+    private const string SlotPartKey = "slot.part:";
+    private const string On = "on";
+    private const string Off = "off";
+
     public required DateTimeOffset At { get; init; }
 
     /// <summary>Résumé sur une ligne (« DDR4-3467 · 16-19-19-39 · 2N »).</summary>
@@ -51,12 +61,12 @@ public sealed record MemorySnapshot
             foreach (var clock in intel.Clocks)
             {
                 // L'horloge mémoire est notée en débit (MT/s), l'unité du BIOS et de l'étiquette des barrettes.
-                Add(ClockName(clock.Key), clock.Key == "DCLK" ? string.Create(CultureInfo.InvariantCulture, $"{clock.Mhz * 2:0} MT/s") : Mhz(clock.Mhz));
+                Add(clock.Key, clock.Key == "DCLK" ? string.Create(CultureInfo.InvariantCulture, $"{clock.Mhz * 2:0} MT/s") : Mhz(clock.Mhz));
             }
 
             foreach (var setting in intel.Settings)
             {
-                Add(setting.Key == "CommandRate" ? T("Command rate") : setting.Key, setting.Value);
+                Add(setting.Key, setting.Value);
             }
 
             commandRate = intel.Settings.FirstOrDefault(s => s.Key == "CommandRate")?.Value;
@@ -74,9 +84,9 @@ public sealed record MemorySnapshot
             }
 
             commandRate = live.Settings.Command2T ? "2T" : "1T";
-            Add(T("Command rate"), commandRate);
-            Add("Gear Down", live.Settings.GearDownMode ? T("activé") : T("désactivé"));
-            Add("Power Down", live.Settings.PowerDown ? T("activé") : T("désactivé"));
+            Add(CommandRateKey, commandRate);
+            Add("Gear Down", live.Settings.GearDownMode ? On : Off);
+            Add("Power Down", live.Settings.PowerDown ? On : Off);
             timings = live.Timings;
         }
 
@@ -87,11 +97,11 @@ public sealed record MemorySnapshot
 
         foreach (var slot in slots)
         {
-            Add(T("Vitesse appliquée ({0})", slot.Slot), slot.ConfiguredMts is { } mts ? string.Create(CultureInfo.InvariantCulture, $"{mts} MT/s") : null);
-            Add(T("Barrette {0}", slot.Slot), string.Join(" ", new[] { slot.Manufacturer, slot.PartNumber }.Where(p => !string.IsNullOrWhiteSpace(p))));
+            Add(SlotSpeedKey + slot.Slot, slot.ConfiguredMts is { } mts ? string.Create(CultureInfo.InvariantCulture, $"{mts} MT/s") : null);
+            Add(SlotPartKey + slot.Slot, string.Join(" ", new[] { slot.Manufacturer, slot.PartNumber }.Where(p => !string.IsNullOrWhiteSpace(p))));
         }
 
-        Add(T("Tension mesurée"), measuredVoltage);
+        Add(VoltageKey, measuredVoltage);
 
         string? Timing(string key) => timings.FirstOrDefault(t => t.Key == key)?.Clocks?.ToString(CultureInfo.InvariantCulture);
         var primaries = new[] { Timing("tCL"), Timing("tRCD") ?? Timing("tRCDRD"), Timing("tRP"), Timing("tRAS") };
@@ -147,15 +157,28 @@ public sealed record MemorySnapshot
         ArgumentNullException.ThrowIfNull(differences);
         return differences.Count == 0
         ? T("Aucune différence : même vitesse, mêmes réglages et mêmes timings.")
-        : string.Join(Environment.NewLine, differences.Select(d => $"{d.Key} : {d.Before ?? "—"} → {d.After ?? "—"}"));
+        : string.Join(Environment.NewLine, differences.Select(d => $"{KeyText(d.Key)} : {ValueText(d.Before)} → {ValueText(d.After)}"));
     }
 
-    private static string ClockName(string key) => key switch
+    /// <summary>Libellé affiché d'une clé. Une fiche d'une version précédente a des clés déjà traduites : elles restent telles quelles.</summary>
+    private static string KeyText(string key) => key switch
     {
         "DCLK" => T("Débit mémoire"),
         "RING" => "Ring",
         "SA" => T("Agent système"),
+        CommandRateKey => T("Command rate"),
+        VoltageKey => T("Tension mesurée"),
+        _ when key.StartsWith(SlotSpeedKey, StringComparison.Ordinal) => T("Vitesse appliquée ({0})", key[SlotSpeedKey.Length..]),
+        _ when key.StartsWith(SlotPartKey, StringComparison.Ordinal) => T("Barrette {0}", key[SlotPartKey.Length..]),
         _ => key,
+    };
+
+    private static string ValueText(string? value) => value switch
+    {
+        null => "—",
+        On => T("activé"),
+        Off => T("désactivé"),
+        _ => value,
     };
 }
 

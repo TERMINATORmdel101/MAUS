@@ -1,10 +1,138 @@
 # Journal des versions
 
-Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…) puis, depuis la 0.3.3-alpha, sur le PC Windows du porteur (Intel Core i7-8700K, carte MSI Z390). Ce qui n'a pas pu être vérifié sur un vrai processeur est signalé dans l'application.
+Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…). Depuis la 0.3.3-alpha, une partie des fonctions est aussi essayée sur le PC Windows du porteur : un seul PC, et pas toutes les fonctions (pour la 0.8.6, voir « Essais sur un vrai PC »).
+
+## 0.8.6 — 10/11/2026 — page Suivi, BitLocker, audit sans droits, réparation suivie pas à pas
+
+### Nouvelle page Suivi (Ctrl+7)
+
+Ce qui donne une raison de revenir, sans inventer de problème. Tout reste sur le PC.
+
+- **Windows a-t-il défait mes réglages ?** : compare vos corrections au dernier audit (en place, plus en place, non contrôlée), avec la date et le build de Windows, sans rien relancer ni réappliquer tout seul.
+- **Qu'est-ce qui a changé ?** : compare deux audits gardés (programmes au démarrage, tâches, pilotes, build de Windows, constats), date chaque changement sans désigner de coupable, et dit « non comparable » plutôt que de faire passer un nouveau contrôle de MAUS ou un audit qui lit moins pour un changement du PC.
+- **Carnet de santé** : une ligne datée à chaque audit, avec ce qu'il a pu lire (usure et erreurs des disques, batterie, temps de démarrage), et la chauffe à chaque test de refroidissement ; comparé à ce seul PC, sans prédiction ni seuil.
+- **Mon PC a planté** : sur un bouton, les 30 derniers jours sur une seule liste, sans coupable, à copier masquée pour un réparateur.
+- **Avant et après, en vrai** : les démarrages mesurés par Windows avant et après une séance de corrections, et MAUS dit franchement quand aucun effet n'est visible.
+- **Les audits de la semaine** : combien d'audits depuis votre dernière visite et ce qui est apparu, ou que rien n'est nouveau, sans fenêtre ni relance.
+- **J'ai changé une pièce** : fiche des modèles (sans numéro de série), ce qui a changé et depuis quand, ce que les constats disent de la nouvelle pièce.
+- **Le dossier du PC** : une page à relire, puis imprimer ou enregistrer pour une revente, une réparation ou une garantie, sans nom, numéro de série ni adresse MAC.
+- **Benchmark** : un repère sur la courbe quand le pilote ou le build change d'une passe à l'autre, sans en déduire de cause.
+
+### BitLocker visible (module BIOS)
+
+- **Disque vraiment chiffré ou partiellement** : l'audit administrateur lit l'avancement du chiffrement au lieu de « protection désactivée », qui pouvait aussi vouloir dire « partiellement chiffré ». Sans droits : « droits requis ».
+- **Identifiant de la clé, à l'écran seulement** : jamais dans un rapport, un export ni le presse-papiers. MAUS ne lit jamais la clé et n'écrit jamais qu'elle est sauvegardée : « une clé existe, vérifiez que vous l'avez », avec la page officielle de Microsoft.
+- **Encadré avant une mise à jour du BIOS** si BitLocker est actif ou si son état n'a pas pu être lu, plus net avec un PIN (TPM + PIN) : retrouver sa clé, suspendre comme l'indique Microsoft. MAUS ne suspend rien lui-même. L'encadré et la note ci-dessous figurent aussi dans les rapports HTML, texte et CSV.
+- **Note factuelle sur le choix de désactiver BitLocker** : ce que ça retire et la procédure officielle de Microsoft, sans correction, sans profil et sans bouton qui agit.
+
+### Accueil et ouverture
+
+- **Audit sans autorisation administrateur** : l'audit marche en mode limité, sans aucune demande d'autorisation ni écriture dans Windows. Le score est dit partiel et n'entre ni dans les courbes ni dans l'historique (seul le carnet de santé note ce qui a pu être lu), et les corrections restent grisées.
+- **Dernier audit retrouvé à l'ouverture** : carte « Dernier audit » datée, anneau gris, jamais présentée comme l'état actuel. L'audit de la semaine y laisse son résumé, à part des comparaisons, et le titre de sa notification y mène.
+- **« Que se passe-t-il ? »** : à la place de « Plus d'outils » sur l'accueil simple, une liste par symptôme (PC lent, réveils la nuit, plantages, Internet, son…) qui ouvre l'outil existant. Sans audit, la ligne le dit et propose l'audit.
+- **Parcours en trois étapes** : lancer l'audit, lire les constats, appliquer les corrections recommandées ; le bouton principal change à chaque étape. Pendant l'audit, un module par ligne avec son état et le temps écoulé.
+- **Score sur l'accueil** : les trois corrections qui rapportent le plus de points ; après des corrections, l'anneau avance et la différence s'affiche (64 → 71) ; quand tout est vert, les quatre lettres s'allument. Sur l'accueil complet, l'état des pilotes graphiques en une ligne.
+- **Première ouverture** : un seul écran (l'essentiel des avertissements en trois lignes, le texte complet à un clic, puis le choix du mode) au lieu de trois fenêtres. L'écran du logo se ferme au plus tard 2 secondes après l'ouverture de la fenêtre.
+- **Droits administrateur** : le bandeau montre chaque étape dès le clic, la fenêtre ne se fige plus, l'Atelier relit ses données tout seul. Quand les droits sont ouverts, une bande le dit, et un bouton les referme sans fermer MAUS. Option : lancer l'audit dès que les droits sont accordés (désactivée par défaut, aucune demande d'autorisation de plus).
+- **Comptes standard** : valider l'autorisation avec le mot de passe d'un administrateur relie enfin MAUS à son moteur.
+
+### Audit et constats
+
+- BitLocker : le constat dit si le disque est chiffré, en entier ou en partie, et qu'une clé de récupération existe, sans jamais la lire. Avant une mise à jour du BIOS, un encadré rappelle de noter sa clé et de suspendre la protection.
+- Mises à jour : MAUS dit laquelle échoue, combien de fois et avec quel code, si Microsoft en retient une, et conseille d'attendre pour une mise à jour ou un pilote facultatifs sans problème à régler.
+- « Mon PC a planté » distingue écran bleu, bouton, arrêt non expliqué, mise à jour et arrêt demandé, avec le programme et le motif notés par Windows. « Pourquoi mon PC est lent » donne le dernier vrai redémarrage.
+- Batterie : la capacité passée s'affiche en français, depuis le début réel des données de Windows (non essayé sur un vrai portable).
+- Plusieurs phrases corrigées parce qu'elles affirmaient plus que ce que Windows permet de savoir, et davantage d'erreurs matérielles sont comptées.
+- **Constats plus clairs** : « Pourquoi ça compte » d'abord, en langage courant ; valeurs lues, identifiant et détails sous « Détails techniques ». Recherche et filtres (rouges seulement, ce que MAUS peut corriger, par famille). Chaque état a un pictogramme et un mot, jamais la couleur seule.
+- **Comparer deux audits** : MAUS garde le résumé des 12 derniers audits sur ce PC et montre ce qui s'est aggravé ou amélioré ; après une mise à jour de Windows, il le signale à l'ouverture et affiche ce que la mise à jour a changé. Passer de Conforme à Info n'est plus compté comme une aggravation, ni un réglage marqué « voulu » comme une amélioration.
+- **Choix des modules audités** : un module décoché est dit non vérifié, le score devient partiel, le moteur demande confirmation, et l'audit de la semaine reste complet.
+- **Seuils** : sous « Détails techniques », chaque constat dit d'où vient son seuil : sa source (35 jours de pause, 15 % d'espace libre : Microsoft) ou « choisi par MAUS, sans source publiée ». Le diagnostic de lenteur et les alarmes en direct le disent aussi. « Le PC chauffe trop » (zone de la carte mère à 90 °C, sans source) devient la limite du processeur ou de son fabricant. Plus de chiffre de gain sans source pour XMP/EXPO et Resizable BAR : le benchmark le mesure sur votre PC.
+- **Score** : un même sujet vu par deux modules (services et pause de Windows Update) ne compte plus qu'une fois, et une panne de périphérique ne compte plus deux fois. Les scores d'avant ne se comparent plus : la courbe repart avec ce barème et le dit, au lieu d'annoncer un progrès du PC.
+- **Audit plus juste** : winget reconnu à sa famille de paquet exacte, et sa liste illisible n'est plus lue comme « tout est à jour » ; une exclusion Defender `*.*` vue comme large ; un hyperviseur en marche (Hyper-V, WSL2) n'est plus pris pour une machine virtuelle, et la virtualisation s'y lit correctement ; plus d'orange permanent sur les Core de 13e et 14e génération ; Core de bureau du modèle 191 plus comparés à un repère qui ne les concerne pas ; température AMD lue sur Tdie avant Tctl ; éditions LTSC reconnues ; cartes Intel Arc Pro, Radeon Pro WX et RX Vega 56/64 reconnues comme dédiées ; les réglages posés par les corrections de confidentialité de MAUS ne sont plus signalés comme suspects ; un service WMI en panne ou un journal d'événements abîmé donnent un contrôle « indéterminé », plus un module entier en erreur ; le proxy se lit de la même façon quelle que soit la langue de Windows.
+- **Mises à jour de Windows** : MAUS dit clairement qu'aucune mise à jour n'est tout à fait sans risque, avec le lien vers les problèmes connus publiés par Microsoft ; rappel du point de restauration et de la sauvegarde ; comment revenir au pilote précédent ; ce que coûte une longue pause. Carte « Avant une mise à jour » quand Windows Update propose quelque chose : point de restauration, sauvegarde, temps, pilote.
+- **Mises à jour qui échouent** : quelle mise à jour, combien de fois, avec quel code, et si elle a réussi ensuite, d'après l'historique de Windows, sans droits ni réseau. MAUS cite le code sans l'expliquer et renvoie vers les outils de Microsoft ; pilotes et applications du Store sont à part ; le seuil d'échec répété est dit choisi par MAUS, les définitions de Microsoft Defender n'y comptent pas, et une mise à jour que Windows ne propose plus reste une information.
+- **Retenue de Microsoft** : MAUS dit ce que Windows note quand Microsoft retient une nouvelle version : il suffit d'attendre, et le numéro se cherche dans les problèmes connus.
+- **Mises à jour et pilotes facultatifs** : information reprise de Microsoft : le correctif de sécurité du mois suivant reprend le contenu de l'aperçu facultatif ; un pilote facultatif s'installe si un appareil pose problème, après un point de restauration.
+- **Audit de la semaine sans réseau et sans droits administrateur** : il lit ce que Windows Update a déjà trouvé et ne demande pas la liste winget. Il signale ce qu'il peut lire sans droits, sans score (un score partiel paraîtrait trop bon). La tâche d'une version précédente est recréée sans droits : à son prochain lancement, qui n'audite rien cette fois-là, ou par le bouton « Remettre en place » de l'accueil. Une tâche d'un autre compte est signalée. Option : prévenir après cet audit (rouge seulement, à chaque audit avec le score, jamais) ; « ne plus jamais prévenir » est confirmé par le moteur.
+- **Mon PC est lent** : chaque cause mène à ses constats, puis aux corrections ou aux tests.
+
+### Corrections et Historique
+
+- **Corrections plus légères** : les corrections recommandées d'emblée, sans rien à ouvrir ; le reste et les outils derrière de simples liens. Les avertissements restent toujours visibles, et rien de coché ne reste caché. Ligne du temps de la séance, rappel de redémarrage ; un profil dit combien de lignes il coche.
+- **Historique** : « Tout annuler d'aujourd'hui », de la plus récente à la plus ancienne, qui s'arrête si une valeur n'a pas pu être remise. Une valeur « modifiée depuis » reste annulable, et le résultat d'une annulation s'y lit. Une correction annulée n'apparaît plus « confirmée » dans le rapport.
+- **« Garder » une fréquence d'écran** n'est plus définitif : l'Historique propose de revenir à l'ancienne fréquence, sauf si elle a changé entre-temps.
+- **Protection du système coupée** : avant de renoncer au point de restauration, MAUS propose de l'activer, sauf si une stratégie l'a coupée. Le point de restauration vise le lecteur de Windows, même sur D:.
+- **Réparation et logiciels** : DISM, SFC et pnputil sont lancés directement et MAUS affiche leur progression et leur résultat ; plus aucune invite de commande administrateur ne reste ouverte. winget et l'installateur de PawnIO démarrent sans droits : chacun demande l'autorisation de Windows s'il en a besoin, et les boutons marchent aussi en mode limité. Une longue sélection de logiciels ne dépasse plus la limite de la ligne de commande.
+- **Textes** : plus aucune promesse d'une correction qui n'existe pas.
+
+### Atelier, tests et benchmark
+
+- **Atelier en trois entrées** : Mon PC (fiche, stockage, mémoire, pilotes), En direct (capteurs, processus), Tests ; chaque entrée revient à sa dernière section.
+- **Page des tests simplifiée** : six tuiles, test processeur Rapide, Normal ou Long, « Tout tester » avec une seule confirmation, panneau unique du test en cours, coche de fin.
+- **Nouveaux tests** : refroidissement, charge combinée, vraie capacité d'une clé USB, écran, clavier et souris, haut-parleurs, batterie, balade Wi-Fi, contrôle technique du PC.
+- **Courbes sur plusieurs semaines** (Atelier > Tests) : usure et température des disques, capacité de la batterie, températures maximales ; les scores de l'audit de la semaine restent sur leur propre courbe, à part de ceux des audits lancés à la main. **En direct** : courbe sous chaque valeur, repère qui glisse et couleur qui monte vers le seuil.
+- **Page Benchmark** : cartes de score cliquables, avec le score qui monte et des barres qui se remplissent ; la carte de score à partager s'ouvre en grand dans MAUS ; mon classement, pour comparer deux réglages avec mes propres passes.
+- **Mesure du benchmark plus juste** : l'image finale des scènes est calculée à la résolution de calcul, quelle que soit la définition de l'écran, et le test vectoriel colore son image sur tous les cœurs, quatre fois par seconde ; les scores de cette édition ne se comparent pas aux précédents. Une température suivie puis perdue pendant 15 secondes arrête aussi le benchmark.
+- **Pendant le benchmark** : un écran entre chaque test, avec le test qui arrive, les images et les scores déjà obtenus. « Le plus rapide » et « le moins rapide » comparent chaque test à son propre composant : une carte graphique n'est plus désignée à tort parce que le processeur compte plus de points. Écran et PC restent éveillés. Échap affiche le bilan partiel, et une panne garde les résultats déjà mesurés.
+- **Score du processeur recalé** : pour le processeur, 10 000 points valent de nouveau la machine de référence. Ses anciennes valeurs lui donnaient environ 4 fois trop de points et faussaient le score combiné. Les références de la carte graphique sont remesurées en 1440p et en 4K, pas encore en 1080p ni en 720p. Les scores d'avant la 0.8.6 ne se comparent plus aux nouveaux, et la page le dit.
+- **Arrêt sur la chaleur** : sur les processeurs Intel, la température lue s'arrête à la limite du processeur. Un test de stabilité s'arrête désormais si le processeur reste à sa limite pendant 10 minutes, durée choisie par MAUS et annoncée à la confirmation ; le benchmark n'annonce plus d'arrêt sur ce critère.
+- **Corrections** : le test de disque de 4 Go aboutit enfin ; en DirectX 11, la scène Galaxie enchaîne ses calculs comme en DirectX 12 ; le test de la mémoire vive part d'une mesure fraîche ; la mesure de latence retrouve les noms des pilotes sous Windows 11 24H2 ; plus de ligne vide ni de faux « Machine équilibrée » quand une passe compte moins de deux tests ; ralentissement de la carte signalé aussi pour le lancer de rayons ; un historique de benchmark illisible n'est ni écrasé ni élagué ; l'analyse d'un lecteur entier aboutit.
+- **Capacité passée de la batterie** (Atelier > Mon PC, carte « Batterie ») : sur un clic, en français, sans droits et sans passer par le moteur, la courbe et les valeurs lues dans le rapport XML de Windows, avec le début réel des données (jamais « depuis l'achat »). Ni seuil de remplacement ni preuve pour une garantie ; le contenu du fichier n'étant pas documenté, tout écart donne « non lu ». Essayé seulement sur la forme du rapport d'un PC fixe et sur un exemple : aucun vrai rapport de portable lu à ce jour.
+
+### Rapports, aide et installation
+
+- **Rapport HTML plus soigné** : bandeau avec le logo, score dans un anneau de couleur, nombre de constats sur la ligne de chaque module, conseils mis en valeur, impression en clair. Toujours une seule page, sans script ni ressource externe. Aussi en JSON et CSV ; la page HTML s'imprime depuis le navigateur.
+- **Noms masqués** : avant d'être coupés, valeur par valeur dans l'export JSON, et les dossiers des autres comptes aussi. Le nom du réseau Wi-Fi n'est plus jamais lu.
+- **Demander de l'aide** : MAUS dit ce qu'il a retiré du résumé, et le copie en Markdown pour un forum.
+- **Vérifier mon installation** (À propos) : dossier protégé, bibliothèques identiques à la compilation, empreinte du programme à comparer à celle publiée, journal réservé aux administrateurs ; la page dit que ce n'est pas une preuve absolue. **Sécurité dans « À propos »** : ce que fait le moteur, ce que MAUS ne touche jamais, lien vers le document complet.
+
+### Confort, apparence et accessibilité
+
+- Lecteurs d'écran : le bandeau du haut et la barre de gauche sont maintenant vus (« Toutes les fonctionnalités », « Refermer les droits », choix de la langue).
+- **Paramètres en trois onglets** (Apparence, Comportement, Droits administrateur), chaque option avec son explication et sa valeur recommandée. **Mode technicien** : détails techniques dépliés partout, et les erreurs gardent leur message d'origine.
+- **Taille de l'affichage** : de Compact à Très grand, en tête des Paramètres ; Ctrl + molette et Ctrl + 0 dans la fenêtre principale. **Apparence** : une seule échelle de tailles de texte, un seul jeu d'icônes.
+- **Messages** : une phrase humaine et « que faire » à la place du texte brut de Windows (accès refusé, fichier introuvable, disque plein, délai dépassé, autorisation annulée…). Questions, avertissements et confirmations dans une seule fenêtre aux couleurs de MAUS, avec la même réponse par défaut qu'avant, et un seul gabarit pour les confirmations (ce qui va changer, à savoir, retour en arrière, rappel, Continuer ?). Seuls le message d'erreur grave et la confirmation du moteur restent ceux de Windows.
+- **Messages d'aide** : après deux secondes au survol, mots techniques expliqués, réglage pour les couper. Ce qui est grisé dit pourquoi.
+- **Animations** : constats qui apparaissent un par un puis au fil du défilement, catégories et zones repliables qui s'ouvrent en douceur, grandes cartes qui s'agrandissent à peine au survol, marque du menu qui glisse, score qui monte avec un halo, arc pendant l'audit, changement de page plus ample, fondu au changement de thème. Tout s'arrête si les animations sont coupées (Paramètres, ou « Effets d'animation » de Windows).
+- **Confort** : numéro de version dans le titre, raccourcis Ctrl+1 à Ctrl+7 en infobulle, fenêtre rouverte à sa place, sur l'Atelier ou le Benchmark si c'est là qu'on l'avait laissée. Logo affiché dès le début de l'ouverture. MAUS ne se ferme plus au lancement sur un petit écran (1080p à 200 %, bureau à distance).
+- **Lecteurs d'écran** : tout a un nom (onglets principaux, boutons et cartes), et une garde l'exige. **Contraste élevé** : bouton d'arrêt, couleurs du logo et boutons principaux suivent les couleurs de Windows.
+- **Traductions** : textes passés en anglais et en espagnol, ressources en espagnol livrées avec MAUS.
+
+### Sécurité et fiabilité
+
+- **Écritures** : protection renforcée des écritures du moteur, limitées à une liste fermée de clés de registre, à chaque écriture et à chaque annulation (voir le document de sécurité). Les « valeurs Windows » des effets visuels se limitent à trois clés ; une tâche de Windows lui-même n'est jamais touchée ; les valeurs sensibles demandent la confirmation du moteur et s'annulent une par une.
+- **Moteur et lancement** : protection renforcée du lancement de MAUS (le `MAUS.exe` publié est un petit lanceur natif), des dossiers réservés de MAUS et de leurs journaux, des commandes lancées par MAUS, des entrées et de l'arrêt du moteur, et de la ligne de commande. Liste plus courte de commandes admises : `netsh`, `dsregcmd` et `manage-bde` n'en font plus partie.
+- **Aucun processus administrateur dans vos fichiers** : winget n'est plus jamais lancé avec les droits administrateur (la liste des logiciels à mettre à jour est lue par la fenêtre, même quand le moteur fait l'audit ; le moteur a une opération de moins), et le benchmark lancé par le moteur garde la température du processeur mais n'écrit plus rien dans votre profil : il rend sa passe au moteur, et c'est la fenêtre, sans droits, qui la garde.
+- **Confirmation du moteur** : la question du moteur administrateur s'affiche dans sa propre fenêtre, dont les boutons ne répondent qu'au bout de 2 secondes au premier plan, et de nouveau après chaque retour au premier plan ; aucun raccourci d'une seule touche, « Non » par défaut, et « Non » sans réponse au bout de 2 minutes.
+- **Processus administrateur** : les programmes lancés par MAUS travaillent dans le dossier System32 ; sans dossier protégé, un processus administrateur n'écrit plus de journal de diagnostic dans votre profil ; une sauvegarde de pilote qu'un autre compte a pu modifier n'est plus proposée ni réinstallée.
+- **Stockage et processus** : protection renforcée de l'analyse de l'espace disque (les profils des autres comptes ne sont jamais lus) et de l'arrêt d'un processus (ni un autre compte ni un processus vital). Une tâche qui n'est pas celle de MAUS n'est jamais reprise, et sa remise à jour après une mise à jour du Store demande confirmation.
+- **Lecture des barrettes** : protection renforcée ; en DDR5 avec la protection d'écriture du BIOS, MAUS affiche le seul profil standard et le dit.
+- **Résumés d'audit** : plus de valeurs lues gardées dans le profil. **Rapport de batterie** : une fenêtre lancée en administrateur le refuse et demande de rouvrir MAUS normalement.
+- **Stabilité** : une erreur d'une opération du moteur (disque plein, fichier refusé) revient à l'écran au lieu d'un canal coupé ; les écritures de fichiers retentent quand un antivirus tient le fichier un instant ; un fichier de choix modifié à la main ne bloque plus MAUS ; le choix de langue et de thème n'est plus effacé au premier démarrage du moteur.
+
+### Moins de choses à l'écran
+
+- **Mode technicien, un seul interrupteur** : l'accueil complet n'est plus une option à part. « Retirer et redétecter », « Sauvegarder le pilote », « Supprimer le pilote », la liste des sauvegardes et « Réinstaller une sauvegarde » ne s'affichent plus qu'en mode technicien ; le moteur et ses vérifications ne changent pas, et les sauvegardes déjà faites restent accessibles ainsi.
+- **Retirés** : la carte « Bienvenue » de l'accueil (l'écran d'ouverture et le parcours en trois étapes disent la même chose), le bandeau de surveillance et ses réglages (le compteur d'images par seconde reste), l'étalonnage de la tension de la mémoire (une carte mère qui décrit sa tension l'affiche toujours), le fond Mica (toutes les fenêtres gardent le fond normal), le bouton « Avec ma passe précédente » du benchmark (« Comparer à la dernière », dans « Mon classement », fait la même chose). Les anciens réglages restent dans le fichier de préférences et sont simplement ignorés.
+- **Benchmark** : l'historique des passes est replié sous le classement.
+- **Avertissements** : la relecture n'a plus qu'un bouton « Fermer », qui répond à Entrée et à Échap.
+
+### Fabrication et ligne de commande
+
+- **Fabrication** : le paquet du Store passe par tous les tests et se fabrique sur GitHub, avec attestation de provenance ; il refuse d'écraser un paquet de la même version. La publication demande désormais Visual C++.
+- **Tests** : premiers tests de la ligne de commande et des écrans (rien n'est appliqué sans accord), plus de 3 300 tests au total.
+- **Ligne de commande** : `--force`, conseillé après une annulation refusée, reprend bien la valeur ; `maus --revert` refuse `--change` sans identifiant au lieu d'annuler toute la séance ; `--module` signale un nom manquant ou inconnu.
+- **Documents** : le principe « pas de source, pas de seuil » est précisé ; fiches d'origine et journal des sessions retirés du dépôt, gardés dans son historique.
+- **Plus de deux cents petits défauts réglés** : messages plus justes quand une mesure manque ou qu'un plafond est atteint, code jamais lu retiré, le bon compte de corrections recommandées sur le bouton de l'accueil, meilleurs messages et affichages.
+
+### Essais sur un vrai PC
+
+- **Essayé sur le PC du porteur** : l'audit avec et sans droits administrateur, une correction appliquée puis annulée, un point de restauration, la page Suivi, « Refermer les droits », le benchmark complet en 1440p et en 4K.
+- **Pas encore essayé sur un vrai PC** : la réparation DISM puis SFC avec sa progression, une action sur le pilote graphique, winget et PawnIO lancés sans droits, le bouton « Remettre en place », le benchmark complet en 1080p et en 720p, les processeurs AMD, la mémoire DDR5, les cartes graphiques AMD et Intel. Ces parcours ne sont vérifiés que par les tests simulés et la lecture du code.
 
 ## 0.8.5 — 30/10/2026 — relecture complète du code, moteur plus strict, document du Store exact
 
-Corrections (dernier chiffre, règle du porteur), à la suite d'une relecture complète du code (douze cartes par sous-système, quatre angles d'attaque) : aucune faille critique ni haute trouvée ; le moteur administrateur et le document de sécurité du Microsoft Store sont rendus exacts l'un par rapport à l'autre.
+Corrections (dernier chiffre, règle du porteur), à la suite d'une relecture complète du code (douze cartes par sous-système, quatre angles d'attaque) : le moteur administrateur et le document de sécurité du Microsoft Store sont rendus exacts l'un par rapport à l'autre.
 
 - **Moteur administrateur** : le rapport de batterie n'est plus une opération du moteur (il est toujours fait sans droits par la fenêtre) ; une annulation « forcée » venue du canal est ignorée (une valeur changée depuis la correction est toujours laissée telle quelle ; seul l'outil en ligne de commande, lancé par un administrateur, offre `--force`) ; chaque action sur le pilote graphique est confirmée par le moteur lui-même (redémarrage et sauvegarde compris) ; la description du point de restauration et les notes de vérification sont bornées ; un jour de la semaine hors définition est refusé ; l'annulation et la vérification passent par le même verrou que l'application des corrections ; `schtasks` est arrêté s'il ne répond pas en une minute.
 - **Fenêtre** : installer ou retirer PawnIO ne fige plus la fenêtre pendant la confirmation du moteur ; « Lancer l'audit » est inactif pendant les corrections, et un audit ne peut plus en doubler un autre ; la fiche mémoire ne redemande plus l'autorisation administrateur si le moteur s'est arrêté entre-temps (elle le dit) ; les erreurs imprévues de l'audit, des corrections, de l'annulation, de la fiche matériel et du test du processeur sont journalisées dans `%LOCALAPPDATA%\MAUS\logs`.

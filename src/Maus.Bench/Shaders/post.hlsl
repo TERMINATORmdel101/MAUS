@@ -276,7 +276,7 @@ float4 FinalPS(FullscreenOut input) : SV_Target
     return float4(srgb, 1.0);
 }
 
-// Simple recopie (aperçus, captures).
+// Recopie de l'image finale à l'écran : une seule lecture par pixel, quelle que soit la définition de l'écran.
 float4 CopyPS(FullscreenOut input) : SV_Target
 {
     return Source.SampleLevel(LinearClamp, input.UV, 0);

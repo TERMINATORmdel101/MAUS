@@ -16,7 +16,7 @@ public partial class SecurityGuardTests
     private static readonly string[] ProcessLaunchers =
     [
         "Maus.App/EngineHost.cs", "Maus.App/ShellLauncher.cs", "Maus.Core/Engine/Broker/LocalMausEngine.Workshop.cs",
-        "Maus.Core/Engine/TaskSchedulerClient.cs", "Maus.Core/Fixes/ScheduledTasks.cs", "Maus.Core/Platform/ReadOnlyCommandRunner.cs",
+        "Maus.Core/Platform/ReadOnlyCommandRunner.cs", "Maus.Core/Platform/SchtasksTool.cs", "Maus.Core/Platform/SystemTool.cs",
         "Maus.Core/Platform/VisibleConsole.cs", "Maus.Core/Workshop/PresentMonCapture.cs",
     ];
 
@@ -42,9 +42,9 @@ public partial class SecurityGuardTests
         "Maus.Bench/Gpu/D3D12/D3D12CommandList.cs", "Maus.Bench/Gpu/D3D12/D3D12GpuDevice.cs", "Maus.Bench/Gpu/D3D12/D3D12RayTracing.cs",
         "Maus.Bench/Gpu/D3D12/D3D12Upload.cs", "Maus.Bench/Platform/BenchWindow.cs", "Maus.Core/Modules/M01Audit/NativeReaders.cs",
         "Maus.Core/Modules/M05Power/Win32PowerPlatform.cs", "Maus.Core/Modules/M08Bios/FirmwareVariableReader.cs",
-        "Maus.Core/Modules/M09Gpu/GpuSchedulingReader.cs", "Maus.Core/Modules/M14Display/RefreshRateTrial.cs",
+        "Maus.Core/Modules/M14Display/RefreshRateTrial.cs", "Maus.Core/Platform/D3dkmtAdapters.cs",
         "Maus.Core/Modules/M14Display/Win32DisplayConfigReader.cs", "Maus.Core/Modules/M18Network/WifiSource.cs",
-        "Maus.Core/Platform/DriverDateSource.cs", "Maus.Core/Workshop/D3D11GpuMemory.cs", "Maus.Core/Workshop/DiskSpeedTest.cs",
+        "Maus.Core/Workshop/D3D11GpuMemory.cs", "Maus.Core/Workshop/DiskSpeedTest.cs",
         "Maus.Core/Workshop/EtwDriverLatencyTracer.cs", "Maus.Core/Workshop/GpuPerformance.cs", "Maus.Core/Workshop/Memory/PawnIo/PawnIoModule.cs",
         "Maus.Core/Workshop/MemoryTest.cs", "Maus.Core/Workshop/Nvml.cs", "Maus.Core/Workshop/Pdh.cs", "Maus.Core/Workshop/WindowsCoreTopology.cs",
     ];
@@ -54,6 +54,50 @@ public partial class SecurityGuardTests
     [
         "Maus.App/ViewModels/MainViewModel.Home.cs", "Maus.App/ViewModels/ModuleViewModel.cs", "Maus.Core/Localization/Texts.cs",
     ];
+
+    [Theory]
+    [InlineData("/k title MAUS", "/d /k title MAUS")]
+    [InlineData("/s /k \"title MAUS\"", "/d /s /k \"title MAUS\"")]
+    public void Command_windows_never_run_autorun(string arguments, string expected) =>
+        Assert.Equal(expected, VisibleConsole.CommandLine(arguments));
+
+    [Theory]
+    [InlineData(@"\\serveur\partage\a.exe", true)]
+    [InlineData("//serveur/partage/a.exe", true)]
+    [InlineData(@"\/serveur\a.exe", true)]
+    [InlineData(@"\\?\C:\a.exe", true)]
+    [InlineData(@"C:\Programmes\a.exe", false)]
+    [InlineData("a.exe", false)]
+    [InlineData("", false)]
+    public void Network_paths_are_recognized_in_every_spelling(string path, bool remote) =>
+        Assert.Equal(remote, FinalPath.IsRemote(path));
+
+    [Fact]
+    public void Only_the_interface_without_rights_opens_a_command_window() =>
+        Assert.Equal(["Maus.Core/Modules/M20Software/SoftwareConsole.cs"], Sources().Where(s => s.Value.Contains("VisibleConsole.Run", StringComparison.Ordinal)).Select(s => s.Key));
+
+    [Theory]
+    [InlineData("DOTNET_")]
+    [InlineData("COMPlus_")]
+    [InlineData("CORECLR_")]
+    [InlineData("COREHOST_")]
+    public void The_native_host_removes_the_variables_read_by_dotnet(string prefix) =>
+        Assert.Contains("L\"" + prefix + "\"", File.ReadAllText(Path.Combine(SourceFolder(), "Maus.App", "Host", "MausHost.cpp")), StringComparison.Ordinal);
+
+    [Fact]
+    public void A_published_maus_uses_the_native_host()
+    {
+        var project = File.ReadAllText(Path.Combine(SourceFolder(), "Maus.App", "Maus.App.csproj"));
+
+        Assert.Contains("<AppHostSourcePath Condition=\"'$(SelfContained)' == 'true'\">", project, StringComparison.Ordinal);
+        Assert.Contains("Host\\MausHost.cpp", project, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Maus.App", "Maus.App.csproj")]
+    [InlineData("Maus.Cli", "Maus.Cli.csproj")]
+    public void Startup_hooks_are_off_in_the_programs(string folder, string project) =>
+        Assert.Contains("<StartupHookSupport>false</StartupHookSupport>", File.ReadAllText(Path.Combine(SourceFolder(), folder, project)), StringComparison.Ordinal);
 
     private static string SourceFolder([CallerFilePath] string here = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "..", "src"));
@@ -70,6 +114,18 @@ public partial class SecurityGuardTests
     private static List<string> FilesMatching(Regex pattern) =>
         [.. Sources().Where(s => pattern.IsMatch(s.Value)).Select(s => s.Key).Order(StringComparer.Ordinal)];
 
+    /// <summary>MAUS ne lit jamais une clé BitLocker et n'agit jamais sur BitLocker : ces méthodes WMI n'apparaissent nulle part dans le code.</summary>
+    [Fact]
+    public void Bitlocker_methods_that_read_a_key_or_change_protection_are_never_named_in_the_code()
+    {
+        var forbidden = new Regex(
+            "GetKeyProtectorNumericalPassword|GetKeyProtectorExternalKey|GetKeyProtectorCertificate|GetKeyPackage|GetExternalKeyFromFile|" +
+            "DisableKeyProtectors|EnableKeyProtectors|ProtectKeyWith|DeleteKeyProtector|\"Decrypt\"|\"Encrypt\"",
+            RegexOptions.CultureInvariant);
+
+        Assert.Empty(FilesMatching(forbidden));
+    }
+
     private static void OnlyIn(Regex pattern, string[] allowed, string what)
     {
         var found = FilesMatching(pattern);
@@ -84,6 +140,22 @@ public partial class SecurityGuardTests
     [Fact]
     public void Programs_are_started_only_from_reviewed_files() =>
         OnlyIn(ProcessStart(), ProcessLaunchers, "Lancement de programme");
+
+    /// <summary>
+    /// Dossier de travail (0.8.6) : chaque programme lancé par MAUS, avec ou sans droits, a System32 pour dossier courant, jamais
+    /// celui du processus qui le lance. Chaque <c>new ProcessStartInfo</c> d'un fichier relu pose son <c>WorkingDirectory</c>.
+    /// </summary>
+    [Fact]
+    public void Every_program_started_by_maus_works_in_system32()
+    {
+        var sources = Sources();
+        foreach (var file in ProcessLaunchers)
+        {
+            var starts = NewStartInfo().Count(sources[file]);
+            var folders = System32WorkingDirectory().Count(sources[file]);
+            Assert.True(starts > 0 && starts == folders, $"{file} : {starts} lancement(s) préparé(s), {folders} dossier(s) de travail System32");
+        }
+    }
 
     [Fact]
     public void Shell_execution_and_command_interpreter_stay_where_they_were_reviewed()
@@ -101,7 +173,14 @@ public partial class SecurityGuardTests
         var sources = Sources();
         foreach (var file in FilesMatching(ManualAllocation()))
         {
-            Assert.True(sources[file].Contains("finally", StringComparison.Ordinal) && FreeCall().IsMatch(sources[file]),
+            var source = sources[file];
+            var freedInFinally = false;
+            for (var at = source.IndexOf("finally", StringComparison.Ordinal); at >= 0 && !freedInFinally; at = source.IndexOf("finally", at + 1, StringComparison.Ordinal))
+            {
+                freedInFinally = FreeCall().IsMatch(source.AsSpan(at, Math.Min(800, source.Length - at)));
+            }
+
+            Assert.True(freedInFinally,
                 $"{file} réserve de la mémoire sans la rendre dans un bloc finally");
         }
     }
@@ -165,6 +244,12 @@ public partial class SecurityGuardTests
 
     [GeneratedRegex(@"Process\.Start\(|new ProcessStartInfo|new Process\b|CreateProcess\w*\(|ShellExecute\w*\(")]
     private static partial Regex ProcessStart();
+
+    [GeneratedRegex(@"new ProcessStartInfo\b")]
+    private static partial Regex NewStartInfo();
+
+    [GeneratedRegex(@"WorkingDirectory\s*=\s*((?:[\w.]+\.)?SystemTool\.WorkingFolder|WorkingFolder|system)\s*[,}]")]
+    private static partial Regex System32WorkingDirectory();
 
     [GeneratedRegex(@"UseShellExecute\s*=\s*true")]
     private static partial Regex ShellExecute();

@@ -199,8 +199,6 @@ public sealed record IntelMemoryReport(
 {
     /// <summary>Horloge mémoire DCLK en MHz ; le débit vaut le double, en MT/s.</summary>
     public double? DclkMhz => Clocks.FirstOrDefault(c => c.Key == "DCLK")?.Mhz;
-
-    public double? RingMhz => Clocks.FirstOrDefault(c => c.Key == "RING")?.Mhz;
 }
 
 /// <summary>

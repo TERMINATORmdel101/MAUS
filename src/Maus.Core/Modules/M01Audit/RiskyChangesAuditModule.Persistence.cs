@@ -131,11 +131,13 @@ public sealed partial class RiskyChangesAuditModule
                 return false;
             }
 
-            var folder = separator < 0 ? null : path[..separator];
-            if (string.IsNullOrEmpty(folder))
+            // « \explorer.exe » a bien un dossier, vide : ce n'est pas le cas « sans chemin ».
+            if (separator < 0)
             {
                 return true;
             }
+
+            var folder = path[..separator];
 
             var expanded = folder
                 .Replace("%SystemRoot%", windowsDirectory, StringComparison.OrdinalIgnoreCase)
@@ -202,9 +204,24 @@ public sealed partial class RiskyChangesAuditModule
 
             foreach (var name in names.Where(n => n.Length > 0))
             {
-                var executable = ResolveStartupExecutable(context.Registry.GetString(hive, path, name));
+                var command = context.Registry.GetString(hive, path, name);
+                var executable = ResolveStartupExecutable(command);
                 if (executable is null)
                 {
+                    continue;
+                }
+
+                // Un interpréteur signé qui lance un contenu externe ne passe pas pour « signé » : la ligne entière est à examiner.
+                if (DefenderExclusionClassifier.IsBroadProcess(Path.GetFileName(executable)) && command!.Trim().Trim('"').Length > executable.Length)
+                {
+                    unsigned.Add(T("{0} (lancé par un interpréteur : {1})", name, command.Trim()));
+                    continue;
+                }
+
+                // Programme lancé depuis un partage réseau : signalé sans y toucher, l'audit n'ouvre aucune connexion pour le vérifier.
+                if (Maus.Core.Platform.FinalPath.IsRemote(executable))
+                {
+                    unsigned.Add($"{name} ({executable})");
                     continue;
                 }
 

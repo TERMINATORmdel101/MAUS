@@ -17,6 +17,7 @@ public class RegistryRuleEvaluatorTests
         AbsentIsOk = absentIsOk,
         Severity = severity,
         Explanation = "Explication",
+        ExpectedLabel = "valeur attendue",
         Advice = "Conseil",
     };
 
@@ -72,15 +73,6 @@ public class RegistryRuleEvaluatorTests
         Assert.Equal(FindingStatus.Ok, RegistryRuleEvaluator.Evaluate(rule, new FakeRegistry()).Status);
         var registry = new FakeRegistry().Set(RegistryHive.LocalMachine, @"SOFTWARE\Test", "Value", 1);
         Assert.Equal(FindingStatus.Problem, RegistryRuleEvaluator.Evaluate(rule, registry).Status);
-    }
-
-    [Fact]
-    public void OneOf_accepts_any_listed_value_case_insensitively()
-    {
-        var rule = Rule(RuleExpectation.OneOf) with { Values = ["explorer.exe", "other.exe"] };
-        var registry = new FakeRegistry().Set(RegistryHive.LocalMachine, @"SOFTWARE\Test", "Value", "Explorer.EXE");
-
-        Assert.Equal(FindingStatus.Ok, RegistryRuleEvaluator.Evaluate(rule, registry).Status);
     }
 
     [Fact]

@@ -20,9 +20,6 @@ public sealed class DisplayModule : IAuditModule
     internal const string AdvancedDisplayPage = "ms-settings:display-advanced";
     internal const string GraphicsPage = "ms-settings:display-advancedgraphics";
 
-    /// <summary>Tolérance entre la fréquence exacte (59,94 Hz) et la valeur entière des modes (60 Hz).</summary>
-    private const double RefreshTolerance = 1.0;
-
     private readonly IDisplayConfigReader _reader;
 
     public DisplayModule()
@@ -63,7 +60,7 @@ public sealed class DisplayModule : IAuditModule
 
         var screens = paths.Select((path, index) => new Screen(path, index + 1, Label(path, index + 1))).ToList();
         var findings = new List<Finding>();
-        findings.AddRange(screens.Select(s => DetectAdapter(context.Hardware, s)).OfType<Finding>());
+        findings.AddRange(screens.Select(s => DetectAdapter(context.Hardware, s) is { } adapter ? Relaxed(adapter, context.Hardware, screens) : null).OfType<Finding>());
         findings.AddRange(screens.Select(s => DetectRefresh(context.Hardware, s)));
         findings.AddRange(screens.Where(s => s.Path.Color is not null).Select(DetectEncoding));
         findings.AddRange(screens.Where(s => s.Path.Color is { HdrActive: true }).Select(DetectBitDepth));
@@ -82,10 +79,16 @@ public sealed class DisplayModule : IAuditModule
 
     // ----- Carte graphique qui pilote l'écran -----
 
+    /// <summary>Un écran secondaire sur le graphique intégré n'est pas grave si un autre est déjà sur la carte dédiée.</summary>
+    private static Finding Relaxed(Finding finding, HardwareProfile hardware, IEnumerable<Screen> screens) =>
+        finding.Status.Rank() > FindingStatus.Info.Rank() && screens.Any(s => FindGpu(hardware, s.Path) is { IsIntegrated: false })
+            ? finding with { Status = FindingStatus.Info, Severity = Severity.Info }
+            : finding;
+
     private static Finding? DetectAdapter(HardwareProfile hardware, Screen screen)
     {
         // Sur portable, la dalle interne (et souvent la sortie HDMI) passe par le graphique intégré : c'est normal.
-        if (hardware.FormFactor != FormFactor.Desktop || !hardware.HasDedicatedGpu || IsIndirect(screen.Path.Output))
+        if (hardware.FormFactor != FormFactor.Desktop || !hardware.HasDedicatedGpu || IsIndirect(screen.Path.Output) || DisplayParsers.IsInternal(screen.Path.Output))
         {
             return null;
         }
@@ -129,12 +132,12 @@ public sealed class DisplayModule : IAuditModule
         };
     }
 
-    // ----- Fréquence de rafraîchissement -----
+    // ----- Fréquence d'actualisation -----
 
     private static Finding DetectRefresh(HardwareProfile hardware, Screen screen)
     {
         var id = $"M14.refresh.{screen.Slug}";
-        var title = T("Fréquence de rafraîchissement : {0}", screen.Label);
+        var title = T("Fréquence d'actualisation : {0}", screen.Label);
         var path = screen.Path;
         if (path.RefreshHz is not { } current || current <= 0)
         {
@@ -155,9 +158,9 @@ public sealed class DisplayModule : IAuditModule
         }
 
         var resolution = atCurrent is not null ? $"{path.Width}×{path.Height}" : native is { } nat ? $"{nat.Width}×{nat.Height}" : T("résolution actuelle");
-        var lower = current < max - RefreshTolerance;
+        var lower = current < max - RefreshRateTargets.Tolerance;
         var color = path.Color;
-        var explanation = T("La fréquence de rafraîchissement est le nombre d'images que l'écran affiche par seconde. " +
+        var explanation = T("La fréquence d'actualisation est le nombre d'images que l'écran affiche par seconde. " +
                                    "Plus elle est haute, plus le mouvement de la souris, le défilement et les jeux sont fluides.");
         if (!lower)
         {
@@ -238,7 +241,6 @@ public sealed class DisplayModule : IAuditModule
                   "Le débit du câble est fixe et le HDR exige 10 bits par couleur au lieu de 8. Une fréquence plus basse ou le DisplayPort donneront une image plus nette.", (color.HdrActive ? "HDR" : "SDR"), Hz(screen.Path.RefreshHz ?? 0))
                 : T("Les couleurs passent sans compression : le texte reste net."),
             Advice = advice,
-            Fixable = subsampled,
         };
     }
 
@@ -269,7 +271,7 @@ public sealed class DisplayModule : IAuditModule
     {
         var color = screen.Path.Color;
         var id = $"M14.hdr.{screen.Slug}";
-        var title = $"HDR : {screen.Label}";
+        var title = T("HDR : {0}", screen.Label);
         if (color is null)
         {
             return Finding.Unknown(id, title, T("État de la couleur avancée (HDR) illisible pour cet écran."), screen.Category);
@@ -425,7 +427,7 @@ public sealed class DisplayModule : IAuditModule
     {
         if (settings.TryGetValue(key, out var value))
         {
-            labels.Add($"{label} {(value == "0" ? "désactivé" : "activé")}");
+            labels.Add($"{label} {(value == "0" ? T("désactivé") : T("activé"))}");
         }
     }
 

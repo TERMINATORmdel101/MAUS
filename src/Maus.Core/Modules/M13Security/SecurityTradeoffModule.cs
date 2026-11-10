@@ -8,7 +8,7 @@ namespace Maus.Core.Modules.M13Security;
 /// <summary>
 /// Module 13 — Performance contre sécurité. Décrit l'intégrité de la mémoire (HVCI) et la VBS, ce qui en dépend
 /// et ce qui en réduit le coût. Signale en rouge les atténuations CPU coupées et la liste de blocage des pilotes désactivée.
-/// Aucun constat ne propose de couper une protection : l'option experte reste désactivée par défaut.
+/// Aucun constat ne propose de couper une protection.
 /// </summary>
 public sealed class SecurityTradeoffModule : Fixes.IFixableModule
 {
@@ -48,7 +48,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     ];
 
     /// <summary>Fonctions facultatives qui gardent l'hyperviseur chargé.</summary>
-    private static readonly (string Feature, string Name)[] HypervisorFeatures =
+    private static (string Feature, string Name)[] HypervisorFeatures =>
     [
         ("Microsoft-Hyper-V-All", "Hyper-V"),
         ("VirtualMachinePlatform", T("Plateforme de machine virtuelle (WSL2)")),
@@ -177,7 +177,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Expected = T("actives (valeurs absentes, ou sans bit de désactivation)"),
             Explanation = T("Ces protections du processeur empêchent un programme de lire la mémoire du noyau ou d'autres programmes (failles Spectre et Meltdown). Des scripts d'optimisation les coupent pour gagner quelques pour cent : le PC devient alors vulnérable. Windows les active par défaut et MAUS ne propose jamais de les couper."),
             Advice = deviating
-                ? $@"Supprimer les valeurs FeatureSettingsOverride et FeatureSettingsOverrideMask sous HKLM\{MemoryManagementKey}, puis redémarrer. Elles viennent le plus souvent d'un script d'optimisation (voir aussi le Module 1)."
+                ? T("Supprimer les valeurs FeatureSettingsOverride et FeatureSettingsOverrideMask sous HKLM\\{0}, puis redémarrer. Elles viennent le plus souvent d'un script d'optimisation (voir aussi le Module 1).", MemoryManagementKey)
                 : null,
             Fixable = deviating,
         };
@@ -187,7 +187,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     {
         const string id = "M13.driver-blocklist";
         var title = T("Liste de blocage des pilotes vulnérables active");
-        const string category = "Pilotes";
+        var category = T("Pilotes");
         long? value;
         try
         {
@@ -237,7 +237,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
         var policyNote = configuration?.IsImposedByPolicy == true ? T(" Ce réglage est imposé par une stratégie (organisation ou script).") : string.Empty;
         if (deviceGuard.IsMemoryIntegrityRunning)
         {
-            var advice = T("Recommandé : la laisser active. Option experte, jamais appliquée par défaut : la couper peut faire gagner environ 2 à 6 % en jeu sur un processeur récent, au prix d'un PC plus vulnérable.");
+            var advice = T("Recommandé : la laisser active. La couper peut faire gagner environ 2 à 6 % en jeu sur un processeur récent, au prix d'un PC plus vulnérable. Ce réglage se trouve dans Sécurité Windows : MAUS n'y touche pas.");
             if (hasAntiCheat)
             {
                 advice += T(" {0} : sans elle, vos jeux protégés risquent de refuser de se lancer.", Installed(antiCheats!));
@@ -296,7 +296,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     {
         const string id = "M13.anti-cheat";
         var title = T("Anti-triche noyau (Riot Vanguard, FACEIT)");
-        const string category = "Jeux";
+        var category = T("Jeux");
         if (antiCheats is null)
         {
             return Finding.Unknown(id, title, T("Liste des services Windows illisible."), category);
@@ -321,7 +321,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
     {
         const string id = "M13.mbec";
         var title = T("Accélération matérielle de l'intégrité de la mémoire (MBEC/GMET)");
-        const string category = "Processeur";
+        var category = T("Processeur");
         if (deviceGuard is null)
         {
             return denied
@@ -359,7 +359,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             Expected = T("présente"),
             Explanation = T("Ce processeur n'a pas MBEC ni GMET : Windows émule cette fonction (Restricted User Mode) et l'intégrité de la mémoire y coûte davantage, surtout sur Ryzen 1000 et 2000 ou sur Intel antérieur à la 7e génération."),
             Advice = deviceGuard.IsMemoryIntegrityRunning
-                ? T("L'intégrité de la mémoire est active : MAUS la laisse ainsi par défaut. Si vous privilégiez les performances en jeu, l'option experte permettra de la couper, en connaissance de cause.")
+                ? T("L'intégrité de la mémoire est active : MAUS la laisse ainsi par défaut.")
                 : null,
         };
     }
@@ -438,13 +438,22 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             found.Add(T("Recall (installé)"));
         }
 
+        // Une seule source lue : « aucune » ne se dit pas, la liste peut être incomplète.
+        var partial = deviceGuard is null || features is null;
+        if (found.Count == 0 && partial)
+        {
+            return denied
+                ? Finding.AdminRequired(id, title, DependenciesCategory)
+                : Finding.Unknown(id, title, T("État de Credential Guard et des fonctions facultatives illisible."), DependenciesCategory);
+        }
+
         return new Finding
         {
             Id = id,
             Title = title,
             Category = DependenciesCategory,
             Status = FindingStatus.Info,
-            Current = found.Count > 0 ? string.Join(", ", found) : T("aucune détectée"),
+            Current = found.Count > 0 ? string.Join(", ", found) + (partial ? T(" (liste partielle)") : string.Empty) : T("aucune détectée"),
             Explanation = T("Credential Guard, Recall et la connexion Windows Hello renforcée ne fonctionnent qu'avec la VBS : la couper les désactiverait."),
         };
     }
@@ -502,7 +511,6 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
             return new VbsConfiguration(
                 registry.GetDword(RegistryHive.LocalMachine, MemoryIntegrityKey, "Enabled"),
                 registry.GetDword(RegistryHive.LocalMachine, MemoryIntegrityKey, "Locked"),
-                registry.GetDword(RegistryHive.LocalMachine, DeviceGuardKey, "EnableVirtualizationBasedSecurity"),
                 registry.GetDword(RegistryHive.LocalMachine, DeviceGuardKey, "Locked"),
                 registry.GetDword(RegistryHive.LocalMachine, DeviceGuardPolicyKey, "EnableVirtualizationBasedSecurity"),
                 registry.GetDword(RegistryHive.LocalMachine, DeviceGuardPolicyKey, "HypervisorEnforcedCodeIntegrity"));
@@ -571,7 +579,7 @@ public sealed class SecurityTradeoffModule : Fixes.IFixableModule
 
     /// <summary>« Riot Vanguard est installé » ou « Riot Vanguard et FACEIT sont installés ».</summary>
     private static string Installed(List<string> names) =>
-        names.Count > 1 ? T("{0} sont installés", string.Join(" et ", names)) : T("{0} est installé", names[0]);
+        names.Count > 1 ? T("{0} sont installés", string.Join(T(" et "), names)) : T("{0} est installé", names[0]);
 
     private static string Format(long? value) =>
         value is null ? T("absente") : value.Value.ToString(CultureInfo.InvariantCulture);

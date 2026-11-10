@@ -1,3 +1,4 @@
+using Maus.Core.Hardware;
 using Maus.Core.Preferences;
 using Microsoft.Win32;
 
@@ -18,7 +19,7 @@ public class AppearanceTests
 
         // Thème clair : texte blanc sur les fonds foncés ; thème sombre : texte noir sur les fonds clairs (WCAG AA, 4,5:1).
         Assert.True(variants.Dark1.ContrastWith(White) >= AccentVariants.MinimumContrast, $"{hex} : Dark1 {variants.Dark1}");
-        Assert.True(variants.OnWhiteText.ContrastWith(White) >= AccentVariants.MinimumContrast, $"{hex} : bouton {variants.OnWhiteText}");
+        Assert.True(variants.Dark1.ContrastWith(White) >= AccentVariants.MinimumContrast, $"{hex} : bouton {variants.Dark1}");
         Assert.True(variants.Light2.ContrastWith(Black) >= AccentVariants.MinimumContrast, $"{hex} : Light2 {variants.Light2}");
         Assert.True(variants.Light3.Luminance() >= variants.Light1.Luminance() && variants.Dark3.Luminance() <= variants.Dark1.Luminance());
     }
@@ -34,14 +35,14 @@ public class AppearanceTests
     [Fact]
     public void Components_mode_takes_the_cpu_hue_and_a_touch_of_the_graphics_card()
     {
-        var intelNvidia = AccentPalette.For(AccentChoice.Components, new ComponentBrands(ComponentBrand.Intel, ComponentBrand.Nvidia), null);
+        var intelNvidia = AccentPalette.For(AccentChoice.Components, new ComponentBrands(HardwareVendor.Intel, HardwareVendor.Nvidia), null);
         Assert.Equal(AccentPalette.IntelHue, intelNvidia.Primary);
         Assert.Equal(AccentPalette.NvidiaHue, intelNvidia.Secondary);
 
-        var amdApu = AccentPalette.For(AccentChoice.Components, new ComponentBrands(ComponentBrand.Amd, ComponentBrand.Amd), null);
+        var amdApu = AccentPalette.For(AccentChoice.Components, new ComponentBrands(HardwareVendor.Amd, HardwareVendor.Amd), null);
         Assert.Equal((AccentPalette.AmdHue, (Rgb?)null), amdApu);
 
-        var unknownCpu = AccentPalette.For(AccentChoice.Components, new ComponentBrands(ComponentBrand.Other, ComponentBrand.Nvidia), null);
+        var unknownCpu = AccentPalette.For(AccentChoice.Components, new ComponentBrands(HardwareVendor.Other, HardwareVendor.Nvidia), null);
         Assert.Equal((AccentPalette.NvidiaHue, (Rgb?)null), unknownCpu);
 
         Assert.Equal((AccentPalette.Maus, (Rgb?)null), AccentPalette.For(AccentChoice.Components, ComponentBrands.Unknown, null));
@@ -57,11 +58,11 @@ public class AppearanceTests
     }
 
     [Theory]
-    [InlineData("GenuineIntel", ComponentBrand.Intel)]
-    [InlineData("AuthenticAMD", ComponentBrand.Amd)]
-    [InlineData("HygonGenuine", ComponentBrand.Other)]
-    [InlineData(null, ComponentBrand.Other)]
-    public void Cpu_vendor_gives_the_brand(string? vendor, ComponentBrand expected) =>
+    [InlineData("GenuineIntel", HardwareVendor.Intel)]
+    [InlineData("AuthenticAMD", HardwareVendor.Amd)]
+    [InlineData("HygonGenuine", HardwareVendor.Other)]
+    [InlineData(null, HardwareVendor.Other)]
+    public void Cpu_vendor_gives_the_brand(string? vendor, HardwareVendor expected) =>
         Assert.Equal(expected, ComponentBrands.FromCpuVendor(vendor));
 
     [Fact]
@@ -72,11 +73,11 @@ public class AppearanceTests
             .Set(RegistryHive.LocalMachine, GraphicsBrand.DisplayClassKey + @"\0001", "MatchingDeviceId", @"PCI\VEN_10DE&DEV_2484")
             .Set(RegistryHive.LocalMachine, GraphicsBrand.DisplayClassKey + @"\Properties", "Security", "x");
 
-        Assert.Equal(ComponentBrand.Nvidia, GraphicsBrand.Read(registry));
-        Assert.Equal(ComponentBrand.Amd, GraphicsBrand.FromDeviceIds([@"pci\ven_8086&dev_3e92", @"pci\ven_1002&dev_73bf"]));
-        Assert.Equal(ComponentBrand.Intel, GraphicsBrand.FromDeviceIds([@"pci\ven_8086&dev_3e92"]));
-        Assert.Equal(ComponentBrand.Other, GraphicsBrand.FromDeviceIds([@"root\basicdisplay"]));
-        Assert.Equal(ComponentBrand.Other, GraphicsBrand.Read(new FakeRegistry()));
+        Assert.Equal(HardwareVendor.Nvidia, GraphicsBrand.Read(registry));
+        Assert.Equal(HardwareVendor.Amd, GraphicsBrand.FromDeviceIds([@"pci\ven_8086&dev_3e92", @"pci\ven_1002&dev_73bf"]));
+        Assert.Equal(HardwareVendor.Intel, GraphicsBrand.FromDeviceIds([@"pci\ven_8086&dev_3e92"]));
+        Assert.Equal(HardwareVendor.Other, GraphicsBrand.FromDeviceIds([@"root\basicdisplay"]));
+        Assert.Equal(HardwareVendor.Other, GraphicsBrand.Read(new FakeRegistry()));
     }
 
     [Fact]

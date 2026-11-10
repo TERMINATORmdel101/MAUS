@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Maus.Core\Maus.Core.csproj" />
+    <ProjectReference Include="..\..\src\Maus.Cli\Maus.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

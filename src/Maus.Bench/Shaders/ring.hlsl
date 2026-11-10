@@ -36,17 +36,11 @@ struct RockPixel
 };
 
 // Rotation de Rodrigues autour d'un axe unitaire.
-float3 Rotate(float3 v, float3 axis, float angle)
-{
-    float c = cos(angle), s = sin(angle);
-    return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
-}
-
 float3 RockWorld(RockVertex v, Rock rock, out float3 normal)
 {
     float angle = rock.AxisSpin.w * RingParams.y;
-    normal = Rotate(v.Normal, rock.AxisSpin.xyz, angle);
-    return Rotate(v.Position, rock.AxisSpin.xyz, angle) * rock.PositionScale.w + rock.PositionScale.xyz;
+    normal = RotateAxis(v.Normal, rock.AxisSpin.xyz, angle);
+    return RotateAxis(v.Position, rock.AxisSpin.xyz, angle) * rock.PositionScale.w + rock.PositionScale.xyz;
 }
 
 RockPixel RockVS(RockVertex v, uint instance : SV_InstanceID)
@@ -119,12 +113,6 @@ float3 PlanetBands(float3 p)
     color = lerp(color, float3(0.85, 0.35, 0.2), smoothstep(0.35, 0.1, length(storm)) * 0.8);
     return color;
 }
-
-struct SceneOut
-{
-    float4 Color : SV_Target0;
-    float2 Velocity : SV_Target1;
-};
 
 SceneOut RockPS(RockPixel input)
 {

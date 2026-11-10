@@ -12,10 +12,15 @@ public static class TextReport
 
         writer.WriteLine(T("MAUS {0} — audit en lecture seule, aucune modification", report.MausVersion));
         writer.WriteLine(T("{0} {1} (build {2}), édition {3}", report.Windows.ProductName, report.Windows.DisplayVersion, report.Windows.FullBuild, report.Windows.EditionId));
-        writer.WriteLine($"{Labels.Of(report.Hardware.FormFactor)} · {report.Hardware.Cpu.Name} · {string.Join(", ", report.Hardware.Gpus.Select(g => g.Name))}");
+        writer.WriteLine($"{Labels.Of(report.Hardware.FormFactor)} · {report.Hardware.Cpu.DisplayName} · {string.Join(", ", report.Hardware.Gpus.Select(g => g.Name))}");
         if (!report.IsElevated)
         {
             writer.WriteLine(T("Sans droits administrateur : certains contrôles restent indéterminés."));
+        }
+
+        if (HealthScore.PartialNote(HealthScore.Explain(report.Modules)) is { } partial)
+        {
+            writer.WriteLine(partial);
         }
 
         foreach (var module in report.Modules)
@@ -45,6 +50,20 @@ public static class TextReport
                     {
                         writer.WriteLine($"        → {finding.Advice}");
                     }
+                }
+
+                // Encadré (à faire avant le BIOS) et note, quel que soit l'état : comme à l'écran. ScreenOnlyNote n'est jamais écrite ici.
+                if (finding.Callout is { Length: > 0 } callout)
+                {
+                    foreach (var line in callout.Split('\n'))
+                    {
+                        writer.WriteLine($"        {line}");
+                    }
+                }
+
+                if (finding.SideNote is { Length: > 0 } sideNote)
+                {
+                    writer.WriteLine($"        {sideNote}");
                 }
             }
         }

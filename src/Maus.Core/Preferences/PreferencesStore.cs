@@ -60,12 +60,19 @@ public sealed class PreferencesNotSavedException(string message, UserPreferences
 /// <remarks>
 /// Un fichier momentanément illisible n'est jamais pris pour un fichier vide : après quelques tentatives, MAUS continue avec
 /// les choix en mémoire et ne réécrit plus le fichier jusqu'à sa fermeture. Un fichier abîmé, ou écrit par une version plus
-/// récente (valeur inconnue), est lu autant que possible, puis copié à côté avant d'être remplacé.
+/// récente (valeur inconnue), est lu autant que possible, puis copié à côté avant d'être remplacé. Un réglage inconnu de
+/// cette version est gardé tel quel (<see cref="UserPreferences.UnknownSettings"/>) : le fichier reste complet, sans copie.
 /// </remarks>
 /// <param name="wait">Attente entre deux tentatives de lecture (remplaçable pour les tests).</param>
 public sealed class FilePreferencesStore(string directory, IDirectoryProtector protector, Action<TimeSpan>? wait = null) : IPreferencesStore
 {
     private const string FileName = "preferences.json";
+
+    private const int MaxScreenSide = 100_000;
+
+    private const int MaxHz = 2000;
+
+    private const int MaxScreenText = 500;
 
     /// <summary>Lecture de secours : une valeur d'énumération inconnue de cette version prend sa valeur par défaut.</summary>
     internal static readonly JsonSerializerOptions TolerantJson = CreateTolerantOptions();
@@ -81,7 +88,11 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
     private bool _memoryOnly;
 
     public static string DefaultDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "MAUS", "settings");
+        Path.Combine(SystemPaths.MausData, "settings");
+
+    /// <summary>Dossier des choix d'affichage de l'utilisateur, écrits sans droits administrateur.</summary>
+    public static string UserDirectory =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "settings");
 
     /// <summary>
     /// Le magasin de toute l'application : l'état « fichier illisible, choix gardés en mémoire » vaut ainsi pour toute la
@@ -105,7 +116,22 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
                 return _known ?? UserPreferences.Default;
             }
 
-            var read = AtomicFile.ReadText(FilePath, protector.IsTrusted, wait);
+            StoredFileRead read;
+            try
+            {
+                read = protector.EnsureReadable(directory)
+                    ? AtomicFile.ReadText(FilePath, protector.IsTrusted, wait)
+                    : new StoredFileRead(StoredFileState.Absent);
+            }
+            catch (JournalUnsafeException ex)
+            {
+                // Rien n'est lu d'un dossier qui n'est pas sûr : aucune marque « voulu » n'y est reprise.
+                State = PreferencesFileState.Untrusted;
+                Notice = T("MAUS n'a pas lu le fichier de vos choix, parce que son dossier n'est pas sûr : {0}", ex.Message);
+                _known = UserPreferences.Default;
+                return UserPreferences.Default;
+            }
+
             switch (read.State)
             {
                 case StoredFileState.Unavailable:
@@ -172,13 +198,69 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
     /// <returns>Les préférences lues, et <c>false</c> si une partie n'a pas pu l'être (fichier abîmé ou d'une version plus récente).</returns>
     private static (UserPreferences Preferences, bool Complete) Parse(string text)
     {
-        if (TryDeserialize(text, FileJournalStore.JsonOptions) is { } strict)
+        if (TryDeserialize(text, StrictJson) is { } strict)
         {
-            return (strict, true);
+            return WithoutNulls(strict);
         }
 
-        return (TryDeserialize(text, TolerantJson) ?? UserPreferences.Default, false);
+        return (TryDeserialize(text, TolerantJson) is { } tolerant ? WithoutNulls(tolerant).Preferences : UserPreferences.Default, false);
     }
+
+    /// <summary>
+    /// Le fichier peut être modifié à la main : une liste nulle, ou un élément nul, ferait tomber tous ceux qui la lisent. Une marque
+    /// « voulu » sans constat ou à une date impossible ne cache rien ; une fréquence impossible ne se propose pas à l'annulation.
+    /// </summary>
+    private static (UserPreferences Preferences, bool Complete) WithoutNulls(UserPreferences read)
+    {
+        var complete = true;
+        IReadOnlyList<T> Clean<T>(IReadOnlyList<T>? list, Func<T, bool>? isGood = null)
+            where T : class
+        {
+            if (list is null || list.Any(item => item is null || isGood?.Invoke(item) == false))
+            {
+                complete = false;
+                return list?.Where(item => item is not null && isGood?.Invoke(item) != false).ToList() ?? [];
+            }
+
+            return list;
+        }
+
+        var clean = read with
+        {
+            Acknowledged = BoundedMarks(Clean(read.Acknowledged, IsPossible)),
+            SkippedModules = Clean(read.SkippedModules),
+            KeptRefreshRates = Clean(read.KeptRefreshRates, IsPossible),
+        };
+        return (clean, complete);
+    }
+
+    /// <summary>
+    /// La 0.8.5 gardait la valeur d'une marque sans limite, et le moteur refuse tout le fichier au-delà de sa borne : une seule
+    /// marque longue bloquerait tous les choix. Bornée ici, elle vaut toujours pour la même valeur. Ce n'est pas un fichier abîmé.
+    /// </summary>
+    private static IReadOnlyList<Acknowledgement> BoundedMarks(IReadOnlyList<Acknowledgement> marks) =>
+        marks.Any(mark => mark.Current?.Length > Acknowledgement.MaxCurrentLength)
+            ? [.. marks.Select(mark => mark with { Current = Acknowledgement.Bounded(mark.Current) })]
+            : marks;
+
+    private static bool IsPossible(Acknowledgement mark) => mark.FindingId is { Length: > 0 } && StoredValues.IsPossibleDate(mark.At);
+
+    private static bool IsPossible(KeptRefreshRate kept) =>
+        kept is { SourceName: not null, Label: not null, Width: > 0 and <= MaxScreenSide, Height: > 0 and <= MaxScreenSide, FromHz: > 0 and <= MaxHz, ToHz: > 0 and <= MaxHz }
+        && StoredValues.IsPrintable(kept.SourceName, MaxScreenText) && StoredValues.IsPrintable(kept.Label, MaxScreenText) && StoredValues.IsPossibleDate(kept.At);
+
+    /// <summary>
+    /// Lecture stricte : MAUS n'écrit que des noms d'énumération ; un nombre passe par la lecture tolérante, qui le contrôle.
+    /// </summary>
+    private static JsonSerializerOptions CreateStrictOptions()
+    {
+        var options = new JsonSerializerOptions(FileJournalStore.JsonOptions);
+        options.Converters.Clear();
+        options.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
+        return options;
+    }
+
+    private static readonly JsonSerializerOptions StrictJson = CreateStrictOptions();
 
     private static UserPreferences? TryDeserialize(string text, JsonSerializerOptions options)
     {
@@ -206,6 +288,7 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
         options.Converters.Add(new TolerantEnumConverter<AccentChoice>());
         options.Converters.Add(new TolerantEnumConverter<AnimationChoice>());
         options.Converters.Add(new TolerantEnumConverter<OverlayCorner>());
+        options.Converters.Add(new TolerantEnumConverter<WeeklyNotification>());
         // Une énumération ajoutée plus tard sans être listée ici reste lue strictement : fichier traité comme abîmé, copie gardée.
         options.Converters.Add(new JsonStringEnumConverter());
         return options;

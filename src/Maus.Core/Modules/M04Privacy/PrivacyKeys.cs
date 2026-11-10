@@ -10,7 +10,7 @@ internal static class PrivacyKeys
     public static string Offers => T("Recommandations et offres");
     public static string Tips => T("Publicités et astuces");
     public static string Search => T("Recherche et historique");
-    public const string Ai = "IA : Copilot et Recall";
+    public static string Ai => T("IA : Copilot et Recall");
     public static string Downloads => T("Téléchargements");
 
     // HKLM : stratégie et état effectif des données de diagnostic.

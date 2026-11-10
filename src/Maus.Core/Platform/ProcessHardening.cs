@@ -38,6 +38,18 @@ public static partial class ProcessHardening
     public static IReadOnlyList<string> HardenInterface() =>
         Apply([(ImageLoadPolicy, NoRemoteImages | NoLowMandatoryLabelImages, "images")]);
 
+    /// <summary>
+    /// Fenêtre de MAUS lancée en administrateur : le moteur tourne alors dans ce processus. Liens refusés et bibliothèques de
+    /// System32 d'abord, comme le moteur ; les points d'extension restent permis, une fenêtre en a besoin pour la saisie.
+    /// </summary>
+    /// <returns>Les protections appliquées (noms courts, pour le journal de diagnostic).</returns>
+    public static IReadOnlyList<string> HardenElevatedWindow() =>
+        Apply(
+        [
+            (ImageLoadPolicy, NoRemoteImages | NoLowMandatoryLabelImages | PreferSystem32Images, "images"),
+            (RedirectionTrustPolicy, EnforceRedirectionTrust, "redirection-guard"),
+        ]);
+
     /// <summary>Moteur administrateur (et audit planifié) : toutes les protections ci-dessus.</summary>
     /// <returns>Les protections appliquées (noms courts, pour le journal de diagnostic).</returns>
     public static IReadOnlyList<string> HardenEngine() =>

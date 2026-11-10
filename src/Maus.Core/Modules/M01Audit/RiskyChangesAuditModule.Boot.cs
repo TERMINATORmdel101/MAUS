@@ -19,7 +19,7 @@ public sealed partial class RiskyChangesAuditModule
     private static Check SecureBootCheck => new("M01.secure-boot", T("Démarrage sécurisé (Secure Boot)"), BootCategory, Severity.Medium);
 
     /// <summary>Éléments BCD posés par les « optimiseurs » de latence.</summary>
-    private static readonly (string Element, string Label)[] TimerTweaks =
+    private static (string Element, string Label)[] TimerTweaks =>
     [
         ("useplatformclock", T("horloge HPET forcée (useplatformclock)")),
         ("useplatformtick", T("tick de plateforme forcé (useplatformtick)")),
@@ -127,7 +127,7 @@ public sealed partial class RiskyChangesAuditModule
                 T("désactivé"),
                 T("activé"),
                 explanation,
-                T("Activer « Secure Boot » dans les réglages du BIOS/UEFI de la carte mère (voir Module 13) ; MAUS ne peut pas le faire depuis Windows.")),
+                T("Activer « Secure Boot » dans les réglages du BIOS/UEFI de la carte mère (voir Module 8) ; MAUS ne peut pas le faire depuis Windows.")),
             _ => SecureBootCheck.Unknown(T("État du démarrage sécurisé illisible (PC démarré en mode BIOS hérité ?).")),
         };
     }

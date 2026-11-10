@@ -110,7 +110,8 @@ public static class CoreCycleTest
             {
                 var core = cores[position];
                 checkpoint?.Save(new CoreTestCheckpoint(started, core.Index, position, cores.Count));
-                var worker = new Worker(core, topology, options, kernel, reference);
+                var phase = T("charge continue");
+                var worker = new PinnedCoreWorker(core, topology, kernel, reference, options.Fault, options.Stall, w => Cycle(w, label => Volatile.Write(ref phase, label)));
                 var thread = new Thread(worker.Run) { IsBackground = true, Name = $"MAUS core {core.Index}" };
                 thread.Start();
                 var coreClock = Stopwatch.StartNew();
@@ -118,8 +119,8 @@ public static class CoreCycleTest
                 while (!worker.Finished && coreClock.Elapsed < options.PerCore)
                 {
                     await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
-                    var failed = verdicts.Values.Count(v => !v.Stable) + (worker.Errors > 0 ? 1 : 0);
-                    progress?.Report(new CoreCycleProgress(core.Index, position, cores.Count, worker.PhaseLabel,
+                    var failed = verdicts.Values.Count(v => !v.Stable) + (worker.Errors > 0 && verdicts[core.Index].Stable ? 1 : 0);
+                    progress?.Report(new CoreCycleProgress(core.Index, position, cores.Count, Volatile.Read(ref phase),
                         100.0 * (done + Math.Min(1, coreClock.Elapsed / options.PerCore)) / total, failed));
                     if (cancellationToken.IsCancellationRequested)
                     {
@@ -140,14 +141,7 @@ public static class CoreCycleTest
                     }
                 }
 
-                worker.Stop();
-                if (!froze)
-                {
-                    thread.Join(TimeSpan.FromSeconds(5));
-                }
-
-                var previous = verdicts[core.Index];
-                verdicts[core.Index] = new CoreVerdict(core.Index, previous.Rounds + worker.Rounds, previous.Errors + worker.Errors, previous.Froze || froze, previous.Pinned && worker.Pinned);
+                verdicts[core.Index] = worker.Finish(thread, froze, verdicts[core.Index]);
                 done++;
             }
         }
@@ -155,15 +149,7 @@ public static class CoreCycleTest
         // Fin du test (même interrompu par l'utilisateur) : seule une vraie coupure laisse la trace pour le lancement suivant.
         checkpoint?.Clear();
         clock.Stop();
-        int? whea = null;
-        try
-        {
-            whea = wheaSince?.Invoke(started);
-        }
-        catch (InvalidOperationException)
-        {
-            // Journal illisible : le bilan se fait sans lui.
-        }
+        var whea = wheaSince?.Invoke(started);
 
         return new CoreCycleResult(cores.Select(c => verdicts[c.Index]).ToList(), clock.Elapsed, abortReason is not null, abortReason, whea);
     }
@@ -180,101 +166,138 @@ public static class CoreCycleTest
         return new CoreCycleOptions(TimeSpan.FromSeconds(slice), rounds);
     }
 
-    /// <summary>Fil de calcul d'un cœur : il signale régulièrement qu'il est vivant (battement).</summary>
-    private sealed class Worker(CpuCore core, ICoreTopology topology, CoreCycleOptions options, Func<ulong> kernel, ulong reference)
+    /// <summary>Déroulé d'un tour sur un cœur : charge continue, à-coups qui réveillent le cœur, puis repos.</summary>
+    private static void Cycle(PinnedCoreWorker worker, Action<string> phase)
     {
-        private volatile bool _stopping;
-        private long _heartbeat = Stopwatch.GetTimestamp();
-        private long _rounds;
-        private int _errors;
-        private volatile string _phase = T("charge continue");
-
-        public bool Pinned { get; private set; } = true;
-
-        public bool Finished { get; private set; }
-
-        public long Rounds => Interlocked.Read(ref _rounds);
-
-        public int Errors => Volatile.Read(ref _errors);
-
-        public string PhaseLabel => _phase;
-
-        public TimeSpan SilentFor => Stopwatch.GetElapsedTime(Interlocked.Read(ref _heartbeat));
-
-        public void Stop() => _stopping = true;
-
-        public void Run()
+        while (!worker.Stopping)
         {
-            try
+            phase(T("charge continue"));
+            Work(worker, SustainedPhase);
+            phase(T("à-coups (réveils du cœur)"));
+            for (var i = 0; i < Bursts && !worker.Stopping; i++)
             {
-                Pinned = topology.PinCurrentThread(core);
-                if (options.Stall?.Invoke(core.Index) == true)
-                {
-                    while (!_stopping)
-                    {
-                        Thread.Sleep(20);
-                    }
+                Work(worker, BurstWork);
+                Pause(worker, BurstPause);
+            }
 
-                    return;
-                }
+            phase(T("repos"));
+            Pause(worker, IdlePhase);
+        }
+    }
 
+    private static void Work(PinnedCoreWorker worker, TimeSpan duration)
+    {
+        var watch = Stopwatch.StartNew();
+        while (watch.Elapsed < duration && !worker.Stopping)
+        {
+            worker.Verify();
+        }
+    }
+
+    /// <summary>Repos réel du cœur (il peut entrer en veille), par petites tranches pour répondre vite à l'arrêt.</summary>
+    private static void Pause(PinnedCoreWorker worker, TimeSpan duration)
+    {
+        var watch = Stopwatch.StartNew();
+        while (!worker.Stopping && watch.Elapsed < duration)
+        {
+            Thread.Sleep(TimeSpan.FromMilliseconds(Math.Min(25, (duration - watch.Elapsed).TotalMilliseconds + 1)));
+        }
+
+        worker.Beat();
+    }
+}
+
+/// <summary>
+/// Fil de calcul épinglé sur un cœur, commun au test des cœurs et au programme Curve Optimizer : il compte ses calculs et ses
+/// erreurs, et signale régulièrement qu'il est vivant (battement). Le déroulé de la charge est propre à chaque test.
+/// </summary>
+internal sealed class PinnedCoreWorker(
+    CpuCore core,
+    ICoreTopology topology,
+    Func<ulong> kernel,
+    ulong reference,
+    Func<int, long, ulong, ulong>? fault,
+    Func<int, bool>? stall,
+    Action<PinnedCoreWorker> body)
+{
+    private volatile bool _stopping;
+    private volatile bool _finished;
+    private long _heartbeat = Stopwatch.GetTimestamp();
+    private long _rounds;
+    private int _errors;
+
+    public bool Stopping => _stopping;
+
+    public bool Pinned { get; private set; } = true;
+
+    public bool Finished => _finished;
+
+    public long Rounds => Interlocked.Read(ref _rounds);
+
+    public int Errors => Volatile.Read(ref _errors);
+
+    public TimeSpan SilentFor => Stopwatch.GetElapsedTime(Interlocked.Read(ref _heartbeat));
+
+    public void Stop() => _stopping = true;
+
+    public void Run()
+    {
+        try
+        {
+            Pinned = topology.PinCurrentThread(core);
+            if (stall?.Invoke(core.Index) == true)
+            {
                 while (!_stopping)
                 {
-                    _phase = T("charge continue");
-                    Work(SustainedPhase);
-                    _phase = T("à-coups (réveils du cœur)");
-                    for (var i = 0; i < Bursts && !_stopping; i++)
-                    {
-                        Work(BurstWork);
-                        Pause(BurstPause);
-                    }
-
-                    _phase = T("repos");
-                    Pause(IdlePhase);
+                    Thread.Sleep(20);
                 }
-            }
-            catch (Exception)
-            {
-                // Une exception dans un fil d'arrière-plan fermerait MAUS : elle compte comme une erreur de ce cœur.
-                Interlocked.Increment(ref _errors);
-            }
-            finally
-            {
-                Finished = true;
-            }
-        }
 
-        private void Work(TimeSpan duration)
+                return;
+            }
+
+            body(this);
+        }
+        catch (Exception)
         {
-            var watch = Stopwatch.StartNew();
-            while (watch.Elapsed < duration && !_stopping)
-            {
-                var result = kernel();
-                var count = Interlocked.Increment(ref _rounds);
-                if (options.Fault is { } fault)
-                {
-                    result = fault(core.Index, count, result);
-                }
-
-                if (result != reference)
-                {
-                    Interlocked.Increment(ref _errors);
-                }
-
-                Interlocked.Exchange(ref _heartbeat, Stopwatch.GetTimestamp());
-            }
+            // Une exception dans un fil d'arrière-plan fermerait MAUS : elle compte comme une erreur de ce cœur.
+            Interlocked.Increment(ref _errors);
         }
-
-        /// <summary>Repos réel du cœur (il peut entrer en veille), par petites tranches pour répondre vite à l'arrêt.</summary>
-        private void Pause(TimeSpan duration)
+        finally
         {
-            var watch = Stopwatch.StartNew();
-            while (!_stopping && watch.Elapsed < duration)
-            {
-                Thread.Sleep(TimeSpan.FromMilliseconds(Math.Min(25, (duration - watch.Elapsed).TotalMilliseconds + 1)));
-            }
-
-            Interlocked.Exchange(ref _heartbeat, Stopwatch.GetTimestamp());
+            _finished = true;
         }
+    }
+
+    /// <summary>Un calcul, comparé à la référence.</summary>
+    public void Verify()
+    {
+        var result = kernel();
+        var count = Interlocked.Increment(ref _rounds);
+        if (fault is not null)
+        {
+            result = fault(core.Index, count, result);
+        }
+
+        if (result != reference)
+        {
+            Interlocked.Increment(ref _errors);
+        }
+
+        Beat();
+    }
+
+    /// <summary>Signe de vie : un fil muet trop longtemps est un cœur figé.</summary>
+    public void Beat() => Interlocked.Exchange(ref _heartbeat, Stopwatch.GetTimestamp());
+
+    /// <summary>Arrête le fil (sans l'attendre s'il est figé) et ajoute ce passage au verdict du cœur.</summary>
+    public CoreVerdict Finish(Thread thread, bool froze, CoreVerdict previous)
+    {
+        Stop();
+        if (!froze)
+        {
+            thread.Join(TimeSpan.FromSeconds(5));
+        }
+
+        return new CoreVerdict(core.Index, previous.Rounds + Rounds, previous.Errors + Errors, previous.Froze || froze, previous.Pinned && Pinned);
     }
 }

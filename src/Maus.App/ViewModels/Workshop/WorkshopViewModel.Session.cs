@@ -18,6 +18,12 @@ public sealed partial class WorkshopViewModel
     private const string RecordingSession = "MAUS_Releve";
     private SessionRecording? _lastRecording;
     private TimeSpan? _recordLimit;
+
+    /// <summary>
+    /// Plafond de « jusqu'à l'arrêt », choisi par MAUS et annoncé dans la liste : le moteur garde en mémoire chaque image de tous
+    /// les programmes, et les mesures aussi ; un relevé oublié ne doit pas remplir la mémoire.
+    /// </summary>
+    private static readonly TimeSpan LongestSession = TimeSpan.FromHours(12);
     private bool _isRecording;
     private string _sessionStatus = T("Lancez l'enregistrement, jouez, puis arrêtez-le (ou laissez-le s'arrêter tout seul) : MAUS fait le bilan. Il continue même si vous quittez cet onglet ou réduisez la fenêtre.");
     private string _sessionSummary = string.Empty;
@@ -33,7 +39,7 @@ public sealed partial class WorkshopViewModel
         new(T("30 minutes (recommandé)"), TimeSpan.FromMinutes(30)),
         new(T("1 heure"), TimeSpan.FromHours(1)),
         new(T("2 heures"), TimeSpan.FromHours(2)),
-        new(T("jusqu'à l'arrêt"), null),
+        new(T("jusqu'à l'arrêt (12 heures au plus)"), null),
     ];
 
     public TestOption<TimeSpan?> SessionDuration
@@ -80,7 +86,7 @@ public sealed partial class WorkshopViewModel
     public ICommand StartSessionCommand => _startSession ??= new AsyncCommand(async () =>
     {
         _recording = new SessionRecording(DateTimeOffset.Now);
-        _recordLimit = SessionDuration.Value;
+        _recordLimit = SessionDuration.Value ?? LongestSession;
         SessionSummary = string.Empty;
         // Images par seconde : seulement avec toutes les fonctionnalités (PresentMon passe par le moteur). En mode limité, le
         // relevé se fait sans elles, sans demande d'autorisation.
@@ -102,7 +108,7 @@ public sealed partial class WorkshopViewModel
         IsRecording = true;
     });
 
-    public ICommand StopSessionCommand => _stopSession ??= new AsyncCommand(() => Run(FinishSession));
+    public ICommand StopSessionCommand => _stopSession ??= new AsyncCommand(FinishSession);
 
     public ICommand ExportSessionCommand => _exportSession ??= new AsyncCommand(ExportSessionAsync);
 
@@ -114,7 +120,7 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        recording.Add(snapshot);
+        recording.Add(snapshot with { Readings = [] });
         SessionStatus = T("Enregistrement en cours : {0:hh\\:mm\\:ss}, {1} mesures.", recording.Elapsed, recording.Count);
         if (_recordLimit is { } limit && recording.Elapsed >= limit)
         {
@@ -164,6 +170,7 @@ public sealed partial class WorkshopViewModel
             text.AppendLine("• " + finding);
         }
 
+        text.AppendLine().Append(SessionRecording.ThresholdNote);
         SessionSummary = text.ToString().TrimEnd();
         SessionStatus = T("Session terminée : {0:hh\\:mm\\:ss}, {1} mesures.", summary.Duration, summary.Samples);
     }
@@ -171,10 +178,13 @@ public sealed partial class WorkshopViewModel
     /// <summary>Arrête PresentMon hors du fil de l'interface (quelques secondes), puis ajoute son bilan en tête du relevé.</summary>
     private async Task FinishFramesAsync()
     {
+        var exited = (await EngineHost.Current.ReadFramesAsync(RecordingSession, null, null, FrameTimeLog.MinimumFrames, CancellationToken.None)).Exited;
         var frames = await EngineHost.Current.StopFramesAsync(RecordingSession, CancellationToken.None);
         var refresh = Maus.Core.Platform.DisplayRefresh.PrimaryHz();
         var line = frames is null
-            ? T("Images par seconde : pas assez d'images d'un même jeu pendant le relevé (au moins {0}).", FrameTimeLog.MinimumFrames)
+            ? exited
+                ? T("Images par seconde : PresentMon s'est arrêté pendant le relevé, le compte des images n'est pas allé au bout.")
+                : T("Images par seconde : pas assez d'images d'un même jeu pendant le relevé (au moins {0}).", FrameTimeLog.MinimumFrames)
             : string.Join(Environment.NewLine, [T("Images par seconde : {0}", frames.Describe()), .. FrameAdvice.Explain(frames, refresh).Select(l => "• " + l)]);
         SessionSummary = SessionSummary.Length == 0 ? line : line + Environment.NewLine + Environment.NewLine + SessionSummary;
     }
@@ -199,28 +209,11 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            FileName = T("MAUS-session") + $"-{recording.Start:yyyy-MM-dd-HHmm}.csv",
-            DefaultExt = ".csv",
-            Filter = T("Tableau CSV") + " (*.csv)|*.csv",
-            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-        };
-        if (dialog.ShowDialog() != true)
-        {
-            return;
-        }
-
-        try
-        {
-            // Format régional de Windows (séparateur, virgule décimale), pas celui de la langue de MAUS : c'est lui qu'Excel attend.
-            // Encodage avec BOM : Excel reconnaît alors les accents des en-têtes.
-            await File.WriteAllTextAsync(dialog.FileName, recording.ToCsv(RegionalCulture), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
-            SessionStatus = T("Relevé enregistré : {0}", dialog.FileName);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            SessionStatus = T("Le relevé n'a pas pu être enregistré : {0}", ex.Message);
-        }
+        // Format régional de Windows (séparateur, virgule décimale), pas celui de la langue de MAUS : c'est lui qu'Excel attend.
+        await CsvExport.SaveAsync(
+            T("MAUS-session") + $"-{recording.Start:yyyy-MM-dd-HHmm}.csv",
+            () => recording.ToCsv(RegionalCulture),
+            path => SessionStatus = T("Relevé enregistré : {0}", path),
+            ex => SessionStatus = T("Le relevé n'a pas pu être enregistré : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
     }
 }

@@ -40,6 +40,7 @@ public class StartupAppsModuleTests
         Assert.Equal("Lanceurs de jeux", steam.Category);
         Assert.Equal("Steam (lanceur de jeux)", steam.Title);
         Assert.Equal("activé · Valve Corporation", steam.Current);
+        Assert.True(steam.Enabled);
         Assert.Equal("désactivé", steam.Expected);
         Assert.True(steam.Fixable);
         Assert.Contains("mises à jour des jeux", steam.Explanation, StringComparison.Ordinal);
@@ -63,6 +64,7 @@ public class StartupAppsModuleTests
         Assert.Equal(FindingStatus.Ok, steam.Status);
         Assert.StartsWith($"désactivé le {DisabledOn.ToLocalTime():dd/MM/yyyy}", steam.Current, StringComparison.Ordinal);
         Assert.False(steam.Fixable);
+        Assert.False(steam.Enabled);
         Assert.StartsWith("0 lancement(s) actif(s) sur 1 entrée(s)", findings.Single(f => f.Id == "M12.summary").Current, StringComparison.Ordinal);
     }
 
@@ -135,7 +137,7 @@ public class StartupAppsModuleTests
     {
         var registry = new FakeRegistry().Set(RegistryHive.CurrentUser, Run, "OldTool", @"""C:\Program Files\OldTool\old.exe"" /tray");
 
-        var findings = await Detect(registry: registry);
+        var findings = await Detect(registry: registry, files: new FakeFiles().AddFile(@"C:\Windows\explorer.exe"));
 
         var entry = findings.Single(f => f.Id == "M12.hkcu-run-oldtool");
         Assert.Equal(FindingStatus.Improvable, entry.Status);
@@ -161,7 +163,7 @@ public class StartupAppsModuleTests
         Assert.Equal("Suspect", entry.Category);
         Assert.Contains(reason, entry.Explanation, StringComparison.Ordinal);
         Assert.Contains("Module 1", entry.Advice, StringComparison.Ordinal);
-        Assert.Null(entry.SettingsPage);
+        Assert.Equal("ms-settings:startupapps", entry.SettingsPage);
         Assert.False(entry.Fixable);
         Assert.Same(entry, findings[0]);
         Assert.Contains("1 suspecte(s)", findings.Single(f => f.Id == "M12.summary").Current, StringComparison.Ordinal);
@@ -271,6 +273,11 @@ public class StartupAppsModuleTests
         Assert.Contains("20,1 s avant l'affichage du bureau", boot.Explanation, StringComparison.Ordinal);
         Assert.Contains("programme Steam (+3,2 s), pilote Pilote XYZ (+1,5 s), stratégies de l'utilisateur (+0,9 s)", boot.Explanation, StringComparison.Ordinal);
         Assert.Contains("Derniers démarrages : 45,3 s le 20/09/2026, 90,0 s le 01/09/2026", boot.Explanation, StringComparison.Ordinal);
+
+        // Le carnet de santé reçoit chaque démarrage avec sa date, sans dépendre de la langue.
+        var dated = Maus.Core.Follow.HealthLog.FromAudit([new ModuleResult("M12", "M12", findings, TimeSpan.Zero)], [], DateTimeOffset.Now, weekly: false, elevated: true)!.Boots!;
+        Assert.Equal([90d, 45.3], dated.Select(b => b.Seconds));
+        Assert.Equal(new DateOnly(2026, 9, 20), DateOnly.FromDateTime(dated[1].At.LocalDateTime));
     }
 
     [Fact]
@@ -302,6 +309,9 @@ public class StartupAppsModuleTests
         Assert.Contains(@"MSIAfterburner (C:\Program Files (x86)\MSI Afterburner\MSIAfterburner.exe /s)", tasks.Explanation, StringComparison.Ordinal);
         Assert.DoesNotContain("CreateObjectTask", tasks.Explanation, StringComparison.Ordinal);
         Assert.True(tasks.Fixable);
+
+        // Le résumé de l'audit garde le nom, jamais la commande.
+        Assert.Equal(new FollowedItem("MSIAfterburner"), Assert.Single(tasks.Followed!));
     }
 
     [Fact]
@@ -314,6 +324,9 @@ public class StartupAppsModuleTests
         Assert.Equal(FindingStatus.Ok, none.Single(f => f.Id == "M12.logon-tasks").Status);
         Assert.Equal(FindingStatus.Unknown, denied.Single(f => f.Id == "M12.logon-tasks").Status);
         Assert.Equal(FindingStatus.Unknown, missing.Single(f => f.Id == "M12.logon-tasks").Status);
+        Assert.Empty(none.Single(f => f.Id == "M12.logon-tasks").Followed!);
+        Assert.Null(denied.Single(f => f.Id == "M12.logon-tasks").Followed);
+        Assert.Null(missing.Single(f => f.Id == "M12.logon-tasks").Followed);
     }
 
     [Fact]
@@ -416,6 +429,135 @@ public class StartupAppsModuleTests
     }
 
     [Theory]
+    [InlineData(@"C:\Program Files\App\lanceur /min", @"C:\Program Files\App\lanceur.exe", "/min")]
+    [InlineData(@"C:\Program Files\Node.js Tools\x.exe -a", @"C:\Program Files\Node.js Tools\x.exe", "-a")]
+    [InlineData(@"C:\Autre\absent.exe -a", @"C:\Autre\absent.exe", "-a")]
+    public void Unquoted_commands_are_cut_like_windows_does(string command, string executable, string arguments)
+    {
+        var existing = new[] { @"C:\Program Files\App\lanceur.exe", @"C:\Program Files\Node.js Tools\x.exe" };
+
+        var (exe, args) = StartupParsers.SplitCommand(command, existing.Contains);
+
+        Assert.Equal(executable, exe);
+        Assert.Equal(arguments, args);
+    }
+
+    [Fact]
+    public void Unquoted_network_commands_are_never_probed()
+    {
+        var (exe, _) = StartupParsers.SplitCommand(@"\\nas\outils\app.exe -a", _ => throw new InvalidOperationException("sondé"));
+
+        Assert.Equal(@"\\nas\outils\app.exe", exe);
+    }
+
+    [Fact]
+    public async Task Missing_program_on_an_absent_drive_is_not_an_orphan()
+    {
+        var registry = new FakeRegistry().Set(RegistryHive.CurrentUser, Run, "Outil", @"""D:\Outils\app.exe""");
+
+        var entry = (await Detect(registry: registry, files: new FakeFiles().AddFile(@"C:\Windows\explorer.exe"))).Single(f => f.Id == "M12.hkcu-run-outil");
+
+        Assert.DoesNotContain("introuvable", entry.Current, StringComparison.Ordinal);
+        Assert.NotEqual(FindingStatus.Improvable, entry.Status);
+    }
+
+    [Fact]
+    public async Task A_path_windows_refuses_to_read_is_not_an_orphan()
+    {
+        var registry = new FakeRegistry().Set(RegistryHive.CurrentUser, Run, "Outil", @"""C:\Refuse\app.exe""");
+        var files = new FakeFiles().AddFile(@"C:\Windows\explorer.exe").Refuse(@"C:\Refuse\app.exe");
+
+        var entry = (await Detect(registry: registry, files: files)).Single(f => f.Id == "M12.hkcu-run-outil");
+
+        Assert.DoesNotContain("introuvable", entry.Current, StringComparison.Ordinal);
+        Assert.Contains("n'a pas pu vérifier", entry.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_command_read_on_the_pc_is_shown_as_it_is_and_never_becomes_a_link()
+    {
+        var registry = new FakeRegistry().Set(RegistryHive.CurrentUser, Run, "Outil", @"""C:\Outils\app.exe"" --update https://exemple.test/charge");
+
+        var entry = (await Detect(registry: registry, files: new FakeFiles().AddFile(@"C:\Windows\explorer.exe").AddFile(@"C:\Outils\app.exe"))).Single(f => f.Id == "M12.hkcu-run-outil");
+
+        Assert.True(entry.ExplanationHasPcData);
+        Assert.Contains("https://exemple.test/charge", entry.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_real_reader_tells_a_present_file_from_an_absent_one()
+    {
+        IFileSystemReader files = new LocalFileSystemReader();
+        var missing = Path.Combine(Path.GetTempPath(), "maus-tests-" + Guid.NewGuid().ToString("N"), "app.exe");
+        var file = Path.GetTempFileName();
+        try
+        {
+            Assert.True(files.IsFilePresent(file));
+            Assert.False(files.IsFilePresent(missing));
+            Assert.False(files.IsFilePresent(Path.GetTempPath()));
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task A_reassuring_name_outside_protected_folders_is_not_trusted()
+    {
+        const string fake = @"C:\Users\Bob\AppData\Local\SecurityHealthSystray.exe";
+        var registry = new FakeRegistry().Set(RegistryHive.CurrentUser, Run, "SecurityHealth", $"\"{fake}\"");
+        var files = new FakeFiles().AddFile(fake).SetVersionInfo(fake, "Microsoft Corporation");
+
+        var entry = (await Detect(registry: registry, files: files)).Single(f => f.Id == "M12.hkcu-run-securityhealth");
+
+        Assert.Contains("non répertorié", entry.Title, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Hidden_powershell_in_shortcut_arguments_is_suspicious()
+    {
+        const string shortcut = FakeStartupEnvironment.UserFolder + @"\a.lnk";
+        var environment = new FakeStartupEnvironment();
+        environment.Shortcuts[shortcut] = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+        environment.ShortcutArguments[shortcut] = "-w hidden -enc SQBFAFgA";
+
+        var finding = (await Detect(files: new FakeFiles().AddFile(shortcut), environment: environment)).Single(f => f.Id.StartsWith("M12.user-folder-", StringComparison.Ordinal));
+
+        Assert.Equal(FindingStatus.Warning, finding.Status);
+        Assert.Contains("-enc SQBFAFgA", finding.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Unreadable_shortcut_says_maus_cannot_judge_it()
+    {
+        const string shortcut = FakeStartupEnvironment.UserFolder + @"\a.lnk";
+
+        var finding = (await Detect(files: new FakeFiles().AddFile(shortcut))).Single(f => f.Id.StartsWith("M12.user-folder-", StringComparison.Ordinal));
+
+        Assert.Contains("ne peut pas juger", finding.Advice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Shortcut_arguments_are_read_after_the_other_strings()
+    {
+        const uint hasWorkingDir = 0x10, hasArguments = 0x20, isUnicode = 0x80;
+        var data = new List<byte>(new byte[0x4C]);
+        BitConverter.TryWriteBytes(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data), 0x4C);
+        BitConverter.TryWriteBytes(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data)[0x14..], hasWorkingDir | hasArguments | isUnicode);
+        foreach (var text in new[] { @"C:\Dossier", "-w hidden" })
+        {
+            data.AddRange(BitConverter.GetBytes((ushort)text.Length));
+            data.AddRange(Encoding.Unicode.GetBytes(text));
+        }
+
+        Assert.Equal("-w hidden", StartupParsers.ParseShortcut(data.ToArray())?.Arguments);
+
+        // Compteur qui dépasse la fin du fichier : aucun argument, pas d'exception.
+        Assert.Equal(string.Empty, StartupParsers.ParseShortcut(data.Take(data.Count - 4).ToArray())?.Arguments);
+    }
+
+    [Theory]
     [InlineData("3f2504e0-4f89-11d3-9a0c-0305e82c3301.exe", true)]
     [InlineData("a7f3c9e1b2d4f6a8.exe", true)]
     [InlineData("x9k2p7q4m1.exe", true)]
@@ -447,7 +589,7 @@ public class StartupAppsModuleTests
     {
         var data = Shortcut(@"C:\Program Files\Steam\steam.exe", unicodePath: null, withIdList: true);
 
-        Assert.Equal(@"C:\Program Files\Steam\steam.exe", StartupParsers.ParseShortcutTarget(data));
+        Assert.Equal(@"C:\Program Files\Steam\steam.exe", StartupParsers.ParseShortcut(data)?.Target);
     }
 
     [Fact]
@@ -455,7 +597,7 @@ public class StartupAppsModuleTests
     {
         var data = Shortcut(@"C:\Prog?\app.exe", unicodePath: @"C:\Progé\app.exe", withIdList: false);
 
-        Assert.Equal(@"C:\Progé\app.exe", StartupParsers.ParseShortcutTarget(data));
+        Assert.Equal(@"C:\Progé\app.exe", StartupParsers.ParseShortcut(data)?.Target);
     }
 
     [Fact]
@@ -464,9 +606,9 @@ public class StartupAppsModuleTests
         var header = new byte[0x4C];
         BinaryPrimitives.WriteUInt32LittleEndian(header, 0x4C);
 
-        Assert.Null(StartupParsers.ParseShortcutTarget(header));
-        Assert.Null(StartupParsers.ParseShortcutTarget([1, 2, 3]));
-        Assert.Null(StartupParsers.ParseShortcutTarget(new byte[0x4C]));
+        Assert.Null(StartupParsers.ParseShortcut(header)?.Target);
+        Assert.Null(StartupParsers.ParseShortcut([1, 2, 3]));
+        Assert.Null(StartupParsers.ParseShortcut(new byte[0x4C])?.Target);
     }
 
     [Theory]

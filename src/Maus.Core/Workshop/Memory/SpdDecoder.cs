@@ -16,6 +16,9 @@ public static class SpdDecoder
     public const byte Ddr4Type = 0x0C;
     public const byte Ddr5Type = 0x12;
 
+    /// <summary>Première page d'une puce DDR5 : le profil standard (JEDEC) y tient en entier.</summary>
+    public const int FirstPageBytes = 128;
+
     /// <summary>Décode une image SPD ; <c>null</c> si ce n'est ni de la DDR4 ni de la DDR5.</summary>
     public static SpdModule? Decode(SpdImage image)
     {
@@ -24,7 +27,7 @@ public static class SpdDecoder
         ? image.Bytes[2] switch
         {
             Ddr4Type when image.Bytes.Length >= 256 => DecodeDdr4(image),
-            Ddr5Type when image.Bytes.Length >= 512 => DecodeDdr5(image),
+            Ddr5Type when image.Bytes.Length >= 512 || (image.FirstPageOnly && image.Bytes.Length >= FirstPageBytes) => DecodeDdr5(image),
             _ => null,
         }
         : null;
@@ -67,7 +70,7 @@ public static class SpdDecoder
             ? 0L
             : (long)densityGbit * 1024 * 1024 * 1024 / 8 * (busWidth / deviceWidth) * logicalRanks;
 
-        var profiles = new List<SpdProfile> { Ddr4Jedec(b) };
+        var profiles = new List<SpdProfile?> { Ddr4Jedec(b) }.OfType<SpdProfile>().ToList();
         if (b.Length >= 487 && b[384] == 0x0C && b[385] == 0x4A)
         {
             var version = $"{b[387] >> 4}.{b[387] & 0x0F}";
@@ -89,7 +92,6 @@ public static class SpdDecoder
             Ranks = ranks,
             DeviceWidth = deviceWidth,
             DieDensityGbit = densityGbit,
-            DiesPerPackage = dies,
             BankGroups = ((b[4] >> 6) & 0x03) switch { 1 => 2, 2 => 4, _ => 1 },
             BanksPerGroup = ((b[4] >> 4) & 0x03) == 1 ? 8 : 4,
             ColumnBits = 9 + (b[5] & 0x07),
@@ -108,9 +110,14 @@ public static class SpdDecoder
         };
     }
 
-    private static SpdProfile Ddr4Jedec(byte[] b)
+    private static SpdProfile? Ddr4Jedec(byte[] b)
     {
         var tck = b[18] * Mtb + (sbyte)b[125] * Ftb;
+        if (tck <= 0.2)
+        {
+            return null;
+        }
+
         var timings = new Ddr4Timings(tck)
         {
             Cl = b[24] * Mtb + (sbyte)b[123] * Ftb,
@@ -129,7 +136,7 @@ public static class SpdDecoder
             Wtrs = (((b[43] & 0x0F) << 8) | b[44]) * Mtb,
             Wtrl = (((b[43] >> 4) << 8) | b[45]) * Mtb,
         };
-        return timings.ToProfile(ProfileKind.Jedec, 0, null, null, Ddr4ClList(b, 20), 1.2, null, null);
+        return timings.ToProfile(ProfileKind.Jedec, 0, null, null, 1.2, null, null);
     }
 
     private static SpdProfile? Ddr4Xmp(byte[] b, int number, string version)
@@ -159,17 +166,7 @@ public static class SpdDecoder
 
         // Tension : bit 7 = volts entiers, bits 6:0 = centièmes (1,35 V = 0xA3), comme DDR4XMPEditor.
         var voltage = ((b[p] >> 7) & 1) + (b[p] & 0x7F) / 100.0;
-        // Latences CAS d'un profil XMP : 3 octets seulement (CL 7 à 30), l'octet suivant n'est pas documenté.
-        var xmpCl = b[p + 4] | (b[p + 5] << 8) | (b[p + 6] << 16);
-        var cls = Enumerable.Range(0, 24).Where(bit => (xmpCl & (1 << bit)) != 0).Select(bit => 7 + bit).ToList();
-        return timings.ToProfile(ProfileKind.Xmp, number, version, null, cls, voltage is > 0.9 and < 2.0 ? voltage : null, null, null);
-    }
-
-    private static List<int> Ddr4ClList(byte[] b, int offset)
-    {
-        var mask = b[offset] | (b[offset + 1] << 8) | (b[offset + 2] << 16) | ((b[offset + 3] & 0x3F) << 24);
-        var first = (b[offset + 3] & 0x80) != 0 ? 23 : 7;
-        return Enumerable.Range(0, 30).Where(bit => (mask & (1 << bit)) != 0).Select(bit => first + bit).ToList();
+        return timings.ToProfile(ProfileKind.Xmp, number, version, null, voltage is > 0.9 and < 2.0 ? voltage : null, null, null);
     }
 
     /// <summary>Durées DDR4 en nanosecondes, converties en cycles à la fréquence du profil.</summary>
@@ -205,7 +202,7 @@ public static class SpdDecoder
 
         public double Wtrl { get; init; }
 
-        public SpdProfile ToProfile(ProfileKind kind, int number, string? version, string? name, IReadOnlyList<int> cls, double? vdd, double? vddq, double? vpp)
+        public SpdProfile ToProfile(ProfileKind kind, int number, string? version, string? name, double? vdd, double? vddq, double? vpp)
         {
             var speed = Ddr4Speed(tck);
             var cycle = 2000.0 / speed;
@@ -233,7 +230,7 @@ public static class SpdDecoder
             Add("tRFC", TimingGroup.Secondary, Rfc1, showNs: true);
             Add("tRFC2", TimingGroup.Secondary, Rfc2, showNs: true);
             Add("tRFC4", TimingGroup.Secondary, Rfc4, showNs: true);
-            return new SpdProfile(kind, number, version, name, speed, tck, cls, timings, vdd, vddq, vpp);
+            return new SpdProfile(kind, number, version, name, speed, tck, timings, vdd, vddq, vpp);
         }
     }
 
@@ -265,14 +262,15 @@ public static class SpdDecoder
         var densityGbit = densityCode < densities.Length ? densities[densityCode] : 0;
         var dies = ((b[4] >> 5) & 0x07) switch { 2 => 2, 3 => 4, 4 => 8, 5 => 16, _ => 1 };
         var deviceWidth = 4 << ((b[6] >> 5) & 0x07);
-        var ranks = ((b[234] >> 3) & 0x07) + 1;
-        var busWidth = 8 << (b[235] & 0x07);
-        var subChannels = ((b[235] >> 5) & 0x03) + 1;
-        var capacity = densityGbit == 0 || deviceWidth == 0
+        var firstPageOnly = b.Length < 512;
+        var ranks = firstPageOnly ? 0 : ((b[234] >> 3) & 0x07) + 1;
+        var busWidth = firstPageOnly ? 0 : 8 << (b[235] & 0x07);
+        var subChannels = firstPageOnly ? 2 : ((b[235] >> 5) & 0x03) + 1;
+        var capacity = firstPageOnly || densityGbit == 0 || deviceWidth == 0
             ? 0L
             : (long)densityGbit * 1024 * 1024 * 1024 / 8 * dies * (busWidth / deviceWidth) * ranks * subChannels;
 
-        var profiles = new List<SpdProfile> { Ddr5Jedec(b) };
+        var profiles = new List<SpdProfile?> { Ddr5Jedec(b) }.OfType<SpdProfile>().ToList();
         if (b.Length >= 896 && b[640] == 0x0C && b[641] == 0x4A)
         {
             var version = $"{b[642] >> 4}.{b[642] & 0x0F}";
@@ -287,7 +285,8 @@ public static class SpdDecoder
             }
         }
 
-        if (b.Length >= 922 && b[832] == 'E' && b[833] == 'X' && b[834] == 'P' && b[835] == 'O')
+        // Bloc EXPO complet (octets 832 à 959, somme de contrôle comprise) : une image plus courte est ignorée.
+        if (b.Length >= 960 && b[832] == 'E' && b[833] == 'X' && b[834] == 'P' && b[835] == 'O')
         {
             var version = $"{b[836] >> 4}.{b[836] & 0x0F}";
             for (var n = 1; n <= 2; n++)
@@ -301,7 +300,7 @@ public static class SpdDecoder
             }
         }
 
-        string? pmic = (b[200] & 0x80) != 0
+        string? pmic = !firstPageOnly && (b[200] & 0x80) != 0
             ? (b[200] & 0x0F) switch
             {
                 0 => "PMIC5000",
@@ -324,15 +323,15 @@ public static class SpdDecoder
             Ranks = ranks,
             DeviceWidth = deviceWidth,
             DieDensityGbit = densityGbit,
-            DiesPerPackage = dies,
             BankGroups = 1 << ((b[7] >> 5) & 0x07),
             BanksPerGroup = 1 << (b[7] & 0x07),
             ColumnBits = 10 + ((b[5] >> 5) & 0x07),
             RowBits = 16 + (b[5] & 0x1F),
             SubChannels = subChannels,
-            Ecc = ((b[235] >> 3) & 0x03) != 0,
+            Ecc = !firstPageOnly && ((b[235] >> 3) & 0x03) != 0,
             SpdRevision = $"{b[1] >> 4}.{b[1] & 0x0F}",
-            ChecksumOk = Crc16(b.AsSpan(0, 510)) == (b[510] | (b[511] << 8)),
+            ChecksumOk = firstPageOnly || Crc16(b.AsSpan(0, 510)) == (b[510] | (b[511] << 8)),
+            FirstPageOnly = firstPageOnly,
             HasThermalSensor = ((b[14] >> 3) & 1) != 0,
             Pmic = pmic,
             PartNumber = b.Length >= 551 ? Ascii(b, 521, 30) : string.Empty,
@@ -345,10 +344,15 @@ public static class SpdDecoder
         };
     }
 
-    private static SpdProfile Ddr5Jedec(byte[] b)
+    private static SpdProfile? Ddr5Jedec(byte[] b)
     {
         var tckPs = U16(b, 20);
         var speed = Ddr5Speed(tckPs);
+        if (speed <= 0)
+        {
+            return null;
+        }
+
         var cycle = 2000.0 / speed;
         var timings = Ddr5Core(b, 30, cycle);
 
@@ -370,8 +374,7 @@ public static class SpdDecoder
         Secondary("tWTRL", 85);
         Secondary("tWTRS", 88);
         Secondary("tRTP", 91);
-        var cls = Enumerable.Range(0, 40).Where(bit => (b[24 + (bit / 8)] & (1 << (bit % 8))) != 0).Select(bit => 20 + (2 * bit)).ToList();
-        return new SpdProfile(ProfileKind.Jedec, 0, null, null, speed, tckPs / 1000.0, cls, timings, 1.1, 1.1, 1.8);
+        return new SpdProfile(ProfileKind.Jedec, 0, null, null, speed, tckPs / 1000.0, timings, 1.1, 1.1, 1.8);
     }
 
     private static SpdProfile? Ddr5Profile(byte[] b, ProfileKind kind, int number, string version, string? name, int p, int vppAt, int vddAt, int vddqAt, int tckAt)
@@ -411,14 +414,11 @@ public static class SpdDecoder
             }
         }
 
-        var cls = kind == ProfileKind.Xmp
-            ? Enumerable.Range(0, 40).Where(bit => (b[p + 7 + (bit / 8)] & (1 << (bit % 8))) != 0).Select(bit => 20 + (2 * bit)).ToList()
-            : [];
         // Somme de contrôle : 2 derniers octets de chaque profil XMP, ou du bloc EXPO entier (832 à 959).
         var checksum = kind == ProfileKind.Xmp
             ? Crc16(b.AsSpan(p, 62)) == U16(b, p + 62)
             : Crc16(b.AsSpan(832, 126)) == U16(b, 958);
-        return new SpdProfile(kind, number, version, name, speed, tckPs / 1000.0, cls, timings, Volts(b[p + vddAt]), Volts(b[p + vddqAt]), Volts(b[p + vppAt]))
+        return new SpdProfile(kind, number, version, name, speed, tckPs / 1000.0, timings, Volts(b[p + vddAt]), Volts(b[p + vddqAt]), Volts(b[p + vppAt]))
         {
             ChecksumOk = checksum,
         };

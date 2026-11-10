@@ -74,7 +74,7 @@ public class IntelMemoryControllerTests
         Assert.Equal(13500, Timing("tREFI"));
 
         Assert.Equal(1733.3, report.DclkMhz!.Value, 1);
-        Assert.Equal(4300, report.RingMhz);
+        Assert.Equal(4300, report.Clocks.Single(c => c.Key == "RING").Mhz);
         Assert.Equal(800, report.RingMinMhz);
         Assert.Equal(4300, report.RingMaxMhz);
         Assert.Equal(800, report.Clocks.Single(c => c.Key == "SA").Mhz);
@@ -308,7 +308,7 @@ public class IntelMemoryControllerTests
         Assert.Contains(report.Settings, s => s is { Key: "CommandRate", Value: "2N" });
         Assert.Contains(report.Settings, s => s is { Key: "Gear", Value: "Gear 2" });
         Assert.Equal(3000, report.DclkMhz!.Value, 3);
-        Assert.Equal(4800, report.RingMhz);
+        Assert.Equal(4800, report.Clocks.Single(c => c.Key == "RING").Mhz);
         int? Timing(string key) => report.Timings.Single(t => t.Key == key).Clocks;
         Assert.Equal((30, 36, 36, 76), (Timing("tCL"), Timing("tRCD"), Timing("tRP"), Timing("tRAS")));
         Assert.Equal((28, 12, 90), (Timing("tCWL"), Timing("tRDPRE"), Timing("tWRPRE")));
@@ -552,7 +552,7 @@ public class IntelMemoryControllerTests
         Assert.Null(unknown.Intel);
         Assert.Contains(unknown.Notes, n => n.Contains("modèle 55h", StringComparison.Ordinal));
 
-        var refused = MemoryDetails.Read(new NoSpd(), null, null, null, new IntelControllerAccess(6, CoffeeLake, () => throw new PawnIoException("Module PawnIO refusé", 50), () => null));
+        var refused = MemoryDetails.Read(new NoSpd(), null, null, null, new IntelControllerAccess(6, CoffeeLake, () => throw new PawnIoException("Module PawnIO refusé"), () => null));
         Assert.Null(refused.Intel);
         Assert.Contains(refused.Notes, n => n.Contains("Module PawnIO refusé", StringComparison.Ordinal));
     }

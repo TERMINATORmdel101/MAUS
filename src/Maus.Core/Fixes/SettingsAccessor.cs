@@ -3,7 +3,7 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Fixes;
 
-/// <summary>Lit et écrit un réglage quelle que soit sa nature (registre, paramètre système).</summary>
+/// <summary>Lit et écrit un réglage quelle que soit sa nature (registre, paramètre système). Les écritures passent par la liste blanche <see cref="SettingAllowlist"/>.</summary>
 public interface ISettingsAccessor
 {
     /// <summary>Valeur actuelle, ou <c>null</c> si elle est absente.</summary>
@@ -69,6 +69,7 @@ public sealed class SettingsAccessor(
     {
 
         ArgumentNullException.ThrowIfNull(key);
+        SettingAllowlist.Require(key);
 
         switch (key.Kind)
         {
@@ -110,6 +111,7 @@ public sealed class SettingsAccessor(
     public void RemoveContainerIfEmpty(SettingKey key)
     {
         ArgumentNullException.ThrowIfNull(key);
+        SettingAllowlist.Require(key);
 
         if (key.Kind == SettingKind.Registry)
         {

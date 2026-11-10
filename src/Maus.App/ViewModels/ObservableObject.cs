@@ -31,6 +31,16 @@ public abstract class ObservableObject : INotifyPropertyChanged
 /// </summary>
 public sealed class AsyncCommand(Func<Task> execute) : ICommand
 {
+    /// <summary>Action sans rien d'asynchrone.</summary>
+    public AsyncCommand(Action execute)
+        : this(() =>
+        {
+            execute();
+            return Task.CompletedTask;
+        })
+    {
+    }
+
     private bool _running;
 
     public event EventHandler? CanExecuteChanged;
@@ -48,19 +58,18 @@ public sealed class AsyncCommand(Func<Task> execute) : ICommand
         catch (Maus.Core.Engine.Broker.EngineDeclinedException declined)
         {
             // Autorisation administrateur refusée : un choix de l'utilisateur, pas une erreur. Seule cette action est annulée.
-            System.Windows.MessageBox.Show(declined.Message, "MAUS", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            Views.QuestionWindow.Inform("MAUS", declined.Message, Views.QuestionTone.Information);
         }
         catch (Exception ex) when (ex is not (OutOfMemoryException or InsufficientExecutionStackException or AccessViolationException))
         {
             Maus.Core.Diagnostics.Breadcrumbs.Add("action d'un bouton en erreur (" + ex.GetType().Name + ")");
             var log = Maus.Core.Diagnostics.CrashLog.Write(ex, "Erreur dans l'action d'un bouton : MAUS continue");
-            System.Windows.MessageBox.Show(
-                Maus.Core.Localization.Texts.T("Cette action n'a pas pu se terminer à cause d'une erreur inattendue. MAUS continue de fonctionner.") +
-                "\n\n" + ex.Message +
-                (log is null ? string.Empty : "\n\n" + Maus.Core.Localization.Texts.T("Détails enregistrés dans :") + "\n" + log),
+            Views.QuestionWindow.Inform(
                 Maus.Core.Localization.Texts.T("MAUS — erreur"),
-                System.Windows.MessageBoxButton.OK,
-                System.Windows.MessageBoxImage.Warning);
+                Maus.Core.Localization.Texts.T("Cette action n'a pas pu se terminer à cause d'une erreur inattendue. MAUS continue de fonctionner.") +
+                "\n\n" + Maus.Core.Diagnostics.ErrorText.For(ex) +
+                (log is null ? string.Empty : "\n\n" + Maus.Core.Localization.Texts.T("Détails enregistrés dans :") + "\n" + log),
+                Views.QuestionTone.Error);
         }
         finally
         {

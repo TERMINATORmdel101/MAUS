@@ -5,6 +5,18 @@ namespace Maus.Core.Tests.Modules.M10Memory;
 public class MemoryParsersTests
 {
     [Theory]
+    [InlineData(4, 1866, 3200, 1866)] // Vraie DDR4-1866 sur une barrette 3200 : le doublement dépasserait la barrette.
+    [InlineData(4, 1066, 2133, 2132)] // Vieux BIOS : fréquence en MHz.
+    [InlineData(4, 1600, 3200, 3200)]
+    [InlineData(4, 1600, null, 3200)]
+    [InlineData(4, 3200, 3200, 3200)]
+    [InlineData(5, 3000, 6000, 6000)]
+    public void Configured_speed_is_doubled_only_when_it_fits_the_module(int generation, int configured, int? rawMax, int expected)
+    {
+        Assert.Equal(expected, MemorySpeeds.ConfiguredTransfersPerSecond(generation, configured, rawMax));
+    }
+
+    [Theory]
     // Corsair : série, génération, vitesse, CAS ; ValueSelect (CMV, CMSO) = JEDEC.
     [InlineData("CMK32GX5M2B6000C36", "Corsair", 6000, 5, 36, false)]
     [InlineData("CMK16GX4M2B3200C16", "Corsair", 3200, 4, 16, false)]

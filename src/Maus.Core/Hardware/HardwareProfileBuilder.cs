@@ -1,5 +1,6 @@
 using Maus.Core.Platform;
 using Microsoft.Win32;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Hardware;
 
@@ -13,7 +14,10 @@ public static class HardwareProfileBuilder
         var system = TryFirst(cim, "SELECT Manufacturer, Model, PCSystemTypeEx, PartOfDomain FROM Win32_ComputerSystem");
         var enclosure = TryFirst(cim, "SELECT ChassisTypes FROM Win32_SystemEnclosure");
         var board = TryFirst(cim, "SELECT Manufacturer, Product FROM Win32_BaseBoard");
-        var hasBattery = TryQuery(cim, "SELECT DeviceID FROM Win32_Battery").Count > 0;
+        var hasBattery = cim.QueryOrEmpty("SELECT DeviceID FROM Win32_Battery").Count > 0;
+        var partOfDomain = system?.GetBool("PartOfDomain");
+        var enrolled = HasOrganizationEnrollment(registry);
+        var managed = partOfDomain == true || enrolled == true;
 
         return new HardwareProfile
         {
@@ -28,38 +32,41 @@ public static class HardwareProfileBuilder
             BoardProduct = board?.GetString("Product")?.Trim() ?? string.Empty,
             Cpu = ReadCpu(cim),
             Gpus = ReadGpus(cim),
-            IsManaged = system?.GetBool("PartOfDomain") == true || HasOrganizationEnrollment(registry),
+            IsManaged = managed,
+            ManagementUnknown = !managed && (partOfDomain is null || enrolled is null),
         };
     }
 
     private static CpuInfo ReadCpu(ICimReader cim)
     {
-        var cpu = TryFirst(cim, "SELECT Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed FROM Win32_Processor");
+        var cpu = TryFirst(cim, "SELECT Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors FROM Win32_Processor");
         if (cpu is null)
         {
             return CpuInfo.Unknown;
         }
 
-        var name = cpu.GetString("Name")?.Trim() ?? "Inconnu";
+        var name = cpu.GetString("Name")?.Trim() ?? string.Empty;
         return new CpuInfo(
             name,
             CpuClassifier.VendorOf(cpu.GetString("Manufacturer"), name),
             (int)(cpu.GetInt64("NumberOfCores") ?? 0),
-            (int)(cpu.GetInt64("NumberOfLogicalProcessors") ?? 0),
-            (int)(cpu.GetInt64("MaxClockSpeed") ?? 0));
+            (int)(cpu.GetInt64("NumberOfLogicalProcessors") ?? 0));
     }
 
-    private static List<GpuInfo> ReadGpus(ICimReader cim) =>
-        TryQuery(cim, "SELECT Name, PNPDeviceID, DriverVersion, DriverDate FROM Win32_VideoController")
+    internal static List<GpuInfo> ReadGpus(ICimReader cim) =>
+        cim.QueryOrEmpty("SELECT Name, PNPDeviceID, DriverVersion, DriverDate, InfFilename FROM Win32_VideoController")
             .Where(row => row.GetString("PNPDeviceID")?.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase) == true)
-            .Select(row =>
-            {
-                var name = row.GetString("Name")?.Trim() ?? "GPU inconnu";
-                var pnp = row.GetString("PNPDeviceID") ?? string.Empty;
-                var vendor = GpuClassifier.VendorOf(pnp, name);
-                return new GpuInfo(name, vendor, row.GetString("DriverVersion"), row.GetDateTime("DriverDate"), pnp, GpuClassifier.IsLikelyIntegrated(vendor, name));
-            })
+            .Select(ToGpuInfo)
             .ToList();
+
+    /// <summary>Carte graphique décrite par une ligne de <c>Win32_VideoController</c>.</summary>
+    internal static GpuInfo ToGpuInfo(CimRow row)
+    {
+        var name = row.GetString("Name")?.Trim() ?? T("GPU inconnu");
+        var pnp = row.GetString("PNPDeviceID") ?? string.Empty;
+        var vendor = GpuClassifier.VendorOf(pnp, name);
+        return new GpuInfo(name, vendor, row.GetString("DriverVersion"), row.GetDateTime("DriverDate"), pnp, GpuClassifier.IsLikelyIntegrated(vendor, name), row.GetString("InfFilename"));
+    }
 
     private const string EnrollmentsKey = @"SOFTWARE\Microsoft\Enrollments";
 
@@ -76,9 +83,10 @@ public static class HardwareProfileBuilder
 
     /// <summary>
     /// Vrai si une inscription sous <c>HKLM\SOFTWARE\Microsoft\Enrollments</c> porte le <c>ProviderID</c>
-    /// d'un vrai service de gestion (Intune « MS DM Server » ou autre MDM).
+    /// d'un vrai service de gestion (Intune « MS DM Server » ou autre MDM). Faux si tout a été lu sans en trouver, <c>null</c>
+    /// si une partie était illisible sans preuve ailleurs : une clé absente veut dire « aucune inscription », un refus ne dit rien.
     /// </summary>
-    internal static bool HasOrganizationEnrollment(IRegistryReader registry)
+    internal static bool? HasOrganizationEnrollment(IRegistryReader registry)
     {
         IReadOnlyList<string> enrollments;
         try
@@ -87,9 +95,10 @@ public static class HardwareProfileBuilder
         }
         catch (MausAccessDeniedException)
         {
-            return false;
+            return null;
         }
 
+        var unreadable = false;
         foreach (var id in enrollments)
         {
             try
@@ -102,28 +111,13 @@ public static class HardwareProfileBuilder
             }
             catch (MausAccessDeniedException)
             {
-                // Inscription illisible : ignorée.
+                // Inscription illisible : la suite peut encore prouver la gestion.
+                unreadable = true;
             }
         }
 
-        return false;
+        return unreadable ? null : false;
     }
 
-    private static CimRow? TryFirst(ICimReader cim, string wql)
-    {
-        var rows = TryQuery(cim, wql);
-        return rows.Count > 0 ? rows[0] : null;
-    }
-
-    private static IReadOnlyList<CimRow> TryQuery(ICimReader cim, string wql)
-    {
-        try
-        {
-            return cim.Query(wql);
-        }
-        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
-        {
-            return [];
-        }
-    }
+    private static CimRow? TryFirst(ICimReader cim, string wql) => cim.QueryOrEmpty(wql).FirstOrNull();
 }

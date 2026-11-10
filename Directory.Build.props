@@ -8,9 +8,9 @@
     <Description>MAUS : audit, réparation et optimisation transparente de Windows 11.</Description>
     <Copyright>Contributeurs de MAUS. Licence GPL-3.0-only.</Copyright>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-    <Version>0.8.5</Version>
+    <Version>0.8.6</Version>
     <NeutralLanguage>fr-FR</NeutralLanguage>
-    <SatelliteResourceLanguages>fr;en</SatelliteResourceLanguages>
+    <SatelliteResourceLanguages>fr;en;es</SatelliteResourceLanguages>
     <!-- Permet de compiler depuis Linux (sessions cloud) ; sans effet sous Windows. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <!-- Verrouillage des bibliothèques (0.8.4) : packages.lock.json garde la version exacte et l'empreinte (SHA-512) de

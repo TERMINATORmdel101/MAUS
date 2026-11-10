@@ -30,7 +30,6 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
     private ID3D11DepthStencilView? _dsv;
     private bool _outputDirty = true;
     private int _transientOffset;
-    private ID3D11Buffer? _indirectBound;
 
     public D3D11CommandList(ID3D11Device device, ID3D11DeviceContext context)
     {
@@ -83,18 +82,6 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
         }
     }
 
-    public void SetRenderTarget(ITexture? color, ITexture? depth = null, int mip = 0, int slice = 0)
-    {
-        if (color is null)
-        {
-            SetRenderTargets([], depth, mip, slice);
-        }
-        else
-        {
-            SetRenderTargets([color], depth, mip, slice);
-        }
-    }
-
     public void SetViewport(float x, float y, float width, float height) => _context.RSSetViewport(x, y, width, height);
 
     public void SetScissor(int left, int top, int right, int bottom) => _context.RSSetScissorRect(left, top, right - left, bottom - top);
@@ -136,9 +123,6 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
 
     public void SetBuffer(int slot, IBuffer? buffer) =>
         _srvs[slot] = buffer is null ? null! : ((D3D11Buffer)buffer).ShaderView ?? throw new InvalidOperationException("Tampon non lisible : " + buffer.Desc.Name);
-
-    public void SetStorageTexture(int slot, ITexture? texture, int mip = 0) =>
-        _uavs[slot] = texture is null ? null! : ((D3D11Texture)texture).StorageView(mip);
 
     public void SetStorageBuffer(int slot, IBuffer? buffer) =>
         _uavs[slot] = buffer is null ? null! : ((D3D11Buffer)buffer).StorageView ?? throw new InvalidOperationException("Tampon non inscriptible : " + buffer.Desc.Name);
@@ -188,14 +172,6 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
         _context.DrawIndexedInstanced((uint)indexCount, (uint)instanceCount, (uint)firstIndex, baseVertex, (uint)firstInstance);
     }
 
-    public void DrawIndexedIndirect(IBuffer arguments, int offsetBytes)
-    {
-        PrepareDraw();
-        var buffer = ((D3D11Buffer)arguments).Buffer;
-        _indirectBound = buffer;
-        _context.DrawIndexedInstancedIndirect(buffer, (uint)offsetBytes);
-    }
-
     public void Dispatch(int groupsX, int groupsY, int groupsZ)
     {
         // Une cible encore attachée empêcherait d'écrire la même texture depuis le shader de calcul.
@@ -209,9 +185,9 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
         _context.CSSetShaderResources(0, MaxTextures, _srvs);
         _context.Dispatch((uint)groupsX, (uint)groupsY, (uint)groupsZ);
 
-        // Libère les écritures : la même ressource pourra être lue au passage suivant.
+        // Libère les écritures : la même ressource pourra être lue au passage suivant. Le choix des sorties reste, comme en
+        // Direct3D 12 : une scène peut enchaîner plusieurs calculs sur le même tampon.
         _context.CSSetUnorderedAccessViews(0, MaxStorage, _noUavs);
-        Array.Clear(_uavs);
     }
 
     public void UpdateBuffer<T>(IBuffer buffer, ReadOnlySpan<T> data, int offsetBytes = 0)
@@ -249,7 +225,6 @@ internal sealed unsafe class D3D11CommandList : ICommandList, IDisposable
 
         _transient.Dispose();
         GC.KeepAlive(_device);
-        GC.KeepAlive(_indirectBound);
     }
 
     private void PrepareDraw()

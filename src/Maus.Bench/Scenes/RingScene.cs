@@ -32,15 +32,9 @@ internal sealed class RingScene : BenchScene
         (92, new CameraPose(OnRing(1.0f, 140f, 34f), new Vector3(0f, -4f, 0f), 50f)));
 
     private const int Variants = 3;
-    private readonly IBuffer?[] _variantVertices = new IBuffer?[Variants];
-    private readonly IBuffer?[] _variantIndices = new IBuffer?[Variants];
+    private readonly IndexedMesh?[] _variants = new IndexedMesh?[Variants];
     private IBuffer? _rocks;
-    private IBuffer? _detailedVertices;
-    private IBuffer? _detailedIndices;
-    private IBuffer? _coarseVertices;
-    private IBuffer? _coarseIndices;
-    private int _detailedIndexCount;
-    private int _coarseIndexCount;
+    private IndexedMesh? _coarseMesh;
     private ITexture? _shadowMap;
     private IPipeline? _background;
     private IPipeline? _rocksPipeline;
@@ -50,9 +44,7 @@ internal sealed class RingScene : BenchScene
 
     public override string Title => T("Anneau de la géante");
 
-    public override string Subtitle => T("Géométrie : des centaines de milliers de rochers, plus de 100 millions de triangles par image");
-
-    public override GpuCapability Capability => GpuCapability.Geometry;
+    public override string Subtitle => T("Géométrie : une pluie de rochers, des millions de triangles par image");
 
     public override void Load(SceneContext context)
     {
@@ -63,18 +55,11 @@ internal sealed class RingScene : BenchScene
         for (var v = 0; v < Variants; v++)
         {
             var (vv, vi) = RockMesh.Create(subdivisions: detail, seed: 11 + (v * 17));
-            _variantVertices[v] = device.CreateBuffer(new BufferDesc(vv.Length * 4, BufferUsage.Vertex, 24, "Rocher détaillé " + v), MemoryMarshal.AsBytes(vv.AsSpan()));
-            _variantIndices[v] = device.CreateBuffer(new BufferDesc(vi.Length * 4, BufferUsage.Index, 4, "Rocher détaillé " + v + " : indices"), MemoryMarshal.AsBytes(vi.AsSpan()));
+            _variants[v] = IndexedMesh.Create(device, "Rocher détaillé " + v, vv, vi, RockMesh.Stride);
         }
 
-        var (dv, di) = RockMesh.Create(subdivisions: detail, seed: 7);
         var (cv, ci) = RockMesh.Create(subdivisions: detail - 1, seed: 7);
-        _detailedVertices = device.CreateBuffer(new BufferDesc(dv.Length * 4, BufferUsage.Vertex, 24, "Rocher détaillé"), MemoryMarshal.AsBytes(dv.AsSpan()));
-        _detailedIndices = device.CreateBuffer(new BufferDesc(di.Length * 4, BufferUsage.Index, 4, "Rocher détaillé : indices"), MemoryMarshal.AsBytes(di.AsSpan()));
-        _coarseVertices = device.CreateBuffer(new BufferDesc(cv.Length * 4, BufferUsage.Vertex, 24, "Rocher simple"), MemoryMarshal.AsBytes(cv.AsSpan()));
-        _coarseIndices = device.CreateBuffer(new BufferDesc(ci.Length * 4, BufferUsage.Index, 4, "Rocher simple : indices"), MemoryMarshal.AsBytes(ci.AsSpan()));
-        _detailedIndexCount = di.Length;
-        _coarseIndexCount = ci.Length;
+        _coarseMesh = IndexedMesh.Create(device, "Rocher simple", cv, ci, RockMesh.Stride);
 
         var rocks = CreateRocks(_detailed, _coarse);
         _rocks = device.CreateBuffer(new BufferDesc(rocks.Length * 48L, BufferUsage.Structured, 48, "Rochers"), MemoryMarshal.AsBytes(rocks.AsSpan()));
@@ -149,9 +134,8 @@ internal sealed class RingScene : BenchScene
         DrawDetailed(cmd, constants);
         cmd.Flush();
         cmd.SetConstants(1, constants with { RingParams = constants.RingParams with { X = _detailed } });
-        cmd.SetVertexBuffer(0, _coarseVertices, 24);
-        cmd.SetIndexBuffer(_coarseIndices);
-        cmd.DrawIndexed(_coarseIndexCount, _coarse);
+        _coarseMesh!.Bind(cmd);
+        cmd.DrawIndexed(_coarseMesh.IndexCount, _coarse);
         cmd.SetTexture(1, null);
         cmd.SetBuffer(0, null);
     }
@@ -163,9 +147,9 @@ internal sealed class RingScene : BenchScene
         for (var v = 0; v < Variants; v++)
         {
             cmd.SetConstants(1, constants with { RingParams = constants.RingParams with { X = v * perVariant } });
-            cmd.SetVertexBuffer(0, _variantVertices[v], 24);
-            cmd.SetIndexBuffer(_variantIndices[v]);
-            cmd.DrawIndexed(_detailedIndexCount, v == Variants - 1 ? _detailed - (perVariant * (Variants - 1)) : perVariant);
+            var mesh = _variants[v]!;
+            mesh.Bind(cmd);
+            cmd.DrawIndexed(mesh.IndexCount, v == Variants - 1 ? _detailed - (perVariant * (Variants - 1)) : perVariant);
         }
     }
 
@@ -173,16 +157,13 @@ internal sealed class RingScene : BenchScene
     {
         if (disposing)
         {
-            foreach (var buffer in _variantVertices.Concat(_variantIndices))
+            foreach (var mesh in _variants)
             {
-                buffer?.Dispose();
+                mesh?.Dispose();
             }
 
             _rocks?.Dispose();
-            _detailedVertices?.Dispose();
-            _detailedIndices?.Dispose();
-            _coarseVertices?.Dispose();
-            _coarseIndices?.Dispose();
+            _coarseMesh?.Dispose();
             _shadowMap?.Dispose();
             _background?.Dispose();
             _rocksPipeline?.Dispose();
@@ -289,6 +270,9 @@ internal sealed class RingScene : BenchScene
 /// <summary>Maillage de rocher : icosaèdre subdivisé, déformé par du bruit (bosses et facettes), normales lissées.</summary>
 internal static class RockMesh
 {
+    /// <summary>Taille d'un sommet : position et normale.</summary>
+    public const int Stride = 24;
+
     public static (float[] Vertices, uint[] Indices) Create(int subdivisions, int seed)
     {
         var t = (1f + MathF.Sqrt(5f)) / 2f;

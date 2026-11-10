@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Maus.Core.Platform;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Modules.M14Display;
@@ -97,10 +98,60 @@ public sealed class RefreshRateTrial(IDisplayModeWriter writer, RefreshTarget ta
 }
 
 /// <summary>Écrans du dernier audit : retrouve l'écran d'un constat <c>M14.refresh.display-N</c> (même ordre que le module).</summary>
+/// <summary>
+/// Retour à l'ancienne fréquence d'un écran, depuis l'Historique : « Garder » n'est plus définitif (décision du porteur,
+/// 0.8.6). Comme pour une correction, un réglage changé entre-temps n'est pas écrasé.
+/// </summary>
+public static class RefreshRateUndo
+{
+    /// <param name="Finished">Rien de plus à proposer : l'entrée quitte l'Historique.</param>
+    /// <param name="Message">Ce qu'il faut dire à l'utilisateur.</param>
+    public sealed record Outcome(bool Finished, string Message);
+
+    public static Outcome Run(Maus.Core.Preferences.KeptRefreshRate kept) => Run(kept, new Win32DisplayConfigReader().ReadActivePaths(), new Win32DisplayModeWriter());
+
+    internal static Outcome Run(Maus.Core.Preferences.KeptRefreshRate kept, IReadOnlyList<DisplayPath>? paths, IDisplayModeWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(kept);
+        ArgumentNullException.ThrowIfNull(writer);
+
+        var path = paths?.FirstOrDefault(p => string.Equals(p.SourceName, kept.SourceName, StringComparison.OrdinalIgnoreCase));
+        if (path is null)
+        {
+            return new(false, T("Cet écran n'est pas branché en ce moment : rien n'a changé."));
+        }
+
+        if (path.Width != kept.Width || path.Height != kept.Height || path.RefreshHz is not { } current || Math.Abs(current - kept.ToHz) > 1)
+        {
+            return new(true, T("{0} n'est plus à {1} Hz : le réglage a changé depuis, MAUS le laisse tel quel.", kept.Label, kept.ToHz));
+        }
+
+        // Note du fichier de l'utilisateur : la fréquence n'est écrite que si Windows la propose pour cet écran et cette taille.
+        var listed = path.Modes
+            .Where(m => IsSameSize(m, kept) && Math.Abs(m.RefreshHz - kept.FromHz) <= RefreshRateTargets.Tolerance)
+            .OrderBy(m => Math.Abs(m.RefreshHz - kept.FromHz))
+            .FirstOrDefault();
+        if (listed is null)
+        {
+            return new(false, RefreshRateTrial.Describe(DisplayChange.Refused));
+        }
+
+        var change = writer.Keep(kept.SourceName, kept.Width, kept.Height, listed.RefreshHz);
+        return change == DisplayChange.Applied
+            ? new(true, T("{0} est revenu à {1} Hz.", kept.Label, kept.FromHz))
+            : new(false, RefreshRateTrial.Describe(change));
+    }
+
+    /// <summary>Un écran tourné peut lister ses modes dans l'autre sens (voir <c>DisplayModule</c>).</summary>
+    private static bool IsSameSize(DisplayMode mode, Maus.Core.Preferences.KeptRefreshRate kept) =>
+        (mode.Width == kept.Width && mode.Height == kept.Height) || (mode.Width == kept.Height && mode.Height == kept.Width);
+}
+
 public static class RefreshRateTargets
 {
     private const string Prefix = "M14.refresh.display-";
-    private const double Tolerance = 1.0;
+    /// <summary>Tolérance entre la fréquence exacte (59,94 Hz) et la valeur entière des modes (60 Hz).</summary>
+    internal const double Tolerance = 1.0;
 
     public static bool IsRefreshFinding(string findingId) =>
         findingId is not null && findingId.StartsWith(Prefix, StringComparison.Ordinal);
@@ -138,7 +189,6 @@ public static class RefreshRateTargets
 /// </summary>
 public sealed unsafe partial class Win32DisplayModeWriter : IDisplayModeWriter
 {
-    private const uint EnumCurrentSettings = unchecked((uint)-1);
     private const uint UpdateRegistry = 0x1;
     private const uint Test = 0x2;
     private const uint PelsWidth = 0x80000;
@@ -166,23 +216,20 @@ public sealed unsafe partial class Win32DisplayModeWriter : IDisplayModeWriter
             return DisplayChange.Failed;
         }
 
-        return Map(Change(sourceName, &mode, UpdateRegistry));
+        var test = Change(sourceName, &mode, Test);
+        return test == Successful ? Map(Change(sourceName, &mode, UpdateRegistry)) : Map(test);
     }
 
     public DisplayChange RestoreSaved(string sourceName) => Map(Change(sourceName, null, 0));
 
     /// <summary>Part du mode actuel (orientation, position, profondeur gardées) et ne change que taille et fréquence.</summary>
-    private static bool TryReadCurrent(string sourceName, int width, int height, int hz, out DevMode mode)
+    private static bool TryReadCurrent(string sourceName, int width, int height, int hz, out DevModeW mode)
     {
         ArgumentNullException.ThrowIfNull(sourceName);
-        mode = new DevMode { Size = (ushort)sizeof(DevMode) };
-        fixed (char* name = sourceName)
-        fixed (DevMode* pointer = &mode)
+        mode = new DevModeW { Size = DevModeW.NativeSize };
+        if (DisplayRefresh.EnumDisplaySettingsExW(sourceName, DisplayRefresh.EnumCurrentSettings, ref mode, 0) == 0)
         {
-            if (EnumDisplaySettingsExW(name, EnumCurrentSettings, pointer, 0) == 0)
-            {
-                return false;
-            }
+            return false;
         }
 
         mode.PelsWidth = (uint)width;
@@ -192,7 +239,7 @@ public sealed unsafe partial class Win32DisplayModeWriter : IDisplayModeWriter
         return true;
     }
 
-    private static int Change(string sourceName, DevMode* mode, uint flags)
+    private static int Change(string sourceName, DevModeW* mode, uint flags)
     {
         ArgumentNullException.ThrowIfNull(sourceName);
         try
@@ -216,29 +263,6 @@ public sealed unsafe partial class Win32DisplayModeWriter : IDisplayModeWriter
         _ => DisplayChange.Failed,
     };
 
-    /// <summary><c>DEVMODEW</c> (220 octets) : taille à 68, champs utilisés à 72, mode d'affichage à 172-184.</summary>
-    [StructLayout(LayoutKind.Explicit, Size = 220)]
-    private struct DevMode
-    {
-        [FieldOffset(68)]
-        public ushort Size;
-
-        [FieldOffset(72)]
-        public uint Fields;
-
-        [FieldOffset(172)]
-        public uint PelsWidth;
-
-        [FieldOffset(176)]
-        public uint PelsHeight;
-
-        [FieldOffset(184)]
-        public uint DisplayFrequency;
-    }
-
     [LibraryImport("user32.dll")]
-    private static partial int EnumDisplaySettingsExW(char* deviceName, uint modeNum, DevMode* devMode, uint flags);
-
-    [LibraryImport("user32.dll")]
-    private static partial int ChangeDisplaySettingsExW(char* deviceName, DevMode* devMode, nint hwnd, uint flags, nint parameter);
+    private static partial int ChangeDisplaySettingsExW(char* deviceName, DevModeW* devMode, nint hwnd, uint flags, nint parameter);
 }

@@ -28,7 +28,7 @@ public sealed record SettingValue(RegistryValueKind Kind, string Data)
         long l => new(kind ?? RegistryValueKind.QWord, l.ToString(CultureInfo.InvariantCulture)),
         string s => new(kind is RegistryValueKind.ExpandString ? RegistryValueKind.ExpandString : RegistryValueKind.String, s),
         string[] values => new(RegistryValueKind.MultiString, string.Join(MultiStringSeparator, values)),
-        byte[] bytes => new(RegistryValueKind.Binary, Convert.ToHexString(bytes)),
+        byte[] bytes => new(kind is RegistryValueKind.None ? RegistryValueKind.None : RegistryValueKind.Binary, Convert.ToHexString(bytes)),
         var other => new(kind ?? RegistryValueKind.String, Convert.ToString(other, CultureInfo.InvariantCulture) ?? string.Empty),
     };
 
@@ -51,6 +51,12 @@ public sealed record SettingValue(RegistryValueKind Kind, string Data)
         if (left is null || right is null)
         {
             return left is null && right is null;
+        }
+
+        if (left.Kind == RegistryValueKind.DWord && right.Kind == RegistryValueKind.DWord)
+        {
+            // Sur 32 bits : -1 et 4294967295 sont le même DWORD (voir ParseInteger), l'écriture rend déjà l'un pour l'autre.
+            return unchecked((int)left.ParseInteger()) == unchecked((int)right.ParseInteger());
         }
 
         if (IsInteger(left.Kind) && IsInteger(right.Kind))

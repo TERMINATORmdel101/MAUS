@@ -10,15 +10,13 @@ public class ClassifierTests
     [InlineData("AMD Ryzen 7 7800X3D 8-Core Processor", false)]
     [InlineData("AMD Ryzen 7 9800X3D 8-Core Processor", false)]
     [InlineData("AMD Ryzen 9 9950X3D2 16-Core Processor", false)]
+    [InlineData("AMD Ryzen 9 9955HX3D 16-Core Processor", true)]
+    [InlineData("AMD Ryzen 9 7945HX3D with Radeon Graphics", true)]
+    [InlineData("AMD Ryzen 9 7945HX with Radeon Graphics", false)]
+    [InlineData("AMD Ryzen 9 9955HX 16-Core Processor", false)]
     [InlineData("AMD Ryzen 9 7950X 16-Core Processor", false)]
     public void Detects_asymmetric_dual_ccd_x3d(string name, bool expected) =>
         Assert.Equal(expected, CpuClassifier.IsAsymmetricDualCcdX3D(name));
-
-    [Theory]
-    [InlineData("AMD Ryzen 7 7800X3D 8-Core Processor", true)]
-    [InlineData("AMD Ryzen 9 9950X3D2 16-Core Processor", true)]
-    [InlineData("AMD Ryzen 7 7700X 8-Core Processor", false)]
-    public void Detects_any_x3d(string name, bool expected) => Assert.Equal(expected, CpuClassifier.IsX3D(name));
 
     [Theory]
     [InlineData("13th Gen Intel(R) Core(TM) i9-13900K", true)]

@@ -33,8 +33,6 @@ internal sealed class FractalScene : BenchScene
 
     public override string Subtitle => T("Calcul pur : la fractale est recalculée des centaines de fois par pixel");
 
-    public override GpuCapability Capability => GpuCapability.Compute;
-
     public override void Load(SceneContext context)
     {
         _steps = context.Light ? new Vector2(170f, 28f) : new Vector2(260f, 56f);

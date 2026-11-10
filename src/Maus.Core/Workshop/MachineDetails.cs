@@ -130,7 +130,7 @@ public static class MachineDetailsReader
 
     internal static SystemIdentity ReadSystem(AuditContext context, IFirmwareTypeSource firmware)
     {
-        var rows = Query(context.Cim, OperatingSystemQuery);
+        var rows = context.Cim.QueryOrEmpty(OperatingSystemQuery);
         var os = rows.Count > 0 ? rows[0] : null;
         var (tpm, tpmNeedsAdmin) = ReadTpm(context.Cim);
         return new SystemIdentity(
@@ -197,7 +197,7 @@ public static class MachineDetailsReader
 
     internal static MemorySlots? ReadSlots(ICimReader cim)
     {
-        var arrays = Query(cim, MemoryArrayQuery).Where(r => r.GetInt64("Use") is null or 3).ToList();
+        var arrays = cim.QueryOrEmpty(MemoryArrayQuery).Where(r => r.GetInt64("Use") is null or 3).ToList();
         if (arrays.Count == 0)
         {
             return null;
@@ -237,7 +237,7 @@ public static class MachineDetailsReader
     }
 
     internal static IReadOnlyList<NetworkAdapterIdentity> ReadNetwork(ICimReader cim) =>
-        Query(cim, NetworkQuery, CimScopes.StandardCimv2)
+        cim.QueryOrEmpty(NetworkQuery, CimScopes.StandardCimv2)
             .Where(a => a.GetBool("HardwareInterface") == true)
             .Select(a => new NetworkAdapterIdentity(
                 Clean(a.GetString("Name")) ?? "?",
@@ -255,34 +255,13 @@ public static class MachineDetailsReader
             .ToList();
 
     internal static IReadOnlyList<AudioDeviceIdentity> ReadAudio(ICimReader cim) =>
-        Query(cim, SoundQuery)
+        cim.QueryOrEmpty(SoundQuery)
             .Select(r => new AudioDeviceIdentity(Clean(r.GetString("Name")) ?? "?", Clean(r.GetString("Manufacturer"))))
             .Where(d => d.Name != "?")
             .DistinctBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-    private static string? Clean(string? value)
-    {
-        var trimmed = value?.Trim();
-        return string.IsNullOrEmpty(trimmed)
-            || trimmed.Equals("To Be Filled By O.E.M.", StringComparison.OrdinalIgnoreCase)
-            || trimmed.Equals("Default string", StringComparison.OrdinalIgnoreCase)
-            || trimmed.Equals("System Product Name", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : trimmed;
-    }
-
-    private static IReadOnlyList<CimRow> Query(ICimReader cim, string wql, string scope = CimScopes.Default)
-    {
-        try
-        {
-            return cim.Query(wql, scope);
-        }
-        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
-        {
-            return [];
-        }
-    }
+    private static string? Clean(string? value) => Hardware.HardwareText.Clean(value);
 
     private static int? Safe(Func<int?> read)
     {

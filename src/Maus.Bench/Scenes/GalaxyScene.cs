@@ -50,8 +50,6 @@ internal sealed class GalaxyScene : BenchScene
 
     public override string Subtitle => T("Bande passante : des millions de particules simulées et superposées à chaque image");
 
-    public override GpuCapability Capability => GpuCapability.Bandwidth;
-
     public override void Load(SceneContext context)
     {
         var device = context.Device;

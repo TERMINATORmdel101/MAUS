@@ -96,7 +96,7 @@ public sealed class DevicesModule : IAuditModule
         var unsigned = drivers.Where(d => d.IsSigned == false).ToList();
         return new Finding
         {
-            Id = "M17.unsigned-drivers",
+            Id = Follow.WhatChanged.DriversFindingId,
             Title = T("Pilotes sans signature numérique"),
             Category = Category,
             Status = unsigned.Count == 0 ? FindingStatus.Ok : FindingStatus.Info,
@@ -109,6 +109,7 @@ public sealed class DevicesModule : IAuditModule
             Advice = unsigned.Count == 0
                 ? null
                 : T("Vérifiez qu'ils viennent bien du fabricant de l'appareil (Atelier > Pilotes, bouton « Voir les pilotes non signés ») ; sinon, réinstallez le pilote depuis le site du fabricant."),
+            Followed = Follow.WhatChanged.KeptDrivers(drivers),
         };
     }
 
@@ -119,7 +120,8 @@ public sealed class DevicesModule : IAuditModule
         Id = "M17.devices",
         Title = T("Périphériques en erreur"),
         Category = Category,
-        Status = failing.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
+        // Le résumé informe : chaque appareil en panne porte déjà sa gravité dans son propre constat.
+        Status = failing.Count == 0 ? FindingStatus.Ok : FindingStatus.Info,
         Severity = Severity.Medium,
         Current = failing.Count == 0
             ? T("aucun périphérique en erreur")
@@ -148,6 +150,7 @@ public sealed class DevicesModule : IAuditModule
             Expected = T("fonctionne normalement"),
             Explanation = T("Windows signale ce code d'erreur pour l'appareil « {0} » ({1}).", device.Name, ClassLabel(device.Class))
                 + (critical ? " " + T("C'est un composant essentiel : sans lui, l'affichage ou les disques peuvent fonctionner en mode dégradé.") : string.Empty),
+            ExplanationHasPcData = true,
             Advice = advice,
             SettingsPage = settingsPage,
         };
@@ -200,12 +203,7 @@ public sealed class DevicesModule : IAuditModule
         _ => pnpClass,
     };
 
-    private static string Slug(string value)
-    {
-        var chars = value.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray();
-        var slug = new string(chars).Trim('-');
-        return slug.Length > 60 ? slug[..60] : slug.Length == 0 ? "x" : slug;
-    }
+    private static string Slug(string value) => FindingSlug.Of(value, 60);
 
     private sealed record Device(string Name, string PnpId, string Class, long Code, bool Present);
 }

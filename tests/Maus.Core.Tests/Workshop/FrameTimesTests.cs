@@ -164,6 +164,42 @@ public class FrameTimesTests
     }
 
     [Fact]
+    public void The_time_of_dropped_frames_goes_to_the_next_displayed_frame()
+    {
+        var log = new FrameTimeLog();
+        log.AddCsvLine(Header);
+        for (var i = 0; i < 300; i++)
+        {
+            log.AddCsvLine(Line("jeu.exe", i * 0.01, 10, 5, dropped: i % 2));
+        }
+
+        // Une image sur deux écartée, 100 appels par seconde : le joueur en voit 50.
+        var summary = log.Summarize()!;
+        Assert.Equal(150, summary.Frames);
+        Assert.Equal(50, summary.AverageFps, 0);
+        Assert.Equal(0.5, summary.GpuBusyShare!.Value, 2);
+    }
+
+    [Fact]
+    public void Only_the_most_active_swap_chain_of_a_program_counts()
+    {
+        var log = new FrameTimeLog();
+        log.AddCsvLine(Header);
+        for (var i = 0; i < 200; i++)
+        {
+            log.AddCsvLine(Line("jeu.exe", i * 0.01, 10, 5));
+            if (i % 2 == 0)
+            {
+                log.AddCsvLine(Line("jeu.exe", i * 0.01, 20, 5).Replace("0x0", "0x1", StringComparison.Ordinal));
+            }
+        }
+
+        var summary = log.Summarize()!;
+        Assert.Equal(200, summary.Frames);
+        Assert.Equal(100, summary.AverageFps, 0);
+    }
+
+    [Fact]
     public void Advice_points_to_the_limiting_part_and_the_screen()
     {
         var gpuBound = Log(300, _ => 10, gpuShare: 0.98).Summarize()!;

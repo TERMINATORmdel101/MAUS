@@ -40,6 +40,6 @@ public sealed class DismCommandTests
         Assert.True(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/batteryreport", "/output", ReadOnlyCommandRunner.BatteryReportPath]));
         Assert.False(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/batteryreport", "/output", @"C:\Windows\System32\x.html"]));
         Assert.False(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/batteryreport"]));
-        Assert.True(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/getactivescheme"]));
+        Assert.True(ReadOnlyCommandRunner.IsAllowed("powercfg.exe", ["/list"]));
     }
 }

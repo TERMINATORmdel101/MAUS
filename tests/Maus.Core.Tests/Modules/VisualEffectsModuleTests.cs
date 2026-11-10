@@ -8,6 +8,45 @@ public class VisualEffectsModuleTests
 {
     private const string Advanced = @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";
 
+    private static FakePackages WithWidgets() => new FakePackages().Add("MicrosoftWindows.Client.WebExperience");
+
+    [Fact]
+    public void Declarations_read_on_the_pc_never_lead_outside_what_maus_expects()
+    {
+        const string Root = VisualEffectDefaults.Root;
+        var known = new Dictionary<uint, (uint Set, bool UiParam)> { [SpiGet.MenuAnimation] = (SpiSet.MenuAnimation, false) };
+        var registry = new FakeRegistry()
+            .Set(RegistryHive.LocalMachine, Root + @"\Run", "Type", "checkbox").Set(RegistryHive.LocalMachine, Root + @"\Run", "DefaultValue", 1)
+            .Set(RegistryHive.LocalMachine, Root + @"\Run", "RegPath", @"Software\Microsoft\Windows\CurrentVersion\Run")
+            .Set(RegistryHive.LocalMachine, Root + @"\Run", "ValueName", "Updater").Set(RegistryHive.LocalMachine, Root + @"\Run", "CheckedValue", 1)
+            .Set(RegistryHive.LocalMachine, Root + @"\Machine", "Type", "checkbox").Set(RegistryHive.LocalMachine, Root + @"\Machine", "DefaultValue", 1)
+            .Set(RegistryHive.LocalMachine, Root + @"\Machine", "HKeyRoot", unchecked((int)0x80000002))
+            .Set(RegistryHive.LocalMachine, Root + @"\Machine", "RegPath", Advanced)
+            .Set(RegistryHive.LocalMachine, Root + @"\Machine", "ValueName", "Hidden").Set(RegistryHive.LocalMachine, Root + @"\Machine", "CheckedValue", 1)
+            .Set(RegistryHive.LocalMachine, Root + @"\Spi", "Type", "checkbox").Set(RegistryHive.LocalMachine, Root + @"\Spi", "DefaultValue", 1)
+            .Set(RegistryHive.LocalMachine, Root + @"\Spi", "SPIActionGet", (int)SpiGet.MenuAnimation)
+            .Set(RegistryHive.LocalMachine, Root + @"\Spi", "SPIActionSet", 0x2001)
+            .Set(RegistryHive.LocalMachine, Root + @"\Sure", "Type", "checkbox").Set(RegistryHive.LocalMachine, Root + @"\Sure", "DefaultValue", 1)
+            .Set(RegistryHive.LocalMachine, Root + @"\Sure", "SPIActionGet", (int)SpiGet.MenuAnimation)
+            .Set(RegistryHive.LocalMachine, Root + @"\Sure", "SPIActionSet", (int)SpiSet.MenuAnimation);
+
+        var effects = VisualEffectDefaults.Read(registry, known);
+
+        // Seule la déclaration conforme passe : ni une clé Run, ni une autre ruche, ni un code d'écriture inconnu.
+        Assert.Equal("Sure", Assert.Single(effects).Name);
+    }
+
+    [Fact]
+    public async Task Widgets_not_installed_are_not_reported_as_active()
+    {
+        var findings = await new VisualEffectsModule().DetectAsync(TestContext.Create(packages: new FakePackages()), CancellationToken.None);
+
+        var widgets = findings.Single(f => f.Id == "M06.widgets");
+        Assert.Equal(FindingStatus.Ok, widgets.Status);
+        Assert.Equal("non installés", widgets.Current);
+        Assert.False(widgets.Fixable);
+    }
+
     [Fact]
     public async Task Default_windows_settings_are_reported_as_optimisations()
     {
@@ -17,7 +56,7 @@ public class VisualEffectsModuleTests
             parameters.Values[action] = true;
         }
 
-        var findings = await new VisualEffectsModule().DetectAsync(TestContext.Create(parameters: parameters), CancellationToken.None);
+        var findings = await new VisualEffectsModule().DetectAsync(TestContext.Create(parameters: parameters, packages: WithWidgets()), CancellationToken.None);
 
         Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M06.taskview").Status);
         Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M06.widgets").Status);
@@ -87,7 +126,7 @@ public class VisualEffectsFixTests
             .Set(Microsoft.Win32.RegistryHive.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "ShowTaskViewButton", 1)
             .Set(Microsoft.Win32.RegistryHive.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "EnableTransparency", 1);
         var parameters = WindowsDefaults();
-        var audit = TestContext.Create(registry, parameters: parameters);
+        var audit = TestContext.Create(registry, parameters: parameters, packages: new FakePackages().Add("MicrosoftWindows.Client.WebExperience"));
 
         var (plan, _) = await Fixes.RoundTrip.AssertAsync(new VisualEffectsModule(), audit, registry, parameters);
 

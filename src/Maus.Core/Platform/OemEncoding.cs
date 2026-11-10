@@ -24,6 +24,25 @@ public static partial class OemEncoding
     public static Encoding Current => Get(CodePage);
 
     /// <summary>
+    /// Encodage de la page de code ANSI du système : pnputil y écrit quand sa sortie est redirigée, contrairement aux autres outils
+    /// (constaté le 1/11/2026 sur un Windows français : octet 0xA0 pour l'espace insécable, page 1252 et non 850).
+    /// </summary>
+    public static Encoding Ansi
+    {
+        get
+        {
+            try
+            {
+                return Get((int)GetACP());
+            }
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+            {
+                return Current;
+            }
+        }
+    }
+
+    /// <summary>
     /// Encodage d'une page de code (les pages OEM sont fournies par <see cref="CodePagesEncodingProvider"/>). Une page
     /// inconnue donne celle de la culture invariante (437), qui garde au moins les caractères ASCII.
     /// </summary>
@@ -66,4 +85,7 @@ public static partial class OemEncoding
 
     [LibraryImport("kernel32.dll")]
     private static partial uint GetOEMCP();
+
+    [LibraryImport("kernel32.dll")]
+    private static partial uint GetACP();
 }

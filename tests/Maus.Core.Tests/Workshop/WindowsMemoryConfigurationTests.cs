@@ -5,6 +5,39 @@ namespace Maus.Core.Tests.Workshop;
 
 public class WindowsMemoryConfigurationTests
 {
+    [Fact]
+    public void A_chip_read_only_at_its_start_says_so_and_proves_nothing_about_the_speed()
+    {
+        var image = new SpdImage(0, MemoryDetailsTests.Ddr5Kit()[..SpdDecoder.FirstPageBytes], FirstPageOnly: true);
+
+        var module = SpdDecoder.Decode(image)!;
+
+        Assert.True(module.FirstPageOnly);
+        Assert.Equal(0, module.CapacityBytes);
+        Assert.True(module.ChecksumOk);
+        Assert.Equal(ProfileKind.Jedec, Assert.Single(module.Profiles).Kind);
+        Assert.Equal("capacité inconnue", module.CapacityText);
+        Assert.DoesNotContain("rang", module.Organization, StringComparison.Ordinal);
+        var slot = new MemorySlotConfiguration("DIMM 1", null, null, 1L << 34, 6000, 1.35, "DDR5");
+        Assert.Null(WindowsMemoryConfiguration.CompareWithSpd([slot], [module]));
+        Assert.Null(SpdDecoder.Decode(image with { FirstPageOnly = false }));
+    }
+
+    [Fact]
+    public void A_repeated_slot_name_gets_its_bank_label()
+    {
+        var a = Dimm("DIMM 1", 3200, 0);
+        a["BankLabel"] = "P0 CHANNEL A";
+        var b = Dimm("DIMM 1", 3200, 0);
+        b["BankLabel"] = "P0 CHANNEL B";
+        var c = Dimm("DIMM 2", 3200, 0);
+        c["BankLabel"] = "P0 CHANNEL C";
+
+        var slots = WindowsMemoryConfiguration.Parse([new CimRow(a), new CimRow(b), new CimRow(c)]);
+
+        Assert.Equal(["P0 CHANNEL A / DIMM 1", "P0 CHANNEL B / DIMM 1", "DIMM 2"], slots.Select(s => s.Slot));
+    }
+
     private static Dictionary<string, object?> Dimm(string locator, long configured, long voltageMv) => new()
     {
         ["DeviceLocator"] = locator,
@@ -17,8 +50,19 @@ public class WindowsMemoryConfigurationTests
         ["SMBIOSMemoryType"] = 26L,
     };
 
+    [Fact]
+    public void A_module_with_only_its_standard_profile_is_never_called_custom()
+    {
+        MemorySlotConfiguration[] slots = [new("A1", null, null, 8L << 30, 2133, null, "DDR4")];
+
+        var text = WindowsMemoryConfiguration.CompareWithSpd(slots, [Module(Profile(ProfileKind.Jedec, 2133))]);
+
+        Assert.Contains("profil standard", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("personnalisé", text, StringComparison.Ordinal);
+    }
+
     private static SpdProfile Profile(ProfileKind kind, int speed, int number = 1) =>
-        new(kind, number, kind == ProfileKind.Xmp ? "2.0" : null, null, speed, 2000.0 / speed, [], [], null, null, null);
+        new(kind, number, kind == ProfileKind.Xmp ? "2.0" : null, null, speed, 2000.0 / speed, [], null, null, null);
 
     private static SpdModule Module(params SpdProfile[] profiles) => new()
     {
@@ -43,6 +87,27 @@ public class WindowsMemoryConfigurationTests
         Assert.Equal("DDR4", slots[0].MemoryType);
         Assert.Contains("3467 MT/s", WindowsMemoryConfiguration.Describe(slots));
         Assert.Contains("1.250 V", WindowsMemoryConfiguration.Describe(slots));
+    }
+
+    [Theory]
+    [InlineData(1866L, 3200L, 1866, 3200)] // Vraie DDR4-1866 sur une barrette 3200 : déjà en MT/s.
+    [InlineData(1066L, 1600L, 2132, 3200)] // Vieux BIOS : les deux en MHz.
+    [InlineData(3200L, 3200L, 3200, 3200)]
+    public void Every_reader_gets_the_same_speeds_from_a_ddr4_row(long configured, long rated, int expectedConfigured, int expectedRated)
+    {
+        var row = new CimRow(new Dictionary<string, object?> { ["ConfiguredClockSpeed"] = configured, ["Speed"] = rated, ["SMBIOSMemoryType"] = 26L });
+
+        Assert.Equal((expectedConfigured, expectedRated), Maus.Core.Modules.M10Memory.MemorySpeeds.FromRow(row, 4));
+        Assert.Equal(expectedConfigured, WindowsMemoryConfiguration.Parse([row])[0].ConfiguredMts);
+    }
+
+    [Fact]
+    public void A_filler_value_from_the_bios_is_not_a_name()
+    {
+        Assert.Null(Maus.Core.Hardware.HardwareText.Clean(" To Be Filled By O.E.M.\0 "));
+        Assert.Null(Maus.Core.Hardware.HardwareText.Clean("Undefined"));
+        Assert.Null(Maus.Core.Hardware.HardwareText.Clean("   "));
+        Assert.Equal("Patriot", Maus.Core.Hardware.HardwareText.Clean(" Patriot\0"));
     }
 
     [Fact]
@@ -96,7 +161,7 @@ public class WindowsMemoryConfigurationTests
     public void Profile_summary_shows_speed_primary_timings_and_voltage()
     {
         MemoryTiming Primary(string key, int clocks) => new(key, TimingGroup.Primary, clocks);
-        var profile = new SpdProfile(ProfileKind.Xmp, 1, "2.0", null, 3200, 0.625, [],
+        var profile = new SpdProfile(ProfileKind.Xmp, 1, "2.0", null, 3200, 0.625,
             [Primary("tCL", 16), Primary("tRCD", 18), Primary("tRP", 18), Primary("tRAS", 36)], 1.35, null, null);
 
         Assert.Equal("3200 MT/s · 16-18-18-36 · 1.35 V", MemoryDetails.ProfileSummary(profile));

@@ -12,7 +12,6 @@ public sealed record MemorySlotConfiguration(
     string? Manufacturer,
     long CapacityBytes,
     int? ConfiguredMts,
-    int? RatedMts,
     double? ConfiguredVolts,
     string? MemoryType);
 
@@ -37,24 +36,48 @@ public static class WindowsMemoryConfiguration
         {
             return Parse(cim.Query(Query));
         }
-        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             return [];
         }
     }
 
-    public static IReadOnlyList<MemorySlotConfiguration> Parse(IEnumerable<CimRow> rows) => rows
-        .Select(row => new MemorySlotConfiguration(
-            Clean(row.GetString("DeviceLocator")) ?? Clean(row.GetString("BankLabel")) ?? "?",
+    /// <summary>
+    /// Nom de l'emplacement. Certaines cartes répètent « DIMM 1 » sur chaque canal : le nom du banc (« P0 CHANNEL A ») est alors
+    /// ajouté, pour que chaque barrette garde le sien.
+    /// </summary>
+    private static string SlotName(CimRow row, HashSet<string> repeated)
+    {
+        var locator = Clean(row.GetString("DeviceLocator"));
+        var bank = Clean(row.GetString("BankLabel"));
+        return locator is not null && bank is not null && repeated.Contains(locator) ? $"{bank} / {locator}" : locator ?? bank ?? "?";
+    }
+
+    /// <summary>Type de mémoire que déclare le BIOS, s'il est connu : celui de la première barrette qui en donne un.</summary>
+    public static string? MemoryTypeOf(IReadOnlyList<MemorySlotConfiguration> slots)
+    {
+        ArgumentNullException.ThrowIfNull(slots);
+        return slots.Select(s => s.MemoryType).FirstOrDefault(t => t is not null);
+    }
+
+    public static IReadOnlyList<MemorySlotConfiguration> Parse(IEnumerable<CimRow> rows)
+    {
+        var all = rows.ToList();
+        var repeated = all.Select(row => Clean(row.GetString("DeviceLocator"))).OfType<string>()
+            .GroupBy(locator => locator, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return all.Select(row => new MemorySlotConfiguration(
+            SlotName(row, repeated),
             Clean(row.GetString("PartNumber")),
             Clean(row.GetString("Manufacturer")),
             row.GetInt64("Capacity") ?? 0,
-            Positive(row.GetInt64("ConfiguredClockSpeed")),
-            Positive(row.GetInt64("Speed")),
+            // Les vieux BIOS donnent la vitesse en MHz, soit la moitié : MemorySpeeds la convertit, comme dans le module 10.
+            Modules.M10Memory.MemorySpeeds.FromRow(row, Modules.M10Memory.MemorySpeeds.Generation(row.GetInt64("SMBIOSMemoryType"))).Configured,
             // ConfiguredVoltage est en millivolts ; 0 signifie « inconnu ».
             Positive(row.GetInt64("ConfiguredVoltage")) is { } millivolts ? millivolts / 1000.0 : null,
-            MemoryTypeName(row.GetInt64("SMBIOSMemoryType"))))
-        .ToList();
+            Modules.M10Memory.MemorySpeeds.TypeName(row.GetInt64("SMBIOSMemoryType"))))
+            .ToList();
+    }
 
     /// <summary>Une ligne par barrette : emplacement, référence, capacité, vitesse et tension appliquées.</summary>
     public static string Describe(IReadOnlyList<MemorySlotConfiguration> slots)
@@ -94,7 +117,8 @@ public static class WindowsMemoryConfiguration
     public static string? CompareWithSpd(IReadOnlyList<MemorySlotConfiguration> slots, IReadOnlyList<SpdModule> modules)
     {
         var applied = slots.Select(s => s.ConfiguredMts).OfType<int>().DefaultIfEmpty(0).Max();
-        var profiles = modules.SelectMany(m => m.Profiles).ToList();
+        // Une puce lue à moitié n'a montré que son profil standard : rien à en conclure sur la vitesse appliquée.
+        var profiles = modules.Where(m => !m.FirstPageOnly).SelectMany(m => m.Profiles).ToList();
         if (applied == 0 || profiles.Count == 0)
         {
             return null;
@@ -121,21 +145,18 @@ public static class WindowsMemoryConfiguration
             return T("Vitesse appliquée : {0} MT/s, la vitesse standard (JEDEC). Le profil {1} ({2} MT/s) n'est pas activé dans le BIOS.", applied, MemoryDetails.ProfileName(fastest), fastest.SpeedMts);
         }
 
+        // Barrette sans profil XMP ni EXPO : rien de personnalisé à annoncer.
+        if (profiles.All(p => p.Kind == ProfileKind.Jedec))
+        {
+            return applied >= jedecMax - SpeedToleranceMts
+                ? T("Vitesse appliquée : {0} MT/s, celle du profil standard (JEDEC), le seul de cette barrette.", applied)
+                : T("Vitesse appliquée : {0} MT/s, en dessous du profil standard (JEDEC) : limite du processeur ou de la carte mère, ou réglage du BIOS.", applied);
+        }
+
         return T("Vitesse appliquée : {0} MT/s, différente des profils de la puce SPD : réglage personnalisé dans le BIOS.", applied);
     }
 
-    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? Clean(string? value) => Hardware.HardwareText.Clean(value);
 
     private static int? Positive(long? value) => value is > 0 and <= int.MaxValue ? (int)value.Value : null;
-
-    private static string? MemoryTypeName(long? smbiosType) => smbiosType switch
-    {
-        24 => "DDR3",
-        26 => "DDR4",
-        29 => "LPDDR3",
-        30 => "LPDDR4",
-        34 => "DDR5",
-        35 => "LPDDR5",
-        _ => null,
-    };
 }

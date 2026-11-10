@@ -46,8 +46,9 @@ internal struct PostConstants
 
 /// <summary>
 /// Chaîne d'image commune à toutes les scènes : image HDR (16 bits flottants) et mouvement écrits par la scène,
-/// anticrénelage temporel, halo sur six niveaux, puis image finale mise à l'échelle de l'écran (bandes noires si le
-/// format diffère : la résolution de calcul est fixe pour que les scores restent comparables).
+/// anticrénelage temporel, halo sur six niveaux, puis image finale calculée elle aussi à la résolution de calcul (fixe, pour
+/// que les scores restent comparables d'un écran à l'autre). Elle est ensuite recopiée à l'écran avec une seule lecture par
+/// pixel (bandes noires si le format diffère) : la définition de l'écran ne pèse presque plus sur la mesure.
 /// </summary>
 internal sealed class PostProcess : IDisposable
 {
@@ -60,7 +61,9 @@ internal sealed class PostProcess : IDisposable
     private readonly IPipeline _bloomDown;
     private readonly IPipeline _bloomUp;
     private readonly IPipeline _final;
+    private readonly IPipeline _copy;
     private readonly ITexture _composite;
+    private readonly ITexture _output;
     private int _current;
     private bool _historyValid;
 
@@ -77,6 +80,7 @@ internal sealed class PostProcess : IDisposable
         }
 
         _composite = device.CreateTexture(TextureDesc.Target(size.Width, size.Height, PixelFormat.Rgba16Float, "Image et effets"));
+        _output = device.CreateTexture(TextureDesc.Target(size.Width, size.Height, PixelFormat.Rgba8Unorm, "Image finale"));
         var width = size.Width;
         var height = size.Height;
         for (var i = 0; i < BloomLevels; i++)
@@ -92,6 +96,7 @@ internal sealed class PostProcess : IDisposable
         _bloomDown = device.CreatePipeline(Fullscreen("Halo : réduction", vs, shaders.Get("post.hlsl", "BloomDownPS", "ps_5_0"), PixelFormat.Rgba16Float, BlendMode.Opaque));
         _bloomUp = device.CreatePipeline(Fullscreen("Halo : agrandissement", vs, shaders.Get("post.hlsl", "BloomUpPS", "ps_5_0"), PixelFormat.Rgba16Float, BlendMode.Additive));
         _final = device.CreatePipeline(Fullscreen("Image finale", vs, shaders.Get("post.hlsl", "FinalPS", "ps_5_0"), PixelFormat.Rgba8Unorm, BlendMode.Opaque));
+        _copy = device.CreatePipeline(Fullscreen("Recopie à l'écran", vs, shaders.Get("post.hlsl", "CopyPS", "ps_5_0"), PixelFormat.Rgba8Unorm, BlendMode.Opaque));
     }
 
     public RenderSize Size { get; }
@@ -112,8 +117,9 @@ internal sealed class PostProcess : IDisposable
         new(name, vs, ps, [], blend, DepthMode.None, CullMode.None, [target]);
 
     /// <summary>
-    /// Anticrénelage, halo et image finale vers l'image affichée ; avec <paramref name="snapshot"/>, la même image finale
-    /// est aussi dessinée en plus petit dans cette texture (vignette de la scène pour l'image du résultat).
+    /// Anticrénelage, halo et image finale à la résolution de calcul, recopiée vers l'image affichée ; avec
+    /// <paramref name="snapshot"/>, la même image finale est aussi dessinée en plus petit dans cette texture (vignette de la
+    /// scène pour l'image du résultat).
     /// </summary>
     public void Run(ICommandList cmd, ColorGrade grade, bool temporal, Action<ITexture>? overlay = null, ITexture? snapshot = null)
     {
@@ -169,25 +175,17 @@ internal sealed class PostProcess : IDisposable
             cmd.Draw(3);
         }
 
-        // Image finale, centrée dans l'écran avec le format de l'image calculée.
-        var back = _device.BackBuffer;
-        var outW = (float)back.Desc.Width;
-        var outH = (float)back.Desc.Height;
-        var scale = MathF.Min(outW / Size.Width, outH / Size.Height);
-        var rectW = Size.Width * scale;
-        var rectH = Size.Height * scale;
-        var rect = new Vector4((outW - rectW) * 0.5f, (outH - rectH) * 0.5f, rectW, rectH);
-
+        // Image finale, à la résolution de calcul : son coût ne dépend pas de l'écran.
         var constants = new PostConstants
         {
             SourceSize = size,
-            OutputRect = rect,
+            OutputRect = new Vector4(0, 0, Size.Width, Size.Height),
             Grade = new Vector4(grade.BloomIntensity, grade.Vignette, grade.Grain, grade.Aberration),
             Lift = new Vector4(grade.Lift, grade.Saturation),
             Gain = new Vector4(grade.Gain, grade.Contrast),
             Extra = new Vector4(0, grade.BloomThreshold, grade.Fade, grade.Sharpen),
         };
-        cmd.SetRenderTarget(back);
+        cmd.SetRenderTarget(_output);
         cmd.SetPipeline(_final);
         cmd.SetTexture(0, resolved);
         cmd.SetTexture(1, null);
@@ -206,14 +204,30 @@ internal sealed class PostProcess : IDisposable
             cmd.Draw(3);
         }
 
-        cmd.SetTexture(0, null);
+        // Recopie à l'écran, centrée avec le format de l'image calculée ; le reste de l'écran reste noir.
+        var back = _device.BackBuffer;
+        var outW = (float)back.Desc.Width;
+        var outH = (float)back.Desc.Height;
+        var scale = MathF.Min(outW / Size.Width, outH / Size.Height);
+        var rectW = Size.Width * scale;
+        var rectH = Size.Height * scale;
+        cmd.Clear(back, new ColorF(0f, 0f, 0f, 1f));
+        cmd.SetRenderTarget(back);
+        cmd.SetViewport((outW - rectW) * 0.5f, (outH - rectH) * 0.5f, rectW, rectH);
+        cmd.SetPipeline(_copy);
+        cmd.SetTexture(0, _output);
         cmd.SetTexture(3, null);
+        cmd.Draw(3);
+        cmd.SetViewport(0, 0, outW, outH);
+
+        cmd.SetTexture(0, null);
     }
 
     public void Dispose()
     {
         HdrColor.Dispose();
         _composite.Dispose();
+        _output.Dispose();
         Velocity.Dispose();
         Depth.Dispose();
         foreach (var texture in _history)
@@ -231,5 +245,6 @@ internal sealed class PostProcess : IDisposable
         _bloomDown.Dispose();
         _bloomUp.Dispose();
         _final.Dispose();
+        _copy.Dispose();
     }
 }

@@ -16,8 +16,8 @@ internal sealed class FakePowerPlatform : IPowerPlatform, Maus.Core.Platform.IPo
     /// <summary>Exception levée par chaque appel (par exemple DLL introuvable).</summary>
     public Exception? Failure { get; set; }
 
-    public static PowerCapabilities Caps(bool aoAc = false, bool hiberFile = false, bool s3 = true, bool ups = false, bool batteries = false) =>
-        new(LidPresent: false, SystemS3: s3, SystemS4: hiberFile, HiberFilePresent: hiberFile, UpsPresent: ups, AoAc: aoAc, SystemBatteriesPresent: batteries, BatteriesAreShortTerm: false);
+    public static PowerCapabilities Caps(bool aoAc = false, bool hiberFile = false, bool s3 = true, bool ups = false) =>
+        new(SystemS3: s3, HiberFilePresent: hiberFile, UpsPresent: ups, AoAc: aoAc, BatteriesAreShortTerm: false);
 
     public Guid? GetActiveScheme() => Failure is null ? ActiveScheme : throw Failure;
 

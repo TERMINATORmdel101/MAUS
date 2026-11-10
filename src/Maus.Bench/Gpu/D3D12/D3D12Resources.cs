@@ -11,17 +11,15 @@ namespace Maus.Bench.Gpu.D3D12;
 internal sealed class D3D12Texture : ITexture
 {
     private readonly D3D12GpuDevice _owner;
-    private readonly bool _ownsResource;
     private readonly Dictionary<int, CpuDescriptorHandle> _shaderViews = [];
     private readonly Dictionary<(int Mip, int Slice), CpuDescriptorHandle> _targets = [];
-    private readonly Dictionary<int, CpuDescriptorHandle> _storage = [];
     private CpuDescriptorHandle? _depth;
 
+    /// <param name="existing">Ressource déjà créée (image de la chaîne d'échange) : la texture prend possession de cette référence.</param>
     public D3D12Texture(D3D12GpuDevice owner, TextureDesc desc, ID3D12Resource? existing = null, ResourceStates initialState = ResourceStates.Common)
     {
         _owner = owner;
         Desc = desc;
-        _ownsResource = existing is null;
         Resource = existing ?? Create(owner.Device, desc);
         Slices = desc.Kind == TextureKind.TextureCube ? 6 : 1;
         States = new ResourceStates[desc.MipLevels * Slices];
@@ -54,20 +52,15 @@ internal sealed class D3D12Texture : ITexture
             Format = format,
             Shader4ComponentMapping = ShaderComponentMapping.Default,
         };
-        switch (Desc.Kind)
+        if (Desc.Kind == TextureKind.TextureCube)
         {
-            case TextureKind.Texture3D:
-                description.ViewDimension = ShaderResourceViewDimension.Texture3D;
-                description.Texture3D = new Texture3DShaderResourceView { MostDetailedMip = first, MipLevels = count };
-                break;
-            case TextureKind.TextureCube:
-                description.ViewDimension = ShaderResourceViewDimension.TextureCube;
-                description.TextureCube = new TextureCubeShaderResourceView { MostDetailedMip = first, MipLevels = count };
-                break;
-            default:
-                description.ViewDimension = ShaderResourceViewDimension.Texture2D;
-                description.Texture2D = new Texture2DShaderResourceView { MostDetailedMip = first, MipLevels = count };
-                break;
+            description.ViewDimension = ShaderResourceViewDimension.TextureCube;
+            description.TextureCube = new TextureCubeShaderResourceView { MostDetailedMip = first, MipLevels = count };
+        }
+        else
+        {
+            description.ViewDimension = ShaderResourceViewDimension.Texture2D;
+            description.Texture2D = new Texture2DShaderResourceView { MostDetailedMip = first, MipLevels = count };
         }
 
         handle = _owner.ShaderHeap.Allocate();
@@ -119,40 +112,10 @@ internal sealed class D3D12Texture : ITexture
         return handle;
     }
 
-    public CpuDescriptorHandle StorageView(int mip)
-    {
-        if (_storage.TryGetValue(mip, out var handle))
-        {
-            return handle;
-        }
-
-        var description = new UnorderedAccessViewDescription { Format = DxgiFormats.View(Desc.Format) };
-        if (Desc.Kind == TextureKind.Texture3D)
-        {
-            description.ViewDimension = UnorderedAccessViewDimension.Texture3D;
-            description.Texture3D = new Texture3DUnorderedAccessView { MipSlice = (uint)mip, FirstWSlice = 0, WSize = uint.MaxValue };
-        }
-        else
-        {
-            description.ViewDimension = UnorderedAccessViewDimension.Texture2D;
-            description.Texture2D = new Texture2DUnorderedAccessView { MipSlice = (uint)mip };
-        }
-
-        handle = _owner.ShaderHeap.Allocate();
-        _owner.Device.CreateUnorderedAccessView(Resource, null, description, handle);
-        _storage[mip] = handle;
-        return handle;
-    }
-
     public void Dispose()
     {
-        _owner.Retire(this, _ownsResource ? Resource : null);
+        _owner.Retire(Resource);
         foreach (var handle in _shaderViews.Values)
-        {
-            _owner.ShaderHeap.Free(handle);
-        }
-
-        foreach (var handle in _storage.Values)
         {
             _owner.ShaderHeap.Free(handle);
         }
@@ -181,18 +144,9 @@ internal sealed class D3D12Texture : ITexture
             flags |= ResourceFlags.AllowDepthStencil;
         }
 
-        if (desc.Usage.HasFlag(TextureUsage.Storage))
-        {
-            flags |= ResourceFlags.AllowUnorderedAccess;
-        }
-
         var format = DxgiFormats.Storage(desc.Format);
-        var description = desc.Kind switch
-        {
-            TextureKind.Texture3D => ResourceDescription.Texture3D(format, (uint)desc.Width, (uint)desc.Height, (ushort)desc.Depth, (ushort)desc.MipLevels, flags),
-            TextureKind.TextureCube => ResourceDescription.Texture2D(format, (uint)desc.Width, (uint)desc.Height, 6, (ushort)desc.MipLevels, flags: flags),
-            _ => ResourceDescription.Texture2D(format, (uint)desc.Width, (uint)desc.Height, 1, (ushort)desc.MipLevels, flags: flags),
-        };
+        var faces = (ushort)(desc.Kind == TextureKind.TextureCube ? 6 : 1);
+        var description = ResourceDescription.Texture2D(format, (uint)desc.Width, (uint)desc.Height, faces, (ushort)desc.MipLevels, flags: flags);
         var resource = device.CreateCommittedResource(HeapType.Default, description, ResourceStates.Common);
         resource.Name = desc.Name;
         return resource;
@@ -212,22 +166,21 @@ internal sealed class D3D12Buffer : IBuffer
         var flags = desc.Usage.HasFlag(BufferUsage.Storage) ? ResourceFlags.AllowUnorderedAccess : ResourceFlags.None;
         Resource = owner.Device.CreateCommittedResource(HeapType.Default, ResourceDescription.Buffer((ulong)desc.SizeInBytes, flags), ResourceStates.Common);
         Resource.Name = desc.Name;
-        var raw = desc.Usage.HasFlag(BufferUsage.Raw) || desc.Usage.HasFlag(BufferUsage.IndirectArgs);
-        var elements = raw ? (uint)(desc.SizeInBytes / 4) : (uint)(desc.SizeInBytes / Math.Max(1, desc.Stride));
+        var elements = (uint)(desc.SizeInBytes / Math.Max(1, desc.Stride));
         if (desc.Usage.HasFlag(BufferUsage.Structured))
         {
             var handle = owner.ShaderHeap.Allocate();
             owner.Device.CreateShaderResourceView(Resource, new ShaderResourceViewDescription
             {
-                Format = raw ? Format.R32_Typeless : Format.Unknown,
+                Format = Format.Unknown,
                 ViewDimension = ShaderResourceViewDimension.Buffer,
                 Shader4ComponentMapping = ShaderComponentMapping.Default,
                 Buffer = new BufferShaderResourceView
                 {
                     FirstElement = 0,
                     NumElements = elements,
-                    StructureByteStride = raw ? 0u : (uint)desc.Stride,
-                    Flags = raw ? BufferShaderResourceViewFlags.Raw : BufferShaderResourceViewFlags.None,
+                    StructureByteStride = (uint)desc.Stride,
+                    Flags = BufferShaderResourceViewFlags.None,
                 },
             }, handle);
             _shaderView = handle;
@@ -238,14 +191,14 @@ internal sealed class D3D12Buffer : IBuffer
             var handle = owner.ShaderHeap.Allocate();
             owner.Device.CreateUnorderedAccessView(Resource, null, new UnorderedAccessViewDescription
             {
-                Format = raw ? Format.R32_Typeless : Format.Unknown,
+                Format = Format.Unknown,
                 ViewDimension = UnorderedAccessViewDimension.Buffer,
                 Buffer = new BufferUnorderedAccessView
                 {
                     FirstElement = 0,
                     NumElements = elements,
-                    StructureByteStride = raw ? 0u : (uint)desc.Stride,
-                    Flags = raw ? BufferUnorderedAccessViewFlags.Raw : BufferUnorderedAccessViewFlags.None,
+                    StructureByteStride = (uint)desc.Stride,
+                    Flags = BufferUnorderedAccessViewFlags.None,
                 },
             }, handle);
             _storageView = handle;
@@ -265,7 +218,7 @@ internal sealed class D3D12Buffer : IBuffer
 
     public void Dispose()
     {
-        _owner.Retire(this, Resource);
+        _owner.Retire(Resource);
         if (_shaderView is { } srv)
         {
             _owner.ShaderHeap.Free(srv);
@@ -280,12 +233,15 @@ internal sealed class D3D12Buffer : IBuffer
 
 internal sealed class D3D12Pipeline : IPipeline
 {
-    public D3D12Pipeline(ID3D12Device device, ID3D12RootSignature rootSignature, GraphicsPipelineDesc desc)
+    private readonly D3D12GpuDevice _owner;
+
+    public D3D12Pipeline(D3D12GpuDevice owner, GraphicsPipelineDesc desc)
     {
+        _owner = owner;
         Desc = desc;
         var description = new GraphicsPipelineStateDescription
         {
-            RootSignature = rootSignature,
+            RootSignature = owner.RootSignature,
             VertexShader = desc.VertexShader.Bytecode,
             PixelShader = desc.PixelShader?.Bytecode ?? ReadOnlyMemory<byte>.Empty,
             BlendState = Blend(desc.Blend),
@@ -314,7 +270,7 @@ internal sealed class D3D12Pipeline : IPipeline
             DepthStencilFormat = desc.DepthFormat == PixelFormat.Unknown ? Format.Unknown : Format.D32_Float,
             SampleDescription = new SampleDescription(1, 0),
         };
-        State = device.CreateGraphicsPipelineState(description);
+        State = owner.Device.CreateGraphicsPipelineState(description);
         State.Name = desc.Name;
     }
 
@@ -322,7 +278,7 @@ internal sealed class D3D12Pipeline : IPipeline
 
     public ID3D12PipelineState State { get; }
 
-    public void Dispose() => State.Dispose();
+    public void Dispose() => _owner.Retire(State);
 
     private static BlendDescription Blend(BlendMode mode)
     {
@@ -350,10 +306,13 @@ internal sealed class D3D12Pipeline : IPipeline
 
 internal sealed class D3D12ComputePipeline : IComputePipeline
 {
-    public D3D12ComputePipeline(ID3D12Device device, ID3D12RootSignature rootSignature, ShaderCode code)
+    private readonly D3D12GpuDevice _owner;
+
+    public D3D12ComputePipeline(D3D12GpuDevice owner, ShaderCode code)
     {
+        _owner = owner;
         Name = code.Name;
-        State = device.CreateComputePipelineState(new ComputePipelineStateDescription { RootSignature = rootSignature, ComputeShader = code.Bytecode });
+        State = owner.Device.CreateComputePipelineState(new ComputePipelineStateDescription { RootSignature = owner.RootSignature, ComputeShader = code.Bytecode });
         State.Name = code.Name;
     }
 
@@ -361,5 +320,5 @@ internal sealed class D3D12ComputePipeline : IComputePipeline
 
     public ID3D12PipelineState State { get; }
 
-    public void Dispose() => State.Dispose();
+    public void Dispose() => _owner.Retire(State);
 }

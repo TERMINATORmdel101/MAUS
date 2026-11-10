@@ -48,7 +48,7 @@ public class GameBarFixTests
         var hardware = new HardwareProfile
         {
             FormFactor = FormFactor.Desktop,
-            Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32, 4201),
+            Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32),
         };
         var audit = TestContext.Create(registry, hardware: hardware, packages: new FakePackages().Add("Microsoft.XboxGamingOverlay"));
 
@@ -60,12 +60,27 @@ public class GameBarFixTests
     }
 }
 
+public class GameBarLockRemovalTests
+{
+    [Fact]
+    public async Task Xbox_app_profile_offers_to_remove_the_recording_lock()
+    {
+        var registry = new FakeRegistry().Set(RegistryHive.LocalMachine, GameBarKeys.GameDvrPolicy, "AllowGameDVR", 0);
+        var audit = TestContext.Create(registry, packages: new FakePackages().Add(GameBarKeys.GameBarPackage).Add(GameBarKeys.XboxAppPackage));
+        var module = new GameBarModule();
+
+        var removal = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None)).Single(c => c.Id == "M07.gamedvr-policy");
+
+        Assert.Null(removal.Writes.Single().Value);
+    }
+}
+
 public class GameBarProfileChoiceTests
 {
     private static readonly HardwareProfile X3D = new()
     {
         FormFactor = FormFactor.Desktop,
-        Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32, 4201),
+        Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32),
     };
 
     [Fact]

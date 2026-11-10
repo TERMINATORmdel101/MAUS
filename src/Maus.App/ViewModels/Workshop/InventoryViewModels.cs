@@ -6,16 +6,92 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels.Workshop;
 
-public sealed record InfoLine(string Label, string Value);
+public sealed record InfoLine(string Label, string Value)
+{
+    public override string ToString() => Label;
+}
 
 /// <summary>Jauge de sécurité d'une fiche (valeur actuelle et zones normale, élevée, dangereuse).</summary>
 public sealed record GaugeInfo(string Caption, double Minimum, double Maximum, double Elevated, double Danger, double Value, string Legend);
 
+/// <summary>
+/// Capacité passée de la batterie sur la carte « Batterie » : rien n'est lu avant le clic. Le relevé s'affiche sur la carte, avec
+/// une courbe sans couleur de seuil, ou « non lu » au moindre écart dans le rapport de Windows.
+/// </summary>
+public sealed class BatteryHistoryViewModel(Func<Task<BatteryHistoryResult>> read, bool severalBatteries) : ObservableObject
+{
+    private IReadOnlyList<string> _lines = [];
+    private IReadOnlyList<int> _curve = [];
+    private IReadOnlyList<int> _marks = [];
+
+    public override string ToString() => T("Capacité passée de la batterie");
+
+    public ICommand ReadCommand => field ??= new AsyncCommand(ReadAsync);
+
+    /// <summary>Le relevé, ou la raison pour laquelle il n'y en a pas ; vide avant le clic.</summary>
+    public IReadOnlyList<string> Lines
+    {
+        get => _lines;
+        private set
+        {
+            if (SetProperty(ref _lines, value))
+            {
+                OnPropertyChanged(nameof(HasLines));
+            }
+        }
+    }
+
+    public bool HasLines => Lines.Count > 0;
+
+    /// <summary>Courbe en % de la capacité d'origine ; vide s'il y a moins de deux relevés.</summary>
+    public IReadOnlyList<int> Curve
+    {
+        get => _curve;
+        private set
+        {
+            if (SetProperty(ref _curve, value))
+            {
+                OnPropertyChanged(nameof(HasCurve));
+            }
+        }
+    }
+
+    public bool HasCurve => Curve.Count > 1;
+
+    /// <summary>Repères de la courbe : les changements de batterie signalés par Windows.</summary>
+    public IReadOnlyList<int> Marks
+    {
+        get => _marks;
+        private set => SetProperty(ref _marks, value);
+    }
+
+    internal async Task ReadAsync()
+    {
+        var result = await read();
+        if (result.History is not { } history)
+        {
+            Curve = [];
+            Marks = [];
+            Lines = [result.Refusal ?? T("Non lu : le rapport de Windows n'a pas pu être lu, ou son contenu n'est pas celui que MAUS connaît.")];
+            return;
+        }
+
+        Marks = history.CurveChanges;
+        Curve = history.Curve;
+        Lines = severalBatteries && history.Points.Count > 0
+            ? [.. history.Describe(), T("Ce PC a plusieurs batteries : cet historique de Windows ne les distingue pas.")]
+            : history.Describe();
+    }
+}
+
 /// <summary>Fiche d'un composant dans « Mon PC ».</summary>
 public sealed class ComponentCardViewModel
 {
-    public ComponentCardViewModel(string letter, string title, string subtitle, IReadOnlyList<InfoLine> lines, string? searchReference, Action<string> search, GaugeInfo? gauge = null, (string Label, Func<Task> Run)? action = null)
+    public override string ToString() => Title;
+
+    public ComponentCardViewModel(string letter, string title, string subtitle, IReadOnlyList<InfoLine> lines, string? searchReference, Action<string> search, GaugeInfo? gauge = null, (string Label, Func<Task> Run)? action = null, BatteryHistoryViewModel? history = null)
     {
+        History = history;
         ActionLabel = action?.Label;
         ActionCommand = new AsyncCommand(action?.Run ?? (() => Task.CompletedTask));
         Letter = letter;
@@ -30,8 +106,6 @@ public sealed class ComponentCardViewModel
             {
                 search(searchReference);
             }
-
-            return Task.CompletedTask;
         });
     }
 
@@ -58,10 +132,18 @@ public sealed class ComponentCardViewModel
 
     public ICommand ActionCommand { get; }
 
+    /// <summary>Capacité passée (carte « Batterie » seulement), ou <c>null</c>.</summary>
+    public BatteryHistoryViewModel? History { get; }
+
+    public bool HasHistory => History is not null;
+
+    public string HistoryLabel { get; } = T("Capacité passée de la batterie");
+
     /// <param name="spd">Puces SPD lues par PawnIO, ou <c>null</c> si elles ne sont pas lisibles (pilote absent, pas d'administrateur).</param>
     /// <param name="details">Windows, écrans, réseau, son et emplacements mémoire, ou <c>null</c> s'ils n'ont pas été lus.</param>
     /// <param name="batteryReport">Ouvre le rapport de batterie de Windows (bouton de la carte « Batterie »).</param>
-    public static IReadOnlyList<ComponentCardViewModel> From(HardwareInventory inventory, SafetyLimits limits, Action<string> search, IReadOnlyList<SpdModule>? spd = null, MachineDetails? details = null, DateTime? now = null, Func<Task>? batteryReport = null)
+    /// <param name="batteryHistory">Lit la capacité passée dans le rapport de Windows (bouton de la première carte « Batterie » : l'historique vaut pour tout le PC).</param>
+    public static IReadOnlyList<ComponentCardViewModel> From(HardwareInventory inventory, SafetyLimits limits, Action<string> search, IReadOnlyList<SpdModule>? spd = null, MachineDetails? details = null, DateTime? now = null, Func<Task>? batteryReport = null, Func<Task<BatteryHistoryResult>>? batteryHistory = null)
     {
         ArgumentNullException.ThrowIfNull(inventory);
         ArgumentNullException.ThrowIfNull(limits);
@@ -87,7 +169,8 @@ public sealed class ComponentCardViewModel
         }
 
         cards.AddRange(inventory.Disks.Select(disk => DiskCard(disk, search)));
-        cards.AddRange(inventory.Batteries.Select(battery => BatteryCard(battery, search, batteryReport)));
+        var historyRead = batteryHistory is null ? null : new BatteryHistoryViewModel(batteryHistory, inventory.Batteries.Count > 1);
+        cards.AddRange(inventory.Batteries.Select((battery, index) => BatteryCard(battery, search, batteryReport, index == 0 ? historyRead : null)));
 
         if (details is { Network.Count: > 0 })
         {
@@ -117,7 +200,7 @@ public sealed class ComponentCardViewModel
             new(T("Microcode"), details?.Microcode ?? "—"),
             new(T("Instructions"), cpu.InstructionSets.Count == 0 ? "—" : string.Join(", ", cpu.InstructionSets)),
             new(T("Architecture hybride"), cpu.Hybrid ? T("oui") : T("non")),
-            new(T("Température maximale prévue"), cpuLimit is null ? T("non répertoriée") : $"{cpuLimit.MaxC} °C"),
+            new(T("Température maximale prévue"), cpuLimit is null ? T("non répertoriée") : cpuLimit.Verified ? $"{cpuLimit.MaxC} °C" : T("{0} °C (valeur non vérifiée)", cpuLimit.MaxC)),
         ], cpu.Name, search);
     }
 
@@ -148,7 +231,7 @@ public sealed class ComponentCardViewModel
             new(T("Référence"), module.PartNumber ?? "—"),
             .. ProfileLines(spd, module.PartNumber, index),
             new(T("Vitesse nominale / appliquée"), $"{module.RatedSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} / {module.ConfiguredSpeedMts?.ToString(CultureInfo.InvariantCulture) ?? "—"} MT/s"),
-            new(T("Tension déclarée (min / max)"), module.MinMillivolts is null ? "—" : $"{V(module.MinMillivolts.Value)} / {V(module.MaxMillivolts ?? 0)}"),
+            new(T("Tension déclarée (min / max)"), module.MinMillivolts is null ? "—" : $"{V(module.MinMillivolts.Value)} / {(module.MaxMillivolts is { } max ? V(max) : "—")}"),
         ], module.PartNumber, search, gauge);
     }
 
@@ -172,7 +255,7 @@ public sealed class ComponentCardViewModel
             {
                 var shutdown = nvidia.ShutdownTemperatureC ?? slow + 5;
                 gauge = new GaugeInfo(T("Température"), 20, shutdown + 5, slow - 10, slow, t,
-                    T("{0} °C · ralentit à {1} °C · s'éteint à {2} °C", t, slow, shutdown));
+                    (nvidia.ShutdownTemperatureC is null ? T("{0} °C · ralentit à {1} °C", t, slow) : T("{0} °C · ralentit à {1} °C · s'éteint à {2} °C", t, slow, shutdown)) + " · " + Ui.GaugeOrangeZone);
             }
         }
 
@@ -205,9 +288,9 @@ public sealed class ComponentCardViewModel
 
     /// <summary>
     /// Carte « Batterie » : capacité restante sans couleurs de seuil (aucun seuil d'usure général n'est publié pour les PC),
-    /// cycles de charge, et le rapport de batterie de Windows (évolution de la capacité depuis l'achat).
+    /// cycles de charge, capacité passée lue sur un clic, et le rapport de batterie de Windows.
     /// </summary>
-    private static ComponentCardViewModel BatteryCard(BatteryIdentity battery, Action<string> search, Func<Task>? batteryReport)
+    private static ComponentCardViewModel BatteryCard(BatteryIdentity battery, Action<string> search, Func<Task>? batteryReport, BatteryHistoryViewModel? history)
     {
         return new ComponentCardViewModel("B", T("Batterie"), $"{battery.Manufacturer} {battery.Name}".Trim(),
         [
@@ -215,7 +298,7 @@ public sealed class ComponentCardViewModel
             new(T("Capacité d'origine / actuelle"), $"{battery.DesignCapacityMwh?.ToString("N0", Culture) ?? "—"} / {battery.FullChargeCapacityMwh?.ToString("N0", Culture) ?? "—"} mWh"),
             new(T("Cycles de charge"), battery.CycleCount?.ToString("N0", Culture) ?? T("non communiqué par la batterie")),
             new(T("Tension"), battery.VoltageMv is { } mv ? V(mv) : "—"),
-        ], battery.Name, search, action: batteryReport is null ? null : (T("Rapport de batterie de Windows"), batteryReport));
+        ], battery.Name, search, action: batteryReport is null ? null : (T("Rapport de batterie de Windows"), batteryReport), history: history);
     }
 
     /// <summary>Carte « Windows et ce PC » : modèle, version, installation, démarrage, UEFI, Secure Boot et TPM.</summary>
@@ -263,7 +346,7 @@ public sealed class ComponentCardViewModel
     {
         if (system.Tpm is not { } tpm)
         {
-            return system.TpmNeedsAdministrator ? T("lisible avec l'autorisation administrateur (par exemple après « Lancer l'audit »)") : T("aucune détectée");
+            return system.TpmNeedsAdministrator ? T("lisible avec « Toutes les fonctionnalités », en haut de la fenêtre") : T("aucune détectée");
         }
 
         var parts = new List<string> { tpm.SpecVersion is { } spec ? T("version {0}", spec) : T("version inconnue") };

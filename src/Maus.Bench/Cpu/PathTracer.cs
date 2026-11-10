@@ -15,16 +15,28 @@ internal sealed class PathTracerTest : CpuBenchTest
     private const int MaxDepth = 6;
     private readonly bool _singleCore;
     private readonly PathScene _scene = PathScene.Create();
-    private readonly Vector3[] _accumulation;
-    private readonly int[] _samples;
+    private Vector3[] _accumulation = [];
+    private int[] _samples = [];
 
     // Tous les cœurs : image en 1080p natif ; un seul cœur : 960×540 (sinon l'image n'aurait pas le temps de se former).
     public PathTracerTest(bool singleCore)
         : base(singleCore ? 960 : 1920, singleCore ? 540 : 1080)
     {
         _singleCore = singleCore;
+    }
+
+    public override void Prepare()
+    {
+        base.Prepare();
         _accumulation = new Vector3[Width * Height];
         _samples = new int[Width * Height];
+    }
+
+    public override void Release()
+    {
+        base.Release();
+        _accumulation = [];
+        _samples = [];
     }
 
     public override string Id => _singleCore ? "cpu-single" : "cpu-render";
@@ -34,10 +46,6 @@ internal sealed class PathTracerTest : CpuBenchTest
     public override string Subtitle => _singleCore
         ? T("Le même calcul sur un seul cœur : la vitesse d'un cœur, qui compte dans la plupart des jeux")
         : T("Lancer de rayons physique : chaque cœur calcule des millions de trajets de lumière par seconde");
-
-    public override string Capability => _singleCore ? "singlecore" : "multicore";
-
-    public override string Unit => MillionsOfRays;
 
     public override double UnitScale => 1e6;
 

@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   analyse:
-    runs-on: windows-latest
+    # Image fixe, et non « windows-latest » : GitHub peut changer celle-ci sans prévenir (équivalent aujourd'hui).
+    runs-on: windows-2025
     timeout-minutes: 45
     permissions:
       contents: read
@@ -29,6 +30,8 @@ jobs:
     steps:
       - name: Code du dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: SDK .NET 10
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0

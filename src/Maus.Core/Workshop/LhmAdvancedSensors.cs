@@ -22,12 +22,26 @@ public sealed class LhmAdvancedSensors : IAdvancedSensors
         _computer.Open();
     }
 
+    private bool _failureNoted;
+
     public IReadOnlyList<HardwareReading> Read()
     {
         var readings = new List<HardwareReading>();
         foreach (var hardware in _computer.Hardware)
         {
-            Collect(hardware, GroupOf(hardware.HardwareType), readings);
+            try
+            {
+                Collect(hardware, GroupOf(hardware.HardwareType), readings);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // Un composant illisible ne doit pas priver des mesures des autres. Noté une seule fois.
+                if (!_failureNoted)
+                {
+                    _failureNoted = true;
+                    Maus.Core.Diagnostics.Breadcrumbs.Add("capteurs : composant illisible (" + ex.GetType().Name + ")");
+                }
+            }
         }
 
         return readings;
@@ -56,7 +70,6 @@ public sealed class LhmAdvancedSensors : IAdvancedSensors
     {
         HardwareType.Cpu => ReadingGroup.Cpu,
         HardwareType.Motherboard or HardwareType.SuperIO or HardwareType.EmbeddedController => ReadingGroup.Motherboard,
-        HardwareType.Memory => ReadingGroup.Memory,
         _ => ReadingGroup.Other,
     };
 

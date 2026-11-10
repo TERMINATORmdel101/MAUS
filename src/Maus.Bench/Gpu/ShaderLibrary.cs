@@ -29,9 +29,6 @@ public sealed partial class ShaderLibrary
         _useCache = useCache ?? !Maus.Core.Platform.ProcessElevation.IsElevated();
     }
 
-    /// <summary>Le cache sur disque est utilisé (faux pour un benchmark administrateur).</summary>
-    public bool UsesDiskCache => _useCache;
-
     /// <summary>Compile (ou reprend du cache) un point d'entrée d'un fichier HLSL embarqué.</summary>
     /// <param name="file">Nom du fichier embarqué (« terrain.hlsl »).</param>
     /// <param name="entry">Point d'entrée (« PSMain »).</param>
@@ -54,12 +51,12 @@ public sealed partial class ShaderLibrary
             try
             {
                 var bytes = File.ReadAllBytes(cachePath);
-                if (bytes.Length > 0)
+                if (IsCompleteBytecode(bytes))
                 {
                     return _compiled[key] = new ShaderCode($"{file}:{entry}", bytes);
                 }
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // Cache illisible : on recompile.
             }
@@ -79,8 +76,11 @@ public sealed partial class ShaderLibrary
 
         try
         {
+            // Écrit à côté puis mis en place d'un seul coup : un arrêt en plein milieu ne laisse pas un fichier tronqué.
             Directory.CreateDirectory(_cacheFolder);
-            File.WriteAllBytes(cachePath, code);
+            var temporary = cachePath + ".tmp";
+            File.WriteAllBytes(temporary, code);
+            File.Move(temporary, cachePath, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -89,6 +89,15 @@ public sealed partial class ShaderLibrary
 
         return _compiled[key] = new ShaderCode($"{file}:{entry}", code);
     }
+
+    /// <summary>
+    /// Fichier DXBC entier : il commence par « DXBC » et l'entier à l'octet 24 donne sa longueur totale (format du conteneur
+    /// écrit par d3dcompiler). Un fichier tronqué ou étranger est recompilé.
+    /// </summary>
+    internal static bool IsCompleteBytecode(ReadOnlySpan<byte> bytes) =>
+        bytes.Length >= 28
+        && bytes[..4].SequenceEqual("DXBC"u8)
+        && BitConverter.ToInt32(bytes[24..28]) == bytes.Length;
 
     /// <summary>
     /// Shader compilé pendant la fabrication de MAUS par DXC (modèle 6.5, lancer de rayons) ; <c>null</c> s'il est absent de

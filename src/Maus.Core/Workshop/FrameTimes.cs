@@ -67,7 +67,9 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
     private static readonly HashSet<string> NotGames = new(StringComparer.OrdinalIgnoreCase) { "dwm.exe", "MAUS.exe", "<error>", "<unknown>" };
 
     private readonly Lock _gate = new();
-    private readonly Dictionary<string, List<Frame>> _frames = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Par programme, puis par chaîne d'affichage (colonne SwapChainAddress) : le bilan porte sur sa chaîne la plus active.</summary>
+    private readonly Dictionary<string, Dictionary<string, SwapChain>> _frames = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Heure (horloge du PC) de la dernière image reçue de chaque programme : un jeu fermé ou en pause n'envoie plus rien.</summary>
     private readonly Dictionary<string, long> _lastSeen = new(StringComparer.OrdinalIgnoreCase);
@@ -76,6 +78,16 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
     private double _latest;
 
     private readonly record struct Frame(double Time, double Ms, double? GpuMs, bool Synced);
+
+    /// <summary>Images affichées d'une chaîne, et temps des images écartées depuis la dernière d'entre elles.</summary>
+    private sealed class SwapChain
+    {
+        public List<Frame> Frames { get; } = [];
+
+        public double DroppedMs { get; set; }
+
+        public double DroppedGpuMs { get; set; }
+    }
 
     /// <summary>Ajoute une ligne de la sortie CSV (la première est l'en-tête).</summary>
     public void AddCsvLine(string? line)
@@ -97,21 +109,40 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
             string? Cell(string name) => _columns.TryGetValue(name, out var i) && i < cells.Length ? cells[i].Trim() : null;
             double? Number(string name) => double.TryParse(Cell(name), NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : null;
 
-            // Image jamais affichée : elle ne compte pas dans ce que le joueur a vu.
-            if (Cell("Application") is not { Length: > 0 } application || Cell("Dropped") == "1"
+            if (Cell("Application") is not { Length: > 0 } application
                 || Number("msBetweenPresents") is not { } ms || ms <= 0 || ms > 10_000)
             {
                 return;
             }
 
-            var time = Number("TimeInSeconds") ?? _latest;
-            _latest = Math.Max(_latest, time);
-            if (!_frames.TryGetValue(application, out var list))
+            if (!_frames.TryGetValue(application, out var chains))
             {
-                _frames[application] = list = [];
+                _frames[application] = chains = new(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var address = Cell("SwapChainAddress") ?? string.Empty;
+            if (!chains.TryGetValue(address, out var chain))
+            {
+                chains[address] = chain = new SwapChain();
             }
 
             var gpu = Number("msGPUActive") is { } g && g >= 0 ? Math.Min(g, ms) : (double?)null;
+
+            // Image jamais affichée : le joueur ne l'a pas vue, mais son temps s'est écoulé (msBetweenPresents compte depuis
+            // l'appel précédent, affiché ou non). Il revient à l'image affichée suivante, comme à l'écran.
+            if (Cell("Dropped") == "1")
+            {
+                chain.DroppedMs += ms;
+                chain.DroppedGpuMs += gpu ?? 0;
+                return;
+            }
+
+            ms += chain.DroppedMs;
+            gpu += chain.DroppedGpuMs;
+            chain.DroppedMs = chain.DroppedGpuMs = 0;
+            var time = Number("TimeInSeconds") ?? _latest;
+            _latest = Math.Max(_latest, time);
+            var list = chain.Frames;
             list.Add(new Frame(time, ms, gpu, Number("SyncInterval") >= 1));
             _lastSeen[application] = _clock();
 
@@ -156,7 +187,7 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
             var game = _frames
                 .Where(f => !NotGames.Contains(f.Key))
                 .Where(f => silentAfter is not { } silence || (_lastSeen.TryGetValue(f.Key, out var seen) && now - seen <= silence.TotalMilliseconds))
-                .Select(f => (Application: f.Key, Frames: SincePause(f.Value.Where(x => x.Time >= since).ToList(), silentAfter)))
+                .Select(f => (Application: f.Key, Frames: f.Value.Values.Select(c => SincePause(c.Frames.Where(x => x.Time >= since).ToList(), silentAfter)).MaxBy(c => c.Count)!))
                 .OrderByDescending(f => f.Frames.Count)
                 .FirstOrDefault();
             if (game.Frames is not { } frames || frames.Count < Math.Max(2, minimumFrames))
@@ -177,7 +208,7 @@ public sealed class FrameTimeLog(TimeSpan? keep = null, Func<long>? clock = null
             return new FrameSummary(
                 game.Application,
                 frames.Count,
-                frames.Count * 1000 / total,
+                frames.Count * 1000.0 / total,
                 Slowest(0.01),
                 frames.Count >= MinimumFramesFor01 ? Slowest(0.001) : null,
                 withGpu.Count == frames.Count && total > 0 ? withGpu.Sum(f => f.GpuMs!.Value) / total : null,
@@ -203,6 +234,9 @@ public static class FrameAdvice
 {
     public const double GpuBound = 0.95;
     public const double NotGpuBound = 0.85;
+
+    /// <summary>Les bornes de ce conseil ne viennent pas d'une norme : l'écran le dit.</summary>
+    public static string ThresholdNote => T("Bornes de ce conseil : carte graphique occupée {0:0} % de la durée de l'image ou plus, elle limite ; moins de {1:0} %, c'est autre chose. Elles sont choisies par MAUS, sans source publiée.", GpuBound * 100, NotGpuBound * 100);
 
     /// <param name="refreshHz">Fréquence de l'écran principal, si connue.</param>
     public static IReadOnlyList<string> Explain(FrameSummary frames, int? refreshHz)

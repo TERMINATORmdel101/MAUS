@@ -18,12 +18,12 @@
         </Border>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="Page" Margin="28,22,28,20">
+            <StackPanel x:Name="Page" Margin="24,20,24,20">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock x:Name="ScoreValue" FontSize="40" FontWeight="Bold" VerticalAlignment="Center" />
                     <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="{x:Static app:Ui.HealthCaption}" Opacity="{DynamicResource MutedOpacity}" />
-                        <TextBlock x:Name="ScoreWord" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ScoreWord" FontSize="{StaticResource FontSizeCardTitle}" FontWeight="SemiBold" />
                     </StackPanel>
                 </StackPanel>
                 <TextBlock x:Name="Summary" TextWrapping="Wrap" Margin="0,12,0,0" />
@@ -33,18 +33,18 @@
                     <TextBlock x:Name="PartialNote" TextWrapping="Wrap" />
                 </Border>
 
-                <TextBlock Text="{x:Static app:Ui.ScoreLostTitle}" FontSize="15" FontWeight="SemiBold" Margin="0,20,0,8" />
+                <TextBlock Text="{x:Static app:Ui.ScoreLostTitle}" FontSize="{StaticResource FontSizeLead}" FontWeight="SemiBold" Margin="0,20,0,8" />
                 <TextBlock x:Name="NothingLost" Text="{x:Static app:Ui.ScoreNothingLost}" TextWrapping="Wrap" Visibility="Collapsed" />
-                <ItemsControl x:Name="Rows">
+                <ItemsControl Focusable="False" x:Name="Rows">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type views:ScoreRow}">
                             <Border Margin="0,0,0,6" Padding="12,8" CornerRadius="10" BorderThickness="4,1,1,1"
                                     Background="{Binding Brush, Converter={StaticResource Pastel}}" BorderBrush="{Binding Brush}">
                                 <DockPanel>
-                                    <TextBlock DockPanel.Dock="Left" Text="{Binding Points}" Width="44" FontSize="15" FontWeight="Bold" Foreground="{Binding Brush}" VerticalAlignment="Center" />
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding Points}" Width="44" FontSize="{StaticResource FontSizeLead}" FontWeight="Bold" Foreground="{Binding Brush, Converter={StaticResource Pastel}, ConverterParameter=Ink}" VerticalAlignment="Center" />
                                     <StackPanel>
                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Detail}" FontSize="12" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Detail}" FontSize="{StaticResource FontSizeSmall}" Opacity="{DynamicResource MutedOpacity}" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </DockPanel>
                             </Border>
@@ -53,9 +53,9 @@
                 </ItemsControl>
                 <TextBlock x:Name="CapNote" TextWrapping="Wrap" Margin="0,6,0,0" FontWeight="SemiBold" Visibility="Collapsed" />
 
-                <TextBlock Text="{x:Static app:Ui.ScoreRulesTitle}" FontSize="15" FontWeight="SemiBold" Margin="0,22,0,8" />
+                <TextBlock Text="{x:Static app:Ui.ScoreRulesTitle}" FontSize="{StaticResource FontSizeLead}" FontWeight="SemiBold" Margin="0,22,0,8" />
                 <Border Style="{StaticResource SoftCard}" Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}">
-                <ItemsControl ItemsSource="{x:Static app:Ui.ScoreRules}">
+                <ItemsControl Focusable="False" ItemsSource="{x:Static app:Ui.ScoreRules}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <DockPanel Margin="0,0,0,6">

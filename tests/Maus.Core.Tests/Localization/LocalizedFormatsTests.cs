@@ -94,7 +94,7 @@ public class LocalizedFormatsTests
 
             var lines = recording.ToCsv(Texts.RegionalCulture).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
-            Assert.StartsWith("Time;", lines[0], StringComparison.Ordinal);
+            Assert.StartsWith("\"Time\";", lines[0], StringComparison.Ordinal);
             Assert.Contains(";12,5;", lines[1], StringComparison.Ordinal);
         }
         finally

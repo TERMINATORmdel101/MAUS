@@ -62,6 +62,11 @@ public sealed partial class WorkshopViewModel
     /// </summary>
     private ISensorSource CreateSensors() => new Maus.Core.Engine.Broker.EngineSensorSource(EngineHost.Current);
 
+    /// <summary>Le moteur a les droits administrateur : d'après sa dernière réponse, sinon d'après le mode de MAUS.</summary>
+    private bool EngineHasRights => _sensors is Maus.Core.Engine.Broker.EngineSensorSource { State: { } state }
+        ? state.EngineElevated
+        : EngineHost.OnDemand is not { IsElevatedRunning: false };
+
     /// <summary>Après chaque mesure : état du pilote PawnIO tel que le moteur le voit.</summary>
     private void CheckAdvancedSensors()
     {
@@ -96,15 +101,14 @@ public sealed partial class WorkshopViewModel
                 + "jusqu'à ce que vous le retiriez (bouton « Retirer PawnIO », ou Paramètres > Applications). Relancez MAUS après l'installation.")
             : T("MAUS va ouvrir une fenêtre de commande qui désinstalle PawnIO avec winget. Les autres logiciels qui l'utilisent "
                 + "(FanControl, LibreHardwareMonitor, OpenRGB) perdront aussi l'accès aux capteurs. Relancez MAUS ensuite.");
-        if (!_confirm(title, message + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.OperationReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(title, Maus.Core.Reporting.ConfirmationText.Build(message, undo: T("le pilote se retire avec le bouton « Retirer PawnIO », ou dans Paramètres > Applications."), reminder: Maus.Core.Legal.Disclaimer.OperationReminder)))
         {
             return;
         }
 
-        // Attente asynchrone : le moteur affiche sa propre confirmation pendant ce temps, la fenêtre de MAUS reste vivante.
-        var outcome = await EngineHost.Current.OpenConsoleAsync(new Maus.Core.Engine.Broker.ConsoleRequest(
-            install ? Maus.Core.Engine.Broker.ConsoleKind.PawnIoInstall : Maus.Core.Engine.Broker.ConsoleKind.PawnIoUninstall), CancellationToken.None);
-        if (!outcome.Opened)
+        // Sans droits : l'installateur de PawnIO demande lui-même l'autorisation de Windows.
+        var outcome = await Task.Run(() => install ? Maus.Core.Modules.M20Software.SoftwareConsole.InstallPawnIo() : Maus.Core.Modules.M20Software.SoftwareConsole.UninstallPawnIo());
+        if (!outcome.Ran)
         {
             PawnIoStatus = outcome.Message ?? T("La fenêtre de commande n'a pas pu s'ouvrir.");
         }

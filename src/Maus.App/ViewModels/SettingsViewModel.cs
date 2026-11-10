@@ -3,6 +3,7 @@ using System.Windows.Media;
 using Maus.App.Appearance;
 using Maus.Core.Diagnostics;
 using Maus.Core.Fixes;
+using Maus.Core.Hardware;
 using Maus.Core.Preferences;
 using static Maus.Core.Localization.Texts;
 
@@ -11,6 +12,8 @@ namespace Maus.App.ViewModels;
 /// <summary>Une couleur proposée : libellé, précision et pastilles d'aperçu (teinte principale et secondaire).</summary>
 public sealed class AccentOptionViewModel(AccentChoice value, string label, string? detail)
 {
+    public override string ToString() => Label;
+
     public AccentChoice Value { get; } = value;
 
     public string Label { get; } = label;
@@ -88,18 +91,20 @@ public sealed class SettingsViewModel : ObservableObject
             new(T("5 secondes (le plus léger)"), 5000),
         ];
 
+        ZoomOptions = ZoomChoices(current.UiZoomUsed);
+        _zoom = ZoomOptions.First(o => Math.Abs(o.Value - current.UiZoomUsed) < 0.001);
         _theme = ThemeOptions.FirstOrDefault(o => o.Value == current.Theme) ?? ThemeOptions[0];
         _accent = AccentOptions.FirstOrDefault(o => o.Value == current.Accent) ?? AccentOptions[0];
         _animations = AnimationOptions.FirstOrDefault(o => o.Value == current.Animations) ?? AnimationOptions[0];
         _refresh = RefreshOptions.FirstOrDefault(o => o.Value == (int)current.RefreshInterval.TotalMilliseconds) ?? RefreshOptions[1];
         _monitorOnTop = current.MonitorOnTop;
         _offerAllFeatures = current.OfferAllFeatures;
-        _homeComplete = current.HomeComplete;
-        _micaBackdrop = current.MicaBackdrop;
+        _auditWhenElevated = current.AuditWhenElevated;
+        _technicianMode = current.TechnicianMode;
+        _helpTips = !current.HelpTipsOff;
         OpenMonitorCommand = new AsyncCommand(() =>
         {
             openMonitor();
-            return Task.CompletedTask;
         });
     }
 
@@ -116,49 +121,25 @@ public sealed class SettingsViewModel : ObservableObject
     public ChoiceOption<ThemeChoice> Theme
     {
         get => _theme;
-        set
-        {
-            if (value is not null && SetProperty(ref _theme, value))
-            {
-                Change(p => p with { Theme = value.Value });
-            }
-        }
+        set => SetChoice(ref _theme, value, (p, v) => p with { Theme = v.Value });
     }
 
     public AccentOptionViewModel Accent
     {
         get => _accent;
-        set
-        {
-            if (value is not null && SetProperty(ref _accent, value))
-            {
-                Change(p => p with { Accent = value.Value });
-            }
-        }
+        set => SetChoice(ref _accent, value, (p, v) => p with { Accent = v.Value });
     }
 
     public ChoiceOption<AnimationChoice> Animations
     {
         get => _animations;
-        set
-        {
-            if (value is not null && SetProperty(ref _animations, value))
-            {
-                Change(p => p with { Animations = value.Value });
-            }
-        }
+        set => SetChoice(ref _animations, value, (p, v) => p with { Animations = v.Value });
     }
 
     public ChoiceOption<int> Refresh
     {
         get => _refresh;
-        set
-        {
-            if (value is not null && SetProperty(ref _refresh, value))
-            {
-                Change(p => p with { RefreshMilliseconds = value.Value });
-            }
-        }
+        set => SetChoice(ref _refresh, value, (p, v) => p with { RefreshMilliseconds = v.Value });
     }
 
     private bool _offerAllFeatures;
@@ -167,55 +148,73 @@ public sealed class SettingsViewModel : ObservableObject
     public bool OfferAllFeatures
     {
         get => _offerAllFeatures;
+        set => Set(ref _offerAllFeatures, value, (p, v) => p with { OfferAllFeatures = v });
+    }
+
+    private bool _auditWhenElevated;
+
+    /// <summary>Lancer l'audit dès que les droits administrateur sont accordés (désactivé par défaut).</summary>
+    public bool AuditWhenElevated
+    {
+        get => _auditWhenElevated;
+        set => Set(ref _auditWhenElevated, value, (p, v) => p with { AuditWhenElevated = v });
+    }
+
+    private ChoiceOption<double> _zoom;
+
+    /// <summary>Tailles proposées ; une taille réglée avec Ctrl + molette s'ajoute à la liste, pour rester visible ici.</summary>
+    public IReadOnlyList<ChoiceOption<double>> ZoomOptions { get; }
+
+    private static List<ChoiceOption<double>> ZoomChoices(double current)
+    {
+        List<ChoiceOption<double>> choices =
+        [
+            new(T("Compact (85 %)"), 0.85),
+            new(T("Normal (100 %)"), 1),
+            new(T("Grand (115 %)"), 1.15),
+            new(T("Très grand (130 %)"), 1.3),
+        ];
+        if (!choices.Exists(c => Math.Abs(c.Value - current) < 0.001))
+        {
+            choices.Add(new(T("Personnalisée ({0:0} %)", current * 100), current));
+        }
+
+        return choices;
+    }
+
+    public ChoiceOption<double> Zoom
+    {
+        get => _zoom;
+        set => SetChoice(ref _zoom, value, (p, v) => p with { UiZoom = v.Value });
+    }
+
+    private bool _helpTips;
+
+    private bool _technicianMode;
+
+    /// <summary>Mode technicien : détails techniques dépliés partout, erreurs avec leur message d'origine.</summary>
+    public bool HelpTips
+    {
+        get => _helpTips;
         set
         {
-            if (SetProperty(ref _offerAllFeatures, value))
+            if (SetProperty(ref _helpTips, value))
             {
-                Change(p => p with { OfferAllFeatures = value });
+                Change(p => p with { HelpTipsOff = !value });
             }
         }
     }
 
-    private bool _homeComplete;
-
-    /// <summary>Accueil complet (toutes les cartes) au lieu de l'accueil simple recommandé.</summary>
-    public bool HomeComplete
+    public bool TechnicianMode
     {
-        get => _homeComplete;
-        set
-        {
-            if (SetProperty(ref _homeComplete, value))
-            {
-                Change(p => p with { HomeComplete = value });
-            }
-        }
-    }
-
-    private bool _micaBackdrop;
-
-    /// <summary>Fond « Mica » de Windows 11 derrière la fenêtre principale.</summary>
-    public bool MicaBackdrop
-    {
-        get => _micaBackdrop;
-        set
-        {
-            if (SetProperty(ref _micaBackdrop, value))
-            {
-                Change(p => p with { MicaBackdrop = value });
-            }
-        }
+        get => _technicianMode;
+        set => Set(ref _technicianMode, value, (p, v) => p with { TechnicianMode = v });
     }
 
     public bool MonitorOnTop
     {
         get => _monitorOnTop;
-        set
-        {
-            if (SetProperty(ref _monitorOnTop, value))
-            {
-                Change(p => p with { MonitorOnTop = value });
-            }
-        }
+        set => Set(ref _monitorOnTop, value, (p, v) => p with { MonitorOnTop = v });
     }
 
     /// <summary>Message si l'enregistrement échoue (le choix vaut alors pour cette ouverture de MAUS).</summary>
@@ -235,11 +234,11 @@ public sealed class SettingsViewModel : ObservableObject
 
     private static string ComponentsDetail()
     {
-        static string? Name(ComponentBrand brand) => brand switch
+        static string? Name(HardwareVendor brand) => brand switch
         {
-            ComponentBrand.Intel => "Intel",
-            ComponentBrand.Amd => "AMD",
-            ComponentBrand.Nvidia => "Nvidia",
+            HardwareVendor.Intel => "Intel",
+            HardwareVendor.Amd => "AMD",
+            HardwareVendor.Nvidia => "Nvidia",
             _ => null,
         };
 
@@ -254,10 +253,29 @@ public sealed class SettingsViewModel : ObservableObject
     }
 
     /// <summary>Applique tout de suite, puis enregistre (le choix reste valable pour cette ouverture même si l'enregistrement échoue).</summary>
+    /// <summary>Change un choix et l'enregistre, s'il a vraiment changé.</summary>
+    private void Set<T>(ref T field, T value, Func<UserPreferences, T, UserPreferences> change, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    {
+        if (SetProperty(ref field, value, propertyName))
+        {
+            Change(p => change(p, value));
+        }
+    }
+
+    /// <summary>Comme <see cref="Set{T}"/> pour une liste de choix : WPF envoie <c>null</c> quand la liste se vide, et il est ignoré.</summary>
+    private void SetChoice<T>(ref T field, T? value, Func<UserPreferences, T, UserPreferences> change, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+        where T : class
+    {
+        if (value is not null)
+        {
+            Set(ref field, value, change, propertyName);
+        }
+    }
+
     private void Change(Func<UserPreferences, UserPreferences> change)
     {
         AppearanceManager.Apply(change(AppearanceManager.Current));
-        SaveAsync(change).Forget("paramètres : enregistrement", ex => Status = T("Votre choix n'a pas pu être enregistré : {0}", ex.Message));
+        SaveAsync(change).Forget("paramètres : enregistrement", ex => Status = T("Votre choix n'a pas pu être enregistré : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
     }
 
     private async Task SaveAsync(Func<UserPreferences, UserPreferences> change) =>
@@ -270,7 +288,7 @@ public sealed class SettingsViewModel : ObservableObject
             }
             catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
             {
-                return T("Votre choix n'a pas pu être enregistré : {0}", ex.Message);
+                return T("Votre choix n'a pas pu être enregistré : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
             }
         });
 }

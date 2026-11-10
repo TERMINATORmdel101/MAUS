@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using Maus.Core.Hardware;
 using Maus.Core.Platform;
 using Maus.Core.Preferences;
 using Maus.Core.Workshop;
@@ -120,6 +121,8 @@ public static class AppearanceManager
     private static bool s_listening;
 
     /// <summary>Choix d'affichage en vigueur.</summary>
+    private static readonly string[] LogoColors = ["MausBlue", "MausRed", "MausGreen", "MausGold", "MausGrey", "MausDangerFill"];
+
     public static UserPreferences Current { get; private set; } = UserPreferences.Default;
 
     /// <summary>Marques du processeur et de la carte graphique, lues une fois (CPUID et registre, sans pilote).</summary>
@@ -134,8 +137,8 @@ public static class AppearanceManager
     /// <summary>Lit les marques des composants ; à appeler une fois, au démarrage.</summary>
     public static void DetectComponents()
     {
-        var cpu = ComponentBrand.Other;
-        var graphics = ComponentBrand.Other;
+        var cpu = HardwareVendor.Other;
+        var graphics = HardwareVendor.Other;
         try
         {
             cpu = ComponentBrands.FromCpuVendor(CpuIdParser.Read(new X86CpuIdSource())?.Vendor);
@@ -158,6 +161,9 @@ public static class AppearanceManager
     }
 
     /// <summary>Applique les choix à toute l'application (à chaud).</summary>
+    /// <summary>Change seulement la taille de l'affichage (Ctrl + molette) : inutile de réappliquer tout le thème à chaque cran.</summary>
+    public static void SetZoom(double zoom) => Current = Current with { UiZoom = zoom };
+
     public static void Apply(UserPreferences preferences)
     {
         ArgumentNullException.ThrowIfNull(preferences);
@@ -176,24 +182,11 @@ public static class AppearanceManager
             _ => !SystemUsesLightTheme(),
         };
 
-#pragma warning disable WPF0001
-        var mode = preferences.Theme switch
-        {
-            ThemeChoice.Light => ThemeMode.Light,
-            ThemeChoice.Dark => ThemeMode.Dark,
-            _ => ThemeMode.System,
-        };
-        if (application.ThemeMode != mode)
-        {
-            application.ThemeMode = mode;
-        }
-#pragma warning restore WPF0001
+        ApplyLook(application, preferences);
 
-        ApplyAccent(application.Resources, preferences.Accent, IsDark);
-        Pastel.Apply(application.Resources, IsDark, SystemParameters.HighContrast);
-
-        // Thème sombre : tous les textes en blanc plein (demande du porteur) ; thème clair : textes secondaires atténués.
-        application.Resources["MutedOpacity"] = IsDark ? 1.0 : 0.72;
+        // Mode technicien : les erreurs gardent leur message d'origine entre crochets.
+        Maus.Core.Diagnostics.ErrorText.Verbose = preferences.TechnicianMode;
+        Motion.HelpTips = !preferences.HelpTipsOff;
         Motion.IsEnabled = preferences.Animations switch
         {
             AnimationChoice.On => true,
@@ -205,11 +198,81 @@ public static class AppearanceManager
         {
             // Windows passe en clair ou en sombre, change sa couleur ou ses animations : on suit.
             s_listening = true;
+            Motion.WatchExpanders();
+            Motion.WatchToolTips();
+            WhyDisabled.Watch();
             SystemEvents.UserPreferenceChanged += (_, _) => application.Dispatcher.BeginInvoke(() => Apply(Current));
         }
 
         Changed?.Invoke(null, EventArgs.Empty);
     }
+
+    /// <summary>Thème et couleurs appliqués en dernier : remplacer une ressource fait reparcourir toutes les fenêtres ouvertes.</summary>
+    private static LookState? s_appliedLook;
+
+    private readonly record struct LookState(ThemeChoice Theme, AccentChoice Accent, bool Dark, Rgb? WindowsAccent);
+
+    /// <summary>Thème et couleurs, seulement s'ils ont changé. En contraste élevé, toujours : la palette de Windows a pu changer sans que rien d'autre ne bouge.</summary>
+    private static void ApplyLook(Application application, UserPreferences preferences)
+    {
+        var look = new LookState(preferences.Theme, preferences.Accent, IsDark, WindowsAccent());
+        if (look == s_appliedLook && !SystemParameters.HighContrast && !s_lookWasHighContrast)
+        {
+            return;
+        }
+
+        s_appliedLook = look;
+        s_lookWasHighContrast = SystemParameters.HighContrast;
+
+#pragma warning disable WPF0001
+        var mode = preferences.Theme switch
+        {
+            ThemeChoice.Light => ThemeMode.Light,
+            ThemeChoice.Dark => ThemeMode.Dark,
+            _ => ThemeMode.System,
+        };
+        if (application.ThemeMode != mode)
+        {
+            foreach (Window window in application.Windows)
+            {
+                Motion.CrossFade(window);
+            }
+
+            application.ThemeMode = mode;
+        }
+#pragma warning restore WPF0001
+
+        ApplyAccent(application.Resources, preferences.Accent, IsDark);
+        if (SystemParameters.HighContrast)
+        {
+            // Le thème Fluent donne ici une teinte sombre de l'accent, qui n'appartient pas au thème de contraste.
+            application.Resources["AccentTextFillColorPrimaryBrush"] = SystemColors.HotTrackBrush;
+        }
+
+        Pastel.Apply(application.Resources, IsDark, SystemParameters.HighContrast);
+
+        // Thème sombre : tous les textes en blanc plein (demande du porteur) ; thème clair : textes secondaires atténués.
+        application.Resources["MutedOpacity"] = IsDark ? 1.0 : 0.72;
+
+        // Contraste élevé : le texte posé sur la couleur d'accentuation prend la couleur de sélection de Windows (0.8.6).
+        application.Resources["OnAccentText"] = SystemParameters.HighContrast ? SystemColors.HighlightTextBrush : Brushes.White;
+
+        // Contraste élevé : le bouton d'arrêt et les couleurs du logo (icônes de navigation, pastilles) aussi. Les fenêtres
+        // lisent ces couleurs à leur ouverture : un changement en cours de route vaut pour les prochaines.
+        foreach (var color in LogoColors)
+        {
+            if (SystemParameters.HighContrast)
+            {
+                application.Resources[color] = SystemColors.HighlightBrush;
+            }
+            else
+            {
+                application.Resources.Remove(color);
+            }
+        }
+    }
+
+    private static bool s_lookWasHighContrast;
 
     /// <summary>Retient un choix d'affichage qui ne change pas l'apparence (zone repliée de l'accueil), sans tout réappliquer.</summary>
     public static void Remember(UserPreferences preferences)
@@ -236,9 +299,10 @@ public static class AppearanceManager
 
         var (primary, secondary) = AccentPalette.For(choice, Brands, WindowsAccent());
         var variants = AccentVariants.From(primary);
-        resources["MausAccent"] = Frozen(new SolidColorBrush(ToColor(dark ? variants.Light1 : primary)));
-        resources["MausAccentStrong"] = Frozen(new SolidColorBrush(ToColor(variants.OnWhiteText)));
-        resources["MausAccentSoft"] = Frozen(new SolidColorBrush(WithAlpha(ToColor(primary), 0x26)));
+        // Contraste élevé : les boutons principaux et la sélection prennent la couleur de sélection de Windows (0.8.6).
+        resources["MausAccent"] = highContrast ? SystemColors.HighlightBrush : Frozen(new SolidColorBrush(ToColor(dark ? variants.Light1 : primary)));
+        resources["MausAccentStrong"] = highContrast ? SystemColors.HighlightBrush : Frozen(new SolidColorBrush(ToColor(variants.Dark1)));
+        resources["MausAccentSoft"] = highContrast ? Brushes.Transparent : Frozen(new SolidColorBrush(WithAlpha(ToColor(primary), 0x26)));
         resources["MausSidebarTint"] = highContrast
             ? Brushes.Transparent
             : Frozen(new LinearGradientBrush(

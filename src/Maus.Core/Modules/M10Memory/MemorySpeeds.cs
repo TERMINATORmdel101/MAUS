@@ -6,11 +6,14 @@ internal static class MemorySpeeds
     /// <summary>Écart toléré entre deux vitesses (Windows arrondit parfois 2666 en 2667).</summary>
     public const int Tolerance = 10;
 
+    // Vitesses standard courantes (normes JEDEC JESD79-3, -4 et -5, à accès réservé) : relevé non vérifié sur le texte des normes,
+    // et la DDR5 peut monter plus haut. 6000 reste hors de la liste : à cette vitesse, c'est presque toujours un profil ou un réglage
+    // manuel, jamais un profil désactivé.
     private static readonly int[] JedecDdr3 = [800, 1066, 1333, 1600, 1866, 2133];
     private static readonly int[] JedecDdr4 = [2133, 2400, 2666, 2933, 3200];
     private static readonly int[] JedecDdr5 = [4000, 4400, 4800, 5200, 5600, 6400];
 
-    /// <summary>Latence CAS minimale des modules JEDEC courants (DDR4 : bins rapides ; DDR5 : bins « B » du commerce).</summary>
+    /// <summary>Latence CAS minimale des modules JEDEC courants (DDR4 : bins rapides ; DDR5 : bins « B » du commerce). Même réserve : relevé non vérifié sur les normes.</summary>
     private static readonly Dictionary<int, int> MinJedecCasDdr4 = new() { [2133] = 15, [2400] = 16, [2666] = 17, [2933] = 19, [3200] = 20 };
     private static readonly Dictionary<int, int> MinJedecCasDdr5 = new() { [4800] = 40, [5200] = 42, [5600] = 46, [6000] = 48, [6400] = 52 };
 
@@ -43,7 +46,7 @@ internal static class MemorySpeeds
 
     public static bool IsJedecSpeed(int generation, int speed) => JedecSpeeds(generation).Any(s => Same(s, speed));
 
-    /// <summary>Vitesse JEDEC la plus haute : au-delà, un profil XMP/EXPO ou un réglage manuel est forcément actif.</summary>
+    /// <summary>Vitesse standard courante la plus haute : au-delà, un profil XMP/EXPO ou un réglage manuel est probablement actif.</summary>
     public static int? MaxJedecSpeed(int generation) => JedecSpeeds(generation) is { Length: > 0 } speeds ? speeds[^1] : null;
 
     /// <summary>
@@ -56,6 +59,31 @@ internal static class MemorySpeeds
         5 when speed is > 0 and <= 3400 => speed * 2,
         _ => speed,
     };
+
+    /// <summary>
+    /// Vitesse appliquée en MT/s, d'après aussi la vitesse maximale brute de la barrette : si celle-ci est déjà en MT/s (2000 ou plus)
+    /// et que le doublement la dépasserait, la valeur était déjà en MT/s (vraie DDR4-1866 sur une barrette 3200). Le vieux BIOS
+    /// (2133 et 1066) continue de doubler.
+    /// </summary>
+    public static int ConfiguredTransfersPerSecond(int? generation, int configured, int? rawMax)
+    {
+        var converted = ToTransfersPerSecond(generation, configured);
+        return converted != configured && rawMax >= 2000 && converted > rawMax + Tolerance ? configured : converted;
+    }
+
+    /// <summary>
+    /// Vitesses d'une ligne de <c>Win32_PhysicalMemory</c> en MT/s, pour tous ceux qui lisent cette classe : appliquée
+    /// (<c>ConfiguredClockSpeed</c>) et nominale (<c>Speed</c>). Une valeur nulle ou absurde reste vide.
+    /// </summary>
+    public static (int? Configured, int? Rated) FromRow(Platform.CimRow row, int? generation)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        int? Raw(string column) => row.GetInt64(column) is > 0 and < 100_000 and var value ? (int)value : null;
+        var rawMax = Raw("Speed");
+        return (
+            Raw("ConfiguredClockSpeed") is { } configured ? ConfiguredTransfersPerSecond(generation, configured, rawMax) : null,
+            rawMax is { } max ? ToTransfersPerSecond(generation, max) : null);
+    }
 
     /// <summary>Latence CAS compatible avec un module JEDEC (pas de profil XMP/EXPO nécessaire pour cette vitesse).</summary>
     public static bool IsJedecTiming(int? generation, int speed, int? casLatency)

@@ -5,7 +5,7 @@ using Maus.Core.Preferences;
 namespace Maus.Core;
 
 /// <summary>Tout ce qu'un module peut lire pendant la détection. Chaque accès passe par une interface pour rester testable.</summary>
-public sealed class AuditContext
+public sealed record AuditContext
 {
     public required IRegistryReader Registry { get; init; }
 
@@ -33,6 +33,12 @@ public sealed class AuditContext
     /// <summary>Horloge injectée, pour tester les calculs d'âge (BIOS, pilotes).</summary>
     public DateTimeOffset Now { get; init; } = DateTimeOffset.Now;
 
+    /// <summary>
+    /// Audit sans aucun accès réseau (audit de la semaine, personne n'a cliqué) : Windows Update n'est pas interrogé, MAUS lit ce
+    /// que Windows a trouvé lui-même lors de sa dernière recherche ; la liste winget n'est pas demandée.
+    /// </summary>
+    public bool Offline { get; init; }
+
     /// <summary>Construit le contexte réel à partir du système courant.</summary>
     public static AuditContext CreateDefault()
     {
@@ -51,20 +57,9 @@ public sealed class AuditContext
         };
     }
 
+    /// <summary>Même contexte, sans accès réseau (audit de la semaine).</summary>
+    public AuditContext WithoutNetwork() => this with { Offline = true };
+
     /// <summary>Même contexte, avec d'autres préférences (après un choix de l'utilisateur).</summary>
-    public AuditContext WithPreferences(UserPreferences preferences) => new()
-    {
-        Registry = Registry,
-        Cim = Cim,
-        Commands = Commands,
-        SystemParameters = SystemParameters,
-        EventLogs = EventLogs,
-        Packages = Packages,
-        Files = Files,
-        Windows = Windows,
-        Hardware = Hardware,
-        IsElevated = IsElevated,
-        Preferences = preferences,
-        Now = Now,
-    };
+    public AuditContext WithPreferences(UserPreferences preferences) => this with { Preferences = preferences };
 }

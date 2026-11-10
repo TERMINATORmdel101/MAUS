@@ -19,12 +19,16 @@ public sealed class WindowsSensorSource : ISensorSource
     private readonly nint _diskWrite;
     private readonly nint _network;
     private readonly nint _thermal;
-    private readonly nint _gpuEngine;
     private readonly INvmlSource _nvml;
+    private readonly LiveNvmlSource? _ownNvml;
+
+    /// <summary>Compteur par moteur graphique : lourd, ajouté seulement sur un PC dont l'unique carte ne donne pas sa charge par NVML.</summary>
+    private nint _gpuEngine;
 
     public WindowsSensorSource(INvmlSource? nvml = null)
     {
-        _nvml = nvml ?? new WindowsNvmlSource();
+        _ownNvml = nvml is null ? new LiveNvmlSource() : null;
+        _nvml = nvml ?? _ownNvml!;
         _cpu = _pdh.Add(@"\Processor Information(_Total)\% Processor Utility");
         _cores = _pdh.Add(@"\Processor Information(*)\% Processor Utility");
         _performance = _pdh.Add(@"\Processor Information(_Total)\% Processor Performance");
@@ -34,7 +38,6 @@ public sealed class WindowsSensorSource : ISensorSource
         _diskWrite = _pdh.Add(@"\PhysicalDisk(_Total)\Disk Write Bytes/sec");
         _network = _pdh.Add(@"\Network Interface(*)\Bytes Total/sec");
         _thermal = _pdh.Add(@"\Thermal Zone Information(*)\Temperature");
-        _gpuEngine = _pdh.Add(@"\GPU Engine(*)\Utilization Percentage");
         _pdh.Collect();
     }
 
@@ -47,19 +50,19 @@ public sealed class WindowsSensorSource : ISensorSource
             .OrderBy(item => item.Name, StringComparer.Ordinal)
             .Select(item => item.Value)
             .ToList();
-        var engines = PdhQuery.Array(_gpuEngine);
-        var gpuPercent = engines.Where(e => e.Name.Contains("engtype_3D", StringComparison.OrdinalIgnoreCase)).Sum(e => e.Value);
+        double? gpuPercent = _gpuEngine == 0 ? null : Math.Min(100, PdhQuery.Array(_gpuEngine).Where(e => e.Name.Contains("engtype_3D", StringComparison.OrdinalIgnoreCase)).Sum(e => e.Value));
         var thermal = PdhQuery.Array(_thermal).Select(t => t.Value - 273.15).Where(c => c is > 0 and < 150).DefaultIfEmpty(double.NaN).Max();
         var nvidia = SafeNvml();
         var perf = GpuPerformance.Read();
 
         var gpus = new List<GpuSensor>();
+        var cards = nvidia.ToList();
         foreach (var adapter in perf)
         {
-            var match = nvidia.FirstOrDefault(n => adapter.Name.Contains(n.Name.Replace("NVIDIA ", string.Empty, StringComparison.OrdinalIgnoreCase), StringComparison.OrdinalIgnoreCase));
+            var match = TakeCard(cards, adapter.Name);
             gpus.Add(new GpuSensor(
                 adapter.Name,
-                (double?)match?.UtilizationPercent ?? (perf.Count == 1 ? Math.Min(100, gpuPercent) : null),
+                (double?)match?.UtilizationPercent ?? (perf.Count == 1 ? gpuPercent : null),
                 match?.TemperatureC ?? adapter.TemperatureC,
                 adapter.FanRpm,
                 match?.FanPercent,
@@ -73,7 +76,7 @@ public sealed class WindowsSensorSource : ISensorSource
         var performance = PdhQuery.Value(_performance);
         var nominal = PdhQuery.Value(_frequency);
         var idle = PdhQuery.Value(_diskIdle);
-        return new SensorSnapshot
+        var snapshot = new SensorSnapshot
         {
             At = DateTimeOffset.Now,
             CpuPercent = Clamp(PdhQuery.Value(_cpu)),
@@ -88,9 +91,43 @@ public sealed class WindowsSensorSource : ISensorSource
             ThermalZoneC = double.IsNaN(thermal) ? null : thermal,
             Gpus = gpus,
         };
+
+        // Après la lecture des valeurs : le nouveau relevé sert de point de départ à la mesure suivante.
+        if (_gpuEngine == 0 && NeedsGpuEngineCounter(gpus))
+        {
+            _gpuEngine = _pdh.Add(@"\GPU Engine(*)\Utilization Percentage");
+            _pdh.Collect();
+        }
+
+        return snapshot;
     }
 
-    public void Dispose() => _pdh.Dispose();
+    public void Dispose()
+    {
+        _pdh.Dispose();
+        _ownNvml?.Dispose();
+    }
+
+    /// <summary>Le compteur des moteurs graphiques ne sert qu'à une carte seule dont NVML ne donne pas la charge.</summary>
+    internal static bool NeedsGpuEngineCounter(IReadOnlyList<GpuSensor> gpus) => gpus.Count == 1 && gpus[0].UtilizationPercent is null;
+
+    /// <summary>
+    /// Carte NVML d'un adaptateur : nom exact d'abord, sinon morceau de nom, et chaque carte ne sert qu'une fois (une RTX 4070 et
+    /// une RTX 4070 Ti dans le même PC gardent chacune leurs mesures).
+    /// </summary>
+    internal static NvidiaGpuState? TakeCard(List<NvidiaGpuState> cards, string adapter)
+    {
+        var match = cards.FirstOrDefault(n => string.Equals(WithoutBrand(n.Name), WithoutBrand(adapter), StringComparison.OrdinalIgnoreCase))
+            ?? cards.FirstOrDefault(n => adapter.Contains(WithoutBrand(n.Name), StringComparison.OrdinalIgnoreCase));
+        if (match is not null)
+        {
+            cards.Remove(match);
+        }
+
+        return match;
+    }
+
+    private static string WithoutBrand(string name) => name.Replace("NVIDIA ", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
 
     private IReadOnlyList<NvidiaGpuState> SafeNvml()
     {
@@ -106,8 +143,17 @@ public sealed class WindowsSensorSource : ISensorSource
 
     private static double? Clamp(double? value) => value is { } v ? Math.Clamp(v, 0, 100) : null;
 
+    /// <summary>Mémoire que Windows peut encore engager (fichier d'échange compris), ou <c>null</c> si illisible.</summary>
+    public static long? AvailableCommitBytes() => MemoryStatus.AvailableCommit();
+
     private static class MemoryStatus
     {
+        public static long? AvailableCommit()
+        {
+            var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+            return GlobalMemoryStatusEx(ref status) ? (long)status.AvailPageFile : null;
+        }
+
         public static (long Used, long Total)? Read()
         {
             var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };

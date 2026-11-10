@@ -29,11 +29,20 @@ public sealed class AuditEngine
         AuditContext context,
         IProgress<ModuleResult>? progress = null,
         int maxParallelism = 4,
+        IReadOnlyCollection<string>? skip = null,
         CancellationToken cancellationToken = default)
     {
         using var gate = new SemaphoreSlim(maxParallelism);
         var tasks = Modules.Select(async module =>
         {
+            // Module que l'utilisateur a décoché : compté comme non vérifié (score partiel, famille grise), jamais comme conforme.
+            if (skip?.Contains(module.Id, StringComparer.Ordinal) == true)
+            {
+                var skipped = new ModuleResult(module.Id, module.Title, [], TimeSpan.Zero, T("Module non choisi pour cet audit."), NotChosen: true);
+                progress?.Report(skipped);
+                return skipped;
+            }
+
             await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {

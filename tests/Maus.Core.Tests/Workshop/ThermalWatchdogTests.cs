@@ -8,6 +8,39 @@ namespace Maus.Core.Tests.Workshop;
 /// </summary>
 public class ThermalWatchdogTests
 {
+    private static string? HeldAtLimit(ThermalTarget target, Func<int, double> temperature, int seconds)
+    {
+        var now = TimeSpan.Zero;
+        var watchdog = new ThermalWatchdog(() => now);
+        watchdog.Begin(target, CpuTemperatureWatch.CappedAtLimit);
+        for (var second = 0; second <= seconds; second += 5)
+        {
+            now = TimeSpan.FromSeconds(second);
+            watchdog.Record(Sample(cpuC: temperature(second), tjMax: 100, gpuC: 60, gpuSlowdown: 90), null, pawnIoInstalled: true);
+        }
+
+        return watchdog.AbortReason();
+    }
+
+    [Fact]
+    public void A_processor_held_at_its_limit_stops_the_test_after_the_chosen_time()
+    {
+        Assert.Null(HeldAtLimit(ThermalTarget.Cpu, _ => 100, 595));
+        Assert.Contains("reste à sa limite", HeldAtLimit(ThermalTarget.Cpu, _ => 100, 600), StringComparison.Ordinal);
+        Assert.NotNull(HeldAtLimit(ThermalTarget.Cpu, second => second % 10 == 0 ? 100 : 97, 600));
+    }
+
+    [Fact]
+    public void Time_at_the_limit_restarts_when_the_processor_cools_down()
+    {
+        Assert.Null(HeldAtLimit(ThermalTarget.Cpu, second => second == 300 ? 96 : 100, 600));
+        Assert.Null(HeldAtLimit(ThermalTarget.Cpu, _ => 96, 3600));
+    }
+
+    [Fact]
+    public void A_graphics_card_test_is_not_stopped_by_the_processor_at_its_limit() =>
+        Assert.Null(HeldAtLimit(ThermalTarget.Gpu, _ => 100, 3600));
+
     private const int Limit = 95;
 
     private static readonly DateTimeOffset Start = new(2026, 9, 30, 22, 0, 0, TimeSpan.FromHours(2));
@@ -38,7 +71,6 @@ public class ThermalWatchdogTests
         watchdog.Record(Sample(cpuC: Limit + 6), Limit, pawnIoInstalled: true);
         watchdog.End();
         Assert.Null(watchdog.AbortReason());
-        Assert.False(watchdog.IsRunning);
     }
 
     [Fact]
@@ -84,7 +116,7 @@ public class ThermalWatchdogTests
         clock.Advance(1);
         var reason = watchdog.AbortReason();
         Assert.NotNull(reason);
-        Assert.Contains("d'où cet arrêt par prudence", reason, StringComparison.Ordinal);
+        Assert.Contains("arrêté par prudence", reason, StringComparison.Ordinal);
         Assert.DoesNotContain("Dernière erreur", reason, StringComparison.Ordinal);
     }
 
@@ -224,7 +256,6 @@ public class ThermalWatchdogTests
 
         clock.Advance(600);
         watchdog.Begin(ThermalTarget.Cpu, CpuTemperatureWatch.NoDriver);
-        Assert.True(watchdog.IsRunning);
         Assert.Null(watchdog.AbortReason());
     }
 
@@ -235,8 +266,13 @@ public class ThermalWatchdogTests
         Assert.Equal(CpuTemperatureWatch.NoDriver, ThermalWatchdog.Assess(null, Limit, pawnIoInstalled: false));
         Assert.Equal(CpuTemperatureWatch.NoDriver, ThermalWatchdog.Assess(Sample(), Limit, pawnIoInstalled: false));
         Assert.Equal(CpuTemperatureWatch.NoTemperature, ThermalWatchdog.Assess(Sample(), Limit, pawnIoInstalled: true));
+        Assert.Equal(CpuTemperatureWatch.NoRights, ThermalWatchdog.Assess(Sample(), Limit, pawnIoInstalled: true, engineElevated: false));
+        Assert.Equal(CpuTemperatureWatch.NoRights, ThermalWatchdog.Assess(null, Limit, pawnIoInstalled: true, engineElevated: false));
+        Assert.Equal(CpuTemperatureWatch.NoDriver, ThermalWatchdog.Assess(null, Limit, pawnIoInstalled: false, engineElevated: false));
+        Assert.NotNull(ThermalWatchdog.Caveat(CpuTemperatureWatch.NoRights));
         Assert.Equal(CpuTemperatureWatch.NoLimit, ThermalWatchdog.Assess(Sample(cpuC: 60), null, pawnIoInstalled: true));
-        Assert.Equal(CpuTemperatureWatch.Watched, ThermalWatchdog.Assess(Sample(cpuC: 60, tjMax: 100), null, pawnIoInstalled: true));
+        Assert.Equal(CpuTemperatureWatch.CappedAtLimit, ThermalWatchdog.Assess(Sample(cpuC: 60, tjMax: 100), null, pawnIoInstalled: true));
+        Assert.Contains("s'arrête à sa limite", ThermalWatchdog.Caveat(CpuTemperatureWatch.CappedAtLimit), StringComparison.Ordinal);
         Assert.Equal(CpuTemperatureWatch.Watched, ThermalWatchdog.Assess(Sample(cpuC: 60), Limit, pawnIoInstalled: true));
 
         // Rien à signaler quand la température est lue avec sa limite, ou attendue.

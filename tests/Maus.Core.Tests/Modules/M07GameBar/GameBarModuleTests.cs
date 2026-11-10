@@ -14,13 +14,13 @@ public class GameBarModuleTests
     private static readonly HardwareProfile X3DDesktop = new()
     {
         FormFactor = FormFactor.Desktop,
-        Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32, 4201),
+        Cpu = new CpuInfo("AMD Ryzen 9 7950X3D 16-Core Processor", HardwareVendor.Amd, 16, 32),
     };
 
     private static readonly HardwareProfile SingleCcdX3D = new()
     {
         FormFactor = FormFactor.Desktop,
-        Cpu = new CpuInfo("AMD Ryzen 7 7800X3D 8-Core Processor", HardwareVendor.Amd, 8, 16, 4201),
+        Cpu = new CpuInfo("AMD Ryzen 7 7800X3D 8-Core Processor", HardwareVendor.Amd, 8, 16),
     };
 
     private static readonly WindowsInfo Home = new("Windows 11 Famille", "Core", "25H2", 26200, 1000);
@@ -127,7 +127,7 @@ public class GameBarModuleTests
 
         Assert.Equal(FindingStatus.Warning, finding.Status);
         Assert.Equal("absente", finding.Current);
-        Assert.True(finding.Fixable);
+        Assert.False(finding.Fixable);
         Assert.Null(finding.SettingsPage); // Réinstallation par le Microsoft Store : aucune page des Paramètres.
         Assert.Contains("ms-gamingoverlay", finding.Explanation, StringComparison.Ordinal);
         Assert.Contains("2 jeu(x)", finding.Explanation, StringComparison.Ordinal);
@@ -262,6 +262,11 @@ public class GameBarModuleTests
         Assert.Equal(FindingStatus.Warning, x3d.Status);
         Assert.True(x3d.Fixable);
 
+        // Avec l'app Xbox (profil 2), le verrou du profil 1 n'a pas lieu d'être : il se retire.
+        var xbox = Single(await Detect(registry, new FakePackages().Add(GameBarPackage).Add(XboxAppPackage)), "M07.gamedvr-policy");
+        Assert.Equal(FindingStatus.Improvable, xbox.Status);
+        Assert.True(xbox.Fixable);
+
         var allowed = Single(await Detect(DefaultRegistry().Set(Hklm, GameDvrPolicy, "AllowGameDVR", 1), packages), "M07.gamedvr-policy");
         Assert.Equal(FindingStatus.Ok, allowed.Status);
         Assert.Equal("enregistrement autorisé", allowed.Current);
@@ -315,7 +320,7 @@ public class GameBarModuleTests
     [InlineData(false, false, false, 1)]
     public void Proposed_profile_follows_cpu_then_packages(bool x3d, bool xboxApp, bool gamingServices, int expectedProfile)
     {
-        var inventory = new FakePackages().Add(GameBarPackage).Add(IdentityProviderPackage);
+        var inventory = new FakePackages().Add(GameBarPackage);
         if (xboxApp)
         {
             inventory.Add(XboxAppPackage);
@@ -329,7 +334,6 @@ public class GameBarModuleTests
         var packages = GamingPackages.TryRead(inventory);
 
         Assert.NotNull(packages);
-        Assert.NotNull(packages.IdentityProvider);
         Assert.Equal((GamingProfile)expectedProfile, GamingPackages.Propose(x3d, packages));
     }
 

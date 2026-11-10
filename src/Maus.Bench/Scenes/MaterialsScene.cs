@@ -75,9 +75,9 @@ internal sealed class MaterialsScene : BenchScene
     private ITexture? _white;
     private ITexture? _flatNormal;
     private ITexture? _defaultSurface;
-    private ProceduralMesh? _tableMesh;
-    private ProceduralMesh? _floorMesh;
-    private ProceduralMesh? _plinthMesh;
+    private IndexedMesh? _tableMesh;
+    private IndexedMesh? _floorMesh;
+    private IndexedMesh? _plinthMesh;
     private IPipeline? _skyPipeline;
     private IPipeline? _objectPipeline;
     private IPipeline? _glassPipeline;
@@ -97,8 +97,6 @@ internal sealed class MaterialsScene : BenchScene
     public override string Title => T("Cabinet de curiosités");
 
     public override string Subtitle => T("Matériaux : objets scannés en haute définition, reflets, lumière d'un vrai ciel HDR");
-
-    public override GpuCapability Capability => GpuCapability.Textures;
 
     public override bool HasOverlay => true;
 
@@ -130,9 +128,9 @@ internal sealed class MaterialsScene : BenchScene
         }
 
         PlaceObjects();
-        _tableMesh = ProceduralMesh.Create(device, "Table", TableGeometry());
-        _floorMesh = ProceduralMesh.Create(device, "Parquet", FloorGeometry());
-        _plinthMesh = ProceduralMesh.Create(device, "Socle", PlinthGeometry());
+        _tableMesh = ProceduralModel(device, "Table", TableGeometry());
+        _floorMesh = ProceduralModel(device, "Parquet", FloorGeometry());
+        _plinthMesh = ProceduralModel(device, "Socle", PlinthGeometry());
         _textures["rosewood:base"] = ImageAssets.LoadTexture(device, Asset("rosewood_veneer1", "rosewood_veneer1_diff_2k.jpg"), ImageRole.Color, _light ? 1 : 0);
         _textures["rosewood:normal"] = ImageAssets.LoadTexture(device, Asset("rosewood_veneer1", "rosewood_veneer1_nor_gl_2k.jpg"), ImageRole.Normal, _light ? 1 : 0);
         _textures["rosewood:surface"] = ImageAssets.LoadTexture(device, Asset("rosewood_veneer1", "rosewood_veneer1_arm_2k.jpg"), ImageRole.Data, _light ? 1 : 0);
@@ -422,15 +420,20 @@ internal sealed class MaterialsScene : BenchScene
         }
     }
 
-    private void DrawProcedural(ICommandList cmd, ProceduralMesh mesh, SceneConstants constants, float kind, string? textures)
+    private void DrawProcedural(ICommandList cmd, IndexedMesh mesh, SceneConstants constants, float kind, string? textures)
     {
         cmd.SetTexture(0, textures is null ? _white : _textures[textures + ":base"]);
         cmd.SetTexture(1, textures is null ? _flatNormal : _textures[textures + ":normal"]);
         cmd.SetTexture(2, textures is null ? _defaultSurface : _textures[textures + ":surface"]);
         cmd.SetTexture(9, textures is null ? _defaultSurface : _textures[textures + ":height"]);
         cmd.SetConstants(1, constants with { Surface = new Vector4(0f, 1f, 1f, kind) });
-        mesh.Draw(cmd);
+        mesh.Bind(cmd);
+        cmd.DrawIndexed(mesh.IndexCount);
     }
+
+    /// <summary>Une forme simple prête à dessiner (sommets de 48 octets).</summary>
+    private static IndexedMesh ProceduralModel(IGpuDevice device, string name, ProceduralGeometry geometry) =>
+        IndexedMesh.Create(device, name, geometry.Vertices, geometry.Indices, 48);
 
     /// <summary>Repère vu d'en dessous d'un plan horizontal : même image que la caméra, reflétée par ce plan.</summary>
     private static FrameConstants MirroredFrame(FrameConstants frame, float height)
@@ -529,7 +532,7 @@ internal sealed class MaterialsScene : BenchScene
             var model = _models[p.Model];
             var rotation = Matrix4x4.CreateRotationZ(p.Roll * MathF.PI / 180f) * Matrix4x4.CreateRotationY(p.Yaw * MathF.PI / 180f);
             var local = Matrix4x4.CreateScale(p.Scale) * rotation;
-            var (low, center) = Footprint(model, local);
+            var (low, center) = BoxFootprint.Of(model.Min, model.Max, local);
             var world = local * Matrix4x4.CreateTranslation(p.Position.X - center.X, TableTop - low, p.Position.Y - center.Y);
             _objects.Add((model, world));
             if (p.Model == "Lantern_01")
@@ -549,27 +552,9 @@ internal sealed class MaterialsScene : BenchScene
             var size = model.Max - model.Min;
             var scale = 0.75f / MathF.Max(size.Y, 0.2f);
             var local = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateRotationY((-angle * 180f / MathF.PI) + 180f);
-            var (low, center) = Footprint(model, local);
+            var (low, center) = BoxFootprint.Of(model.Min, model.Max, local);
             _objects.Add((model, local * Matrix4x4.CreateTranslation(at.X - center.X, 1.1f - low, at.Y - center.Y)));
         }
-    }
-
-    /// <summary>Bas de l'objet tourné (y minimal) et centre de son emprise au sol, d'après les coins de sa boîte.</summary>
-    private static (float Low, Vector2 Center) Footprint(ModelGpu model, Matrix4x4 local)
-    {
-        var low = float.MaxValue;
-        var min = new Vector2(float.MaxValue);
-        var max = new Vector2(float.MinValue);
-        for (var k = 0; k < 8; k++)
-        {
-            var corner = new Vector3((k & 1) == 0 ? model.Min.X : model.Max.X, (k & 2) == 0 ? model.Min.Y : model.Max.Y, (k & 4) == 0 ? model.Min.Z : model.Max.Z);
-            var p = Vector3.Transform(corner, local);
-            low = MathF.Min(low, p.Y);
-            min = Vector2.Min(min, new Vector2(p.X, p.Z));
-            max = Vector2.Max(max, new Vector2(p.X, p.Z));
-        }
-
-        return (low, (min + max) * 0.5f);
     }
 
     private static Vector3[] Downsample(Vector3[] pixels, int width, int height, int factor, out int w, out int h)
@@ -600,7 +585,7 @@ internal sealed class MaterialsScene : BenchScene
     private static ITexture OnePixel(IGpuDevice device, byte r, byte g, byte b, byte a, PixelFormat format, string name)
     {
         var texture = device.CreateTexture(TextureDesc.Image(1, 1, format, name));
-        device.UploadTexture(texture, 0, 0, [r, g, b, a], 4);
+        device.UploadTexture(texture, 0, [r, g, b, a], 4);
         return texture;
     }
 
@@ -755,31 +740,4 @@ internal sealed class ProceduralGeometry
     }
 
     private static Vector3 Abs(Vector3 v) => new(MathF.Abs(v.X), MathF.Abs(v.Y), MathF.Abs(v.Z));
-}
-
-/// <summary>Une forme simple prête à dessiner.</summary>
-internal sealed class ProceduralMesh(IBuffer vertices, IBuffer indices, int count) : IDisposable
-{
-    public static ProceduralMesh Create(IGpuDevice device, string name, ProceduralGeometry geometry)
-    {
-        var v = geometry.Vertices;
-        var i = geometry.Indices;
-        return new ProceduralMesh(
-            device.CreateBuffer(new BufferDesc(v.Length * 4L, BufferUsage.Vertex, 48, name), MemoryMarshal.AsBytes(v.AsSpan())),
-            device.CreateBuffer(new BufferDesc(i.Length * 4L, BufferUsage.Index, 4, name + " : indices"), MemoryMarshal.AsBytes(i.AsSpan())),
-            i.Length);
-    }
-
-    public void Draw(ICommandList cmd)
-    {
-        cmd.SetVertexBuffer(0, vertices, 48);
-        cmd.SetIndexBuffer(indices);
-        cmd.DrawIndexed(count);
-    }
-
-    public void Dispose()
-    {
-        vertices.Dispose();
-        indices.Dispose();
-    }
 }

@@ -7,10 +7,20 @@ namespace Maus.Core.Workshop;
 public static class ScoreTrends
 {
     /// <summary>
-    /// Score de santé au barème selon la gravité (depuis le 29/09/2026). Les scores de l'ancien barème (« health ») restent
-    /// dans l'historique mais ne sont pas mélangés à la courbe : ils ne se comparent pas.
+    /// Score de santé du barème de la 0.8.6 (un sujet vu par deux modules ne compte plus qu'une fois). Les scores des barèmes
+    /// précédents restent dans l'historique mais ne sont pas mélangés à la courbe : la même situation n'y vaut pas les mêmes
+    /// points, et une version de MAUS passerait pour un progrès du PC.
     /// </summary>
-    public const string HealthKind = "health-v2";
+    public const string HealthKind = "health-v3";
+
+    /// <summary>Barème selon la gravité, du 29/09/2026 à la 0.8.5.</summary>
+    public const string PreviousHealthKind = "health-v2";
+
+    /// <summary>
+    /// Score de l'audit de la semaine (0.8.6) : sans réseau, la liste des logiciels à mettre à jour lui manque. Sa courbe est à
+    /// part, pour ne pas faire croire à une amélioration à côté de ceux des audits lancés à la main.
+    /// </summary>
+    public const string WeeklyHealthKind = "health-weekly";
 
     /// <summary>Ancien barème (un problème = 12 points, un point à surveiller = 5), avant le 29/09/2026.</summary>
     public const string LegacyHealthKind = "health";
@@ -37,6 +47,8 @@ public static class ScoreTrends
     public static string Label(string kind) => kind switch
     {
         HealthKind => T("Score de santé"),
+        WeeklyHealthKind => T("Score de santé (audit de la semaine, sans réseau)"),
+        PreviousHealthKind => T("Score de santé (barème précédent)"),
         LegacyHealthKind => T("Score de santé (ancien barème)"),
         "cpu-multi" => T("Processeur (tous les cœurs)"),
         "cpu-int" => T("Processeur (tous les cœurs, calculs entiers)"),
@@ -49,8 +61,20 @@ public static class ScoreTrends
         "ram" => T("Mémoire vive (débit de copie)"),
         "vram" => T("Mémoire vidéo (débit de relecture)"),
         "disk-read" => T("Disque (lecture)"),
+        _ when kind.StartsWith(DiskKindPrefix, StringComparison.Ordinal) => T("Disque (lecture)") + " · " + kind[DiskKindPrefix.Length..],
+        _ when kind.StartsWith(VramKindPrefix, StringComparison.Ordinal) => T("Mémoire vidéo (débit de relecture)") + " · " + kind[VramKindPrefix.Length..],
         _ => kind,
     };
+
+    private const string DiskKindPrefix = "disk-read:";
+
+    private const string VramKindPrefix = "vram:";
+
+    /// <summary>Type de score d'un disque : chacun a sa courbe. Les anciennes entrées restent lisibles sous « disk-read ».</summary>
+    public static string DiskKind(string root) => DiskKindPrefix + root;
+
+    /// <summary>Type de score d'une carte graphique : chacune a sa courbe. Les anciennes entrées restent lisibles sous « vram ».</summary>
+    public static string VramKind(string adapter) => VramKindPrefix + adapter;
 
     /// <summary>Type de score du test processeur : un par charge, car leurs tours n'ont pas la même durée.</summary>
     public static string CpuKind(CpuStressMode mode) => mode switch
@@ -66,11 +90,26 @@ public static class ScoreTrends
 
     public static string Unit(string kind) => kind switch
     {
-        HealthKind or LegacyHealthKind => "/100",
+        _ when MeasureHistory.IsMeasure(kind) => MeasureHistory.Unit(kind),
+        HealthKind or PreviousHealthKind or LegacyHealthKind or WeeklyHealthKind => "/100",
         "ram" or "vram" => T("Go/s"),
         "disk-read" => T("Mo/s"),
+        _ when kind.StartsWith(VramKindPrefix, StringComparison.Ordinal) => T("Go/s"),
+        _ when kind.StartsWith(DiskKindPrefix, StringComparison.Ordinal) => T("Mo/s"),
         _ => T("points"),
     };
+
+    /// <summary>Valeur que MAUS a pu noter pour ce type : un score de santé tient sur 100, une mesure en pourcentage ou en degrés reste à taille humaine.</summary>
+    public static bool IsPossible(string kind, double score)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        return kind switch
+        {
+            HealthKind or PreviousHealthKind or LegacyHealthKind or WeeklyHealthKind => Platform.StoredValues.IsWithin(score, 0, 100),
+            _ when MeasureHistory.IsMeasure(kind) => Platform.StoredValues.IsWithin(score, -100, 1000),
+            _ => Platform.StoredValues.IsWithin(score, 0, 1e12),
+        };
+    }
 
     /// <summary>Scores d'un type, du plus ancien au plus récent (les 50 derniers).</summary>
     public static IReadOnlyList<BenchmarkEntry> Series(IEnumerable<BenchmarkEntry> entries, string kind) =>
@@ -106,6 +145,21 @@ public static class ScoreTrends
             -1 => T("En baisse d'1 point depuis le {0:d}.", first.At.LocalDateTime),
             _ => T("En baisse de {0} points depuis le {1:d}.", -points, first.At.LocalDateTime),
         };
+    }
+
+    /// <summary>
+    /// Tendance de la courbe d'après tout l'historique : tant qu'elle ne compte pas deux scores, dit pourquoi elle repart alors
+    /// que des audits ont déjà été notés avec le barème précédent.
+    /// </summary>
+    public static string DescribeHealthHistory(IReadOnlyCollection<BenchmarkEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var series = Series(entries, HealthKind);
+        var text = DescribeHealth(series);
+        return series.Count < 2 && entries.Any(e => e.Kind == PreviousHealthKind && e.Stable)
+            ? text + " " + T("Le barème a changé avec la 0.8.6 : les scores d'avant ne se comparent pas.")
+            : text;
     }
 
     public static string Describe(IReadOnlyList<BenchmarkEntry> series)

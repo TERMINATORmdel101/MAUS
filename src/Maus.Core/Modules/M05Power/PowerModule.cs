@@ -30,6 +30,9 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static string StartupCategory => T("Démarrage et veille");
     private static string HardwareCategory => T("Matériel et utilitaires");
 
+    /// <summary>Mesure interne du constat M05.power-plan : 1 si powercfg liste « Haute performance », 0 sinon.</summary>
+    private const string HighPerformanceListedMeasure = "high-performance-listed";
+
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan EffectiveModeTimeout = TimeSpan.FromSeconds(3);
 
@@ -76,7 +79,14 @@ public sealed class PowerModule : Fixes.IFixableModule
         var overlays = ReadOverlays(registry);
         var effectiveMode = await ReadEffectiveModeAsync(cancellationToken).ConfigureAwait(false);
 
-        var findings = new List<Finding> { EvaluatePlan(plan, profile, overlays, HasPlanPolicy(registry)) };
+        var planFinding = EvaluatePlan(plan, profile, overlays, HasPlanPolicy(registry));
+        var findings = new List<Finding>
+        {
+            // Mesure interne pour l'étape Plan : ce que powercfg a listé, absente si powercfg n'a pas répondu.
+            listed is null
+                ? planFinding
+                : planFinding with { Measures = new Dictionary<string, double> { [HighPerformanceListedMeasure] = listed.Any(s => s.Guid == PowerSchemes.HighPerformance) ? 1 : 0 } },
+        };
         if (plan?.Kind == SchemeKind.Balanced && profile is PowerProfile.Laptop or PowerProfile.DesktopX3D or PowerProfile.DesktopHybrid or PowerProfile.DesktopModernStandby)
         {
             findings.Add(EvaluateAcMode(overlays, profile, context.Preferences.LaptopPower));
@@ -127,25 +137,33 @@ public sealed class PowerModule : Fixes.IFixableModule
             var capabilities = CallPlatform(_platform.GetCapabilities);
             var hybrid = context.Hardware.Cpu.Vendor == HardwareVendor.Intel && CallPlatform(() => _platform.GetEfficiencyClassCount()) > 1;
             var profile = DetermineProfile(context.Hardware, hybrid, capabilities, listed: null);
-            var highPerformanceAvailable = TryRegistry(() => context.Registry.KeyExists(RegistryHive.LocalMachine, $@"{SchemesKey}\{PowerSchemes.HighPerformance:D}") ? "1" : null) is not null;
-            var target = profile == PowerProfile.Desktop && (highPerformanceAvailable || capabilities?.AoAc != true)
+            // La liste de powercfg d'abord, comme le constat ; le registre seulement si elle n'a pas pu être lue.
+            var highPerformanceAvailable = plan.Measures?.TryGetValue(HighPerformanceListedMeasure, out var listedValue) == true
+                ? listedValue > 0
+                : TryRegistry(() => context.Registry.KeyExists(RegistryHive.LocalMachine, $@"{SchemesKey}\{PowerSchemes.HighPerformance:D}") ? "1" : null) is not null;
+            var target = profile == PowerProfile.Desktop && highPerformanceAvailable
                 ? PowerSchemes.HighPerformance
                 : PowerSchemes.Balanced;
             var toHighPerformance = target == PowerSchemes.HighPerformance;
-            changes.Add(new Fixes.PlannedChange
+
+            // Rien à proposer si la cible est déjà le mode actif : la correction n'aurait aucun effet.
+            if (CallPlatform(_platform.GetActiveScheme) != target)
             {
-                Id = plan.Id,
-                ModuleId = Id,
-                Title = T("Passer au mode de gestion « {0} »", PowerSchemes.Label(toHighPerformance ? SchemeKind.HighPerformance : SchemeKind.Balanced)),
-                Description = plan.Explanation,
-                Category = PlanCategory,
-                Gain = toHighPerformance
-                    ? T("Le processeur reste plus souvent à haute fréquence. Le gain en jeu est souvent faible.")
-                    : T("Les modes secteur et batterie redeviennent disponibles dans Paramètres > Système > Alimentation."),
-                Risk = toHighPerformance ? T("La consommation au repos augmente.") : null,
-                Recommended = !toHighPerformance,
-                Writes = [new Fixes.SettingWrite(Fixes.SettingKey.ActivePowerScheme, Fixes.SettingValue.Text(target.ToString("D")))],
-            });
+                changes.Add(new Fixes.PlannedChange
+                {
+                    Id = plan.Id,
+                    ModuleId = Id,
+                    Title = T("Passer au mode de gestion « {0} »", PowerSchemes.Label(toHighPerformance ? SchemeKind.HighPerformance : SchemeKind.Balanced)),
+                    Description = plan.Explanation,
+                    Category = PlanCategory,
+                    Gain = toHighPerformance
+                        ? T("Le processeur reste plus souvent à haute fréquence. Le gain en jeu est souvent faible.")
+                        : T("Les modes secteur et batterie redeviennent disponibles dans Paramètres > Système > Alimentation."),
+                    Risk = toHighPerformance ? T("La consommation au repos augmente.") : null,
+                    Recommended = !toHighPerformance,
+                    Writes = [new Fixes.SettingWrite(Fixes.SettingKey.ActivePowerScheme, Fixes.SettingValue.Text(target.ToString("D")))],
+                });
+            }
         }
 
         if (byId.TryGetValue("M05.fast-startup", out var fastStartup) && fastStartup.Fixable && fastStartup.Status == FindingStatus.Improvable)
@@ -268,7 +286,7 @@ public sealed class PowerModule : Fixes.IFixableModule
         var current = plan.Name;
         if (plan.Kind == SchemeKind.Balanced && profile is PowerProfile.Desktop && overlays?.Ac is { IsValid: true } ac)
         {
-            current += $" (mode {PowerSchemes.OverlayLabel(ac.Guid)})";
+            current += T(" (mode {0})", PowerSchemes.OverlayLabel(ac.Guid));
         }
 
         if (profile == PowerProfile.Unknown)
@@ -288,7 +306,7 @@ public sealed class PowerModule : Fixes.IFixableModule
         {
             PowerProfile.DesktopX3D => (
                 plan.Kind == SchemeKind.Balanced,
-                "Utilisation normale",
+                T("Utilisation normale"),
                 T("Nous gardons le mode Utilisation normale pour placer vos jeux sur les bons cœurs. Sur un Ryzen X3D à deux CCD, ce mode laisse le pilote AMD et la Game Bar mettre en sommeil les cœurs sans V-Cache pendant un jeu ; « Haute performance » empêche ce tri (voir aussi le Module 7)."),
                 T("Revenir au mode « Utilisation normale » (Panneau de configuration > Options d'alimentation). Vous pouvez garder « Haute performance » si vous le préférez, en sachant que vos jeux risquent de tourner sur les cœurs sans V-Cache.")),
             PowerProfile.DesktopHybrid => (
@@ -303,7 +321,7 @@ public sealed class PowerModule : Fixes.IFixableModule
                 T("Choisir « Utilisation normale » dans les Options d'alimentation, puis le mode « Meilleures performances » dans Paramètres > Système > Alimentation.")),
             PowerProfile.Laptop => (
                 plan.Kind == SchemeKind.Balanced,
-                "Utilisation normale",
+                T("Utilisation normale"),
                 T("Sur un portable, MAUS propose « Utilisation normale » avec le mode « Meilleures performances » sur secteur et « Équilibré » sur batterie : plus de chaleur et de bruit sur secteur, autonomie préservée sur batterie. Ces modes d'alimentation n'existent qu'avec « Utilisation normale » ou un mode qui en dérive."),
                 T("Revenir au mode « Utilisation normale » (Panneau de configuration > Options d'alimentation), puis régler le mode d'alimentation dans Paramètres > Système > Alimentation. Le choix final vous revient.")),
             _ => (
@@ -392,7 +410,6 @@ public sealed class PowerModule : Fixes.IFixableModule
             Explanation = T("Le mode d'alimentation (Paramètres > Système > Alimentation) ajuste « Utilisation normale » : « Meilleures performances » privilégie la réactivité et la fréquence du processeur quand le PC est branché."),
             Advice = compliant ? null : T("Choisir « Meilleures performances » pour « Branché » dans Paramètres > Système > Alimentation. Plus de chaleur et de bruit sur secteur."),
             SettingsPage = compliant ? null : PowerSettingsPage,
-            Fixable = !compliant,
         };
     }
 
@@ -513,7 +530,7 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding EvaluateX3DOptimizer(ICimReader cim)
     {
         const string id = "M05.x3d-optimizer";
-        const string title = "Service AMD 3D V-Cache Performance Optimizer actif";
+        var title = T("Service AMD 3D V-Cache Performance Optimizer actif");
         IReadOnlyList<CimRow> rows;
         try
         {
@@ -598,7 +615,7 @@ public sealed class PowerModule : Fixes.IFixableModule
     private static Finding DescribeModernStandby(PowerCapabilities? capabilities)
     {
         const string id = "M05.modern-standby";
-        const string title = "Veille moderne (S0)";
+        var title = T("Veille moderne (S0)");
         return capabilities is null
             ? Finding.Unknown(id, title, T("Lecture des capacités d'alimentation impossible."), StartupCategory)
             : new Finding

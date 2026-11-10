@@ -14,7 +14,6 @@ public class DisplayParsersTests
         Assert.True(info.HdrActive);
         Assert.Equal(ColorEncoding.Rgb, info.Encoding);
         Assert.Equal(10, info.BitsPerColorChannel);
-        Assert.Equal(AdvancedColorMode.Hdr, info.ActiveMode);
     }
 
     [Fact]
@@ -25,7 +24,6 @@ public class DisplayParsersTests
         Assert.False(info.HdrSupported);
         Assert.False(info.HdrActive);
         Assert.Equal(ColorEncoding.YCbCr422, info.Encoding);
-        Assert.Equal(AdvancedColorMode.Wcg, info.ActiveMode);
     }
 
     [Fact]
@@ -35,7 +33,6 @@ public class DisplayParsersTests
 
         Assert.True(info.HdrSupported);
         Assert.False(info.HdrActive);
-        Assert.Null(info.ActiveMode);
         Assert.Equal(ColorEncoding.YCbCr420, info.Encoding);
     }
 
@@ -51,7 +48,6 @@ public class DisplayParsersTests
         Assert.Equal(supported, info.HdrSupported);
         Assert.Equal(active, info.HdrActive);
         Assert.Equal(ColorEncoding.YCbCr444, info.Encoding);
-        Assert.Null(info.ActiveMode);
     }
 
     [Theory]

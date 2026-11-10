@@ -2,14 +2,12 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Workshop.Memory.PawnIo;
 
 /// <summary>Échec d'un appel au pilote PawnIO (module refusé, processeur non pris en charge, lecture impossible).</summary>
-public sealed class PawnIoException(string message, int win32Error) : Exception(message)
-{
-    public int Win32Error { get; } = win32Error;
-}
+public sealed class PawnIoException(string message) : Exception(message);
 
 /// <summary>
 /// Client minimal du pilote PawnIO : charge un module officiel embarqué dans MAUS (PawnIO.Modules 0.2.11, LGPL-2.1)
@@ -42,7 +40,7 @@ public sealed partial class PawnIoModule : IDisposable
     {
         var name = $"Maus.Core.PawnIo.{resourceName}";
         using var stream = typeof(PawnIoModule).Assembly.GetManifestResourceStream(name)
-            ?? throw new PawnIoException($"Module PawnIO absent de MAUS : {resourceName}", 0);
+            ?? throw new PawnIoException(T("Module PawnIO absent de MAUS : {0}", resourceName));
         using var memory = new MemoryStream();
         stream.CopyTo(memory);
         return Load(memory.ToArray());
@@ -57,7 +55,7 @@ public sealed partial class PawnIoModule : IDisposable
         {
             var error = Marshal.GetLastPInvokeError();
             handle.Dispose();
-            throw new PawnIoException($"Pilote PawnIO inaccessible ({new Win32Exception(error).Message})", error);
+            throw new PawnIoException(T("Pilote PawnIO inaccessible ({0})", new Win32Exception(error).Message));
         }
 
         fixed (byte* input = binary)
@@ -66,7 +64,7 @@ public sealed partial class PawnIoModule : IDisposable
             {
                 var error = Marshal.GetLastPInvokeError();
                 handle.Dispose();
-                throw new PawnIoException($"Module PawnIO refusé ({new Win32Exception(error).Message})", error);
+                throw new PawnIoException(T("Module PawnIO refusé ({0})", new Win32Exception(error).Message));
             }
         }
 
@@ -74,64 +72,64 @@ public sealed partial class PawnIoModule : IDisposable
     }
 
     /// <summary>Appelle la fonction <paramref name="function"/> du module et renvoie ses <paramref name="outputLength"/> valeurs de sortie.</summary>
-    public unsafe long[] Execute(string function, ReadOnlySpan<long> input, int outputLength)
+    public long[] Execute(string function, ReadOnlySpan<long> input, int outputLength)
     {
         ArgumentNullException.ThrowIfNull(function);
         ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
 
-        // Tailles calculées en arithmétique vérifiée : un débordement lève une erreur au lieu d'un tampon trop petit.
-        var request = new byte[checked(FunctionNameLength + (input.Length * sizeof(long)))];
         var outputBytes = checked((uint)(outputLength * sizeof(long)));
-        Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
-        MemoryMarshal.AsBytes(input).CopyTo(request.AsSpan(FunctionNameLength));
         var output = new long[outputLength];
-
-        fixed (byte* pIn = request)
-        fixed (long* pOut = output)
+        if (!Send(function, input, MemoryMarshal.AsBytes(output.AsSpan()), out var returned))
         {
-            if (!DeviceIoControl(_handle, ExecuteCode, pIn, (uint)request.Length, pOut, outputBytes, out var returned, 0))
-            {
-                var error = Marshal.GetLastPInvokeError();
-                throw new PawnIoException($"{function} a échoué ({new Win32Exception(error).Message})", error);
-            }
+            var error = Marshal.GetLastPInvokeError();
+            throw new PawnIoException(T("{0} a échoué ({1})", function, new Win32Exception(error).Message));
+        }
 
-            if (returned < outputBytes)
-            {
-                throw new PawnIoException($"{function} : réponse incomplète ({returned} octets)", 0);
-            }
+        if (returned < outputBytes)
+        {
+            throw new PawnIoException(T("{0} : réponse incomplète ({1} octets)", function, returned));
         }
 
         return output;
     }
 
     /// <summary>
+    /// Demande au pilote : nom de la fonction, puis valeurs d'entrée. Taille calculée en arithmétique vérifiée : un débordement
+    /// lève une erreur au lieu d'un tampon trop petit. L'erreur de Windows se lit juste après, en cas d'échec.
+    /// </summary>
+    private unsafe bool Send(string function, ReadOnlySpan<long> input, Span<byte> output, out uint returned)
+    {
+        var request = new byte[checked(FunctionNameLength + (input.Length * sizeof(long)))];
+        Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
+        MemoryMarshal.AsBytes(input).CopyTo(request.AsSpan(FunctionNameLength));
+
+        fixed (byte* pIn = request)
+        fixed (byte* pOut = output)
+        {
+            return DeviceIoControl(_handle, ExecuteCode, pIn, (uint)request.Length, pOut, (uint)output.Length, out returned, 0);
+        }
+    }
+
+    /// <summary>
     /// Même appel, au format attendu par RAMSPDToolkit : code HRESULT (0 = réussi) au lieu d'une exception, et nombre de
     /// valeurs réellement renvoyées (comme <c>PawnIo.ExecuteHr</c> de LibreHardwareMonitor).
     /// </summary>
-    public unsafe int ExecuteHr(string function, long[] input, uint inputCount, long[] output, uint outputCount, out uint returned)
+    public int ExecuteHr(string function, long[] input, uint inputCount, long[] output, uint outputCount, out uint returned)
     {
         ArgumentNullException.ThrowIfNull(function);
         ArgumentNullException.ThrowIfNull(output);
 
-        var request = new byte[FunctionNameLength + (inputCount * sizeof(long))];
-        Encoding.ASCII.GetBytes(function, 0, Math.Min(function.Length, FunctionNameLength - 1), request, 0);
-        MemoryMarshal.AsBytes(input.AsSpan(0, (int)inputCount)).CopyTo(request.AsSpan(FunctionNameLength));
         var buffer = new byte[checked(outputCount * sizeof(long))];
-
-        fixed (byte* pIn = request)
-        fixed (byte* pOut = buffer)
+        if (!Send(function, input.AsSpan(0, checked((int)inputCount)), buffer, out var bytes))
         {
-            if (!DeviceIoControl(_handle, ExecuteCode, pIn, (uint)request.Length, buffer.Length == 0 ? null : pOut, (uint)buffer.Length, out var bytes, 0))
-            {
-                returned = 0;
-                var error = Marshal.GetLastPInvokeError();
-                return error <= 0 ? error : unchecked((int)(((uint)error & 0xFFFF) | (7u << 16) | 0x80000000));
-            }
-
-            Buffer.BlockCopy(buffer, 0, output, 0, (int)Math.Min(bytes, (uint)(output.Length * sizeof(long))));
-            returned = bytes / sizeof(long);
-            return 0;
+            returned = 0;
+            var error = Marshal.GetLastPInvokeError();
+            return error <= 0 ? error : unchecked((int)(((uint)error & 0xFFFF) | (7u << 16) | 0x80000000));
         }
+
+        Buffer.BlockCopy(buffer, 0, output, 0, (int)Math.Min(bytes, (uint)(output.Length * sizeof(long))));
+        returned = bytes / sizeof(long);
+        return 0;
     }
 
     public void Dispose() => _handle.Dispose();

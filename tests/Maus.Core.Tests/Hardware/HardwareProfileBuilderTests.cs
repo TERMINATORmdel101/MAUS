@@ -31,12 +31,56 @@ public class HardwareProfileBuilderTests
     }
 
     [Fact]
-    public void Unreadable_enrollments_are_not_a_managed_pc()
+    public void Unreadable_enrollments_make_the_management_unknown_not_absent()
     {
         var registry = new FakeRegistry().Deny(RegistryHive.LocalMachine, Enrollments);
 
-        Assert.False(HardwareProfileBuilder.HasOrganizationEnrollment(registry));
+        Assert.Null(HardwareProfileBuilder.HasOrganizationEnrollment(registry));
+
+        var profile = HardwareProfileBuilder.Build(NotInDomain(), registry);
+        Assert.False(profile.IsManaged);
+        Assert.True(profile.ManagementUnknown);
     }
+
+    [Fact]
+    public void Unreadable_wmi_makes_the_management_unknown_not_absent()
+    {
+        var profile = HardwareProfileBuilder.Build(new FakeCim(), new FakeRegistry());
+
+        Assert.False(profile.IsManaged);
+        Assert.True(profile.ManagementUnknown);
+    }
+
+    [Fact]
+    public void One_unreadable_enrollment_is_unknown_but_a_real_one_is_still_a_proof()
+    {
+        var registry = new FakeRegistry()
+            .Set(RegistryHive.LocalMachine, $@"{Enrollments}\A", "ProviderID", "Local Authority")
+            .Deny(RegistryHive.LocalMachine, $@"{Enrollments}\A");
+        Assert.Null(HardwareProfileBuilder.HasOrganizationEnrollment(registry));
+
+        registry.Set(RegistryHive.LocalMachine, $@"{Enrollments}\B", "ProviderID", "MS DM Server");
+        var profile = HardwareProfileBuilder.Build(NotInDomain(), registry);
+        Assert.True(profile.IsManaged);
+        Assert.False(profile.ManagementUnknown);
+    }
+
+    [Fact]
+    public void A_normal_pc_read_correctly_is_neither_managed_nor_unknown()
+    {
+        var withBuiltIn = new FakeRegistry().Set(RegistryHive.LocalMachine, $@"{Enrollments}\E17005D5-A50E-4E57-BE94-1D4FA69C6F93", "ProviderID", "Local Authority");
+
+        foreach (var registry in new[] { withBuiltIn, new FakeRegistry() })
+        {
+            var profile = HardwareProfileBuilder.Build(NotInDomain(), registry);
+            Assert.False(profile.IsManaged);
+            Assert.False(profile.ManagementUnknown);
+        }
+    }
+
+    private static FakeCim NotInDomain() => new FakeCim().Answer(
+        "SELECT Manufacturer, Model, PCSystemTypeEx, PartOfDomain FROM Win32_ComputerSystem",
+        new Dictionary<string, object?> { ["PartOfDomain"] = false, ["PCSystemTypeEx"] = 1L });
 
     [Fact]
     public void Domain_member_is_managed()

@@ -69,7 +69,8 @@ public sealed class MonitorTracker
 
         foreach (var reading in cpuReadings)
         {
-            if (Kind(reading.Kind) is { } kind && kind != MonitorKind.Load)
+            // « Distance to TjMax » est un écart à la limite, pas une température du processeur.
+            if (Kind(reading.Kind) is { } kind && kind != MonitorKind.Load && !reading.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
             {
                 yield return (cpuName, reading.Name, kind, reading.Value);
             }
@@ -104,11 +105,11 @@ public sealed class MonitorTracker
             yield return (memory, T("Utilisée"), MonitorKind.Load, used);
         }
 
-        foreach (var reading in snapshot.Readings.Where(r => r.Group is ReadingGroup.Memory or ReadingGroup.Motherboard))
+        foreach (var reading in snapshot.Readings.Where(r => r.Group == ReadingGroup.Motherboard))
         {
             if (Kind(reading.Kind) is MonitorKind.Temperature or MonitorKind.Power or MonitorKind.Clock)
             {
-                yield return (reading.Group == ReadingGroup.Memory ? memory : reading.Hardware, reading.Name, Kind(reading.Kind)!.Value, reading.Value);
+                yield return (reading.Hardware, reading.Name, Kind(reading.Kind)!.Value, reading.Value);
             }
         }
     }
@@ -148,7 +149,7 @@ public static class ErrorWatch
 
         try
         {
-            foreach (var e in logs.Query("System", WindowsHealthModule.WheaProvider, [.. WindowsHealthModule.WheaFatalIds, .. WindowsHealthModule.WheaCorrectedIds], since, MaxEvents, includeMessage: true))
+            foreach (var e in WindowsHealthModule.QueryWhea(logs, since, MaxEvents, includeMessage: true))
             {
                 events.Add(new WatchedEvent(e.TimeCreated, "System", e.Provider, e.Id, e.Message, Hardware: true, IsPciExpress(e)));
             }
@@ -185,11 +186,76 @@ public static class ErrorWatch
             incomplete);
     }
 
+    /// <summary>Événement WHEA surveillé : erreur matérielle signalée par le processeur ou le chipset.</summary>
+    internal static bool IsWhea(string provider, int id) =>
+        string.Equals(provider, WindowsHealthModule.WheaProvider, StringComparison.OrdinalIgnoreCase)
+        && (WindowsHealthModule.WheaFatalIds.Contains(id) || WindowsHealthModule.WheaCorrectedIds.Contains(id));
+
+    /// <summary>Erreur de Windows surveillée : niveau critique ou erreur, hors WHEA (déjà compté comme matériel).</summary>
+    internal static bool IsWindowsError(string provider, int level) =>
+        ErrorLevels.Contains(level) && !string.Equals(provider, WindowsHealthModule.WheaProvider, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Erreur WHEA venant du bus PCI Express : le message (ou les données) de l'événement nomme le composant.</summary>
     public static bool IsPciExpress(EventRecordInfo e)
     {
         ArgumentNullException.ThrowIfNull(e);
         return (e.Message?.Contains("PCI Express", StringComparison.OrdinalIgnoreCase) ?? false)
         || e.Data.Values.Any(v => v.Contains("PCI Express", StringComparison.OrdinalIgnoreCase));
+    }
+}
+
+/// <summary>
+/// Relevé continu de la fenêtre de surveillance : chaque <see cref="Poll"/> ne lit que ce que les journaux ont reçu depuis le
+/// précédent, et additionne. Les compteurs n'ont donc plus de plafond ; seule la liste affichée reste bornée.
+/// </summary>
+public sealed class ErrorWatchTail(IEventLogReader logs, DateTime since)
+{
+    private readonly EventLogCursor _system = new("System", since);
+    private readonly EventLogCursor _application = new("Application", since);
+    private int _hardware;
+    private int _pciExpress;
+    private int _windows;
+
+    /// <summary>Compteurs depuis le début du relevé et, dans <see cref="ErrorWatchResult.Events"/>, les seuls nouveaux événements, du plus récent au plus ancien.</summary>
+    public ErrorWatchResult Poll()
+    {
+        var events = new List<WatchedEvent>();
+        var incomplete = !ReadInto(events, _system, system: true);
+        incomplete |= !ReadInto(events, _application, system: false);
+
+        _hardware += events.Count(e => e.Hardware);
+        _pciExpress += events.Count(e => e.PciExpress);
+        _windows += events.Count(e => !e.Hardware);
+        events.Sort((a, b) => b.Time.CompareTo(a.Time));
+        return new ErrorWatchResult(_hardware, _pciExpress, _windows, events, incomplete);
+    }
+
+    private bool ReadInto(List<WatchedEvent> events, EventLogCursor cursor, bool system)
+    {
+        try
+        {
+            foreach (var e in logs.ReadNew(cursor, (level, provider, id) => Select(system, level, provider, id)))
+            {
+                var hardware = system && ErrorWatch.IsWhea(e.Provider, e.Id);
+                events.Add(new WatchedEvent(e.TimeCreated, cursor.LogName, e.Provider, e.Id, e.Message, hardware, hardware && ErrorWatch.IsPciExpress(e)));
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException or System.Diagnostics.Eventing.Reader.EventLogException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Seul WHEA a besoin des données nommées (« PCI Express » s'y lit parfois) : pas d'analyse XML pour le reste.</summary>
+    private static EventDetail Select(bool system, int level, string provider, int id)
+    {
+        if (system && ErrorWatch.IsWhea(provider, id))
+        {
+            return EventDetail.MessageAndData;
+        }
+
+        return ErrorWatch.IsWindowsError(provider, level) ? EventDetail.Message : EventDetail.Skip;
     }
 }

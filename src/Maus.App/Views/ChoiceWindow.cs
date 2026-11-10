@@ -6,21 +6,13 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.App.Views;
 
 /// <summary>Choix d'un élément dans une courte liste (sauvegardes de pilotes listées par le moteur).</summary>
-public sealed class ChoiceWindow : Window
+public sealed class ChoiceWindow : MausDialog
 {
-    private readonly ListBox _list = new() { MinHeight = 160, Margin = new Thickness(0, 10, 0, 12) };
+    private readonly ListBox _list = new() { MinHeight = 160, MaxHeight = 360, Margin = new Thickness(0, 10, 0, 12) };
 
     private ChoiceWindow(string title, string message, IReadOnlyList<string> items)
+        : base(title, 520)
     {
-        Title = title;
-        Width = 520;
-        SizeToContent = SizeToContent.Height;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
-        Owner = Application.Current?.MainWindow;
-        SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
-        SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
-
         foreach (var item in items)
         {
             _list.Items.Add(item);
@@ -32,9 +24,7 @@ public sealed class ChoiceWindow : Window
         var ok = new Button { Content = T("Choisir"), IsDefault = true, MinWidth = 110, Margin = new Thickness(0, 0, 8, 0) };
         ok.Click += (_, _) => DialogResult = _list.SelectedItem is not null;
         var cancel = new Button { Content = T("Annuler"), IsCancel = true, MinWidth = 110 };
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        buttons.Children.Add(ok);
-        buttons.Children.Add(cancel);
+        var buttons = ButtonRow(ok, cancel);
 
         var panel = new StackPanel { Margin = new Thickness(18) };
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });

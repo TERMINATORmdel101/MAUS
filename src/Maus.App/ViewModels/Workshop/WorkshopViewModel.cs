@@ -11,8 +11,9 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.App.ViewModels.Workshop;
 
 /// <summary>
-/// Atelier matériel : « Mon PC », « En direct », « Processus », « Tests ». Les mesures ne tournent que lorsque
-/// l'atelier est affiché (ou qu'un test est en cours), pour ne rien consommer le reste du temps.
+/// Atelier matériel, en trois entrées (0.8.6) : « Mon PC » (fiche, stockage, mémoire, pilotes), « En direct » (capteurs,
+/// processus), « Tests ». Les mesures ne tournent que lorsque l'atelier est affiché (ou qu'un test est en cours), pour ne
+/// rien consommer le reste du temps.
 /// </summary>
 public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 {
@@ -21,6 +22,10 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     public const int SectionProcesses = 2;
     public const int SectionTests = 3;
     public const int SectionStorage = 4;
+
+    public const int GroupPc = 0;
+    public const int GroupLive = 1;
+    public const int GroupTests = 2;
 
     private readonly Func<string, string, bool> _confirm;
     private readonly IPreferencesStore _preferences;
@@ -35,7 +40,11 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 
     private bool _isActive;
     private bool _monitorOpen;
+    private bool _stopped;
     private int _section;
+
+    /// <summary>Dernière section ouverte dans chaque entrée : y revenir ne ramène pas à la première.</summary>
+    private readonly int[] _lastInGroup = [SectionPc, SectionLive, SectionTests];
     private bool _inventoryLoaded;
     private MachineDetails? _details;
     private bool _sampling;
@@ -47,6 +56,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     private TestOption<SearchEngine> _searchEngine;
     private bool _isDiagnosing;
     private string _diagnosisStatus = string.Empty;
+    private string _lastRestartText = string.Empty;
     private Action? _stopTest;
     private bool _isTesting;
     private double _cpuProgress;
@@ -80,7 +90,8 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             new("Google", SearchEngine.Google),
             new("Bing", SearchEngine.Bing),
         ];
-        _searchEngine = SearchEngines.FirstOrDefault(e => e.Value == _preferences.Load().SearchEngine) ?? SearchEngines[0];
+        var saved = _preferences.Load();
+        _searchEngine = SearchEngines.FirstOrDefault(e => e.Value == saved.SearchEngine) ?? SearchEngines[0];
         CpuDurations =
         [
             new(T("1 minute (rapide)"), TimeSpan.FromMinutes(1)),
@@ -114,10 +125,12 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             new(T("4 heures (idéal pour une nuit)"), TimeSpan.FromHours(4)),
         ];
         _coreDuration = CoreDurations[1];
-        _crashNotice = DescribeCrash(_checkpoint.Load());
+        _crashNotice = DescribeCrash(_checkpoint.Load(), DateTimeOffset.Now - TimeSpan.FromMilliseconds(Environment.TickCount64));
+        PropertyChanged += OnTestValueChanged;
+        EngineHost.ElevationChanged += OnElevationChanged;
 
-        SearchProcessCommand = new AsyncCommand(() => Run(() => { if (SelectedProcess is { } p) { OpenSearch(WebSearch.ForProcess(p.Name)); } }));
-        ShowProcessCommand = new AsyncCommand(() => Run(() => { if (SelectedProcess?.Sample.Path is { } path) { ShellLauncher.ShowInFolder(path); } }));
+        SearchProcessCommand = new AsyncCommand(() => { if (SelectedProcess is { } p) { OpenSearch(WebSearch.ForProcess(p.Name)); } });
+        ShowProcessCommand = new AsyncCommand(() => { if (SelectedProcess?.Sample.Path is { } path) { ShellLauncher.ShowInFolder(path); } });
         TerminateCommand = new AsyncCommand(TerminateAsync);
         DiagnoseCommand = new AsyncCommand(DiagnoseAsync);
         StartCpuTestCommand = new AsyncCommand(RunCpuTestAsync);
@@ -125,10 +138,10 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         StartVramTestCommand = new AsyncCommand(RunVramTestAsync);
         StartCoreTestCommand = new AsyncCommand(RunCoreTestAsync);
         ScanCommand = new AsyncCommand(ScanAsync);
-        UpCommand = new AsyncCommand(() => Run(GoUp));
-        OpenCurrentFolderCommand = new AsyncCommand(() => Run(() => { if (_current is { } node) { ShellLauncher.OpenFolder(node.Path); } }));
-        StorageSettingsCommand = new AsyncCommand(() => Run(() => ShellLauncher.OpenSettings("ms-settings:storagesense")));
-        StopScanCommand = new AsyncCommand(() => Run(() => _stopScan?.Invoke()));
+        UpCommand = new AsyncCommand(GoUp);
+        OpenCurrentFolderCommand = new AsyncCommand(() => { if (_current is { } node) { ShellLauncher.OpenFolder(node.Path); } });
+        StorageSettingsCommand = new AsyncCommand(() => ShellLauncher.OpenSettings("ms-settings:storagesense"));
+        StopScanCommand = new AsyncCommand(() => _stopScan?.Invoke());
         StartDiskTestCommand = new AsyncCommand(RunDiskTestAsync);
         DiskSizes =
         [
@@ -136,12 +149,21 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             new(T("4 Go (plus fiable)"), 4L << 30),
         ];
         _diskSize = DiskSizes[0];
-        DismissCrashCommand = new AsyncCommand(() => Run(() =>
+        DismissCrashCommand = new AsyncCommand(() =>
         {
-            _checkpoint.Clear();
+            // Pendant un test, la trace est celle du test en cours : elle sert encore.
+            if (!Busy)
+            {
+                _checkpoint.Clear();
+            }
+
             CrashNotice = null;
-        }));
-        StopTestCommand = new AsyncCommand(() => Run(() => _stopTest?.Invoke()));
+        });
+        StopTestCommand = new AsyncCommand(() =>
+        {
+            _seriesStopped = true;
+            _stopTest?.Invoke();
+        });
     }
 
     public LiveViewModel Live { get; } = new();
@@ -156,22 +178,14 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     {
         if (Components.Count == 0)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var text = T("Fiche du PC relevée par MAUS {0} le {1}", Maus.Core.AppVersion.Display, DateTime.Now.ToString("g", Culture)) +
             Environment.NewLine + Environment.NewLine + ComponentCardViewModel.ToText(Components);
-        try
-        {
-            System.Windows.Clipboard.SetText(Maus.Core.Reporting.PrivacyFilter.ForCurrentUser().Mask(text));
-            InventoryStatus = T("Fiche copiée (nom d'utilisateur, nom du PC et e-mails masqués) : collez-la avec Ctrl+V.");
-        }
-        catch (System.Runtime.InteropServices.ExternalException)
-        {
-            InventoryStatus = T("Le presse-papiers est occupé : réessayez.");
-        }
-
-        return Task.CompletedTask;
+        InventoryStatus = ClipboardText.TryCopy(text)
+            ? T("Fiche copiée (nom d'utilisateur, nom du PC et e-mails masqués) : collez-la avec Ctrl+V.")
+            : ClipboardText.Busy;
     });
 
     private ICommand? _copyInventory;
@@ -214,10 +228,41 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _section, value))
             {
+                _lastInGroup[Group] = value;
+                OnPropertyChanged(nameof(Group));
+                OnPropertyChanged(nameof(ShowPcSections));
+                OnPropertyChanged(nameof(ShowLiveSections));
                 RefreshActivity();
             }
         }
     }
+
+    /// <summary>
+    /// Entrée affichée. Les sections gardent leur numéro : la dernière ouverte reste retenue dans les choix, et les liens de
+    /// l'accueil continuent de mener à la bonne.
+    /// </summary>
+    public int Group
+    {
+        get => GroupOf(_section);
+        set
+        {
+            if (value is >= GroupPc and <= GroupTests && value != Group)
+            {
+                Section = _lastInGroup[value];
+            }
+        }
+    }
+
+    public bool ShowPcSections => Group == GroupPc;
+
+    public bool ShowLiveSections => Group == GroupLive;
+
+    private static int GroupOf(int section) => section switch
+    {
+        SectionLive or SectionProcesses => GroupLive,
+        SectionTests => GroupTests,
+        _ => GroupPc,
+    };
 
     public ProcessRowViewModel? SelectedProcess
     {
@@ -283,6 +328,21 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         get => _diagnosisStatus;
         private set => SetProperty(ref _diagnosisStatus, value);
     }
+
+    /// <summary>Le dernier vrai redémarrage, à côté du diagnostic et hors des causes : aucun lien avec la lenteur n'est prouvé.</summary>
+    public string LastRestartText
+    {
+        get => _lastRestartText;
+        private set
+        {
+            if (SetProperty(ref _lastRestartText, value))
+            {
+                OnPropertyChanged(nameof(HasLastRestart));
+            }
+        }
+    }
+
+    public bool HasLastRestart => LastRestartText.Length > 0;
 
     public IReadOnlyList<TestOption<TimeSpan>> CpuDurations { get; }
 
@@ -352,7 +412,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     private CpuTemperatureWatch CpuTemperatureState()
     {
         var installed = _sensors is not null ? IsPawnIoInstalled : PawnIo.State(new WindowsRegistryReader()).Installed;
-        return ThermalWatchdog.Assess(Live.Samples.LastOrDefault(), Live.CpuMaxC, installed);
+        return ThermalWatchdog.Assess(Live.Samples.LastOrDefault(), Live.CpuMaxC, installed, EngineHasRights);
     }
 
     /// <summary>Mesures montrées pendant un test : processeur (tests processeur, mémoire, cœur par cœur) ou carte graphique (mémoire vidéo).</summary>
@@ -390,12 +450,33 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     /// <summary>Un test prépare son lancement (lecture des cœurs, des programmes actifs, confirmation) : aucun autre ne part.</summary>
     private bool _preparing;
 
-    private bool Busy => IsTesting || _preparing;
+    private bool Busy => IsTesting || _preparing || IsBenchmarkRunning;
 
     private void SetPreparing(bool value)
     {
         _preparing = value;
         OnPropertyChanged(nameof(IsIdle));
+    }
+
+    /// <summary>Une seule erreur suffit à dire qu'un PC n'est pas stable : un arrêt du test ne l'efface pas.</summary>
+    private static string ErrorsBeforeStop(long errors) =>
+        errors > 0 ? " " + T("{0} erreur(s) trouvée(s) avant l'arrêt : ce PC n'est pas stable dans ces conditions.", errors) : string.Empty;
+
+    /// <summary>
+    /// Mesure fraîche avant la confirmation d'un test : les mesures ne tournent pas sur cet onglet, et ce que la confirmation
+    /// annonce (mémoire libre, arrêt sur la chaleur) en dépend. Aucun autre test ne part pendant ce temps.
+    /// </summary>
+    private async Task SampleBeforeTestAsync()
+    {
+        SetPreparing(true);
+        try
+        {
+            await SampleLiveAsync();
+        }
+        finally
+        {
+            SetPreparing(false);
+        }
     }
 
     public double CpuProgress
@@ -429,6 +510,14 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     public ICommand TerminateCommand { get; }
 
     public ICommand DiagnoseCommand { get; }
+
+    /// <summary>Ouvre les constats d'un module (posé par la fenêtre principale).</summary>
+    public Action<string>? OpenModuleFindings { get; init; }
+
+    /// <summary>La fiche du PC vient d'être lue.</summary>
+    public Func<HardwareInventory, Task>? InventoryRead { get; init; }
+
+    public bool HasCauses => ProcessList.Causes.Count > 0;
 
     public ICommand StartCpuTestCommand { get; }
 
@@ -516,9 +605,34 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     /// <summary>Fermeture : comme <see cref="Stop"/>, qui rend aussi les ressources de Windows (pilote, requêtes PDH).</summary>
     public void Dispose() => Stop();
 
+    /// <summary>Note la température la plus haute vue en direct, pour la courbe sur plusieurs semaines. Un échec est sans conséquence.</summary>
+    private void RecordPeakTemperatures()
+    {
+        try
+        {
+            var history = BenchmarkHistory.CreateMeasures();
+            var now = DateTimeOffset.Now;
+            if (Live.TakePeakCpu() is { } cpu)
+            {
+                history.Add(MeasureHistory.Peak("cpu", T("Processeur : température maximale"), cpu, now));
+            }
+
+            if (Live.TakePeakGpu() is { } gpu)
+            {
+                history.Add(MeasureHistory.Peak("gpu", T("Carte graphique : température maximale"), gpu, now));
+            }
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Maus.Core.Diagnostics.Breadcrumbs.Add("températures maximales non enregistrées");
+        }
+    }
+
     /// <summary>Arrête les mesures et un test en cours (fermeture de la fenêtre, changement de langue).</summary>
     public void Stop()
     {
+        _stopped = true;
+        RecordPeakTemperatures();
         _isActive = false;
         _monitorOpen = false;
         if (_stopTest is not null)
@@ -535,6 +649,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         _liveTimer.Stop();
         _processTimer.Stop();
         Appearance.AppearanceManager.Changed -= OnAppearanceChanged;
+        EngineHost.ElevationChanged -= OnElevationChanged;
 
         // Referme le pilote (LibreHardwareMonitor) une fois la dernière mesure terminée.
         var sensors = _sensors;
@@ -593,7 +708,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     /// <summary>Erreur imprévue pendant une actualisation : affichée dans la partie de l'atelier concernée.</summary>
     private void ShowActivityError(Exception ex)
     {
-        var message = T("Cette partie de l'atelier n'a pas pu être actualisée : {0}", ex.Message);
+        var message = T("Cette partie de l'atelier n'a pas pu être actualisée : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         switch (Section)
         {
             case SectionLive or SectionTests:
@@ -619,6 +734,11 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 
     private async Task RefreshActivityAsync()
     {
+        if (_stopped)
+        {
+            return;
+        }
+
         if (IsActive && Section == SectionPc && !_inventoryLoaded)
         {
             await LoadInventoryAsync();
@@ -685,12 +805,16 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                 : reading.Spd is null
                     ? T("Profils XMP / EXPO illisibles : la carte mère bloque peut-être l'accès au bus SMBus. Le reste de la fiche est lu sans pilote.")
                     : T("Lu dans le matériel et le BIOS ; profils XMP / EXPO lus dans la puce SPD de chaque barrette par PawnIO, sans rien modifier.");
+            if (InventoryRead is { } inventoryRead)
+            {
+                await inventoryRead(reading.Inventory);
+            }
         }
         catch (Exception ex)
         {
             _inventoryLoaded = false;
             Maus.Core.Diagnostics.CrashLog.Write(ex, "atelier : matériel");
-            InventoryStatus = T("La lecture du matériel a échoué : {0}", ex.Message);
+            InventoryStatus = T("La lecture du matériel a échoué : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
@@ -701,7 +825,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
     private void ShowInventory(HardwareInventory inventory, SafetyLimits limits, IReadOnlyList<SpdModule>? spd)
     {
         Components.Clear();
-        foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd, _details, batteryReport: OpenBatteryReportAsync))
+        foreach (var card in ComponentCardViewModel.From(inventory, limits, reference => OpenSearch(WebSearch.ForComponent(reference)), spd, _details, batteryReport: OpenBatteryReportAsync, batteryHistory: ReadBatteryHistoryAsync))
         {
             Components.Add(card);
         }
@@ -722,7 +846,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             _sensors ??= await Task.Run(CreateSensors);
             var snapshot = await Task.Run(_sensors.Sample);
             // Le chien de garde d'abord : l'arrêt automatique ne dépend pas de l'affichage.
-            if (_watchdog.Record(snapshot, Live.CpuMaxC, IsPawnIoInstalled) is > 0 and var failures)
+            if (_watchdog.Record(snapshot, Live.CpuMaxC, IsPawnIoInstalled, EngineHasRights) is > 0 and var failures)
             {
                 Maus.Core.Diagnostics.Breadcrumbs.Add($"mesures en direct rétablies après {failures} échec(s)");
             }
@@ -744,22 +868,22 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             // Une mesure impossible ne doit jamais faire tomber la fenêtre. Premier échec d'une série noté (pas un par seconde).
-            if (_watchdog.RecordFailure(ex.Message) == 1)
+            if (_watchdog.RecordFailure(Maus.Core.Diagnostics.ErrorText.For(ex)) == 1)
             {
                 Maus.Core.Diagnostics.Breadcrumbs.Add("mesure en direct en échec (" + ex.GetType().Name + ")");
             }
 
             Live.Alarms.Clear();
-            if (IsTesting)
+            if (IsTesting || _monitorOpen)
             {
                 // Pendant un test, les mesures continuent : l'arrêt automatique en dépend. Si elles ne reviennent pas, le chien
                 // de garde arrête le test par prudence.
-                Live.Alarms.Add(T("Une mesure en direct a échoué : {0}. MAUS réessaie à chaque mesure ; si les mesures ne reviennent pas d'ici {1:0} s, le test s'arrêtera par prudence.", ex.Message, ThermalWatchdog.Grace.TotalSeconds));
+                Live.Alarms.Add(T("Une mesure en direct a échoué : {0}. MAUS réessaie à chaque mesure ; si les mesures ne reviennent pas d'ici {1:0} s, le test s'arrêtera par prudence.", Maus.Core.Diagnostics.ErrorText.For(ex), ThermalWatchdog.Grace.TotalSeconds));
             }
             else
             {
                 _liveTimer.Stop();
-                Live.Alarms.Add(T("Les mesures en direct se sont arrêtées : {0}", ex.Message));
+                Live.Alarms.Add(T("Les mesures en direct se sont arrêtées : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
             }
         }
         finally
@@ -788,7 +912,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             _processTimer.Stop();
-            DiagnosisStatus = T("La liste des processus n'a pas pu être lue : {0}", ex.Message);
+            DiagnosisStatus = T("La liste des processus n'a pas pu être lue : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
@@ -796,23 +920,42 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         }
     }
 
+    private const int MaxProcessRows = 200;
+
+    private string _processListNote = string.Empty;
+
+    /// <summary>Dit que la liste des processus est coupée ; vide sinon.</summary>
+    public string ProcessListNote
+    {
+        get => _processListNote;
+        private set
+        {
+            if (SetProperty(ref _processListNote, value))
+            {
+                OnPropertyChanged(nameof(HasProcessListNote));
+            }
+        }
+    }
+
+    public bool HasProcessListNote => ProcessListNote.Length > 0;
+
     private void ShowProcesses()
     {
         var selected = SelectedProcess?.Pid;
         var folders = SystemFolders.Current;
-        var rows = _lastProcesses
+        var all = _lastProcesses
             .Where(p => Filter.Length == 0 || p.Name.Contains(Filter, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(p => p.CpuPercent).ThenByDescending(p => p.PrivateBytes)
-            .Take(200)
-            .Select(p => new ProcessRowViewModel(p, _catalog, folders))
             .ToList();
-        ProcessList.Rows.Clear();
-        foreach (var row in rows)
-        {
-            ProcessList.Rows.Add(row);
-        }
 
-        SelectedProcess = rows.FirstOrDefault(r => r.Pid == selected);
+        // La liste est coupée : un programme discret à l'emplacement inhabituel n'en sort pas, et l'écran dit qu'elle est coupée.
+        var samples = all
+            .OrderByDescending(p => ProcessRules.TrustOf(p, folders) == ProcessTrust.Unusual)
+            .Take(MaxProcessRows)
+            .ToList();
+        ProcessListNote = all.Count > MaxProcessRows ? T("{0} processus sur {1} : cherchez par nom pour voir les autres.", MaxProcessRows, all.Count) : string.Empty;
+        ProcessList.Show(samples, _catalog, folders);
+        SelectedProcess = ProcessList.Rows.FirstOrDefault(r => r.Pid == selected);
     }
 
     private async Task TerminateAsync()
@@ -822,7 +965,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (!_confirm(T("Arrêter ce processus ?"), T("« {0} » va être arrêté immédiatement : son travail non enregistré sera perdu.", process.Name) + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Arrêter ce processus ?"), Maus.Core.Reporting.ConfirmationText.Build(T("« {0} » va être arrêté immédiatement : son travail non enregistré sera perdu.", process.Name), undo: T("aucun ; un programme arrêté ne se relance pas tout seul."))))
         {
             return;
         }
@@ -835,7 +978,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            DiagnosisStatus = ex.Message;
+            DiagnosisStatus = Maus.Core.Diagnostics.ErrorText.For(ex);
         }
 
         await SampleProcessesAsync();
@@ -850,26 +993,47 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 
         IsDiagnosing = true;
         ProcessList.Causes.Clear();
+        LastRestartText = string.Empty;
+        OnPropertyChanged(nameof(HasCauses));
         await RefreshActivityAsync();
         try
         {
+            var started = DateTimeOffset.Now;
             for (var second = 60; second > 0; second--)
             {
                 DiagnosisStatus = T("Mesure en cours : encore {0} s. Utilisez votre PC normalement pendant ce temps.", second);
                 await Task.Delay(1000);
             }
 
-            var causes = SlownessDiagnosis.Analyze(Live.Samples, _lastProcesses, _catalog);
+            // Les mesures de cette minute seulement : l'historique garde aussi celles d'il y a peut-être des heures.
+            var causes = SlownessDiagnosis.Analyze(Live.Samples.Where(s => s.At >= started).ToList(), _lastProcesses, _catalog, Live.CpuMaxC);
             foreach (var cause in causes)
             {
-                ProcessList.Causes.Add(new CauseViewModel(cause.Title, cause.Explanation, cause.ModuleId is null ? string.Empty : T("Voir le module {0}", cause.ModuleId)));
+                var moduleId = cause.ModuleId;
+                ProcessList.Causes.Add(new CauseViewModel(cause.Title, cause.Explanation, moduleId is null ? string.Empty : T("Voir les constats du module {0}", moduleId),
+                    moduleId is null ? null : new AsyncCommand(() =>
+                    {
+                        OpenModuleFindings?.Invoke(moduleId);
+                    })));
             }
 
-            DiagnosisStatus = T("Diagnostic terminé : voici les causes principales, de la plus importante à la moins importante.");
+            OnPropertyChanged(nameof(HasCauses));
+
+            // Lecture d'appoint : son échec ne retire pas les causes déjà affichées.
+            try
+            {
+                LastRestartText = await Task.Run(() => LastRestart.Read(new WindowsEventLogReader(), new WmiCimReader(), new WindowsRegistryReader()).Text);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                LastRestartText = T("La date du dernier vrai redémarrage de Windows n'a pas pu être lue.");
+            }
+
+            DiagnosisStatus = T("Diagnostic terminé : voici les causes principales, de la plus importante à la moins importante.") + " " + SlownessDiagnosis.ThresholdNote;
         }
         catch (Exception ex)
         {
-            DiagnosisStatus = T("Le diagnostic n'a pas pu aboutir : {0}", ex.Message);
+            DiagnosisStatus = T("Le diagnostic n'a pas pu aboutir : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
@@ -885,17 +1049,16 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             return;
         }
 
+        await SampleBeforeTestAsync();
         var duration = CpuDuration.Value;
         var mode = CpuMode.Value;
         var heavyWarning = HeavyWarning(CpuMode) + TemperatureCaveat();
-        if (!_confirm(T("Lancer le test du processeur ?"), T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + heavyWarning + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!Ask(T("Lancer le test du processeur ?"), Maus.Core.Reporting.ConfirmationText.Build(T("Tous les cœurs vont travailler à 100 % pendant {0} : le PC chauffera et ses ventilateurs accéléreront. Le test s'arrête tout seul si une température dangereuse est atteinte, et à tout moment avec « Arrêter le test ».", CpuDuration.Label) + heavyWarning, reminder: Maus.Core.Legal.Disclaimer.TestReminder)))
         {
             return;
         }
 
-        using var cancellation = new CancellationTokenSource();
-        await StartTestAsync(cancellation);
-        try
+        await RunGuardedTestAsync(status => CpuStatus = status, async cancellationToken =>
         {
             CpuStatus = T("Test en cours…");
             var progress = new Progress<CpuTestProgress>(p =>
@@ -903,8 +1066,8 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                 CpuProgress = Math.Min(100, 100 * p.Elapsed.TotalSeconds / duration.TotalSeconds);
                 CpuStatus = T("{0:0} s · {1} tours vérifiés · {2} erreur(s)", p.Elapsed.TotalSeconds, p.Rounds, p.Errors);
             });
-            var result = await CpuTest.RunAsync(new CpuTestOptions(duration, Environment.ProcessorCount, mode), progress, _watchdog.AbortReason, cancellation.Token);
-            CpuProgress = 100;
+            var result = await CpuTest.RunAsync(new CpuTestOptions(duration, Environment.ProcessorCount, mode), progress, _watchdog.AbortReason, cancellationToken);
+            CpuProgress = result.Aborted ? CpuProgress : 100;
             var history = BenchmarkHistory.CreateDefault();
             var previous = history.Load();
             // Un score par type de charge : ils ne se comparent pas entre eux.
@@ -915,26 +1078,18 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             }
 
             var comparison = BenchmarkHistory.CompareToPrevious(previous, entry) is { } delta
-                ? " " + T("({0:+0.0;-0.0;0} % par rapport à vos passages précédents)", delta)
+                ? " " + T("({0:+0.0;-0.0;0} % par rapport à vos mesures précédentes)", delta)
                 : string.Empty;
+            Report(result.Aborted ? TestOutcome.Stopped : !result.Verified ? TestOutcome.None : result.Stable ? TestOutcome.Good : TestOutcome.Problem);
             CpuStatus = result.Aborted
-                ? T("Test interrompu : {0}", result.AbortReason)
+                ? T("Test interrompu : {0}", result.AbortReason) + ErrorsBeforeStop(result.Errors)
                 : !result.Verified
                     ? T("Le test n'a rien vérifié (durée trop courte, ou arrêt dès le début) : pas de verdict.")
                 : result.Stable
                     ? T("Stable : aucune erreur de calcul en {0:0} s. Score : {1:0.0} tours par seconde.", result.Duration.TotalSeconds, result.Score) + comparison
                       + " " + T("Instructions : {0}", CpuStress.Instructions(result.Mode)) + "."
                     : T("INSTABLE : {0} erreur(s) de calcul. Revenez aux réglages d'origine du BIOS (surcadençage, tension) et vérifiez le refroidissement.", result.Errors);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            Maus.Core.Diagnostics.CrashLog.Write(ex, "atelier : test du processeur");
-            CpuStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
-        }
-        finally
-        {
-            await StopTestAsync();
-        }
+        }, crashLabel: "atelier : test du processeur");
     }
 
     private async Task RunRamTestAsync()
@@ -944,22 +1099,28 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var (total, available) = Live.Samples.LastOrDefault() is { MemoryTotalBytes: { } installed, MemoryUsedBytes: { } used } ? (installed, installed - used) : (8L << 30, 4L << 30);
-        var maximum = MemoryTest.MaximumBytes(available, total);
+        await SampleBeforeTestAsync();
+        if (Live.Samples.LastOrDefault() is not { MemoryTotalBytes: { } total, MemoryUsedBytes: { } used } sample
+            || DateTimeOffset.Now - sample.At > TimeSpan.FromMinutes(1))
+        {
+            RamStatus = T("MAUS n'a pas pu mesurer la mémoire libre : le test n'est pas lancé. Réessayez dans quelques secondes.");
+            return;
+        }
+
+        var available = total - used;
+        var maximum = MemoryTest.MaximumBytes(Math.Min(available, WindowsSensorSource.AvailableCommitBytes() ?? available), total);
         var bytes = RamSize.Value switch
         {
             0 => maximum,
             < 0 => Math.Min(MemoryTest.SuggestedBytes(available), maximum),
             _ => Math.Min(RamSize.Value, maximum),
         };
-        if (!_confirm(T("Lancer le test de la mémoire vive ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de mémoire. Fermez vos jeux et programmes lourds pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!Ask(T("Lancer le test de la mémoire vive ?"), Maus.Core.Reporting.ConfirmationText.Build(T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de mémoire. Fermez vos jeux et programmes lourds pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0), reminder: Maus.Core.Legal.Disclaimer.TestReminder)))
         {
             return;
         }
 
-        using var cancellation = new CancellationTokenSource();
-        await StartTestAsync(cancellation);
-        try
+        await RunGuardedTestAsync(status => RamStatus = status, async cancellationToken =>
         {
             RamStatus = T("Test en cours…");
             var progress = new Progress<MemoryTestProgress>(p =>
@@ -967,39 +1128,35 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                 RamProgress = p.Percent;
                 RamStatus = T("{0} · {1:0} % · {2} erreur(s)", p.Step, p.Percent, p.Errors);
             });
-            var result = await MemoryTest.RunAsync(new MemoryTestOptions(bytes), progress, _watchdog.AbortReason, cancellation.Token);
-            RamProgress = 100;
+            var result = await MemoryTest.RunAsync(new MemoryTestOptions(bytes), progress, _watchdog.AbortReason, cancellationToken);
+            RamProgress = result.Aborted ? RamProgress : 100;
             if (!result.Aborted && result.Verified)
             {
                 SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("ram", result.CopyGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now,
                     result.LatencyNanoseconds?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)));
             }
 
+            Report(result.Aborted ? TestOutcome.Stopped : !result.Verified ? TestOutcome.None : result.Stable ? TestOutcome.Good : TestOutcome.Problem);
             RamStatus = result.Aborted
-                ? result.AbortReason is { } reason ? T("Test interrompu : {0}", reason) : T("Test interrompu.")
+                ? (result.AbortReason is { } reason ? T("Test interrompu : {0}", reason) : T("Test interrompu.")) + ErrorsBeforeStop(result.Errors)
                 : !result.Verified
                     ? T("Le test n'a rien vérifié (durée trop courte, ou arrêt dès le début) : pas de verdict.")
                 : result.Stable
                     ? T("Aucune erreur sur {0:0.0} Go. Débit de copie : {1:0.0} Go/s · latence : {2:0.0} ns. (Un test sous Windows ne couvre pas la mémoire déjà utilisée : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)", result.TestedBytes / 1073741824.0, result.CopyGigabytesPerSecond, result.LatencyNanoseconds)
                     : T("ERREURS : {0} valeur(s) relue(s) différente(s). Revenez au profil mémoire d'origine dans le BIOS (voir Module 10), puis refaites le test ; si les erreurs restent, une barrette est probablement défaillante.", result.Errors);
-        }
-        catch (OutOfMemoryException)
-        {
-            RamStatus = T("Windows n'a pas pu réserver cette quantité de mémoire : fermez des applications ou choisissez une quantité plus petite.");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            RamStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
-        }
-        finally
-        {
-            await StopTestAsync();
-        }
+        }, failure: ex => ex is OutOfMemoryException
+            ? T("Windows n'a pas pu réserver cette quantité de mémoire : fermez des applications ou choisissez une quantité plus petite.")
+            : null);
     }
 
-    private static string? DescribeCrash(CoreTestCheckpoint? trace) => trace switch
+    /// <summary>
+    /// Message d'un test resté inachevé. Un gel finit toujours par un redémarrage : si le PC n'a pas redémarré depuis le début
+    /// du test (<paramref name="bootedAt"/>), c'est MAUS qui s'est fermé, et cela ne dit rien du réglage.
+    /// </summary>
+    internal static string? DescribeCrash(CoreTestCheckpoint? trace, DateTimeOffset bootedAt) => trace switch
     {
         null => null,
+        _ when trace.StartedAt > bootedAt => T("Le dernier test, lancé le {0:g}, ne s'est pas terminé : MAUS s'est fermé pendant le test, sans que le PC redémarre. Cela ne dit rien de vos réglages.", trace.StartedAt.ToLocalTime()),
         { Phase: 2 } => T("Le dernier programme complet, lancé le {0:g}, s'est arrêté brutalement pendant la phase des transitoires (tous les cœurs chargés puis arrêtés en même temps) : le PC a gelé ou redémarré. Le réglage global est trop bas pour les brusques variations de charge : remontez l'ensemble du Curve Optimizer de 2 ou 3 points (ou réduisez l'undervolt), puis refaites le programme.", trace.StartedAt.ToLocalTime()),
         { Phase: 1 } => T("Le dernier programme complet, lancé le {0:g}, s'est arrêté brutalement pendant la phase cœur par cœur, sur le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le programme.", trace.StartedAt.ToLocalTime(), trace.Core),
         _ => T("Le dernier test cœur par cœur, lancé le {0:g}, s'est arrêté brutalement pendant le cœur {1} : le PC a gelé ou redémarré. Le réglage de ce cœur (Curve Optimizer ou undervolt) est probablement trop bas : remontez-le de 2 ou 3 points (par exemple de −15 à −12), puis refaites le test.", trace.StartedAt.ToLocalTime(), trace.Core),
@@ -1013,76 +1170,43 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         }
 
         // Occupé dès le clic : la lecture des cœurs et la confirmation prennent du temps, aucun autre test ne doit partir.
-        SetPreparing(true);
-        try
-        {
-            await CoreTestAsync();
-        }
-        finally
-        {
-            SetPreparing(false);
-        }
+        await WithPreparingAsync(CoreTestAsync);
     }
 
     private async Task CoreTestAsync()
     {
-        IReadOnlyList<CpuCore> cores;
-        try
+        CrashNotice = null;
+        if (await ReadCoresAsync(status => CoreStatus = status) is not { } cores)
         {
-            cores = await Task.Run(_topology.Cores);
-        }
-        catch (Exception ex)
-        {
-            CoreStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
             return;
         }
 
-        if (cores.Count == 0)
-        {
-            CoreStatus = T("Windows n'a pas décrit les cœurs du processeur : le test cœur par cœur est impossible sur ce PC.");
-            return;
-        }
-
+        // Mesure fraîche : ce que la confirmation dit de l'arrêt sur la chaleur en dépend.
+        await SampleLiveAsync();
         var plan = CoreCycleTest.Plan(CoreDuration.Value, cores.Count) with { Load = CoreMode.Value };
-        if (!_confirm(T("Lancer le test cœur par cœur ?"), T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + HeavyWarning(CoreMode) + TemperatureCaveat() + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!_confirm(T("Lancer le test cœur par cœur ?"), Maus.Core.Reporting.ConfirmationText.Build(T("MAUS va faire travailler les {0} cœurs un par un, à leur fréquence maximale, avec des à-coups et des pauses, pendant {1}. Si le PC gèle ou redémarre, c'est que le réglage du cœur testé est trop bas : MAUS vous dira lequel au prochain lancement. Enregistrez votre travail avant de commencer.", cores.Count, CoreDuration.Label) + HeavyWarning(CoreMode) + TemperatureCaveat(), reminder: Maus.Core.Legal.Disclaimer.TestReminder)))
         {
             return;
         }
 
-        using var cancellation = new CancellationTokenSource();
-        await StartTestAsync(cancellation);
-        CoreChips.Clear();
-        var hybrid = cores.Select(c => c.EfficiencyClass).Distinct().Count() > 1;
-        var topClass = cores.Max(c => c.EfficiencyClass);
-        string Name(int index)
+        await RunGuardedTestAsync(status => CoreStatus = status, async cancellationToken =>
         {
-            var core = cores.First(c => c.Index == index);
-            return hybrid ? T("Cœur {0} ({1})", index, core.EfficiencyClass == topClass ? "P" : "E") : T("Cœur {0}", index);
-        }
-
-        try
-        {
+            CoreChips.Clear();
+            var name = CoreNamer(cores);
             CoreStatus = T("Test en cours…");
             var progress = new Progress<CoreCycleProgress>(p =>
             {
                 CoreProgress = p.Percent;
-                CoreStatus = T("{0} ({1}/{2}) · {3} · {4:0} % · {5} cœur(s) en erreur", Name(p.Core), p.Position + 1, p.CoreCount, p.Phase, p.Percent, p.FailedCores);
+                CoreStatus = T("{0} ({1}/{2}) · {3} · {4:0} % · {5} cœur(s) en erreur", name(p.Core), p.Position + 1, p.CoreCount, p.Phase, p.Percent, p.FailedCores);
             });
             var logs = new Maus.Core.Platform.WindowsEventLogReader();
-            var result = await CoreCycleTest.RunAsync(_topology, _checkpoint, plan, progress, _watchdog.AbortReason, since => WheaEvents.CountSince(logs, since), cancellation.Token);
-            CoreProgress = 100;
-            foreach (var verdict in result.Cores)
-            {
-                CoreChips.Add(new CoreChipViewModel(
-                    verdict.Froze ? T("{0} · figé", Name(verdict.Core))
-                        : verdict.Errors > 0 ? T("{0} · {1} erreur(s)", Name(verdict.Core), verdict.Errors)
-                        : verdict.Rounds > 0 ? T("{0} · stable", Name(verdict.Core)) : Name(verdict.Core),
-                    verdict.Froze || verdict.Errors > 0 ? Controls.Palette.Red : verdict.Rounds > 0 ? Controls.Palette.Green : Controls.Palette.Grey));
-            }
-
-            var failing = result.Cores.Where(c => !c.Stable).Select(c => Name(c.Core)).ToList();
+            var result = await CoreCycleTest.RunAsync(_topology, _checkpoint, plan, progress, _watchdog.AbortReason, since => WheaEvents.CountSince(logs, since), cancellationToken);
+            CoreProgress = result.Aborted ? CoreProgress : 100;
+            AddCoreChips(result.Cores, name);
+            var failing = result.Cores.Where(c => !c.Stable).Select(c => name(c.Core)).ToList();
             var whea = result.WheaEvents is > 0 ? " " + T("{0} erreur(s) matérielle(s) WHEA pendant le test : même sans plantage, le processeur est à la limite.", result.WheaEvents) : string.Empty;
             var pinning = result.Cores.Any(c => !c.Pinned) ? " " + T("Windows a refusé de fixer le test sur certains cœurs : le résultat par cœur est moins fiable.") : string.Empty;
+            Report(result.Aborted ? TestOutcome.Stopped : failing.Count > 0 || result.WheaEvents is > 0 ? TestOutcome.Problem : TestOutcome.Good);
             CoreStatus = result.Aborted
                 ? T("Test interrompu : {0}", result.AbortReason) + whea
                 : failing.Count > 0
@@ -1090,20 +1214,12 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                     : result.WheaEvents is > 0
                         ? T("Aucune erreur de calcul, mais le processeur a signalé des erreurs matérielles.") + whea + " " + T("Remontez légèrement le Curve Optimizer ou l'undervolt, puis refaites le test.")
                         : result.Untested.Count > 0
-                            ? T("Aucune erreur sur les cœurs testés, mais {0} cœur(s) n'ont pas été testés ({1}) : le test était trop court pour faire le tour. Allongez-le avant de conclure.", result.Untested.Count, string.Join(", ", result.Untested.Select(Name))) + pinning
+                            ? T("Aucune erreur sur les cœurs testés, mais {0} cœur(s) n'ont pas été testés ({1}) : le test était trop court pour faire le tour. Allongez-le avant de conclure.", result.Untested.Count, string.Join(", ", result.Untested.Select(name))) + pinning
                             : result.WheaEvents is null
                                 ? T("Aucune erreur de calcul ni gel sur {0} cœur(s).", result.Cores.Count) + " " + T("Le journal des erreurs matérielles (WHEA) n'a pas pu être lu : regardez-le dans l'Observateur d'événements avant de conclure.") + pinning
                                 : T("Tous les cœurs ont tenu : {0} cœur(s), aucune erreur de calcul, aucun gel, aucune erreur matérielle WHEA.", result.Cores.Count) + pinning + " "
                                     + T("Pour valider un réglage, laissez tourner au moins 20 minutes (idéalement une nuit), puis utilisez le PC normalement quelques jours : certains gels n'arrivent qu'au repos.");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            CoreStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
-        }
-        finally
-        {
-            await StopTestAsync();
-        }
+        });
     }
 
     private async Task LoadGpuAdaptersAsync()
@@ -1125,7 +1241,7 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            VramStatus = T("Direct3D ne répond pas sur ce PC : {0}", ex.Message);
+            VramStatus = T("Direct3D ne répond pas sur ce PC : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
     }
 
@@ -1143,14 +1259,12 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
             < 0 => Math.Min(VramTest.SuggestedBytes(adapter.DedicatedBytes), maximum),
             _ => Math.Min(VramSize.Value, maximum),
         };
-        if (!_confirm(T("Lancer le test de la mémoire vidéo ?"), T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de la mémoire de « {1} ». Fermez vos jeux et applications 3D pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0, adapter.Name) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!Ask(T("Lancer le test de la mémoire vidéo ?"), Maus.Core.Reporting.ConfirmationText.Build(T("MAUS va écrire puis relire des motifs sur {0:0.0} Go de la mémoire de « {1} ». Fermez vos jeux et applications 3D pendant le test ; il s'arrête à tout moment avec « Arrêter le test ».", bytes / 1073741824.0, adapter.Name), reminder: Maus.Core.Legal.Disclaimer.TestReminder)))
         {
             return;
         }
 
-        using var cancellation = new CancellationTokenSource();
-        await StartTestAsync(cancellation, graphics: true);
-        try
+        await RunGuardedTestAsync(status => VramStatus = status, async cancellationToken =>
         {
             VramStatus = T("Test en cours…");
             var progress = new Progress<VramTestProgress>(p =>
@@ -1158,15 +1272,16 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                 VramProgress = p.Percent;
                 VramStatus = T("{0} · {1:0} % · {2} erreur(s)", p.Step, p.Percent, p.Errors);
             });
-            var result = await VramTest.RunAsync(_gpuProvider, adapter, new VramTestOptions(bytes), progress, _watchdog.AbortReason, cancellation.Token);
-            VramProgress = 100;
+            var result = await VramTest.RunAsync(_gpuProvider, adapter, new VramTestOptions(bytes), progress, _watchdog.AbortReason, cancellationToken);
+            VramProgress = result.Aborted ? VramProgress : 100;
             if (!result.Aborted && result.Verified)
             {
-                SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("vram", result.ReadbackGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now, adapter.Name));
+                SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry(ScoreTrends.VramKind(adapter.Name), result.ReadbackGigabytesPerSecond ?? 0, result.Stable, DateTimeOffset.Now, adapter.Name));
             }
 
+            Report(result.Aborted ? TestOutcome.Stopped : !result.Verified ? TestOutcome.None : result.Stable ? TestOutcome.Good : TestOutcome.Problem);
             VramStatus = result.Aborted
-                ? T("Test interrompu : {0}", result.AbortReason)
+                ? T("Test interrompu : {0}", result.AbortReason) + ErrorsBeforeStop(result.Errors)
                 : !result.Verified
                     ? T("Le test n'a rien vérifié (durée trop courte, ou arrêt dès le début) : pas de verdict.")
                 : result.Stable
@@ -1174,10 +1289,29 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
                         + (result.CardWasFull ? " " + T("La carte n'avait plus de place libre : seule la mémoire disponible a été testée.") : string.Empty)
                         + " " + T("(La mémoire déjà utilisée par l'affichage n'est pas couverte : une erreur est un signal fort, l'absence d'erreur n'est pas une preuve absolue.)")
                     : T("ERREURS : {0} valeur(s) relue(s) différente(s) dans la mémoire vidéo. Revenez aux fréquences d'origine de la carte (outil de surcadençage, voir Module 15), vérifiez sa température, puis refaites le test ; si les erreurs restent, la carte est probablement défaillante.", result.Errors);
+        }, failure: ex => T("Direct3D ne répond pas sur ce PC : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)), graphics: true);
+    }
+
+    /// <summary>
+    /// Déroulé commun d'un test, après sa confirmation : démarrage (chien de garde compris), erreur affichée à la place du verdict,
+    /// et fin du test quoi qu'il arrive. <paramref name="failure"/> donne un message propre à ce test, <c>null</c> pour le message commun.
+    /// </summary>
+    private async Task RunGuardedTestAsync(Action<string> status, Func<CancellationToken, Task> body, string? crashLabel = null, Func<Exception, string?>? failure = null, bool graphics = false)
+    {
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            await StartTestAsync(cancellation, graphics);
+            await body(cancellation.Token);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            VramStatus = T("Direct3D ne répond pas sur ce PC : {0}", ex.Message);
+            if (crashLabel is not null)
+            {
+                Maus.Core.Diagnostics.CrashLog.Write(ex, crashLabel);
+            }
+
+            status(failure?.Invoke(ex) ?? T("Le test n'a pas pu se dérouler : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
         }
         finally
         {
@@ -1185,9 +1319,58 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Occupé pendant toute la préparation d'un test : aucun autre ne doit partir.</summary>
+    private async Task WithPreparingAsync(Func<Task> prepare)
+    {
+        SetPreparing(true);
+        try
+        {
+            await prepare();
+        }
+        finally
+        {
+            SetPreparing(false);
+        }
+    }
+
+    /// <summary>Cœurs du processeur, ou <c>null</c> si Windows ne les décrit pas : <paramref name="status"/> dit alors pourquoi.</summary>
+    private async Task<IReadOnlyList<CpuCore>?> ReadCoresAsync(Action<string> status)
+    {
+        try
+        {
+            var cores = await Task.Run(_topology.Cores);
+            if (cores.Count > 0)
+            {
+                return cores;
+            }
+
+            status(T("Windows n'a pas décrit les cœurs du processeur : le test cœur par cœur est impossible sur ce PC."));
+        }
+        catch (Exception ex)
+        {
+            status(T("Le test n'a pas pu se dérouler : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
+        }
+
+        return null;
+    }
+
+    /// <summary>Une pastille par cœur : figé, en erreur, stable ou non testé.</summary>
+    private void AddCoreChips(IEnumerable<CoreVerdict> verdicts, Func<int, string> name)
+    {
+        foreach (var verdict in verdicts)
+        {
+            CoreChips.Add(new CoreChipViewModel(
+                verdict.Froze ? T("{0} · figé", name(verdict.Core))
+                    : verdict.Errors > 0 ? T("{0} · {1} erreur(s)", name(verdict.Core), verdict.Errors)
+                    : verdict.Rounds > 0 ? T("{0} · stable", name(verdict.Core)) : name(verdict.Core),
+                verdict.Froze || verdict.Errors > 0 ? Controls.Palette.Red : verdict.Rounds > 0 ? Controls.Palette.Green : Controls.Palette.Grey));
+        }
+    }
+
     private async Task StartTestAsync(CancellationTokenSource cancellation, bool graphics = false)
     {
         _stopTest = cancellation.Cancel;
+        Report(TestOutcome.None);
         // Pas de mise en veille programmée pendant un test (appelé et levé sur le fil de l'interface).
         KeepAwake.Begin();
         _graphicsTest = graphics;
@@ -1227,23 +1410,20 @@ public sealed partial class WorkshopViewModel : ObservableObject, IDisposable
 
     private void OpenSearch(string query) => ShellLauncher.OpenUrl(WebSearch.Build(SearchEngineChoice.Value, query));
 
-    /// <summary>Rapport de batterie de Windows (powercfg), écrit par le moteur puis ouvert dans le navigateur.</summary>
+    /// <summary>Capacité passée de la batterie (powercfg, en XML), lue ici avec les droits de l'interface : le moteur n'y prend aucune part.</summary>
+    private static Task<Maus.Core.Workshop.BatteryHistoryResult> ReadBatteryHistoryAsync() =>
+        Task.Run(() => Maus.Core.Workshop.BatteryReport.ReadHistoryAsync(new Maus.Core.Platform.ReadOnlyCommandRunner(), CancellationToken.None));
+
+    /// <summary>Rapport de batterie de Windows (powercfg), fait ici avec les droits de l'interface, puis ouvert dans le navigateur.</summary>
     private async Task OpenBatteryReportAsync()
     {
-        var file = await EngineHost.Current.CreateBatteryReportAsync(CancellationToken.None);
-        if (file is null)
+        var report = await Task.Run(() => Maus.Core.Workshop.BatteryReport.CreateAsync(new Maus.Core.Platform.ReadOnlyCommandRunner(), CancellationToken.None));
+        if (report.File is null)
         {
-            System.Windows.MessageBox.Show(T("Windows n'a pas pu faire le rapport de batterie (aucune batterie détectée, ou rapport refusé)."), "MAUS",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            Views.QuestionWindow.Inform("MAUS", report.Refusal ?? T("Windows n'a pas pu faire le rapport de batterie (aucune batterie détectée, ou rapport refusé)."), Views.QuestionTone.Information);
             return;
         }
 
-        ShellLauncher.OpenFile(file);
-    }
-
-    private static Task Run(Action action)
-    {
-        action();
-        return Task.CompletedTask;
+        ShellLauncher.OpenFile(report.File);
     }
 }

@@ -15,8 +15,15 @@ public enum ThermalTarget
 /// <summary>Ce que MAUS sait de l'arrêt automatique sur la chaleur du processeur.</summary>
 public enum CpuTemperatureWatch
 {
-    /// <summary>Température et limite du processeur lues : l'arrêt automatique sur ce critère fonctionne.</summary>
+    /// <summary>Température et limite du processeur lues, et la lecture peut dépasser la limite : l'arrêt automatique sur ce critère fonctionne.</summary>
     Watched,
+
+    /// <summary>
+    /// Température lue, mais elle s'arrête à la limite donnée par le processeur : Intel la calcule d'après la distance à cette
+    /// limite, jamais négative. MAUS voit que le processeur l'atteint, pas qu'il la dépasse : le test s'arrête donc s'il y
+    /// reste trop longtemps (<see cref="ThermalWatchdog.AtLimitTime"/>).
+    /// </summary>
+    CappedAtLimit,
 
     /// <summary>Aucune mesure encore, pilote PawnIO installé : la température devrait arriver avec les premières mesures.</summary>
     Pending,
@@ -26,6 +33,9 @@ public enum CpuTemperatureWatch
 
     /// <summary>Pilote installé, mais la température du processeur n'est pas lue (pilote occupé, en panne, ou processeur non reconnu).</summary>
     NoTemperature,
+
+    /// <summary>Pilote installé, mais MAUS est en mode limité : il faut les droits administrateur pour s'en servir.</summary>
+    NoRights,
 
     /// <summary>
     /// Température lue, mais limite inconnue (ni donnée par le processeur, ni dans le catalogue des seuils) : aucune alarme
@@ -40,6 +50,7 @@ public enum CpuTemperatureWatch
 /// heure, jamais d'après une alarme figée :
 /// <list type="bullet">
 /// <item>alarme « danger » dans la dernière mesure réussie : arrêt ;</item>
+/// <item>processeur dont la lecture s'arrête à sa limite, resté à cette limite pendant <see cref="AtLimitTime"/> : arrêt ;</item>
 /// <item>aucune mesure réussie depuis <see cref="Grace"/> (mesures en échec ou bloquées) : arrêt par prudence, plus rien ne
 /// surveille la chaleur ;</item>
 /// <item>la température du composant testé était lue avec sa limite, et ne l'est plus depuis <see cref="Grace"/> (pilote
@@ -56,6 +67,13 @@ public sealed class ThermalWatchdog
     /// </summary>
     public static readonly TimeSpan Grace = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Durée à la limite avant l'arrêt, choisie par MAUS, sans source publiée : assez longue pour qu'un pic de charge n'arrête
+    /// rien, assez courte pour qu'un ventilateur en panne ne laisse pas un test de plusieurs heures tourner ainsi. La limite
+    /// d'Intel n'est pas un danger immédiat : le test est arrêté par prudence, et il ne prouve plus la stabilité à pleine vitesse.
+    /// </summary>
+    public static readonly TimeSpan AtLimitTime = TimeSpan.FromMinutes(10);
+
     private readonly Func<TimeSpan> _clock;
     private readonly Lock _gate = new();
     private bool _running;
@@ -65,6 +83,7 @@ public sealed class ThermalWatchdog
     private TimeSpan? _lastSampleAt;
     private TimeSpan? _lastWatchedAt;
     private string? _danger;
+    private TimeSpan? _atLimitSince;
     private string? _lastFailure;
     private CpuTemperatureWatch _cpuWatch;
     private int _failures;
@@ -78,36 +97,32 @@ public sealed class ThermalWatchdog
         _clock = clock ?? (static () => TimeSpan.FromMilliseconds(Environment.TickCount64));
     }
 
-    /// <summary>Un test est surveillé.</summary>
-    public bool IsRunning
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _running;
-            }
-        }
-    }
-
     /// <summary>
     /// État de l'arrêt automatique sur la chaleur du processeur d'après la dernière mesure (sans mesure : présence du pilote).
     /// La limite est la même que celle des alarmes (<see cref="SensorAlarms.Check"/>) : celle du processeur, sinon celle du catalogue.
     /// </summary>
-    public static CpuTemperatureWatch Assess(SensorSnapshot? latest, int? cpuMaxC, bool pawnIoInstalled) => latest switch
+    /// <param name="engineElevated">Le moteur a les droits administrateur ; <c>false</c> en mode limité, où le pilote installé ne sert pas.</param>
+    public static CpuTemperatureWatch Assess(SensorSnapshot? latest, int? cpuMaxC, bool pawnIoInstalled, bool engineElevated = true) => latest switch
     {
+        null or { CpuTemperatureC: null } when pawnIoInstalled && !engineElevated => CpuTemperatureWatch.NoRights,
         null => pawnIoInstalled ? CpuTemperatureWatch.Pending : CpuTemperatureWatch.NoDriver,
         { CpuTemperatureC: null } => pawnIoInstalled ? CpuTemperatureWatch.NoTemperature : CpuTemperatureWatch.NoDriver,
-        { CpuTjMaxC: null } when cpuMaxC is null => CpuTemperatureWatch.NoLimit,
+        { CpuTjMaxC: not null } => CpuTemperatureWatch.CappedAtLimit,
+        _ when cpuMaxC is null => CpuTemperatureWatch.NoLimit,
         _ => CpuTemperatureWatch.Watched,
     };
+
+    /// <summary>La température du processeur est lue : si elle ne l'est plus, le test s'arrête par prudence.</summary>
+    private static bool IsRead(CpuTemperatureWatch watch) => watch is CpuTemperatureWatch.Watched or CpuTemperatureWatch.CappedAtLimit;
 
     /// <summary>Avertissement : le test ne pourra pas s'arrêter sur la chaleur du processeur, et pourquoi ; <c>null</c> sinon.</summary>
     public static string? Caveat(CpuTemperatureWatch watch) => watch switch
     {
         CpuTemperatureWatch.NoDriver => T("Sans le pilote PawnIO, MAUS ne lit pas la température du processeur : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant, mais installez PawnIO (onglet En direct) pour suivre sa température."),
         CpuTemperatureWatch.NoTemperature => T("Le pilote PawnIO est installé, mais MAUS ne lit pas la température du processeur en ce moment (voir l'onglet En direct) : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant. Un autre logiciel de surveillance du matériel occupe peut-être le pilote : fermez-le, puis relancez MAUS."),
+        CpuTemperatureWatch.NoRights => T("Le pilote PawnIO est installé, mais MAUS est en mode limité : il ne lit pas la température du processeur et ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant. Pour suivre sa température : bouton « Activer les capteurs avancés » (onglet En direct)."),
         CpuTemperatureWatch.NoLimit => T("MAUS lit la température du processeur, mais ne connaît pas la limite publiée pour ce modèle : il ne peut pas arrêter le test sur ce critère. Le processeur se protège lui-même en ralentissant ; gardez un œil sur la température affichée."),
+        CpuTemperatureWatch.CappedAtLimit => T("Sur ce processeur, la température lue s'arrête à sa limite : MAUS voit qu'il l'atteint, pas qu'il la dépasse. Il arrête donc le test si le processeur reste à sa limite pendant {0:0} minutes, une durée choisie par MAUS. Le processeur se protège aussi lui-même en ralentissant, puis en s'éteignant ; gardez un œil sur la température affichée.", AtLimitTime.TotalMinutes),
         _ => null,
     };
 
@@ -125,10 +140,11 @@ public sealed class ThermalWatchdog
             _startedAt = now;
             _lastSampleAt = null;
             _danger = null;
+            _atLimitSince = null;
             _lastFailure = null;
             _failures = 0;
             _cpuWatch = cpuAtStart;
-            _lastWatchedAt = target == ThermalTarget.Cpu && cpuAtStart == CpuTemperatureWatch.Watched ? now : null;
+            _lastWatchedAt = target == ThermalTarget.Cpu && IsRead(cpuAtStart) ? now : null;
             _pending = target == ThermalTarget.Cpu && cpuAtStart == CpuTemperatureWatch.Pending;
         }
     }
@@ -146,13 +162,14 @@ public sealed class ThermalWatchdog
     /// Mesure réussie (après chaque mesure en direct, test en cours ou non). Les alarmes sont recalculées ici, d'après cette
     /// mesure. Rend le nombre d'échecs qui la précédaient (0 d'habitude).
     /// </summary>
-    public int Record(SensorSnapshot snapshot, int? cpuMaxC, bool pawnIoInstalled)
+    public int Record(SensorSnapshot snapshot, int? cpuMaxC, bool pawnIoInstalled, bool engineElevated = true)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
         var danger = SensorAlarms.Check(snapshot, cpuMaxC).FirstOrDefault(a => a.Level == AlarmLevel.Danger)?.Message;
-        var cpuWatch = Assess(snapshot, cpuMaxC, pawnIoInstalled);
+        var cpuWatch = Assess(snapshot, cpuMaxC, pawnIoInstalled, engineElevated);
         var gpuWatched = snapshot.Gpus.Any(g => g is { TemperatureC: not null, SlowdownTemperatureC: not null });
+        var atLimit = snapshot is { CpuTemperatureC: { } cpu, CpuTjMaxC: { } max } && ThermalRules.CpuAtLimit(cpu, max);
         lock (_gate)
         {
             var now = _clock();
@@ -162,7 +179,8 @@ public sealed class ThermalWatchdog
             _lastSampleAt = now;
             _danger = danger;
             _cpuWatch = cpuWatch;
-            if (_target == ThermalTarget.Cpu ? cpuWatch == CpuTemperatureWatch.Watched : gpuWatched)
+            _atLimitSince = atLimit && _target == ThermalTarget.Cpu ? _atLimitSince ?? now : null;
+            if (_target == ThermalTarget.Cpu ? IsRead(cpuWatch) : gpuWatched)
             {
                 _lastWatchedAt = now;
             }
@@ -197,18 +215,23 @@ public sealed class ThermalWatchdog
             }
 
             var now = _clock();
+            if (_atLimitSince is { } since && now - since >= AtLimitTime)
+            {
+                return T("Le processeur reste à sa limite de température depuis {0:0} minutes : il ralentit pour se protéger, et le test ne prouve plus sa stabilité à pleine vitesse. Test arrêté par prudence : vérifiez le refroidissement (ventilateurs, poussière, pâte thermique) avant de recommencer.", (now - since).TotalMinutes);
+            }
+
             var silent = now - (_lastSampleAt ?? _startedAt);
             if (silent > Grace)
             {
-                var reason = T("Les mesures en direct ne répondent plus depuis {0:0} s : sans elles, l'arrêt automatique en cas de surchauffe ne peut plus fonctionner, d'où cet arrêt par prudence. Relancez le test ; si cela se reproduit, redémarrez MAUS.", silent.TotalSeconds);
+                var reason = T("Les mesures en direct ne répondent plus depuis {0:0} s : le test s'est arrêté par prudence, car sans elles sa protection contre la surchauffe ne peut plus jouer. Relancez le test ; si cela se reproduit, redémarrez MAUS.", silent.TotalSeconds);
                 return _lastFailure is { } failure ? reason + " " + T("Dernière erreur : {0}", failure) : reason;
             }
 
             if (_lastWatchedAt is { } seen && now - seen > Grace)
             {
                 return _target == ThermalTarget.Cpu
-                    ? T("La température du processeur n'est plus lue depuis {0:0} s : sans elle, l'arrêt automatique en cas de surchauffe ne peut plus fonctionner, d'où cet arrêt par prudence. Le pilote PawnIO ne répond peut-être plus (un autre logiciel de surveillance du matériel l'occupe parfois) : fermez les autres logiciels de surveillance, puis relancez le test.", (now - seen).TotalSeconds)
-                    : T("La température de la carte graphique n'est plus lue depuis {0:0} s : sans elle, l'arrêt automatique en cas de surchauffe ne peut plus fonctionner, d'où cet arrêt par prudence. Relancez le test.", (now - seen).TotalSeconds);
+                    ? T("La température du processeur n'est plus lue depuis {0:0} s : le test s'est arrêté par prudence, car sans elle sa protection contre la surchauffe ne peut plus jouer. Le pilote PawnIO ne répond peut-être plus (un autre logiciel de surveillance du matériel l'occupe parfois) : fermez les autres logiciels de surveillance, puis relancez le test.", (now - seen).TotalSeconds)
+                    : T("La température de la carte graphique n'est plus lue depuis {0:0} s : le test s'est arrêté par prudence, car sans elle sa protection contre la surchauffe ne peut plus jouer. Relancez le test.", (now - seen).TotalSeconds);
             }
 
             return null;

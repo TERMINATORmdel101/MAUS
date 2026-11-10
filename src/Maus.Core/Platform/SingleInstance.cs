@@ -8,18 +8,6 @@ public static partial class SingleInstance
 {
     private const int RestoreCommand = 9;
 
-    /// <summary>Autres processus « MAUS » (l'interface ; l'outil en ligne de commande s'appelle « maus » et n'en fait pas partie).</summary>
-    public static int OtherInterfaceProcesses()
-    {
-        var others = OtherInterfaces();
-        foreach (var process in others)
-        {
-            process.Dispose();
-        }
-
-        return others.Count;
-    }
-
     /// <summary>Ramène devant la fenêtre de l'autre MAUS ; <c>false</c> s'il n'en a aucune (MAUS bloqué, resté sans fenêtre).</summary>
     public static bool BringExistingToFront()
     {
@@ -60,7 +48,8 @@ public static partial class SingleInstance
         {
             using (process)
             {
-                if (MainWindowOf(process) != 0)
+                // Jamais le MAUS d'une autre session : il n'est pas bloqué, il appartient à quelqu'un d'autre.
+                if (MainWindowOf(process) != 0 || process.SessionId != System.Diagnostics.Process.GetCurrentProcess().SessionId)
                 {
                     continue;
                 }

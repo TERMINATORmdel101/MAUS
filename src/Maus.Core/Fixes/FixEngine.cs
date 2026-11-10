@@ -30,7 +30,15 @@ public sealed class FixEngine
             {
                 // Un constat marqué « voulu » ne produit jamais de correction.
                 var wanted = result.Findings.Where(f => f.AcknowledgedFrom is not null).Select(f => f.Id).ToHashSet(StringComparer.Ordinal);
-                changes.AddRange(module.Plan(context, result.Findings).Where(c => !wanted.Contains(c.FindingId ?? c.Id)));
+                try
+                {
+                    changes.AddRange(module.Plan(context, result.Findings).Where(c => !wanted.Contains(c.FindingId ?? c.Id)));
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // Comme à l'audit : un module en panne n'enlève pas les corrections des autres.
+                    Maus.Core.Diagnostics.Breadcrumbs.Add("plan du module " + module.Id + " impossible (" + ex.GetType().Name + ")");
+                }
             }
         }
 
@@ -42,7 +50,12 @@ public sealed class FixEngine
     {
         if (_context.Audit.Hardware.IsManaged)
         {
-            return T("Ce PC est géré par une organisation (domaine ou MDM) : MAUS n'y applique aucune correction. Adressez-vous à votre service informatique.");
+            return T("Ce PC est géré par une organisation (domaine d'entreprise ou gestion à distance) : MAUS n'y applique aucune correction. Adressez-vous à votre service informatique.");
+        }
+
+        if (_context.Audit.Hardware.ManagementUnknown)
+        {
+            return T("MAUS n'a pas pu lire si ce PC est géré par une organisation (domaine d'entreprise ou gestion à distance) : par prudence, il n'y applique aucune correction. Relancez l'audit ; si ce message revient, redémarrez le PC et vérifiez que le service « Infrastructure de gestion Windows » est démarré.");
         }
 
         return _context.Audit.IsElevated
@@ -68,11 +81,11 @@ public sealed class FixEngine
         RestorePointOutcome? restorePoint = null;
         if (options.CreateRestorePoint)
         {
-            restorePoint = new RestorePointCreator(_context.SystemRestore, _context.Settings)
+            restorePoint = new RestorePointCreator(_context.SystemRestore, _context.Settings, memo: _context.RestoreFrequencyMemo)
                 .Create(options.RestorePointDescription, options.EnableProtectionIfNeeded);
             if (!restorePoint.Succeeded && !options.ProceedWithoutRestorePoint)
             {
-                return ApplyResult.Block(restorePoint.Message + T(" Aucune modification n'a été faite."), restorePoint);
+                return ApplyResult.Block(T("Aucune correction n'a été appliquée."), restorePoint);
             }
         }
 
@@ -81,6 +94,7 @@ public sealed class FixEngine
             Id = JournalSession.NewId(Now),
             CreatedAt = Now,
             WindowsBuild = _context.Audit.Windows.Build,
+            UserSid = _context.UserSid,
             RestorePoint = restorePoint?.Point,
             RestorePointNote = restorePoint switch
             {
@@ -99,11 +113,18 @@ public sealed class FixEngine
                 outcomes.Add(ApplyOne(session, change, written));
             }
         }
-        catch (JournalUnsafeException ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            // Sans journal sûr, aucune écriture de plus : celles déjà faites sont défaites.
+            // Sans journal sûr, aucune écriture de plus : celles déjà faites sont défaites. Toute erreur compte, pas seulement
+            // celles que le journal annonce : aucune ne doit sortir d'ici en laissant des valeurs modifiées.
             RollBackSession(session);
-            return new ApplyResult(null, outcomes, restorePoint, ex.Message);
+            if (session.HasFailedRollback)
+            {
+                _context.Notifier.Broadcast();
+            }
+
+            var undone = outcomes.Select(o => o.Status != ChangeStatus.Applied ? o : UndoneOutcome(session, o)).ToList();
+            return new ApplyResult(null, undone, restorePoint, session.HasFailedRollback ? ex.Message + " " + T("Certaines valeurs n'ont pas pu être remises à leur état d'origine.") : ex.Message);
         }
 
         if (outcomes.Any(o => o.Status == ChangeStatus.Applied))
@@ -137,14 +158,28 @@ public sealed class FixEngine
     /// <summary>
     /// Remet les valeurs d'origine d'une séance entière, ou d'une seule de ses corrections (<paramref name="changeId"/>).
     /// </summary>
-    public RevertResult Revert(string sessionId, bool force = false, string? changeId = null)
+    /// <param name="confirmSensitive">
+    /// Si elle est donnée, question posée avant d'écrire quand une valeur sensible (<see cref="SensitiveSettings"/>) serait
+    /// vraiment remise ; « non » : rien n'est écrit.
+    /// </param>
+    public RevertResult Revert(string sessionId, bool force = false, string? changeId = null, Func<IReadOnlyList<JournalEntry>, bool>? confirmSensitive = null)
     {
         if (!_context.Audit.IsElevated)
         {
             return new RevertResult(null, [], T("L'annulation demande les droits administrateur. Relancez MAUS en tant qu'administrateur."));
         }
 
-        var session = _context.Journal.Load(sessionId);
+        JournalSession? session;
+        try
+        {
+            session = _context.Journal.Load(sessionId);
+        }
+        catch (JournalUnsafeException ex)
+        {
+            // Rien n'est lu ni remis d'un journal dont le dossier n'est pas sûr.
+            return new RevertResult(null, [], ex.Message);
+        }
+
         if (session is null)
         {
             return new RevertResult(null, [], T("Séance {0} introuvable dans le journal (ou fichier non fiable, ignoré).", sessionId));
@@ -152,40 +187,70 @@ public sealed class FixEngine
 
         var outcomes = new List<RevertOutcome>();
         var targets = Enumerable.Reverse(session.Entries)
-            .Where(e => e.State.IsOutstanding() && (changeId is null || e.ChangeId == changeId))
+            // Une valeur laissée telle quelle parce qu'elle avait changé : --force la reprend, comme le message le conseille.
+            .Where(e => (e.State.IsOutstanding() || (force && e.State == EntryState.RevertSkipped)) && (changeId is null || e.ChangeId == changeId))
             .ToList();
         if (changeId is not null && targets.Count == 0)
         {
             return new RevertResult(session, [], T("La correction {0} n'a rien à annuler dans cette séance.", changeId));
         }
 
-        foreach (var entry in targets)
+        if (confirmSensitive is not null)
         {
-            outcomes.Add(RevertOne(entry, force));
+            var sensitive = targets.Where(e => SensitiveSettings.IsSensitive(e) && WouldRestore(session, e, force)).ToList();
+            if (sensitive.Count > 0 && !confirmSensitive(sensitive))
+            {
+                return new RevertResult(session, [], T("Vous avez répondu Non dans la fenêtre de confirmation : aucune valeur n'a été remise."));
+            }
         }
 
-        if (!session.CanRevert)
+        // Journal enregistré après chaque valeur remise. Sans journal sûr, aucune écriture de plus (comme pour Apply) ;
+        // ce qui a déjà été remis reste remis : Windows est prévenu et le résultat le dit.
+        string? journalError = null;
+        try
         {
-            session.RevertedAt = Now;
+            foreach (var entry in targets)
+            {
+                outcomes.Add(RevertOne(session, entry, force));
+                _context.Journal.Save(session);
+            }
+
+            if (!session.CanRevert)
+            {
+                session.RevertedAt = Now;
+                _context.Journal.Save(session);
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            journalError = T("L'annulation n'a pas pu être enregistrée dans le journal : {0}", ex.Message);
         }
 
-        _context.Journal.Save(session);
         if (outcomes.Any(o => o.Status == RevertStatus.Reverted))
         {
             _context.Notifier.Broadcast();
         }
 
-        return new RevertResult(session, outcomes);
+        return new RevertResult(session, outcomes, journalError);
     }
+
+    /// <summary>Une correction réussie, défaite ensuite parce que le journal a lâché : elle ne compte plus comme appliquée.</summary>
+    private static ChangeOutcome UndoneOutcome(JournalSession session, ChangeOutcome outcome) => outcome with
+    {
+        Status = ChangeStatus.Failed,
+        Message = session.Entries.Any(e => e.ChangeId == outcome.ChangeId && e.State == EntryState.RollbackFailed)
+            ? T("Le journal ne peut plus être écrit, et le retour arrière a échoué : la valeur modifiée est peut-être encore en place.")
+            : T("Le journal ne peut plus être écrit : valeurs d'origine remises."),
+    };
 
     private ChangeOutcome ApplyOne(JournalSession session, PlannedChange change, HashSet<string> written)
     {
-        ChangeOutcome Outcome(ChangeStatus status, string message) => new(change.Id, change.Title, status, message, change.Effect);
+        ChangeOutcome Outcome(ChangeStatus status, string message, bool notAllowed = false) => new(change.Id, change.Title, status, message, change.Effect, notAllowed);
 
         if (change.IsUserScoped && _context.ElevatedAsAnotherUser)
         {
             return Outcome(ChangeStatus.Skipped,
-                T("MAUS a été lancé avec un autre compte administrateur : ce réglage irait dans le mauvais profil. Relancez MAUS depuis votre propre session."));
+                T("MAUS a été lancé avec un autre compte administrateur : ce réglage irait dans le mauvais profil. Relancez MAUS depuis votre propre session."), notAllowed: true);
         }
 
         if (change.Writes.Any(w => written.Contains(w.Key.Identity)))
@@ -198,13 +263,15 @@ public sealed class FixEngine
         foreach (var write in change.Writes)
         {
             SettingValue? before;
+            bool containerExisted;
             try
             {
                 before = _context.Settings.Read(write.Key);
+                containerExisted = _context.Settings.ContainerExists(write.Key);
             }
             catch (Exception ex) when (IsSettingFailure(ex))
             {
-                return Outcome(ChangeStatus.Skipped, T("Valeur d'origine illisible ({0}) : rien n'a été modifié.", write.Key));
+                return Outcome(ChangeStatus.Skipped, T("Valeur d'origine illisible ({0}) : rien n'a été modifié.", write.Key), notAllowed: true);
             }
 
             if (!SettingValue.AreEquivalent(before, write.Value))
@@ -216,7 +283,7 @@ public sealed class FixEngine
                     ChangeTitle = change.Title,
                     Key = write.Key,
                     Before = before,
-                    ContainerExisted = _context.Settings.ContainerExists(write.Key),
+                    ContainerExisted = containerExisted && !CreatedBySession(session, write.Key),
                     After = write.Value,
                 });
             }
@@ -230,6 +297,14 @@ public sealed class FixEngine
         session.Entries.AddRange(entries);
         _context.Journal.Save(session);
 
+        ChangeOutcome Fail(JournalEntry failed, string error, string restored, string notRestored)
+        {
+            failed.Error = error;
+            RollBack(entries);
+            _context.Journal.Save(session);
+            return Outcome(ChangeStatus.Failed, RolledBack(entries) ? restored : notRestored);
+        }
+
         foreach (var entry in entries)
         {
             try
@@ -240,12 +315,9 @@ public sealed class FixEngine
             }
             catch (Exception ex) when (IsSettingFailure(ex))
             {
-                entry.Error = ex.Message;
-                RollBack(entries);
-                _context.Journal.Save(session);
-                return Outcome(ChangeStatus.Failed, RolledBack(entries)
-                    ? T("Écriture refusée ({0}) : valeurs d'origine remises.", entry.Key)
-                    : T("Écriture refusée ({0}), et le retour arrière a échoué : la valeur modifiée est peut-être encore en place. La séance garde son bouton « Annuler » pour réessayer.", entry.Key));
+                return Fail(entry, ex.Message,
+                    T("Écriture refusée ({0}) : valeurs d'origine remises.", entry.Key),
+                    T("Écriture refusée ({0}), et le retour arrière a échoué : la valeur modifiée est peut-être encore en place. La séance garde son bouton « Annuler » pour réessayer.", entry.Key));
             }
         }
 
@@ -255,12 +327,9 @@ public sealed class FixEngine
             var actual = TryRead(entry.Key, out var readable);
             if (!readable || !SettingValue.AreEquivalent(actual, entry.After))
             {
-                entry.Error = T("Relu : {0}, attendu : {1}", SettingValue.Display(actual), SettingValue.Display(entry.After));
-                RollBack(entries);
-                _context.Journal.Save(session);
-                return Outcome(ChangeStatus.Failed, RolledBack(entries)
-                    ? T("Windows n'a pas gardé la valeur ({0}) : valeurs d'origine remises.", entry.Key)
-                    : T("Windows n'a pas gardé la valeur ({0}), et le retour arrière a échoué : la séance garde son bouton « Annuler » pour réessayer.", entry.Key));
+                return Fail(entry, T("Relu : {0}, attendu : {1}", SettingValue.Display(actual), SettingValue.Display(entry.After)),
+                    T("Windows n'a pas gardé la valeur ({0}) : valeurs d'origine remises.", entry.Key),
+                    T("Windows n'a pas gardé la valeur ({0}), et le retour arrière a échoué : la séance garde son bouton « Annuler » pour réessayer.", entry.Key));
             }
         }
 
@@ -273,13 +342,36 @@ public sealed class FixEngine
         return Outcome(ChangeStatus.Applied, T("Appliqué et vérifié."));
     }
 
-    private RevertOutcome RevertOne(JournalEntry entry, bool force)
+    /// <summary>Mêmes conditions que <see cref="RevertOne"/> : cette valeur serait-elle vraiment écrite ?</summary>
+    private bool WouldRestore(JournalSession session, JournalEntry entry, bool force)
+    {
+        if ((entry.Key.IsUserScoped && _context.ElevatedAsAnotherUser) || session.IsInAnotherProfile(entry, _context.UserSid))
+        {
+            return false;
+        }
+
+        var current = TryRead(entry.Key, out var readable);
+        if (!readable || (!SettingValue.AreEquivalent(current, entry.After) && SettingValue.AreEquivalent(current, entry.Before)))
+        {
+            return false;
+        }
+
+        return force || entry.State == EntryState.RollbackFailed || SettingValue.AreEquivalent(current, entry.After);
+    }
+
+    private RevertOutcome RevertOne(JournalSession session, JournalEntry entry, bool force)
     {
         RevertOutcome Outcome(RevertStatus status, string message) => new(entry.ChangeId, entry.ChangeTitle, entry.Key.Describe(), status, message);
 
         if (entry.Key.IsUserScoped && _context.ElevatedAsAnotherUser)
         {
-            return Outcome(RevertStatus.Skipped, T("MAUS a été lancé avec un autre compte administrateur : relancez-le depuis votre propre session pour annuler ce réglage."));
+            return Outcome(RevertStatus.WrongAccount, T("MAUS a été lancé avec un autre compte administrateur : relancez-le depuis votre propre session pour annuler ce réglage."));
+        }
+
+        // Le journal est commun au PC : ici, HKCU serait le profil de ce compte, pas celui de la séance. Même --force ne passe pas.
+        if (session.IsInAnotherProfile(entry, _context.UserSid))
+        {
+            return Outcome(RevertStatus.WrongAccount, T("Séance faite par un autre compte : ce réglage est dans son profil. Ouvrez MAUS depuis ce compte pour l'annuler."));
         }
 
         var current = TryRead(entry.Key, out var readable);
@@ -288,18 +380,26 @@ public sealed class FixEngine
             return Outcome(RevertStatus.Failed, T("Valeur actuelle illisible : rien n'a été modifié."));
         }
 
-        // Écriture interrompue (MAUS fermé, plantage, coupure) : si la valeur d'origine est encore en place, rien n'avait été
-        // écrit ; si c'est la nouvelle valeur, elle se remet comme une correction appliquée (même condition, même relecture).
-        if (entry.State == EntryState.Pending && !force && !SettingValue.AreEquivalent(current, entry.After) && SettingValue.AreEquivalent(current, entry.Before))
+        // La valeur d'origine est déjà là, quel que soit l'état noté : il n'y a rien à remettre. Une écriture interrompue
+        // (MAUS fermé, plantage, coupure) ou un retour arrière raté n'a finalement rien changé ; une correction appliquée
+        // a été défaite par quelqu'un d'autre et compte comme annulée.
+        if (!SettingValue.AreEquivalent(current, entry.After) && SettingValue.AreEquivalent(current, entry.Before))
         {
-            entry.State = EntryState.Failed;
-            entry.Error = T("Correction interrompue avant l'écriture : la valeur d'origine était encore en place.");
-            return Outcome(RevertStatus.Skipped, T("Correction interrompue avant l'écriture : rien à annuler."));
-        }
+            switch (entry.State)
+            {
+                case EntryState.Pending:
+                    entry.State = EntryState.Failed;
+                    entry.Error = T("Correction interrompue avant l'écriture : la valeur d'origine était encore en place.");
+                    return Outcome(RevertStatus.Skipped, T("Correction interrompue avant l'écriture : rien à annuler."));
+                case EntryState.RollbackFailed:
+                    entry.State = EntryState.Failed;
+                    break;
+                default:
+                    entry.State = EntryState.Reverted;
+                    entry.RevertedAt = Now;
+                    break;
+            }
 
-        if (entry.State == EntryState.RollbackFailed && SettingValue.AreEquivalent(current, entry.Before))
-        {
-            entry.State = EntryState.Failed;
             return Outcome(RevertStatus.Skipped, T("La valeur d'origine est déjà en place."));
         }
 
@@ -311,20 +411,15 @@ public sealed class FixEngine
                 T("La valeur a changé depuis la correction ({0}) : laissée telle quelle.", SettingValue.Display(current)));
         }
 
-        try
+        if (!TryRestore(entry, out var refusal, out var reread))
         {
-            Restore(entry);
-        }
-        catch (Exception ex) when (IsSettingFailure(ex))
-        {
-            entry.Error = ex.Message;
-            return Outcome(RevertStatus.Failed, T("Restauration refusée : {0}", ex.Message));
-        }
+            if (refusal is not null)
+            {
+                entry.Error = refusal;
+                return Outcome(RevertStatus.Failed, T("Restauration refusée : {0}", refusal));
+            }
 
-        var restored = TryRead(entry.Key, out readable);
-        if (!readable || !SettingValue.AreEquivalent(restored, entry.Before))
-        {
-            entry.Error = T("Relu après restauration : {0}", SettingValue.Display(restored));
+            entry.Error = T("Relu après restauration : {0}", SettingValue.Display(reread));
             return Outcome(RevertStatus.Failed, T("La valeur d'origine n'a pas pu être relue après restauration."));
         }
 
@@ -360,26 +455,15 @@ public sealed class FixEngine
                 continue;
             }
 
-            try
+            if (TryRestore(entry, out var refusal, out var reread))
             {
-                Restore(entry);
-            }
-            catch (Exception ex) when (IsSettingFailure(ex))
-            {
-                entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + T("retour arrière refusé : ") + ex.Message;
-                entry.State = EntryState.RollbackFailed;
+                entry.State = EntryState.Failed;
                 continue;
             }
 
-            var restored = TryRead(entry.Key, out readable);
-            if (!readable || !SettingValue.AreEquivalent(restored, entry.Before))
-            {
-                entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + T("retour arrière non vérifié (relu : {0})", SettingValue.Display(restored));
-                entry.State = EntryState.RollbackFailed;
-                continue;
-            }
-
-            entry.State = EntryState.Failed;
+            var problem = refusal is not null ? T("retour arrière refusé : ") + refusal : T("retour arrière non vérifié (relu : {0})", SettingValue.Display(reread));
+            entry.Error = (entry.Error is null ? string.Empty : entry.Error + " ; ") + problem;
+            entry.State = EntryState.RollbackFailed;
         }
     }
 
@@ -389,14 +473,41 @@ public sealed class FixEngine
     private void RollBackSession(JournalSession session) =>
         RollBack(session.Entries.Where(e => e.State == EntryState.Applied).ToList());
 
-    private void Restore(JournalEntry entry)
+    /// <summary>
+    /// Remet la valeur d'origine, retire la clé si MAUS l'a créée et qu'elle est vide, puis relit. Rend faux si Windows refuse
+    /// (<paramref name="refusal"/>) ou si la relecture ne donne pas la valeur d'origine (<paramref name="reread"/>).
+    /// </summary>
+    private bool TryRestore(JournalEntry entry, out string? refusal, out SettingValue? reread)
     {
-        _context.Settings.Write(entry.Key, entry.Before);
-        if (!entry.ContainerExisted)
+        refusal = null;
+        reread = null;
+        try
         {
-            _context.Settings.RemoveContainerIfEmpty(entry.Key);
+            _context.Settings.Write(entry.Key, entry.Before);
+            if (!entry.ContainerExisted)
+            {
+                _context.Settings.RemoveContainerIfEmpty(entry.Key);
+            }
         }
+        catch (Exception ex) when (IsSettingFailure(ex))
+        {
+            refusal = ex.Message;
+            return false;
+        }
+
+        reread = TryRead(entry.Key, out var readable);
+        return readable && SettingValue.AreEquivalent(reread, entry.Before);
     }
+
+    /// <summary>
+    /// Une correction déjà appliquée de la séance a créé cette clé de registre : la correction suivante la voit existante, mais
+    /// la clé n'existait pas avant MAUS. La dernière annulée la retire, quel que soit l'ordre des annulations.
+    /// </summary>
+    private static bool CreatedBySession(JournalSession session, SettingKey key) =>
+        key.Kind == SettingKind.Registry && session.Entries.Any(e => e.State == EntryState.Applied && !e.ContainerExisted
+            && e.Key.Kind == SettingKind.Registry
+            && string.Equals(e.Key.Hive, key.Hive, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(e.Key.Path, key.Path, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Échec d'une lecture ou d'une écriture de réglage. Toute erreur compte (droits, clé en cours de suppression, valeur

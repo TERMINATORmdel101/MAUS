@@ -5,7 +5,7 @@ using System.Text;
 namespace Maus.Core.Modules.M18Network;
 
 /// <summary>Connexion Wi-Fi en cours : nom du réseau, signal (0 à 100), débits négociés, norme et canal.</summary>
-public sealed record WifiLink(string Ssid, int SignalPercent, int ReceiveMbps, int TransmitMbps, int PhyType, int? Channel)
+public sealed record WifiLink(int SignalPercent, int ReceiveMbps, int TransmitMbps, int PhyType, int? Channel)
 {
     /// <summary>Fréquence centrale du point d'accès (MHz), lue dans la liste des réseaux visibles ; elle donne la bande sans ambiguïté.</summary>
     public int? FrequencyMhz { get; init; }
@@ -24,14 +24,15 @@ public sealed record WifiLink(string Ssid, int SignalPercent, int ReceiveMbps, i
     };
 
     /// <summary>
-    /// Bande de fréquence : d'après la fréquence quand elle est connue ; sinon 5 GHz si le canal ou la norme l'imposent,
-    /// 2,4 GHz pour les canaux 1 à 14 hors Wi-Fi 6/7 (ambigu avec le 6 GHz).
+    /// Bande de fréquence (valeur interne, traduite à l'affichage par le module) : d'après la fréquence quand elle est
+    /// connue ; sinon 5 GHz si le canal ou la norme l'imposent, 2,4 GHz pour les canaux 1 à 14. En Wi-Fi 6/7, un numéro de canal seul est
+    /// ambigu avec le 6 GHz : pas de bande.
     /// </summary>
     public string? Band => WifiChannels.Band(FrequencyMhz) ?? Channel switch
     {
-        > 14 => "5 GHz",
+        > 14 when PhyType is not (10 or 11) => "5 GHz",
         >= 1 when PhyType is 4 or 8 => "5 GHz",
-        >= 1 when PhyType is not (10 or 11) => "2,4 GHz",
+        >= 1 when PhyType is not (10 or 11) => WifiChannels.Band24,
         _ => null,
     };
 }
@@ -71,9 +72,12 @@ public static class WifiChannels
         _ => null,
     };
 
+    /// <summary>Valeur interne de la bande de 2,4 GHz : elle sert à comparer, jamais à afficher telle quelle.</summary>
+    public const string Band24 = "2,4 GHz";
+
     public static string? Band(int? mhz) => mhz switch
     {
-        >= 2400 and < 2500 => "2,4 GHz",
+        >= 2400 and < 2500 => Band24,
         >= 5150 and <= 5895 => "5 GHz",
         >= 5925 and <= 7125 => "6 GHz",
         _ => null,
@@ -153,11 +157,9 @@ public sealed unsafe partial class WindowsWifiSource : IWifiSource
 
                 try
                 {
-                    // WLAN_CONNECTION_ATTRIBUTES : SSID à 520 (longueur puis 32 octets), adresse du point d'accès à 560,
+                    // WLAN_CONNECTION_ATTRIBUTES : adresse du point d'accès à 560,
                     // type de couche physique à 568, qualité du signal à 576, débits en kbit/s à 580 (réception) et 584 (émission).
                     var bytes = (byte*)data;
-                    var length = Math.Min(32, *(int*)(bytes + 520));
-                    var ssid = Encoding.UTF8.GetString(bytes + 524, Math.Max(0, length));
                     var bssid = WifiBssList.FormatBssid(new ReadOnlySpan<byte>(bytes + 560, 6));
                     var signal = *(int*)(bytes + 576);
                     var channel = WlanQueryInterface(handle, &guid, ChannelNumber, 0, out _, out var channelData, out _) == 0 ? ReadChannel(channelData) : null;
@@ -166,7 +168,7 @@ public sealed unsafe partial class WindowsWifiSource : IWifiSource
                         return new WifiReading(null, nearby, denied);
                     }
 
-                    var link = new WifiLink(ssid, signal, *(int*)(bytes + 580) / 1000, *(int*)(bytes + 584) / 1000, *(int*)(bytes + 568), channel)
+                    var link = new WifiLink(signal, *(int*)(bytes + 580) / 1000, *(int*)(bytes + 584) / 1000, *(int*)(bytes + 568), channel)
                     {
                         FrequencyMhz = nearby.FirstOrDefault(p => p.Bssid == bssid)?.FrequencyMhz,
                     };

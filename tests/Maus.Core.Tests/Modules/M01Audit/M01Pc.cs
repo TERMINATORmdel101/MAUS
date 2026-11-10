@@ -13,17 +13,6 @@ internal sealed class FakeSignatureVerifier : ISignatureVerifier
     public SignatureStatus Verify(string path) => Statuses.GetValueOrDefault(path, SignatureStatus.Signed);
 }
 
-/// <summary>Planificateur simulé : tâches par dossier, ou exception à lever.</summary>
-internal sealed class FakeScheduledTasks : IScheduledTaskReader
-{
-    public Dictionary<string, List<ScheduledTaskInfo>> Folders { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    public Exception? Failure { get; set; }
-
-    public IReadOnlyList<ScheduledTaskInfo> GetTasks(string folderPath) =>
-        Failure is not null ? throw Failure : Folders.GetValueOrDefault(folderPath) ?? [];
-}
-
 /// <summary>
 /// PC de test « propre » (Windows 11 25H2 non modifié, administrateur) que chaque test altère pour simuler une modification risquée.
 /// Les services sont écrits dans le registre au lancement : un service retiré du dictionnaire n'a pas de clé.
@@ -32,7 +21,6 @@ internal sealed class M01Pc
 {
     public const string WindowsDirectory = @"C:\Windows";
     public const string Hosts = @"C:\Windows\System32\drivers\etc\hosts";
-    public const string UpdateTasks = @"\Microsoft\Windows\UpdateOrchestrator";
     public const string WuPolicy = @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate";
     public const string UxSettings = @"SOFTWARE\Microsoft\WindowsUpdate\UX\Settings";
     public const string UacKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
@@ -52,7 +40,6 @@ internal sealed class M01Pc
     public const string DepQuery = "SELECT DataExecutionPrevention_SupportPolicy FROM Win32_OperatingSystem";
     public const string DomainQuery = "SELECT PartOfDomain FROM Win32_ComputerSystem";
 
-    public const string WinHttpDirectFr = "\r\nParamètres de proxy WinHTTP actuels :\r\n\r\n    Accès direct (sans serveur proxy).\r\n";
     public const string ReAgentEnabledFr =
         "\r\nInformations de configuration de l'environnement de récupération Windows (Windows RE) et de réinitialisation du système :\r\n\r\n" +
         "    État de Windows RE :       Enabled\r\n    Emplacement de Windows RE :       \\\\?\\GLOBALROOT\\device\\harddisk0\\partition4\\Recovery\\WindowsRE\r\n\r\n" +
@@ -91,8 +78,6 @@ internal sealed class M01Pc
             {
                 ["RealTimeProtectionEnabled"] = true,
                 ["IsTamperProtected"] = true,
-                ["AntivirusEnabled"] = true,
-                ["AMServiceEnabled"] = true,
             })
             .Answer(RiskyChangesAuditModule.DefenderPreferenceQuery, CimScopes.Defender, new Dictionary<string, object?>
             {
@@ -107,7 +92,6 @@ internal sealed class M01Pc
             .Answer(RiskyChangesAuditModule.ActivationQuery, License("Retail", 1));
 
         Commands
-            .Answer("netsh.exe winhttp show proxy", WinHttpDirectFr)
             .Answer("bcdedit.exe /enum {current}", BcdCurrent)
             .Answer("reagentc.exe /info", ReAgentEnabledFr);
 
@@ -116,13 +100,7 @@ internal sealed class M01Pc
             .AddFile(@"C:\Windows\System32\SecurityHealthSystray.exe")
             .AddFile(@"C:\Program Files (x86)\Steam\steam.exe");
 
-        Tasks.Folders[UpdateTasks] =
-        [
-            new ScheduledTaskInfo("Schedule Scan", true),
-            new ScheduledTaskInfo("Schedule Scan Static Task", true),
-            new ScheduledTaskInfo("Reboot_Battery", false),
-            new ScheduledTaskInfo("USO_UxBroker", true),
-        ];
+        SetUpdateTasks(("Schedule Scan", true), ("Schedule Scan Static Task", true), ("Reboot_Battery", false), ("USO_UxBroker", true));
     }
 
     public Dictionary<string, int> Services { get; } = new(StringComparer.OrdinalIgnoreCase)
@@ -154,8 +132,6 @@ internal sealed class M01Pc
         .Add("Microsoft.DesktopAppInstaller")
         .Add("Microsoft.WindowsCalculator");
 
-    public FakeScheduledTasks Tasks { get; } = new();
-
     public FakeSignatureVerifier Signatures { get; } = new();
 
     public bool Elevated { get; set; } = true;
@@ -165,6 +141,13 @@ internal sealed class M01Pc
     public WindowsInfo Windows { get; set; } = new("Windows 11 Pro", "Professional", "25H2", 26200, 6584);
 
     public DateTimeOffset Now { get; } = new(2026, 9, 24, 12, 0, 0, TimeSpan.FromHours(2));
+
+    /// <summary>Tâches du dossier UpdateOrchestrator ; aucune : le dossier paraît vide.</summary>
+    public void SetUpdateTasks(params (string Name, bool Enabled)[] tasks) =>
+        Cim.Answer(
+            RiskyChangesAuditModule.UpdateTasksQuery,
+            CimScopes.TaskScheduler,
+            [.. tasks.Select(task => new Dictionary<string, object?> { ["TaskName"] = task.Name, ["State"] = task.Enabled ? 3L : 1L })]);
 
     public static Dictionary<string, object?> Product(string name, uint state) => new() { ["displayName"] = name, ["productState"] = state };
 
@@ -179,7 +162,9 @@ internal sealed class M01Pc
         ["LicenseStatus"] = status,
     };
 
-    public RiskyChangesAuditModule Module => new(Signatures, Tasks, WindowsDirectory);
+    internal FakeWinHttpProxy Proxy { get; } = new();
+
+    public RiskyChangesAuditModule Module => new(Signatures, WindowsDirectory, Proxy);
 
     public async Task<IReadOnlyList<Finding>> RunAsync() => await Module.DetectAsync(CreateContext(), CancellationToken.None);
 
@@ -204,4 +189,11 @@ internal sealed class M01Pc
     }
 
     public async Task<Finding> RunAsync(string id) => (await RunAsync()).Single(f => f.Id == id);
+}
+
+internal sealed class FakeWinHttpProxy : IWinHttpProxyReader
+{
+    public WinHttpProxy Value { get; set; } = new(WinHttpProxyKind.Direct);
+
+    public WinHttpProxy Read() => Value;
 }

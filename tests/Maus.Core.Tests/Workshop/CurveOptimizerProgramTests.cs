@@ -61,9 +61,14 @@ public class CurveOptimizerProgramTests
         var checkpoint = new FakeCheckpoint();
         var reports = new List<CurveProgramProgress>();
 
-        // Seuil « figé » large : sur une machine lente (GitHub Actions, peu de processeurs pour trois fils), un cœur sain peut
-        // rester muet plus de 0,8 s ; la détection d'un cœur figé a son propre test.
-        var options = Quick(TimeSpan.FromMilliseconds(900), TimeSpan.FromMilliseconds(900)) with { FreezeAfter = TimeSpan.FromSeconds(5) };
+        // Indépendant du temps : chaque phase va au bout de ce qu'on vérifie, quelle que soit la vitesse de la machine (GitHub Actions :
+        // peu de processeurs pour trois fils). Aucun gel possible ici ; la détection d'un cœur figé a son propre test.
+        var options = Quick(TimeSpan.FromHours(1), TimeSpan.FromHours(1)) with
+        {
+            FreezeAfter = TimeSpan.MaxValue,
+            CyclingDone = passes => passes >= 3 && reports.Exists(r => r.Phase == 1),
+            TransientDone = (bursts, rounds) => bursts >= 2 && rounds > 0 && reports.Exists(r => r.Phase == 2),
+        };
         var result = await CurveOptimizerProgram.RunAsync(topology, checkpoint, options,
             new SyncProgress<CurveProgramProgress>(reports.Add), wheaSince: _ => 0);
 
@@ -83,7 +88,7 @@ public class CurveOptimizerProgramTests
     [Fact]
     public async Task Wrong_result_in_phase_1_names_the_core()
     {
-        var options = Quick(TimeSpan.FromMilliseconds(700), TimeSpan.Zero) with { Fault = (core, round, value) => core == 2 ? value ^ 1 : value };
+        var options = Quick(TimeSpan.FromHours(1), TimeSpan.Zero) with { FreezeAfter = TimeSpan.MaxValue, CyclingDone = passes => passes >= 3, Fault = (core, round, value) => core == 2 ? value ^ 1 : value };
 
         var result = await CurveOptimizerProgram.RunAsync(new FakeTopology(3), null, options);
 
@@ -96,12 +101,19 @@ public class CurveOptimizerProgramTests
     [Fact]
     public async Task Silent_core_in_phase_1_is_declared_frozen_and_the_program_goes_on()
     {
-        var options = Quick(TimeSpan.FromMilliseconds(2500), TimeSpan.Zero) with { Stall = core => core == 1 };
+        // Indépendant du temps : un seul passage par cœur, et seul le cœur muet peut être déclaré gelé, même si la machine fait une pause.
+        var options = Quick(TimeSpan.FromHours(1), TimeSpan.Zero) with
+        {
+            Stall = core => core == 1,
+            CyclingDone = passes => passes >= 3,
+            FreezeAfterFor = core => core == 1 ? TimeSpan.FromMilliseconds(200) : TimeSpan.MaxValue,
+        };
 
         var result = await CurveOptimizerProgram.RunAsync(new FakeTopology(3), null, options);
 
         Assert.True(result.Cores.Single(c => c.Core == 1).Froze);
-        Assert.True(result.Cores.Single(c => c.Core == 0).Stable);
+        Assert.True(result.Cores.Single(c => c.Core == 0) is { Stable: true, Tested: true });
+        Assert.True(result.Cores.Single(c => c.Core == 2) is { Stable: true, Tested: true });
     }
 
     [Fact]
@@ -109,8 +121,10 @@ public class CurveOptimizerProgramTests
     {
         // Une seule erreur, sur le fil 1 (le compteur de tours est partagé par tous les fils).
         var injected = new int[1];
-        var options = Quick(TimeSpan.Zero, TimeSpan.FromMilliseconds(700), CpuStressMode.Fma) with
+        var options = Quick(TimeSpan.Zero, TimeSpan.FromHours(1), CpuStressMode.Fma) with
         {
+            FreezeAfter = TimeSpan.MaxValue,
+            TransientDone = (bursts, rounds) => bursts >= 1 && Volatile.Read(ref injected[0]) == 1,
             Fault = (thread, round, value) => thread == 1 && Interlocked.Exchange(ref injected[0], 1) == 0 ? value ^ 8 : value,
         };
 

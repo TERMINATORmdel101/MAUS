@@ -63,6 +63,12 @@ internal static class GameBarPlanner
                 T("La Game Bar redevient pleinement active pour placer vos jeux sur les cœurs dotés du V-Cache."),
                 Recording, new SettingWrite(SettingKey.Registry("HKLM", GameDvrPolicy, "AllowGameDVR"), null));
         }
+        else if (Deviates("M07.gamedvr-policy") && profile != GamingProfile.NoXbox)
+        {
+            Add("M07.gamedvr-policy", T("Retirer la stratégie qui interdit l'enregistrement des jeux"),
+                T("Ce verrou ne sert qu'au profil 1. Le retirer rend le choix à chaque utilisateur, dans Paramètres > Jeux."),
+                Recording, new SettingWrite(SettingKey.Registry("HKLM", GameDvrPolicy, "AllowGameDVR"), null));
+        }
 
         // Verrou optionnel du profil 1 : proposé non coché, jamais en profil 3.
         if (profile == GamingProfile.NoXbox && !context.Windows.IsHomeEdition && ReadPolicy(context.Registry) != 0)

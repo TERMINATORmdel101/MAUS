@@ -18,7 +18,7 @@ internal sealed record GltfMaterial(
     /// Les images « arm » de Poly Haven portent aussi l'occlusion ambiante dans le rouge ; les images « rough » non (on ne
     /// lit alors que la rugosité, dans le vert, comme le veut glTF).
     /// </summary>
-    public bool AoInRed => MetalRough?.Contains("_arm_", StringComparison.OrdinalIgnoreCase) == true;
+    public bool AoInRed => Path.GetFileName(MetalRough)?.Contains("_arm_", StringComparison.OrdinalIgnoreCase) == true;
 }
 
 /// <summary>Une partie d'un modèle : sommets (position, normale, tangente, coordonnées de texture : 12 flottants), indices.</summary>

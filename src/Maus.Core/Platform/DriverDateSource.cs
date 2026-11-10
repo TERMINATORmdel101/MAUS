@@ -16,7 +16,7 @@ public interface IDriverDateSource
 /// La date de la classe WMI <c>Win32_PnPSignedDriver</c> n'est pas utilisée : sur le PC du porteur (29/09/2026), elle
 /// inversait le jour et le mois (Intel : 11/05/2025 au lieu du 05/11/2025, HyperX : une date dans le futur).
 /// </summary>
-public sealed unsafe partial class CfgMgrDriverDateSource : IDriverDateSource
+public sealed partial class CfgMgrDriverDateSource : IDriverDateSource
 {
     private const uint Success = 0;
     private const uint LocateNormal = 0;
@@ -40,11 +40,9 @@ public sealed unsafe partial class CfgMgrDriverDateSource : IDriverDateSource
                 return null;
             }
 
-            var key = DriverDateKey;
             long fileTime = 0;
-            uint type = 0;
             uint size = sizeof(long);
-            if (CM_Get_DevNode_PropertyW(node, &key, &type, (byte*)&fileTime, &size, 0) != Success || type != FileTimeType || size != sizeof(long) || fileTime <= 0)
+            if (CM_Get_DevNode_PropertyW(node, in DriverDateKey, out var type, ref fileTime, ref size, 0) != Success || type != FileTimeType || size != sizeof(long) || fileTime <= 0)
             {
                 return null;
             }
@@ -69,5 +67,5 @@ public sealed unsafe partial class CfgMgrDriverDateSource : IDriverDateSource
     private static partial uint CM_Locate_DevNodeW(out uint devInst, string deviceId, uint flags);
 
     [LibraryImport("cfgmgr32.dll")]
-    private static partial uint CM_Get_DevNode_PropertyW(uint devInst, DevPropKey* propertyKey, uint* propertyType, byte* buffer, uint* bufferSize, uint flags);
+    private static partial uint CM_Get_DevNode_PropertyW(uint devInst, in DevPropKey propertyKey, out uint propertyType, ref long buffer, ref uint bufferSize, uint flags);
 }

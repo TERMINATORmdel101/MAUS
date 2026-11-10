@@ -23,7 +23,7 @@ public sealed record ProcessSample(
     double CpuPercent,
     long WorkingSetBytes,
     long PrivateBytes,
-    double DiskBytesPerSecond,
+    double IoBytesPerSecond,
     double? GpuPercent,
     int SessionId,
     DateTime? StartTime);
@@ -94,7 +94,7 @@ public sealed record SystemFolders(string Windows, string ProgramFiles, string P
         Environment.GetFolderPath(Environment.SpecialFolder.Windows),
         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
+        Maus.Core.Platform.SystemPaths.ProgramData);
 }
 
 public static partial class ProcessRules
@@ -105,7 +105,6 @@ public static partial class ProcessRules
         "System", "Idle", "System Idle Process", "Registry", "Memory Compression", "Secure System",
         "smss.exe", "csrss.exe", "wininit.exe", "winlogon.exe", "services.exe", "lsass.exe", "lsaiso.exe",
         "svchost.exe", "fontdrvhost.exe", "dwm.exe", "MsMpEng.exe", "NisSrv.exe", "SecurityHealthService.exe",
-        "smss", "csrss", "wininit", "winlogon", "services", "lsass", "svchost", "dwm",
     };
 
     /// <summary>
@@ -122,6 +121,24 @@ public static partial class ProcessRules
     ];
 
     public static bool IsCritical(string name) => Critical.Contains(name) || Critical.Contains(name + ".exe");
+
+    /// <summary>Session Windows de MAUS : celle des programmes de la personne devant l'écran.</summary>
+    public static int CurrentSessionId { get; } = ReadSessionId();
+
+    private static int ReadSessionId()
+    {
+        using var self = System.Diagnostics.Process.GetCurrentProcess();
+        return self.SessionId;
+    }
+
+    /// <summary>
+    /// Processus vital : un nom de la liste, à l'emplacement de Windows ou de Defender (ou illisible : un processus protégé ne
+    /// dit pas son chemin). Un « svchost.exe » posé dans un dossier temporaire n'en est pas un : c'est même à lui qu'on veut
+    /// pouvoir toucher.
+    /// </summary>
+    private static bool IsVital(ProcessSample process, SystemFolders folders) =>
+        process.Pid is 0 or 4
+        || (IsCritical(process.Name) && (process.Path is not { Length: > 0 } || TrustOf(process, folders) is ProcessTrust.Windows or ProcessTrust.Installed));
 
     public static ProcessTrust TrustOf(ProcessSample process, SystemFolders folders)
     {
@@ -168,7 +185,9 @@ public static partial class ProcessRules
     };
 
     /// <summary>Peut-on proposer d'arrêter ce processus ? Sinon, la raison, en clair.</summary>
-    public static (bool Allowed, string? Reason) CanTerminate(ProcessSample process, int ownPid)
+    /// <param name="session">Session de MAUS : un service (session 0) ou le programme d'une autre session ne s'arrête pas ici.</param>
+    /// <param name="folders">Dossiers de Windows ; par défaut ceux de ce PC.</param>
+    public static (bool Allowed, string? Reason) CanTerminate(ProcessSample process, int ownPid, int? session = null, SystemFolders? folders = null)
     {
         ArgumentNullException.ThrowIfNull(process);
 
@@ -177,9 +196,14 @@ public static partial class ProcessRules
             return (false, T("C'est MAUS lui-même."));
         }
 
-        if (process.Pid is 0 or 4 || IsCritical(process.Name))
+        if (IsVital(process, folders ?? SystemFolders.Current))
         {
             return (false, T("Processus vital de Windows : l'arrêter provoquerait un écran bleu ou fermerait votre session."));
+        }
+
+        if (session is { } own && process.SessionId != own)
+        {
+            return (false, T("Ce processus est un service de Windows ou appartient à une autre session : MAUS ne l'arrête pas."));
         }
 
         return (true, null);

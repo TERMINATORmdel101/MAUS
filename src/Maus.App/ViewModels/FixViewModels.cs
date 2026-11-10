@@ -8,6 +8,8 @@ namespace Maus.App.ViewModels;
 /// <summary>Une idée reçue sur l'optimisation, avec un bouton vers sa source.</summary>
 public sealed class MythViewModel(Maus.Core.Reporting.OptimizationMyth myth)
 {
+    public override string ToString() => Claim;
+
     public string Claim => myth.Claim;
 
     public string Truth => myth.Truth;
@@ -17,7 +19,6 @@ public sealed class MythViewModel(Maus.Core.Reporting.OptimizationMyth myth)
     public ICommand OpenSourceCommand { get; } = new AsyncCommand(() =>
     {
         ShellLauncher.OpenUrl(myth.Source);
-        return Task.CompletedTask;
     });
 }
 
@@ -25,6 +26,8 @@ public sealed class MythViewModel(Maus.Core.Reporting.OptimizationMyth myth)
 /// <param name="group">Titre du groupe dans la liste (le module : « M04 · Confidentialité et télémétrie »).</param>
 public sealed class ChangeViewModel(PlannedChange change, string? group = null) : ObservableObject
 {
+    public override string ToString() => Title;
+
     private bool _isSelected = change.Recommended && !change.Advanced;
 
     public PlannedChange Change { get; } = change;
@@ -48,9 +51,30 @@ public sealed class ChangeViewModel(PlannedChange change, string? group = null) 
 
     public string Title => Change.Title;
 
-    public string Module => Change.ModuleId;
-
     public string Description => Change.Description;
+
+    /// <summary>Date de la dernière fois que cette correction a été écrite, si le journal la dit encore en place.</summary>
+    public DateTimeOffset? AppliedOn
+    {
+        get => _appliedOn;
+        set
+        {
+            if (SetProperty(ref _appliedOn, value))
+            {
+                OnPropertyChanged(nameof(HasComeBack));
+                OnPropertyChanged(nameof(ComeBackNote));
+            }
+        }
+    }
+
+    private DateTimeOffset? _appliedOn;
+
+    /// <summary>Déjà faite, et pourtant proposée de nouveau : le réglage est revenu, ou l'écriture n'a pas pris.</summary>
+    public bool HasComeBack => AppliedOn is not null;
+
+    public string ComeBackNote => AppliedOn is { } date
+        ? T("Déjà appliquée le {0} : le réglage a été remis depuis (Windows, une mise à jour, un autre programme), ou la correction n'a pas pris.", date.ToLocalTime().ToString("d", Culture))
+        : string.Empty;
 
     public string? Gain => Change.Gain is null ? null : T("Gain : {0}", Change.Gain);
 
@@ -86,15 +110,24 @@ public sealed class ChangeViewModel(PlannedChange change, string? group = null) 
 /// <summary>Une séance du journal, avec son bouton « Annuler » et une ligne par correction.</summary>
 public sealed class SessionViewModel
 {
-    public SessionViewModel(JournalSession session, Func<SessionViewModel, string?, Task> revert)
+    public override string ToString() => Header;
+
+    private readonly string? _accountSid;
+
+    /// <param name="session">Séance du journal.</param>
+    /// <param name="revert">Annulation de la séance, ou d'une correction.</param>
+    /// <param name="accountSid">Compte de cette session Windows : le journal est commun à tout le PC.</param>
+    /// <param name="comeBack">Corrections que le dernier plan propose de nouveau : elles ne sont plus « en place ».</param>
+    public SessionViewModel(JournalSession session, Func<SessionViewModel, string?, Task> revert, string? accountSid = null, IReadOnlySet<string>? comeBack = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         Session = session;
+        _accountSid = accountSid;
         RevertCommand = new AsyncCommand(() => revert(this, null));
         Changes = session.Entries
             .GroupBy(e => e.ChangeId)
-            .Select(g => new SessionChangeViewModel(g.ToList(), () => revert(this, g.Key)))
+            .Select(g => new SessionChangeViewModel(g.ToList(), () => revert(this, g.Key), session, accountSid, comeBack?.Contains(g.Key) == true))
             .ToList();
     }
 
@@ -104,11 +137,16 @@ public sealed class SessionViewModel
 
     public IReadOnlyList<SessionChangeViewModel> Changes { get; }
 
-    public bool CanRevert => Session.CanRevert;
+    /// <summary>Faite par un autre compte du PC : « Tout annuler » la laisse de côté, et l'écran le dit.</summary>
+    public bool IsFromAnotherAccount => Session.IsFromAnotherAccount(_accountSid);
+
+    /// <summary>Il reste quelque chose que ce compte peut remettre (les réglages du profil d'un autre compte n'en font pas partie).</summary>
+    public bool CanRevert => Session.CanRevertAs(_accountSid);
 
     public string Header =>
         $"{Session.CreatedAt.ToLocalTime().ToString("f", Culture)}  ·  " +
-        (Session.HasFailedRollback ? T("à reprendre : un retour arrière a échoué") : Session.RevertedAt is not null ? T("annulée") : Session.CanRevert ? T("active") : T("rien à annuler"));
+        Session.StateLabel +
+        (IsFromAnotherAccount ? "  ·  " + T("faite par un autre compte") : string.Empty);
 
     public string Summary
     {
@@ -119,7 +157,7 @@ public sealed class SessionViewModel
             var point = Session.RestorePoint is { } rp
                 ? T("point de restauration n° {0}", rp.SequenceNumber)
                 : T("sans point de restauration");
-            return T("{0} valeur(s) en place, {1} restaurée(s) · {2}", applied, reverted, point);
+            return Plural(applied, T("{0} valeur en place"), T("{0} valeurs en place")) + ", " + Plural(reverted, T("{0} restaurée"), T("{0} restaurées")) + " · " + point;
         }
     }
 }
@@ -127,11 +165,19 @@ public sealed class SessionViewModel
 /// <summary>Une correction d'une séance, avec son propre bouton « Annuler ».</summary>
 public sealed class SessionChangeViewModel
 {
-    private readonly IReadOnlyList<JournalEntry> _entries;
+    public override string ToString() => Title;
 
-    public SessionChangeViewModel(IReadOnlyList<JournalEntry> entries, Func<Task> revert)
+    private readonly IReadOnlyList<JournalEntry> _entries;
+    private readonly JournalSession _session;
+    private readonly string? _accountSid;
+    private readonly bool _comeBack;
+
+    public SessionChangeViewModel(IReadOnlyList<JournalEntry> entries, Func<Task> revert, JournalSession session, string? accountSid = null, bool comeBack = false)
     {
         _entries = entries;
+        _session = session;
+        _accountSid = accountSid;
+        _comeBack = comeBack;
         RevertCommand = new AsyncCommand(revert);
     }
 
@@ -139,10 +185,14 @@ public sealed class SessionChangeViewModel
 
     public string Title => _entries[0].ChangeTitle;
 
-    public bool CanRevert => _entries.Any(e => e.State.IsOutstanding());
+    public bool CanRevert => _entries.Any(e => e.State.IsOutstanding() && !_session.IsInAnotherProfile(e, _accountSid));
+
+    /// <summary>Une valeur attend d'être remise, mais seul le compte de la séance peut le faire.</summary>
+    private bool WaitsForItsAccount => _entries.Any(e => e.State.IsOutstanding() && _session.IsInAnotherProfile(e, _accountSid));
 
     public string State => _entries.Select(e => e.State).Distinct().ToList() switch
     {
+        [EntryState.Applied] when _comeBack => T("remise depuis"),
         [EntryState.Applied] => T("en place"),
         [EntryState.Reverted] => T("annulée"),
         [EntryState.RevertSkipped] => T("modifiée depuis"),
@@ -152,7 +202,9 @@ public sealed class SessionChangeViewModel
         _ => T("en partie annulée"),
     };
 
-    public string? Note => _entries.Select(e => e.EffectNote).FirstOrDefault(n => n is not null);
+    public string? Note => WaitsForItsAccount
+        ? T("Séance faite par un autre compte : ce réglage est dans son profil. Ouvrez MAUS depuis ce compte pour l'annuler.")
+        : _entries.Select(e => e.EffectNote).FirstOrDefault(n => n is not null);
 
     public bool HasNote => Note is not null;
 

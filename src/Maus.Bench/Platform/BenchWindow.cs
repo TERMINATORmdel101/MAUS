@@ -79,6 +79,9 @@ public sealed unsafe partial class BenchWindow : IDisposable
     /// <summary>Échap ou fermeture de la fenêtre : l'utilisateur veut arrêter.</summary>
     public bool CloseRequested { get; private set; }
 
+    /// <summary>Oublie la demande d'arrêt : l'écran suivant attend une nouvelle touche.</summary>
+    public void ResetClose() => CloseRequested = false;
+
     /// <summary>Entrée ou Espace (écran des résultats : fermer).</summary>
     public bool ConfirmPressed { get; private set; }
 

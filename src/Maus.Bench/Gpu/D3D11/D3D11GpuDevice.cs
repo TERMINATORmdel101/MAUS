@@ -31,6 +31,7 @@ internal sealed class D3D11GpuDevice : IGpuDevice
         _adapter = GpuAdapters.Preferred(_factory);
         var description = _adapter.Description1;
         AdapterName = description.Description.Trim();
+        DriverVersion = GpuAdapters.DriverVersion(_adapter);
         DedicatedVideoMemory = (long)(ulong)description.DedicatedVideoMemory;
 
         Vortice.Direct3D11.D3D11.D3D11CreateDevice(
@@ -77,6 +78,8 @@ internal sealed class D3D11GpuDevice : IGpuDevice
 
     public string AdapterName { get; }
 
+    public string? DriverVersion { get; }
+
     public long DedicatedVideoMemory { get; }
 
     public int OutputWidth { get; }
@@ -94,10 +97,10 @@ internal sealed class D3D11GpuDevice : IGpuDevice
 
     public ITexture CreateTexture(TextureDesc desc) => new D3D11Texture(_device, desc);
 
-    public unsafe void UploadTexture(ITexture texture, int mip, int slice, ReadOnlySpan<byte> data, int rowPitch)
+    public unsafe void UploadTexture(ITexture texture, int mip, ReadOnlySpan<byte> data, int rowPitch)
     {
         var t = (D3D11Texture)texture;
-        var subresource = (uint)(mip + (slice * t.Desc.MipLevels));
+        var subresource = (uint)mip;
         var slicePitch = (uint)(rowPitch * t.Desc.MipHeight(mip));
         fixed (byte* pointer = data)
         {
@@ -152,13 +155,6 @@ internal sealed class D3D11GpuDevice : IGpuDevice
             Thread.Yield();
             DeviceLost.ThrowIfRemoved(_device.DeviceRemovedReason);
         }
-    }
-
-    public byte[] CaptureBackBuffer(out int width, out int height)
-    {
-        width = OutputWidth;
-        height = OutputHeight;
-        return ReadTexture(_backBuffer);
     }
 
     public unsafe byte[] ReadTexture(ITexture texture)

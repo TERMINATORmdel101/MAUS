@@ -141,6 +141,18 @@ public class AdvancedSensorsTests
     [InlineData("AMD Ryzen 9 5900X 12-Core Processor", null)]
     [InlineData("13th Gen Intel(R) Core(TM) i9-13900K", null)]
     [InlineData("AMD Ryzen 7 7840HS w/ Radeon 780M Graphics", null)]
-    public void Only_verified_models_have_a_catalog_limit(string cpu, int? expected) =>
+    public void Only_verified_models_have_a_catalog_limit(string cpu, int? expected)
+    {
         Assert.Equal(expected, SafetyLimits.Load().ForCpu(cpu)?.MaxC);
+        Assert.NotEqual(false, SafetyLimits.Load().ForCpu(cpu)?.Verified);
+    }
+
+    [Fact]
+    public void A_limit_that_could_not_be_checked_says_so()
+    {
+        var limit = SafetyLimits.Load().ForCpu("AMD Ryzen 7 5700X 8-Core Processor");
+
+        Assert.NotNull(limit);
+        Assert.False(limit.Verified);
+    }
 }

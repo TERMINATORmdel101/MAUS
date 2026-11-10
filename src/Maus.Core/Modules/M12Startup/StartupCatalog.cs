@@ -67,7 +67,7 @@ internal sealed class StartupCatalog
 
     public static StartupCatalog LoadEmbedded() => EmbeddedCatalog.Load<StartupCatalog>("m12-startup-catalog.json");
 
-    /// <summary>Première application du catalogue qui correspond à l'entrée, avec sa famille.</summary>
+    /// <summary>Première application du catalogue qui correspond à l'entrée, avec sa famille. Le nom seul ne prouve rien : les familles « à garder » sont revérifiées par le module.</summary>
     public (StartupApp App, StartupFamily Family)? Match(string entryName, string? executableFileName, string? packageName)
     {
         foreach (var app in Apps)

@@ -82,7 +82,7 @@ public sealed class WmiCimReader : ICimReader
         }
         catch (ManagementException ex) when (ex.ErrorCode is ManagementStatus.InvalidNamespace or ManagementStatus.InvalidClass or ManagementStatus.NotFound)
         {
-            throw new DataSourceUnavailableException(Texts.T("Source WMI absente ({0}).", scope), ex);
+            throw new DataSourceUnavailableException(Texts.T("Source WMI absente ({0}).", scope), ex) { IsAbsent = true };
         }
         catch (ManagementException ex) when (ex.ErrorCode is ManagementStatus.InvalidQuery or ManagementStatus.InvalidProperty
                                                  or ManagementStatus.NotSupported or ManagementStatus.InvalidMethod or ManagementStatus.ProviderLoadFailure)
@@ -100,7 +100,12 @@ public sealed class WmiCimReader : ICimReader
         }
         catch (COMException ex) when (ex.HResult is WbemInvalidNamespace or WbemInvalidClass)
         {
-            throw new DataSourceUnavailableException(Texts.T("Source WMI absente ({0}).", scope), ex);
+            throw new DataSourceUnavailableException(Texts.T("Source WMI absente ({0}).", scope), ex) { IsAbsent = true };
+        }
+        catch (Exception ex) when (ex is ManagementException or COMException)
+        {
+            // Service WMI arrêté ou abîmé (justement le PC à réparer) : donnée illisible, jamais un plantage.
+            throw new DataSourceUnavailableException(Texts.T("Source WMI indisponible ({0}) : {1}", scope, ex.Message), ex);
         }
     }
 

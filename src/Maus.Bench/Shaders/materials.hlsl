@@ -34,8 +34,6 @@ Texture2D<float> SceneDepth : register(t8);
 Texture2D<float4> HeightMap : register(t9);
 Texture2D<float4> FloorReflection : register(t10);
 
-static const float KindObject = 0.0;
-static const float KindGlass = 1.0;
 static const float KindTable = 2.0;
 static const float KindFloor = 3.0;
 static const float KindPlinth = 4.0;
@@ -176,12 +174,6 @@ float4 ShadowVS(ObjectVertex v) : SV_Position
 {
     return mul(mul(float4(v.Position, 1.0), World), ShadowViewProj);
 }
-
-struct SceneOut
-{
-    float4 Color : SV_Target0;
-    float2 Velocity : SV_Target1;
-};
 
 struct Material
 {
@@ -424,8 +416,7 @@ float4 DustPS(FullscreenOut input) : SV_Target
     float far = 12.0;
     if (depth < 1.0)
     {
-        float4 world = mul(float4(input.UV * float2(2.0, -2.0) + float2(-1.0, 1.0), depth, 1.0), InvViewProj);
-        far = min(length(world.xyz / world.w - CameraPos), far);
+        far = min(length(WorldFromDepth(input.UV, depth) - CameraPos), far);
     }
 
     const int steps = Light ? 64 : 192;
@@ -469,9 +460,7 @@ float4 DustPS(FullscreenOut input) : SV_Target
 // Position dans le monde d'un pixel de l'image, d'après sa profondeur.
 float3 WorldAt(float2 uv)
 {
-    float depth = SceneDepth.SampleLevel(PointClamp, uv, 0.0);
-    float4 world = mul(float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), depth, 1.0), InvViewProj);
-    return world.xyz / world.w;
+    return WorldFromDepth(uv, SceneDepth.SampleLevel(PointClamp, uv, 0.0));
 }
 
 // Occlusion ambiante à l'écran : 32 points autour du pixel, à 12 cm au plus ; plus il y a de surfaces qui dépassent

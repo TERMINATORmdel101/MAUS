@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Engine.Broker;
 
@@ -18,60 +19,88 @@ public sealed record EngineRequest(string Op, string Language, JsonElement? Args
 public sealed record EngineResponse(string Kind, JsonElement? Payload = null, string? Error = null);
 
 /// <summary>
-/// Format des messages du canal privé entre l'interface et le moteur : 4 octets de longueur (petit-boutiste), puis le JSON
-/// en UTF-8 d'un <see cref="SignedMessage"/>. Taille bornée (un message plus long est refusé, jamais lu en entier).
+/// Format des messages du canal privé entre l'interface et le moteur : 4 octets de longueur (petit-boutiste), 1 octet de type,
+/// puis soit la clé (présentation), soit 32 octets de signature suivis du corps JSON en UTF-8. Aucun JSON n'est lu ici : le corps
+/// n'est analysé qu'une fois sa signature vérifiée. Taille bornée (un message plus long est refusé, jamais lu en entier).
 /// </summary>
 public static partial class EngineProtocol
 {
     /// <summary>Au-delà, le message est refusé : un audit complet tient en quelques centaines de kilo-octets.</summary>
     public const int MaxMessageBytes = 32 << 20;
 
+    private const byte KeyMessage = 1;
+    private const byte SignedBody = 2;
+
     public static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter() },
+
+        // Sans cela, chaque guillemet et chaque accent coûteraient six octets ou plus. « Unsafe » ne vise que le code HTML, et
+        // ce texte ne va jamais dans une page.
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+
+        // Par leur nom seulement : un nombre pourrait désigner une valeur hors de l'énumération.
+        Converters = { new JsonStringEnumConverter(allowIntegerValues: false) },
     };
 
-    public static async Task WriteAsync<T>(Stream stream, T message, CancellationToken cancellationToken)
+    public static async Task WriteAsync(Stream stream, SignedMessage message, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        var body = JsonSerializer.SerializeToUtf8Bytes(message, Json);
-        if (body.Length > MaxMessageBytes)
+        ArgumentNullException.ThrowIfNull(message);
+        var (kind, first, second) = message.Key is { } key ? (KeyMessage, key, Array.Empty<byte>()) : (SignedBody, message.Mac, message.Body);
+        var length = 1L + first.Length + second.Length;
+        if (length > MaxMessageBytes)
         {
-            throw new InvalidDataException("Message du moteur trop long.");
+            throw new InvalidDataException(T("Message du moteur trop long."));
         }
 
-        var header = new byte[4];
-        BinaryPrimitives.WriteInt32LittleEndian(header, body.Length);
+        var header = new byte[5 + first.Length];
+        BinaryPrimitives.WriteInt32LittleEndian(header, (int)length);
+        header[4] = kind;
+        first.CopyTo(header, 5);
         await stream.WriteAsync(header, cancellationToken).ConfigureAwait(false);
-        await stream.WriteAsync(body, cancellationToken).ConfigureAwait(false);
+        if (second.Length > 0)
+        {
+            await stream.WriteAsync(second, cancellationToken).ConfigureAwait(false);
+        }
+
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Une signature trop courte est rendue telle quelle, comme une clé de mauvaise taille : c'est leur vérification qui les
+    /// refuse, et le refus compte (<see cref="EngineServer.MaxRefusals"/>).
+    /// </summary>
     /// <returns>Le message, ou <c>null</c> si l'autre côté a fermé le canal.</returns>
-    public static async Task<T?> ReadAsync<T>(Stream stream, CancellationToken cancellationToken)
+    public static async Task<SignedMessage?> ReadAsync(Stream stream, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(stream);
         var header = new byte[4];
         if (!await ReadExactAsync(stream, header, cancellationToken).ConfigureAwait(false))
         {
-            return default;
+            return null;
         }
 
         var length = BinaryPrimitives.ReadInt32LittleEndian(header);
         if (length is <= 0 or > MaxMessageBytes)
         {
-            throw new InvalidDataException("Longueur de message du moteur invalide.");
+            throw new InvalidDataException(T("Longueur de message du moteur invalide."));
         }
 
-        var body = new byte[length];
-        if (!await ReadExactAsync(stream, body, cancellationToken).ConfigureAwait(false))
+        var message = new byte[length];
+        if (!await ReadExactAsync(stream, message, cancellationToken).ConfigureAwait(false))
         {
-            throw new EndOfStreamException("Message du moteur coupé.");
+            throw new EndOfStreamException(T("Message du moteur coupé."));
         }
 
-        return JsonSerializer.Deserialize<T>(body, Json);
+        return message[0] switch
+        {
+            KeyMessage => new SignedMessage([], [], message[1..]),
+            SignedBody when length > EngineKey.MacSize => new SignedMessage(message[(1 + EngineKey.MacSize)..], message[1..(1 + EngineKey.MacSize)]),
+            SignedBody => new SignedMessage([], message[1..]),
+            _ => throw new InvalidDataException(T("Longueur de message du moteur invalide.")),
+        };
     }
 
     public static JsonElement ToElement<T>(T value) => JsonSerializer.SerializeToElement(value, Json);

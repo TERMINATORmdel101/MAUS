@@ -7,7 +7,11 @@ using static Maus.Core.Localization.Texts;
 namespace Maus.App.ViewModels;
 
 /// <summary>Une option de liste déroulante : libellé affiché et valeur.</summary>
-public sealed record ChoiceOption<T>(string Label, T Value);
+public sealed record ChoiceOption<T>(string Label, T Value)
+{
+    /// <summary>Ce que lit un lecteur d'écran pour un élément de liste.</summary>
+    public override string ToString() => Label;
+}
 
 /// <summary>Vos choix : profil Game Bar, alimentation du portable, constats marqués « voulu ».</summary>
 public sealed partial class MainViewModel
@@ -50,7 +54,15 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            ChangeLanguageAsync(value.Value).Forget("changement de langue", ex => StatusText = T("La langue n'a pas pu être changée : {0}", ex.Message));
+            // Changer de langue recrée la fenêtre : jamais pendant un audit, une correction ou un test.
+            if (IsRunning || IsApplying || Workshop.IsTesting)
+            {
+                StatusText = T("Attendez la fin de l'opération en cours pour changer de langue.");
+                OnPropertyChanged(nameof(LanguageChoice));
+                return;
+            }
+
+            ChangeLanguageAsync(value.Value).Forget("changement de langue", ex => StatusText = T("La langue n'a pas pu être changée : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
         }
     }
 
@@ -61,10 +73,10 @@ public sealed partial class MainViewModel
         {
             await Task.Run(() => PreferencesStore.Update(p => p with { Language = code }));
         }
-        catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is JournalUnsafeException or Maus.Core.Engine.Broker.EngineException or System.IO.IOException or UnauthorizedAccessException)
         {
             // La langue change quand même pour cette ouverture de MAUS.
-            StatusText = T("Votre choix n'a pas pu être enregistré : {0}", ex.Message);
+            StatusText = T("Votre choix n'a pas pu être enregistré : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
 
         SwitchLanguage(code, HasAudit);
@@ -96,12 +108,13 @@ public sealed partial class MainViewModel
         get => _laptopChoice;
         set
         {
+            var previous = _laptopChoice;
             if (value is null || !SetProperty(ref _laptopChoice, value) || _loadingChoices)
             {
                 return;
             }
 
-            UpdatePreferencesAsync(p => p with { LaptopPower = value.Value }, "M05").Forget("choix de l'alimentation du portable", ReportChoiceError);
+            ChangeLaptopAsync(previous, value).Forget("choix de l'alimentation du portable", ReportChoiceError);
         }
     }
 
@@ -114,17 +127,19 @@ public sealed partial class MainViewModel
             IsLaptop = context.Hardware.IsLaptop;
             GameBarChoice = GameBarOptions.FirstOrDefault(o => o.Value == context.Preferences.GameBarProfile) ?? GameBarOptions[0];
             LaptopChoice = LaptopOptions.FirstOrDefault(o => o.Value == context.Preferences.LaptopPower) ?? LaptopOptions[0];
+            ShowSkippedModules(context.Preferences.SkippedModules);
+            ShowWeeklyNotification(context.Preferences.WeeklyNotification);
         }
         finally
         {
             _loadingChoices = false;
         }
 
-        LoadScheduleAsync().Forget("audit hebdomadaire : lecture", ex => StatusText = T("L'état de l'audit automatique n'a pas pu être lu : {0}", ex.Message));
+        LoadScheduleAsync().Forget("audit hebdomadaire : lecture", ex => StatusText = T("L'état de l'audit automatique n'a pas pu être lu : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)));
     }
 
     /// <summary>Erreur imprévue pendant l'application d'un choix (la trace est déjà dans le journal).</summary>
-    private void ReportChoiceError(Exception ex) => StatusText = T("Votre choix n'a pas pu être appliqué : {0}", ex.Message);
+    private void ReportChoiceError(Exception ex) => StatusText = T("Votre choix n'a pas pu être appliqué : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
 
     private async Task ChangeGameBarAsync(ChoiceOption<int?> previous, ChoiceOption<int?> chosen)
     {
@@ -140,7 +155,24 @@ public sealed partial class MainViewModel
             return;
         }
 
-        await UpdatePreferencesAsync(p => p with { GameBarProfile = chosen.Value }, "M07");
+        if (!await UpdatePreferencesAsync(p => p with { GameBarProfile = chosen.Value }, "M07"))
+        {
+            // Non enregistré : la liste reprend la valeur qui compte vraiment.
+            _loadingChoices = true;
+            GameBarChoice = previous;
+            _loadingChoices = false;
+        }
+    }
+
+    private async Task ChangeLaptopAsync(ChoiceOption<LaptopPowerChoice> previous, ChoiceOption<LaptopPowerChoice> chosen)
+    {
+        await Task.Yield();
+        if (!await UpdatePreferencesAsync(p => p with { LaptopPower = chosen.Value }, "M05"))
+        {
+            _loadingChoices = true;
+            LaptopChoice = previous;
+            _loadingChoices = false;
+        }
     }
 
     /// <summary>Première ouverture sur un portable : la question du choix d'alimentation (décision du projet).</summary>
@@ -169,15 +201,36 @@ public sealed partial class MainViewModel
             var warning = finding.Status == FindingStatus.Problem
                 ? T("Attention : c'est un problème de sécurité ou de fiabilité.") + Environment.NewLine + Environment.NewLine
                 : string.Empty;
-            if (!Confirm(T("Marquer « voulu » ?"), warning + T("« {0} » ({1}) ne sera plus signalé, et MAUS ne proposera plus de le corriger. Si la situation change, il sera de nouveau signalé. Vous pouvez retirer cette marque à tout moment.", finding.Title, finding.Current) +
-                    Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+            if (!Confirm(T("Marquer « voulu » ?"), Maus.Core.Reporting.ConfirmationText.Build(warning + T("« {0} » ({1}) ne sera plus signalé, et MAUS ne proposera plus de le corriger. Si la situation change, il sera de nouveau signalé. Vous pouvez retirer cette marque à tout moment.", finding.Title, finding.Current), undo: T("le bouton « Signaler de nouveau » du constat retire la marque à tout moment."))))
             {
                 return;
             }
         }
 
         var now = DateTimeOffset.Now;
-        await UpdatePreferencesAsync(p => acknowledge ? p.Acknowledge(finding, now) : p.Unacknowledge(finding.Id), moduleId);
+        var related = FindingsOfSameSubject(moduleId, finding, acknowledge);
+        await UpdatePreferencesAsync(
+            p => related.Aggregate(p, (preferences, x) => acknowledge ? preferences.Acknowledge(x.Finding, now) : preferences.Unacknowledge(x.Finding.Id)),
+            [.. related.Select(x => x.ModuleId).Distinct(StringComparer.Ordinal)]);
+    }
+
+    /// <summary>
+    /// Un même sujet signalé par plusieurs modules forme une seule carte : la marque vaut pour tous, sans quoi le constat
+    /// suivant, jusque-là caché, prendrait aussitôt la place de la carte qu'on vient de marquer.
+    /// </summary>
+    private List<(string ModuleId, Finding Finding)> FindingsOfSameSubject(string moduleId, Finding finding, bool acknowledge)
+    {
+        List<(string ModuleId, Finding Finding)> related = [(moduleId, finding)];
+        if (Maus.Core.Reporting.HealthScore.SubjectOf(finding.Id) is { } subject)
+        {
+            related.AddRange(_results
+                .SelectMany(r => r.Findings.Select(f => (r.ModuleId, Finding: f)))
+                .Where(x => x.Finding.Id != finding.Id
+                    && string.Equals(Maus.Core.Reporting.HealthScore.SubjectOf(x.Finding.Id), subject, StringComparison.Ordinal)
+                    && (!acknowledge || IsPriority(x.Finding.Status))));
+        }
+
+        return related;
     }
 
     /// <summary>Après un changement de langue, les marques « voulu » sont réécrites dans la nouvelle langue.</summary>
@@ -199,24 +252,28 @@ public sealed partial class MainViewModel
         }
     }
 
-    private async Task UpdatePreferencesAsync(Func<UserPreferences, UserPreferences> change, params string[] moduleIds)
+    /// <summary>Enregistre un choix et relance les modules concernés.</summary>
+    /// <returns><c>false</c> si le choix n'a pas pu être enregistré : l'appelant remet l'affichage sur la valeur précédente.</returns>
+    private async Task<bool> UpdatePreferencesAsync(Func<UserPreferences, UserPreferences> change, params string[] moduleIds)
     {
         UserPreferences updated;
         try
         {
             updated = await Task.Run(() => PreferencesStore.Update(change));
         }
-        catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is JournalUnsafeException or Maus.Core.Engine.Broker.EngineException or System.IO.IOException or UnauthorizedAccessException)
         {
-            StatusText = T("Votre choix n'a pas pu être enregistré : {0}", ex.Message);
-            return;
+            StatusText = T("Votre choix n'a pas pu être enregistré : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
+            return false;
         }
 
         if (_lastContext is not null)
         {
             _lastContext = _lastContext with { Preferences = updated };
             await RefreshModulesAsync(moduleIds);
-            StatusText = T("Choix enregistré : les constats et les corrections sont mis à jour.");
+            StatusText = IsLimitedAudit ? T("Choix enregistré : il compte à partir du prochain audit.") : T("Choix enregistré : les constats et les corrections sont mis à jour.");
         }
+
+        return true;
     }
 }

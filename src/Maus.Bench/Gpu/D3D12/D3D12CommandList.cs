@@ -134,18 +134,6 @@ internal sealed unsafe class D3D12CommandList : ICommandList
         }
     }
 
-    public void SetRenderTarget(ITexture? color, ITexture? depth = null, int mip = 0, int slice = 0)
-    {
-        if (color is null)
-        {
-            SetRenderTargets([], depth, mip, slice);
-        }
-        else
-        {
-            SetRenderTargets([color], depth, mip, slice);
-        }
-    }
-
     public void SetViewport(float x, float y, float width, float height)
     {
         _viewport = new Viewport(x, y, width, height, 0, 1);
@@ -227,12 +215,6 @@ internal sealed unsafe class D3D12CommandList : ICommandList
         _srvDirty = true;
     }
 
-    public void SetStorageTexture(int slot, ITexture? texture, int mip = 0)
-    {
-        _uav[slot] = new Binding(texture as D3D12Texture, mip, null);
-        _uavDirty = true;
-    }
-
     public void SetStorageBuffer(int slot, IBuffer? buffer)
     {
         _uav[slot] = new Binding(null, 0, buffer as D3D12Buffer);
@@ -288,25 +270,12 @@ internal sealed unsafe class D3D12CommandList : ICommandList
         List.DrawIndexedInstanced((uint)indexCount, (uint)instanceCount, (uint)firstIndex, baseVertex, (uint)firstInstance);
     }
 
-    public void DrawIndexedIndirect(IBuffer arguments, int offsetBytes)
-    {
-        var args = (D3D12Buffer)arguments;
-        RequireBuffer(args, ResourceStates.IndirectArgument);
-        if (_indexBuffer is not null)
-        {
-            RequireBuffer(_indexBuffer, ResourceStates.IndexBuffer);
-        }
-
-        PrepareDraw();
-        List.ExecuteIndirect(_owner.DrawIndexedSignature, 1, args.Resource, (ulong)offsetBytes, null, 0);
-    }
-
     public void Dispatch(int groupsX, int groupsY, int groupsZ)
     {
         // Lecture-écriture d'une même sortie par deux calculs successifs : barrière d'accès non ordonné.
         foreach (var binding in _uav)
         {
-            var resource = binding.Texture?.Resource ?? binding.Buffer?.Resource;
+            var resource = binding.Buffer?.Resource;
             if (resource is not null && _written.Contains(resource))
             {
                 _barriers.Add(ResourceBarrier.BarrierUnorderedAccessView(resource));
@@ -338,7 +307,7 @@ internal sealed unsafe class D3D12CommandList : ICommandList
         List.Dispatch((uint)groupsX, (uint)groupsY, (uint)groupsZ);
         foreach (var binding in _uav)
         {
-            if ((binding.Texture?.Resource ?? binding.Buffer?.Resource) is { } resource)
+            if (binding.Buffer?.Resource is { } resource)
             {
                 _written.Add(resource);
             }
@@ -530,7 +499,7 @@ internal sealed unsafe class D3D12CommandList : ICommandList
             for (var i = 0; i < MaxStorage; i++)
             {
                 var b = _uav[i];
-                _tableScratch[i] = b.Texture is not null ? b.Texture.StorageView(b.Mip) : b.Buffer is not null ? b.Buffer.StorageView : _owner.NullStorage;
+                _tableScratch[i] = b.Buffer is not null ? b.Buffer.StorageView : _owner.NullStorage;
             }
 
             _uavTable = _owner.Ring.Upload(_tableScratch.AsSpan(0, MaxStorage));

@@ -81,6 +81,27 @@ public class HealthScoreTests
         Assert.Equal("M01.defender-tamper", score.Lines[0].FindingId);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Of_two_findings_on_one_subject_only_the_gravest_counts_whatever_the_order(bool reversed)
+    {
+        Finding[] findings =
+        [
+            Costly("M01.secure-boot", FindingStatus.Warning, Severity.Medium),
+            Costly("M08.secure-boot", FindingStatus.Problem, Severity.High),
+        ];
+        if (reversed)
+        {
+            Array.Reverse(findings);
+        }
+
+        var score = HealthScore.Explain([new ModuleResult("M00", "tous", findings, TimeSpan.Zero)]);
+
+        Assert.Equal(Severity.High, Assert.Single(score.Lines).Gravity);
+        Assert.Equal(74, score.Cap);
+    }
+
     [Fact]
     public void Families_follow_the_letters_of_maus()
     {
@@ -95,8 +116,14 @@ public class HealthScoreTests
 
     [Theory]
     [InlineData(95, "excellent")]
+    [InlineData(90, "excellent")]
+    [InlineData(89, "bon")]
     [InlineData(78, "bon")]
+    [InlineData(75, "bon")]
+    [InlineData(74, "à améliorer")]
     [InlineData(60, "à améliorer")]
+    [InlineData(50, "à améliorer")]
+    [InlineData(49, "à corriger en priorité")]
     [InlineData(20, "à corriger en priorité")]
     public void Score_is_described_in_words(int score, string expected)
     {
@@ -109,5 +136,6 @@ public class HealthScoreTests
         Assert.Equal("M01.secure-boot", HealthScore.SubjectOf("M01.secure-boot"));
         Assert.Equal("M01.secure-boot", HealthScore.SubjectOf("M08.secure-boot"));
         Assert.Null(HealthScore.SubjectOf("M08.secure-boot-events"));
+        Assert.Equal("M01.wu-services", HealthScore.SubjectOf("M03.update-services"));
     }
 }

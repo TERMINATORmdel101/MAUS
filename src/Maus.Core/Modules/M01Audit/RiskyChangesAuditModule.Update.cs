@@ -11,20 +11,22 @@ public sealed partial class RiskyChangesAuditModule
     private const string WuPolicyKey = @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate";
     private const string WuAuPolicyKey = WuPolicyKey + @"\AU";
     private const string WuUxSettingsKey = @"SOFTWARE\Microsoft\WindowsUpdate\UX\Settings";
-    private const string UpdateTasksFolder = @"\Microsoft\Windows\UpdateOrchestrator";
+    internal const string UpdateTasksQuery = @"SELECT TaskName, State FROM MSFT_ScheduledTask WHERE TaskPath = '\\Microsoft\\Windows\\UpdateOrchestrator\\'";
 
     /// <summary>Page « Windows Update » des Paramètres (Microsoft Learn, « Launch Windows Settings ») : bouton « Reprendre les mises à jour ».</summary>
     internal const string WindowsUpdatePage = "ms-settings:windowsupdate";
 
     /// <summary>Durée de pause maximale proposée par Paramètres > Windows Update.</summary>
-    private const int MaxPauseDays = 35;
+    internal const int MaxPauseDays = 35;
 
-    private static readonly string[] UpdateServices = ["wuauserv", "UsoSvc", "WaaSMedicSvc", "BITS"];
+    private static readonly string[] PauseEndValues = ["PauseUpdatesExpiryTime", "PauseQualityUpdatesEndTime"];
+
+    private static readonly string[] UpdateServices =["wuauserv", "UsoSvc", "WaaSMedicSvc", "BITS"];
 
     /// <summary>Tâches qui lancent la recherche de mises à jour ; les autres varient selon la build.</summary>
     private static readonly HashSet<string> ScanTasks = new(StringComparer.OrdinalIgnoreCase) { "Schedule Scan", "Schedule Scan Static Task" };
 
-    private static readonly Check UpdateServicesCheck = new("M01.wu-services", "Services de Windows Update", UpdateCategory, Severity.Critical, Fixable: true);
+    private static Check UpdateServicesCheck => new("M01.wu-services", T("Services de Windows Update"), UpdateCategory, Severity.Critical, Fixable: true);
 
     private static Check WsusCheck => new("M01.wu-server", T("Serveur de mises à jour imposé"), UpdateCategory, Severity.Critical, Fixable: true);
 
@@ -126,21 +128,26 @@ public sealed partial class RiskyChangesAuditModule
         var expected = T("aucune pause, ou 5 semaines au plus");
         var advice = T("Reprendre les mises à jour dans Paramètres > Windows Update, puis supprimer la valeur FlightSettingsMaxPauseDays si elle existe.");
         var maxDays = context.Registry.GetDword(Hklm, WuUxSettingsKey, "FlightSettingsMaxPauseDays");
-        var expiry = context.Registry.GetString(Hklm, WuUxSettingsKey, "PauseUpdatesExpiryTime");
+
+        // Les deux dates de fin que lit aussi le Module 3 : la plus lointaine fait foi.
+        var expiries = PauseEndValues
+            .Select(name => context.Registry.GetString(Hklm, WuUxSettingsKey, name))
+            .Where(IsSet)
+            .ToList();
 
         if (maxDays > MaxPauseDays)
         {
             return PauseCheck.Deviation(T("durée maximale de pause portée à {0} jours", maxDays), expected, explanation, advice);
         }
 
-        if (!IsSet(expiry))
+        if (expiries.Count == 0)
         {
             return PauseCheck.Compliant(T("aucune pause"), expected, explanation);
         }
 
-        if (!DateTimeOffset.TryParse(expiry, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var until))
+        if (expiries.Select(M03Updates.UpdateParsers.ParseIsoDate).Max() is not { } until)
         {
-            return PauseCheck.Unknown(T("Date de fin de pause illisible : {0}", expiry));
+            return PauseCheck.Unknown(T("Date de fin de pause illisible : {0}", expiries[0]));
         }
 
         if (until <= context.Now)
@@ -196,13 +203,15 @@ public sealed partial class RiskyChangesAuditModule
             : TargetVersionCheck.Deviation(T("valeurs inactives : {0}", label), expected, T("Ces valeurs sont inactives (TargetReleaseVersion n'est pas à 1), mais restent une trace de blocage. ") + explanation, advice, Severity.Low);
     }
 
-    private Finding DetectUpdateTasks(AuditContext context)
+    private static Finding DetectUpdateTasks(AuditContext context)
     {
         var explanation = T("Ces tâches planifiées lancent la recherche et l'installation des mises à jour en arrière-plan. " +
             "Désactivées, Windows ne vérifie plus seul la présence de correctifs.");
         var expected = T("tâches de recherche actives");
         var advice = T("Réactiver les tâches du dossier UpdateOrchestrator dans le Planificateur de tâches.");
-        var tasks = _tasks.GetTasks(UpdateTasksFolder);
+        var tasks = context.Cim.Query(UpdateTasksQuery, CimScopes.TaskScheduler)
+            .Select(row => new ScheduledTaskInfo(row.GetString("TaskName") ?? string.Empty, row.GetInt64("State") != M04Privacy.PrivacySystemChecks.TaskDisabled))
+            .ToList();
         if (tasks.Count == 0)
         {
             // Sans droits administrateur, ce dossier protégé paraît vide.

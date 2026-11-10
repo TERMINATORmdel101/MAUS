@@ -13,12 +13,10 @@ internal sealed record OemPowerUtility(string Name, string[] PackagePrefixes, st
 /// </summary>
 internal static class OemPowerUtilities
 {
-    public const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+    public const string UninstallKey = InstalledPrograms.UninstallPath;
     public const string ServicesKey = @"SYSTEM\CurrentControlSet\Services";
 
     /// <summary>Programmes 64 bits puis 32 bits (WOW6432Node).</summary>
-    private static readonly RegistryView[] Views = [RegistryView.Registry64, RegistryView.Registry32];
-
     public static readonly IReadOnlyList<OemPowerUtility> Known =
     [
         new("Armoury Crate (ASUS)", ["B9ECED6F.ArmouryCrate"], ["ArmouryCrateService"], ["Armoury Crate"]),
@@ -33,7 +31,7 @@ internal static class OemPowerUtilities
     public static IReadOnlyList<string> Detect(AuditContext context)
     {
         var packages = ReadPackageNames(context.Packages);
-        var displayNames = ReadInstalledProgramNames(context.Registry);
+        var displayNames = InstalledPrograms.Read(context.Registry, out _).Select(p => p.Name).ToList();
         var found = new List<string>();
         foreach (var utility in Known)
         {
@@ -60,46 +58,6 @@ internal static class OemPowerUtilities
         }
     }
 
-    private static List<string> ReadInstalledProgramNames(IRegistryReader registry)
-    {
-        var names = new List<string>();
-        foreach (var view in Views)
-        {
-            foreach (var subKey in TryRead(() => registry.GetSubKeyNames(RegistryHive.LocalMachine, UninstallKey, view)) ?? [])
-            {
-                // Une entrée illisible est ignorée : les autres restent utiles.
-                if (TryRead(() => registry.GetString(RegistryHive.LocalMachine, $@"{UninstallKey}\{subKey}", "DisplayName", view)) is { Length: > 0 } name)
-                {
-                    names.Add(name);
-                }
-            }
-        }
-
-        return names;
-    }
-
-    private static T? TryRead<T>(Func<T?> read)
-        where T : class
-    {
-        try
-        {
-            return read();
-        }
-        catch (MausAccessDeniedException)
-        {
-            return null;
-        }
-    }
-
-    private static bool ServiceExists(IRegistryReader registry, string service)
-    {
-        try
-        {
-            return registry.KeyExists(RegistryHive.LocalMachine, $@"{ServicesKey}\{service}");
-        }
-        catch (MausAccessDeniedException)
-        {
-            return false;
-        }
-    }
+    private static bool ServiceExists(IRegistryReader registry, string service) =>
+        RegistryReaderExtensions.ValueOrNull(() => registry.KeyExists(RegistryHive.LocalMachine, $@"{ServicesKey}\{service}")) ?? false;
 }

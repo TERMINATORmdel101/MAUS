@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Maus.Core.Platform;
 
 namespace Maus.Core.Workshop.Benchmark;
 
@@ -18,6 +19,7 @@ public static partial class BenchmarkShareCode
     private const int MaxJson = 64 * 1024;
     private const int MaxText = 200;
     private const int MaxTests = 24;
+    private const int MaxEdition = 1000;
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -43,7 +45,9 @@ public static partial class BenchmarkShareCode
             report.OverallScore,
             report.Completed,
             [.. report.Tests.Select(t => new PayloadTest(t.Id, t.Device, t.Value, t.Score, t.Low1, t.Sensors?.MaxTemperatureC, t.Sensors?.AverageClockMhz))],
-            report.RayTracingScore > 0 ? report.RayTracingScore : null);
+            report.RayTracingScore > 0 ? report.RayTracingScore : null,
+            report.DisplayResolution.Length > 0 ? report.DisplayResolution : null,
+            report.Edition > 0 ? report.Edition : null);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, Json);
         using var output = new MemoryStream();
         using (var deflate = new DeflateStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
@@ -92,7 +96,7 @@ public static partial class BenchmarkShareCode
 
     private static BenchmarkReport? ToReport(Payload p)
     {
-        if (p.Tests is null || p.Tests.Count > MaxTests || !Valid(p.GpuScore) || !Valid(p.CpuScore) || !Valid(p.OverallScore) || p.Threads is < 0 or > 4096
+        if (p.Tests is null || p.Tests.Count > MaxTests || !StoredValues.IsPossibleDate(p.Date) || !Valid(p.GpuScore) || !Valid(p.CpuScore) || !Valid(p.OverallScore) || p.Threads is < 0 or > 4096
             || (p.RayTracingScore is { } rt && !Valid(rt)))
         {
             return null;
@@ -106,7 +110,7 @@ public static partial class BenchmarkShareCode
                 return null;
             }
 
-            tests.Add(new BenchmarkTestResult(id, t.Device, "", t.Value, "", t.Score, t.Low1)
+            tests.Add(new BenchmarkTestResult(id, t.Device, t.Value, "", t.Score, t.Low1)
             {
                 Sensors = t.MaxTemperatureC is null && t.AverageClockMhz is null
                     ? null
@@ -117,9 +121,11 @@ public static partial class BenchmarkShareCode
         return new BenchmarkReport
         {
             Version = Clean(p.Version) ?? "",
+            Edition = p.Edition is > 0 and <= MaxEdition ? p.Edition.Value : 0,
             Date = p.Date,
             Api = Clean(p.Api) ?? "",
             RenderResolution = Clean(p.RenderResolution) ?? "",
+            DisplayResolution = Clean(p.DisplayResolution) ?? "",
             Gpu = Clean(p.Gpu) ?? "",
             Cpu = Clean(p.Cpu) ?? "",
             Threads = p.Threads,
@@ -137,16 +143,7 @@ public static partial class BenchmarkShareCode
     private static double? Finite(double? value) => value is { } v && Valid(v) ? v : null;
 
     /// <summary>Texte affichable : sans caractères de contrôle, raccourci.</summary>
-    private static string? Clean(string? text)
-    {
-        if (text is null)
-        {
-            return null;
-        }
-
-        var clean = new string([.. text.Where(c => !char.IsControl(c))]).Trim();
-        return clean.Length > MaxText ? clean[..MaxText] : clean;
-    }
+    private static string? Clean(string? text) => text is null ? null : StoredValues.Text(text, MaxText).Trim();
 
     [GeneratedRegex(@"MAUS-BENCH-1:([A-Za-z0-9_\-]{16,8000})", RegexOptions.CultureInvariant)]
     private static partial Regex CodePattern();
@@ -164,14 +161,16 @@ public static partial class BenchmarkShareCode
         double OverallScore,
         bool Completed,
         List<PayloadTest?>? Tests,
-        double? RayTracingScore = null);
+        double? RayTracingScore = null,
+        string? DisplayResolution = null,
+        int? Edition = null);
 
     private sealed record PayloadTest(string? Id, string? Device, double Value, double Score, double? Low1, double? MaxTemperatureC, double? AverageClockMhz);
 }
 
 /// <summary>Une ligne de comparaison : points de l'utilisateur, points de l'autre résultat, écart en %.</summary>
 /// <param name="Id">« overall », « gpu », « cpu », « rt » (lancer de rayons) ou l'identifiant d'un test.</param>
-/// <param name="Difference">Écart de l'autre résultat par rapport au vôtre, en % (+ = plus rapide) ; <c>null</c> si l'un manque.</param>
+/// <param name="Difference">Écart de l'autre résultat par rapport au vôtre, en % (+ = plus rapide) ; <c>null</c> si l'un manque, ou entre deux éditions du benchmark (leurs points ne se comparent pas).</param>
 public sealed record BenchmarkComparisonRow(string Id, double Mine, double Theirs, double? Difference);
 
 /// <summary>Comparaison de deux passes du benchmark, test par test (même barème : 10 000 = la machine de référence).</summary>
@@ -181,6 +180,11 @@ public static class BenchmarkComparison
     {
         ArgumentNullException.ThrowIfNull(mine);
         ArgumentNullException.ThrowIfNull(theirs);
+
+        // Entre deux éditions, les points restent lisibles mais aucun écart n'est calculé : le barème n'est plus le même.
+        var sameEdition = BenchmarkScoring.EditionOf(mine) == BenchmarkScoring.EditionOf(theirs);
+        BenchmarkComparisonRow Row(string id, double myScore, double theirScore) =>
+            new(id, myScore, theirScore, sameEdition && myScore > 0 && theirScore > 0 ? Math.Round(((theirScore / myScore) - 1) * 100, 1) : null);
 
         // Score combiné seulement entre passes des mêmes tests (une passe « carte graphique seule » n'a pas le même mélange).
         var rows = new List<BenchmarkComparisonRow>();
@@ -206,6 +210,22 @@ public static class BenchmarkComparison
     }
 
     /// <summary>
+    /// Classement personnel : les passes complètes qui se comparent à la dernière (même édition, même résolution), de la
+    /// meilleure à la moins bonne.
+    /// </summary>
+    public static IReadOnlyList<BenchmarkReport> Ranking(IReadOnlyList<BenchmarkReport> runs)
+    {
+        ArgumentNullException.ThrowIfNull(runs);
+
+        if (runs.LastOrDefault(r => r.Completed && r.OverallScore > 0) is not { } latest)
+        {
+            return [];
+        }
+
+        return [.. runs.Where(r => r.Completed && r.OverallScore > 0 && Comparable(latest, r)).OrderByDescending(r => r.OverallScore).ThenByDescending(r => r.Date)];
+    }
+
+    /// <summary>
     /// Les points ne se comparent qu'entre passes de la même édition du benchmark (mêmes scènes, même étalonnage) et à
     /// résolution de calcul égale ; le reste (interface, passe interrompue, tests différents) appelle une précaution.
     /// </summary>
@@ -225,7 +245,9 @@ public static class BenchmarkComparison
         var notes = new List<string>();
         if (BenchmarkScoring.EditionOf(mine) != BenchmarkScoring.EditionOf(theirs))
         {
-            notes.Add(Localization.Texts.T("Versions du benchmark différentes (MAUS {0} contre {1}) : les scènes ou l'étalonnage ont changé entre-temps, les points ne se comparent pas.", mine.Version, theirs.Version));
+            notes.Add(string.Equals(mine.Version, theirs.Version, StringComparison.Ordinal)
+                ? Localization.Texts.T("Éditions du benchmark différentes ({0} contre {1}) : la mesure a changé entre-temps, les points ne se comparent pas.", BenchmarkScoring.EditionOf(mine), BenchmarkScoring.EditionOf(theirs))
+                : Localization.Texts.T("Versions du benchmark différentes (MAUS {0} contre {1}) : les scènes ou l'étalonnage ont changé entre-temps, les points ne se comparent pas.", mine.Version, theirs.Version));
         }
 
         if (!string.Equals(mine.RenderResolution, theirs.RenderResolution, StringComparison.Ordinal))
@@ -233,9 +255,16 @@ public static class BenchmarkComparison
             notes.Add(Localization.Texts.T("Résolutions différentes ({0} contre {1}) : les points ne se comparent pas vraiment.", mine.RenderResolution, theirs.RenderResolution));
         }
 
+        // Seulement entre passes d'avant l'édition 4 : depuis, l'image finale ne dépend plus de l'écran.
+        if (BenchmarkScoring.EditionOf(mine) < BenchmarkScoring.ScreenIndependentEdition && BenchmarkScoring.EditionOf(theirs) < BenchmarkScoring.ScreenIndependentEdition
+            && mine.DisplayResolution.Length > 0 && theirs.DisplayResolution.Length > 0 && !string.Equals(mine.DisplayResolution, theirs.DisplayResolution, StringComparison.Ordinal))
+        {
+            notes.Add(Localization.Texts.T("Écrans de définitions différentes ({0} contre {1}) : l'image finale est dessinée à la définition de l'écran, ce qui peut changer un peu les points.", mine.DisplayResolution, theirs.DisplayResolution));
+        }
+
         if (!mine.Completed || !theirs.Completed)
         {
-            notes.Add(Localization.Texts.T("Une des passes a été interrompue : ses scores sont partiels."));
+            notes.Add(Localization.Texts.T("Une des mesures a été interrompue : ses scores sont partiels."));
         }
 
         if (!string.Equals(mine.Api, theirs.Api, StringComparison.Ordinal))
@@ -245,7 +274,7 @@ public static class BenchmarkComparison
 
         if (!SameTests(mine, theirs))
         {
-            notes.Add(Localization.Texts.T("Les deux passes n'ont pas fait les mêmes tests : le score combiné n'est pas comparé, seulement les tests communs."));
+            notes.Add(Localization.Texts.T("Les deux mesures n'ont pas fait les mêmes tests : le score combiné n'est pas comparé, seulement les tests communs."));
         }
 
         return notes;
@@ -253,7 +282,4 @@ public static class BenchmarkComparison
 
     private static bool SameTests(BenchmarkReport a, BenchmarkReport b) =>
         a.Tests.Select(t => t.Id).Order(StringComparer.Ordinal).SequenceEqual(b.Tests.Select(t => t.Id).Order(StringComparer.Ordinal), StringComparer.Ordinal);
-
-    private static BenchmarkComparisonRow Row(string id, double mine, double theirs) =>
-        new(id, mine, theirs, mine > 0 && theirs > 0 ? Math.Round(((theirs / mine) - 1) * 100, 1) : null);
 }

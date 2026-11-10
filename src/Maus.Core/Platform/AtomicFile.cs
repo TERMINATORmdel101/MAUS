@@ -47,6 +47,7 @@ public static partial class AtomicFile
     private const uint MoveFileWriteThrough = 0x8;
 
     private const int ErrorAccessDenied = 5;
+    private const int ErrorSharingViolation = 32;
 
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
@@ -56,6 +57,12 @@ public static partial class AtomicFile
     /// </summary>
     internal static IReadOnlyList<TimeSpan> RetryDelays { get; } =
         [TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(150), TimeSpan.FromMilliseconds(400)];
+
+    /// <summary>
+    /// Taille au-delà de laquelle un fichier n'est pas lu : MAUS n'en écrit aucun de plus de quelques mégaoctets, et lire un fichier
+    /// de plusieurs gigaoctets ferait tomber MAUS faute de mémoire. Il est traité comme illisible : il n'est jamais remplacé.
+    /// </summary>
+    internal const long MaxReadableBytes = 64L * 1024 * 1024;
 
     /// <summary>Lit un fichier texte, en retentant quelques fois s'il est momentanément inaccessible.</summary>
     /// <param name="isTrusted">Contrôle du propriétaire (fichiers protégés) ; <c>null</c> = aucun contrôle.</param>
@@ -74,6 +81,11 @@ public static partial class AtomicFile
                 if (isTrusted is not null && !isTrusted(path))
                 {
                     return new StoredFileRead(StoredFileState.Untrusted);
+                }
+
+                if (new FileInfo(path).Length > MaxReadableBytes)
+                {
+                    return new StoredFileRead(StoredFileState.Unavailable, Error: new IOException(Localization.Texts.T("Ce fichier est beaucoup trop gros pour avoir été écrit par MAUS.")));
                 }
 
                 return new StoredFileRead(StoredFileState.Read, File.ReadAllText(path, Utf8));
@@ -166,9 +178,16 @@ public static partial class AtomicFile
             return;
         }
 
-        if (!MoveFileEx(source, destination, MoveFileReplaceExisting | MoveFileWriteThrough))
+        for (var attempt = 0; !MoveFileEx(source, destination, MoveFileReplaceExisting | MoveFileWriteThrough); attempt++)
         {
+            // Comme à la lecture : un antivirus ou une sauvegarde peut tenir le fichier un instant.
             var error = Marshal.GetLastPInvokeError();
+            if (error is ErrorAccessDenied or ErrorSharingViolation && attempt < RetryDelays.Count)
+            {
+                Thread.Sleep(RetryDelays[attempt]);
+                continue;
+            }
+
             var message = new Win32Exception(error).Message + " (" + destination + ")";
             throw error == ErrorAccessDenied
                 ? new UnauthorizedAccessException(message)
@@ -187,6 +206,42 @@ public static partial class AtomicFile
             // Un fichier temporaire oublié ne gêne rien : il n'est jamais lu.
         }
     }
+
+    /// <summary>Nombre de noms que ce fichier porte sur le disque : plus d'un, une écriture sous un autre nom le changerait aussi.</summary>
+    /// <exception cref="IOException">Fichier occupé, ou nombre illisible.</exception>
+    /// <exception cref="UnauthorizedAccessException">Accès refusé.</exception>
+    public static uint LinkCount(string path)
+    {
+        using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return Describe(handle).Links;
+    }
+
+    /// <summary>Attributs et nombre de noms sur le disque du fichier ouvert, lus par sa poignée.</summary>
+    /// <exception cref="IOException">Informations illisibles.</exception>
+    internal static (FileAttributes Attributes, uint Links) Describe(Microsoft.Win32.SafeHandles.SafeFileHandle handle) =>
+        GetFileInformationByHandle(handle, out var information)
+            ? ((FileAttributes)information.FileAttributes, information.NumberOfLinks)
+            : throw new IOException(new Win32Exception(Marshal.GetLastPInvokeError()).Message);
+
+    /// <summary>BY_HANDLE_FILE_INFORMATION (documentation Microsoft) ; les dates y sont des paires de mots de 32 bits.</summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public ulong CreationTime;
+        public ulong LastAccessTime;
+        public ulong LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file, out ByHandleFileInformation information);
 
     [LibraryImport("kernel32.dll", EntryPoint = "MoveFileExW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]

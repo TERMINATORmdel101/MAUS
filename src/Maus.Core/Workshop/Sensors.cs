@@ -91,8 +91,6 @@ public sealed class SensorHistory(int capacity = 120)
     /// <summary>Série d'une mesure (valeurs absentes ignorées).</summary>
     public IReadOnlyList<double> Series(Func<SensorSnapshot, double?> selector) =>
         _samples.Select(selector).OfType<double>().ToList();
-
-    public double? Max(Func<SensorSnapshot, double?> selector) => Series(selector) is { Count: > 0 } s ? s.Max() : null;
 }
 
 public enum AlarmLevel
@@ -115,16 +113,17 @@ public static class SensorAlarms
         var alarms = new List<SensorAlarm>();
         // Limite : celle que donne le processeur, sinon celle du catalogue (modèles vérifiés) ; inconnue = pas d'alarme inventée
         // (le processeur se protège de toute façon en ralentissant).
-        if (snapshot.CpuTemperatureC is { } cpu && (snapshot.CpuTjMaxC ?? cpuMaxC) is { } max)
+        if (snapshot.CpuTemperatureC is { } cpu && ThermalRules.CpuLimit(snapshot.CpuTjMaxC, cpuMaxC) is { } max)
         {
             // À sa limite, le processeur ralentit de lui-même pour se protéger ; certains modèles récents y montent
-            // volontairement en pleine charge. Danger seulement au-delà (protection qui n'agit pas, ou sonde en défaut).
-            if (cpu >= max + 5)
+            // volontairement en pleine charge. Danger seulement au-delà (protection qui n'agit pas, ou sonde en défaut) : une
+            // limite donnée par le processeur n'est jamais dépassée à la lecture (CpuTemperatureWatch.CappedAtLimit).
+            if (ThermalRules.CpuDanger(cpu, max))
             {
                 alarms.Add(new("cpu-hot", AlarmLevel.Danger,
                     Localization.Texts.T("Le processeur dépasse sa limite ({0:0} °C pour {1} °C au maximum) : arrêtez la charge et vérifiez le refroidissement.", cpu, max)));
             }
-            else if (cpu >= max - 3)
+            else if (ThermalRules.CpuAtLimit(cpu, max))
             {
                 alarms.Add(new("cpu-warm", AlarmLevel.Attention,
                     Localization.Texts.T("Le processeur est à sa limite de température ({0:0} °C sur {1} °C) : il ralentit pour se protéger. Normal en pleine charge pour certains modèles récents ; au repos, vérifiez le refroidissement.", cpu, max)));
@@ -138,7 +137,7 @@ public static class SensorAlarms
                 continue;
             }
 
-            if (gpu.SlowdownTemperatureC is { } slowdown && temperature >= slowdown)
+            if (gpu.SlowdownTemperatureC is { } slowdown && ThermalRules.GpuDanger(temperature, slowdown))
             {
                 alarms.Add(new($"gpu-hot:{gpu.Name}", AlarmLevel.Danger,
                     Localization.Texts.T("{0} a atteint son seuil de ralentissement ({1:0} °C) : elle baisse ses fréquences pour se protéger.", gpu.Name, temperature)));

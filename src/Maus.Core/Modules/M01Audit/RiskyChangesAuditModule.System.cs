@@ -28,6 +28,9 @@ public sealed partial class RiskyChangesAuditModule
         @"Windows\WcmSvc", @"Windows\WorkplaceJoin", @"Windows NT\Printers", @"Windows NT\Terminal Services", @"Windows NT\Windows File Protection",
         @"Windows NT\Rpc",
 
+        // Posées par les corrections de confidentialité de MAUS (M04).
+        @"Windows\DeliveryOptimization", @"Windows\System\EnableActivityFeed", @"Windows\System\PublishUserActivities", @"Windows\System\UploadUserActivities",
+
         // Couvertes par un contrôle dédié de ce module.
         "Windows Defender", @"Windows\WindowsUpdate", "WindowsFirewall", @"Windows\System\EnableSmartScreen", @"Windows\System\ShellSmartScreenLevel",
 
@@ -38,9 +41,9 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Check ModifiedImageCheck => new("M01.modified-image", T("Image de Windows modifiée"), SystemCategory, Severity.High);
 
-    private static readonly Check ActivationCheck = new("M01.activation", "Activation de Windows", SystemCategory, Severity.Medium);
+    private static Check ActivationCheck => new("M01.activation", T("Activation de Windows"), SystemCategory, Severity.Medium);
 
-    private static Check ResidualPoliciesCheck => new("M01.residual-policies", T("Stratégies locales résiduelles"), SystemCategory, Severity.Low, Fixable: true);
+    private static Check ResidualPoliciesCheck => new("M01.residual-policies", T("Stratégies locales résiduelles"), SystemCategory, Severity.Low);
 
     private Finding DetectModifiedImage(AuditContext context, bool? winRe)
     {
@@ -64,7 +67,7 @@ public sealed partial class RiskyChangesAuditModule
 
         if (context.Files.DirectoryExists(Path.Combine(_windowsDirectory, "AtlasModules")))
         {
-            clues.Add("dossier AtlasModules (AtlasOS)");
+            clues.Add(T("dossier AtlasModules (AtlasOS)"));
             strong = true;
         }
 
@@ -76,7 +79,7 @@ public sealed partial class RiskyChangesAuditModule
         if (clues.Count == 0)
         {
             return ModifiedImageCheck.Compliant(
-                winRe is null ? T("aucun indice (WinRE non vérifié sans droits administrateur)") : T("aucun indice"),
+                winRe is not null ? T("aucun indice") : context.IsElevated ? T("aucun indice (WinRE illisible)") : T("aucun indice (WinRE non vérifié sans droits administrateur)"),
                 expected,
                 explanation);
         }
@@ -188,7 +191,7 @@ public sealed partial class RiskyChangesAuditModule
                 current,
                 expected,
                 explanation,
-                T("Passer en revue ces valeurs : celles que vous n'avez pas choisies pourront être supprimées une à une."));
+                T("Passer en revue ces valeurs : MAUS ne les retire pas, car il ne peut pas savoir lesquelles vous avez choisies. Celles que vous ne reconnaissez pas se suppriment dans l'Éditeur du Registre, après une sauvegarde."));
     }
 
     internal static bool IsAcceptedPolicy(string relativePath) =>

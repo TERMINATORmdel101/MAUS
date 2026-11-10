@@ -73,14 +73,20 @@ public class ComponentStoreTests
 public class RepairConsoleTests
 {
     [Fact]
-    public void Dism_runs_before_sfc_and_the_window_stays_open()
+    public async Task Dism_runs_before_sfc_without_any_command_window_and_sfc_runs_even_if_dism_fails()
     {
-        var arguments = RepairConsole.Arguments();
+        var runs = new List<string>();
 
-        Assert.StartsWith("/k ", arguments, StringComparison.Ordinal);
-        var dism = arguments.IndexOf(RepairConsole.DismCommand, StringComparison.Ordinal);
-        var sfc = arguments.IndexOf(RepairConsole.SfcCommand, StringComparison.Ordinal);
-        Assert.True(dism > 0 && sfc > dism);
+        var message = await RepairConsole.RunAsync(
+            (tool, arguments, _) =>
+            {
+                runs.Add(tool + " " + string.Join(' ', arguments));
+                return Task.FromResult(tool == "Dism.exe" ? 87 : 0);
+            },
+            _ => { });
+
+        Assert.Equal(["Dism.exe /Online /Cleanup-Image /RestoreHealth", "sfc.exe /scannow"], runs);
+        Assert.Contains("87", message, StringComparison.Ordinal);
     }
 
     [Fact]

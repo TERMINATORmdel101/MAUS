@@ -51,8 +51,9 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
     public Task RecordVerificationAsync(string sessionId, IReadOnlyList<VerifiedOutcome> verified, CancellationToken cancellationToken) =>
         CallAsync<object>("verify", new { sessionId, verified }, null, cancellationToken);
 
+    /// <param name="force">Jamais transmis : le moteur laisse toujours telle quelle une valeur changée depuis la correction.</param>
     public async Task<RevertResult> RevertAsync(string sessionId, string? changeId, bool force, CancellationToken cancellationToken) =>
-        await CallAsync<RevertResult>("revert", new { sessionId, changeId, force }, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
+        await CallAsync<RevertResult>("revert", new { sessionId, changeId }, null, cancellationToken).ConfigureAwait(false) ?? throw Empty();
 
     public async Task<JournalListing> BrowseJournalAsync(CancellationToken cancellationToken) =>
         await CallAsync<JournalListing>("journal", null, null, cancellationToken).ConfigureAwait(false) ?? new JournalListing([], 0);
@@ -75,7 +76,7 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
     private async Task IntroduceAsync(Stream pipe, CancellationToken cancellationToken)
     {
         await EngineProtocol.WriteAsync(pipe, key.Introduction(), cancellationToken).ConfigureAwait(false);
-        var welcome = await EngineProtocol.ReadAsync<SignedMessage>(pipe, cancellationToken).ConfigureAwait(false)
+        var welcome = await EngineProtocol.ReadAsync(pipe, cancellationToken).ConfigureAwait(false)
             ?? throw new EngineException(T("Le moteur de MAUS a refusé la clé de cette fenêtre. Relancez MAUS."));
         if (!key.VerifyResponse(0, welcome))
         {
@@ -100,7 +101,7 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
                 connect.CancelAfter(ConnectTimeout);
                 await pipe.ConnectAsync(connect.Token).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or TimeoutException)
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or TimeoutException or UnauthorizedAccessException)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 throw new EngineUnavailableException(T("Le moteur de MAUS ne répond pas (il a peut-être été fermé) : relancez MAUS."), ex);
@@ -122,10 +123,10 @@ public sealed partial class RemoteMausEngine(string pipeName, int serverProcessI
                     await IntroduceAsync(pipe, cancellationToken).ConfigureAwait(false);
                 }
 
-                await EngineProtocol.WriteAsync(pipe, key.SignRequest(JsonSerializer.Serialize(request, EngineProtocol.Json)), cancellationToken).ConfigureAwait(false);
+                await EngineProtocol.WriteAsync(pipe, key.SignRequest(JsonSerializer.SerializeToUtf8Bytes(request, EngineProtocol.Json)), cancellationToken).ConfigureAwait(false);
                 while (true)
                 {
-                    var signed = await EngineProtocol.ReadAsync<SignedMessage>(pipe, cancellationToken).ConfigureAwait(false)
+                    var signed = await EngineProtocol.ReadAsync(pipe, cancellationToken).ConfigureAwait(false)
                         ?? throw new EngineException(T("Le moteur de MAUS a coupé le canal sans répondre."));
                     if (!key.VerifyResponse(sequence, signed))
                     {

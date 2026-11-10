@@ -1,22 +1,9 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Maus.Bench.Gpu;
 using Maus.Bench.Render;
 
 namespace Maus.Bench.Scenes;
-
-/// <summary>Capacité de la carte graphique qu'un test met à genoux (pour le bilan « points forts, points faibles »).</summary>
-public enum GpuCapability
-{
-    Geometry,
-    Bandwidth,
-    Compute,
-    Textures,
-    Volumetrics,
-    Effects,
-
-    /// <summary>Lancer de rayons matériel (DXR) : test à part, avec son propre score.</summary>
-    RayTracing,
-}
 
 /// <summary>État d'une scène à un instant : caméra, soleil, paramètres des shaders, étalonnage.</summary>
 internal sealed record SceneState(CameraPose Camera, ColorGrade Grade)
@@ -36,12 +23,55 @@ internal sealed record SceneState(CameraPose Camera, ColorGrade Grade)
     /// <summary>Anticrénelage temporel (décalage sous-pixel et historique) ; coupé pour les scènes de particules.</summary>
     public bool Temporal { get; init; } = true;
 
-    /// <summary>Plan de coupe : l'anticrénelage oublie l'image précédente.</summary>
-    public bool Cut { get; init; }
-
     public float NearPlane { get; init; } = 0.05f;
 
     public float FarPlane { get; init; } = 2000f;
+}
+
+/// <summary>Emprise au sol d'un objet posé dans une scène.</summary>
+internal static class BoxFootprint
+{
+    /// <summary>Bas de l'objet tourné (y minimal) et centre de son emprise au sol, d'après les coins de sa boîte.</summary>
+    public static (float Low, Vector2 Center) Of(Vector3 boxMin, Vector3 boxMax, Matrix4x4 local)
+    {
+        var low = float.MaxValue;
+        var min = new Vector2(float.MaxValue);
+        var max = new Vector2(float.MinValue);
+        for (var k = 0; k < 8; k++)
+        {
+            var corner = new Vector3((k & 1) == 0 ? boxMin.X : boxMax.X, (k & 2) == 0 ? boxMin.Y : boxMax.Y, (k & 4) == 0 ? boxMin.Z : boxMax.Z);
+            var p = Vector3.Transform(corner, local);
+            low = MathF.Min(low, p.Y);
+            min = Vector2.Min(min, new Vector2(p.X, p.Z));
+            max = Vector2.Max(max, new Vector2(p.X, p.Z));
+        }
+
+        return (low, (min + max) * 0.5f);
+    }
+}
+
+/// <summary>Maillage prêt à dessiner : un tampon de sommets (<paramref name="stride"/> octets par sommet) et des indices 32 bits.</summary>
+internal sealed class IndexedMesh(IBuffer vertices, IBuffer indices, int indexCount, int stride) : IDisposable
+{
+    public int IndexCount { get; } = indexCount;
+
+    public static IndexedMesh Create(IGpuDevice device, string name, float[] vertices, uint[] indices, int stride) => new(
+        device.CreateBuffer(new BufferDesc(vertices.Length * 4L, BufferUsage.Vertex, stride, name), MemoryMarshal.AsBytes(vertices.AsSpan())),
+        device.CreateBuffer(new BufferDesc(indices.Length * 4L, BufferUsage.Index, 4, name + " : indices"), MemoryMarshal.AsBytes(indices.AsSpan())),
+        indices.Length,
+        stride);
+
+    public void Bind(ICommandList cmd)
+    {
+        cmd.SetVertexBuffer(0, vertices, stride);
+        cmd.SetIndexBuffer(indices);
+    }
+
+    public void Dispose()
+    {
+        vertices.Dispose();
+        indices.Dispose();
+    }
 }
 
 /// <summary>Ce dont une scène a besoin pour dessiner : carte, shaders, cibles communes.</summary>
@@ -103,8 +133,6 @@ internal abstract class BenchScene : IDisposable
 
     /// <summary>Ce que la scène sollicite, en une phrase.</summary>
     public abstract string Subtitle { get; }
-
-    public abstract GpuCapability Capability { get; }
 
     /// <summary>Durée mesurée, en secondes (1 min 36 par scène : 8 minutes de carte graphique pour les cinq scènes).</summary>
     public virtual double Duration => 96;

@@ -76,7 +76,7 @@ public static partial class WakeReport
             Title = title,
             Category = category,
             Status = FindingStatus.Info,
-            Current = T("{0} réveil(s) ces {1} derniers jours", wakes.Count, Days),
+            Current = wakes.Count >= 200 ? T("au moins {0} réveil(s) ces {1} derniers jours", wakes.Count, Days) : T("{0} réveil(s) ces {1} derniers jours", wakes.Count, Days),
             Explanation = string.Join(" ", parts),
             Advice = T("Pour empêcher un appareil de réveiller le PC : Gestionnaire de périphériques, propriétés de l'appareil, onglet « Gestion de l'alimentation », décochez « Autoriser ce périphérique à sortir l'ordinateur du mode veille ». Pour les tâches : Options d'alimentation, paramètres avancés, « Veille » > « Autoriser les minuteurs de réveil »."),
             SettingsPage = "ms-settings:powersleep",

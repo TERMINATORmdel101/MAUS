@@ -9,6 +9,8 @@ namespace Maus.App.ViewModels.Workshop;
 /// <summary>Une tuile de mesure en direct : valeur, détail, mini-courbe et, si elle a un seuil, jauge de sécurité.</summary>
 public sealed class MetricViewModel(string title, Brush stroke, double maximum = 100) : ObservableObject
 {
+    public override string ToString() => Title;
+
     private string _value = "—";
     private string _detail = string.Empty;
     private IReadOnlyList<double> _series = [];
@@ -55,14 +57,11 @@ public sealed class MetricViewModel(string title, Brush stroke, double maximum =
             if (SetProperty(ref _gauge, value))
             {
                 OnPropertyChanged(nameof(HasGauge));
-                OnPropertyChanged(nameof(HasSeries));
             }
         }
     }
 
     public bool HasGauge => Gauge is not null;
-
-    public bool HasSeries => Gauge is null;
 
     public void Update(string value, string detail, IReadOnlyList<double> series, GaugeInfo? gauge = null)
     {
@@ -77,6 +76,23 @@ public sealed class MetricViewModel(string title, Brush stroke, double maximum =
 public sealed class LiveViewModel : ObservableObject
 {
     private readonly SensorHistory _history = new(90);
+    private double? _peakCpu;
+    private double? _peakGpu;
+
+    /// <summary>Température la plus haute depuis le dernier appel, puis remise à zéro.</summary>
+    public double? TakePeakCpu()
+    {
+        var peak = _peakCpu;
+        _peakCpu = null;
+        return peak;
+    }
+
+    public double? TakePeakGpu()
+    {
+        var peak = _peakGpu;
+        _peakGpu = null;
+        return peak;
+    }
 
     public LiveViewModel()
     {
@@ -132,8 +148,11 @@ public sealed class LiveViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(snapshot);
 
         _history.Add(snapshot);
+        _peakCpu = Math.Max(_peakCpu ?? double.MinValue, snapshot.CpuTemperatureC ?? double.MinValue) is var cpuPeak and > double.MinValue ? cpuPeak : null;
+        var gpuReading = snapshot.Gpus.Select(g => g.TemperatureC).Max();
+        _peakGpu = Math.Max(_peakGpu ?? double.MinValue, gpuReading ?? double.MinValue) is var gpuPeak and > double.MinValue ? gpuPeak : null;
         Cpu.Update(Percent(snapshot.CpuPercent), snapshot.CpuMhz is { } mhz ? (mhz / 1000).ToString("0.00 ", Culture) + "GHz" : string.Empty, _history.Series(s => s.CpuPercent));
-        var cpuMax = snapshot.CpuTjMaxC ?? CpuMaxC;
+        var cpuMax = ThermalRules.CpuLimit(snapshot.CpuTjMaxC, CpuMaxC);
         var details = new List<string>();
         if (snapshot.CpuVoltage is { } volts)
         {
@@ -150,7 +169,7 @@ public sealed class LiveViewModel : ObservableObject
             snapshot.CpuTemperatureC is null ? T("pilote PawnIO requis") : string.Join(" · ", details),
             _history.Series(s => s.CpuTemperatureC),
             snapshot.CpuTemperatureC is { } cpuValue && cpuMax is { } limit
-                ? new GaugeInfo(T("Température"), 20, limit + 10, limit - 10, limit, cpuValue, T("limite du fabricant : {0} °C", limit))
+                ? new GaugeInfo(T("Température"), 20, limit + 10, limit - 10, limit, cpuValue, T("limite du fabricant : {0} °C", limit) + " · " + Ui.GaugeOrangeZone)
                 : null);
         Memory.Update(snapshot.MemoryUsedBytes is { } used ? Gb(used) : "—", snapshot.MemoryTotalBytes is { } total ? "/ " + Gb(total) : string.Empty, _history.Series(s => s.MemoryPercent));
 
@@ -162,18 +181,12 @@ public sealed class LiveViewModel : ObservableObject
             gpu?.FanRpm is { } rpm ? T("ventilateur {0} tr/min", rpm) : string.Empty,
             _history.Series(s => s.Gpus.Select(g => g.TemperatureC).Max()),
             temperature is { } value && gpu?.SlowdownTemperatureC is { } slow
-                ? new GaugeInfo(T("Température"), 20, slow + 10, slow - 10, slow, value, T("ralentit à {0} °C", slow))
+                ? new GaugeInfo(T("Température"), 20, slow + 10, slow - 10, slow, value, T("ralentit à {0} °C", slow) + " · " + Ui.GaugeOrangeZone)
                 : null);
         Disk.Update(Percent(snapshot.DiskActivePercent), T("lecture {0} · écriture {1}", Rate(snapshot.DiskReadBytesPerSecond), Rate(snapshot.DiskWriteBytesPerSecond)), _history.Series(s => s.DiskActivePercent));
         Network.Update(Rate(snapshot.NetworkBytesPerSecond), string.Empty, _history.Series(s => s.NetworkBytesPerSecond));
 
-        Readings.Clear();
-        foreach (var reading in snapshot.Readings.OrderBy(r => r.Group).ThenBy(r => r.Hardware, StringComparer.Ordinal).ThenBy(r => r.Kind))
-        {
-            Readings.Add(new ReadingRowViewModel(reading));
-        }
-
-        OnPropertyChanged(nameof(HasReadings));
+        ShowReadings(snapshot.Readings);
         // Affichage seulement : l'arrêt automatique des tests passe par le chien de garde (ThermalWatchdog), d'après des
         // mesures fraîches.
         var alarms = SensorAlarms.Check(snapshot, CpuMaxC);
@@ -183,11 +196,36 @@ public sealed class LiveViewModel : ObservableObject
             Alarms.Add(alarm.Message);
         }
 
-        OnPropertyChanged(nameof(HasAlarms));
+        HasSensorAlarms = alarms.Count > 0;
+        OnPropertyChanged(nameof(HasSensorAlarms));
         OnPropertyChanged(nameof(ThermalNote));
     }
 
-    public bool HasAlarms => Alarms.Count > 0;
+    /// <summary>Les mêmes capteurs que la fois précédente : seules les valeurs changent, sans recréer les lignes du tableau.</summary>
+    private void ShowReadings(IReadOnlyList<HardwareReading> readings)
+    {
+        var sorted = readings.OrderBy(r => r.Group).ThenBy(r => r.Hardware, StringComparer.Ordinal).ThenBy(r => r.Kind).ToList();
+        if (sorted.Count == Readings.Count && Enumerable.Range(0, sorted.Count).All(i => Readings[i].IsFor(sorted[i])))
+        {
+            for (var i = 0; i < sorted.Count; i++)
+            {
+                Readings[i].Update(sorted[i]);
+            }
+
+            return;
+        }
+
+        Readings.Clear();
+        foreach (var reading in sorted)
+        {
+            Readings.Add(new ReadingRowViewModel(reading));
+        }
+
+        OnPropertyChanged(nameof(HasReadings));
+    }
+
+    /// <summary>Au moins une alarme vient d'un seuil (et non d'une erreur de mesure) : la note sur les marges s'affiche.</summary>
+    public bool HasSensorAlarms { get; private set; }
 
     private static string Percent(double? value) => value is { } v ? v.ToString("0", Culture) + " %" : "—";
 
@@ -204,13 +242,29 @@ public sealed class LiveViewModel : ObservableObject
 }
 
 /// <summary>Une ligne du tableau des capteurs PawnIO : composant, capteur, valeur avec son unité.</summary>
-public sealed class ReadingRowViewModel(HardwareReading reading)
+public sealed class ReadingRowViewModel(HardwareReading reading) : ObservableObject
 {
+    public override string ToString() => Name;
+
+    private readonly ReadingKind _kind = reading.Kind;
+
+    private string _value = Format(reading);
+
     public string Hardware { get; } = reading.Hardware;
 
     public string Name { get; } = reading.Name;
 
-    public string Value { get; } = reading.Kind switch
+    public string Value
+    {
+        get => _value;
+        private set => SetProperty(ref _value, value);
+    }
+
+    internal bool IsFor(HardwareReading other) => other.Kind == _kind && other.Hardware == Hardware && other.Name == Name;
+
+    internal void Update(HardwareReading other) => Value = Format(other);
+
+    private static string Format(HardwareReading reading) => reading.Kind switch
     {
         ReadingKind.Temperature => reading.Value.ToString("0.0 ", Culture) + "°C",
         ReadingKind.Voltage => reading.Value.ToString("0.000 ", Culture) + "V",

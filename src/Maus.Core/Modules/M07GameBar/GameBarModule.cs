@@ -59,7 +59,7 @@ public sealed class GameBarModule : IFixableModule
         findings.Add(DescribeProfile(profile, packages, chosen));
         findings.Add(DetectCaptures(registry, profile));
         findings.Add(DetectControllerButton(registry, profile));
-        findings.Add(DetectRecordingPolicy(registry, context.Windows, profile == GamingProfile.X3D));
+        findings.Add(DetectRecordingPolicy(registry, context.Windows, profile));
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
@@ -157,9 +157,8 @@ public sealed class GameBarModule : IFixableModule
             Expected = T("installée"),
             Explanation = explanation,
             Advice =
-                T("Réinstaller « Game Bar » depuis le Microsoft Store (identifiant {0}). MAUS proposera la commande " +
-                "« winget install --id {0} --source msstore », lancée seulement avec votre accord.", GameBarStoreId),
-            Fixable = true,
+                T("Réinstaller « Game Bar » depuis le Microsoft Store (identifiant {0}), ou avec la commande " +
+                "« winget install --id {0} --source msstore ».", GameBarStoreId),
         };
     }
 
@@ -358,8 +357,9 @@ public sealed class GameBarModule : IFixableModule
     }
 
     /// <summary>Stratégie <c>AllowGameDVR</c> : verrou optionnel du profil 1, à ne jamais poser sur un Ryzen X3D à deux CCD.</summary>
-    private static Finding DetectRecordingPolicy(IRegistryReader registry, WindowsInfo windows, bool x3d)
+    private static Finding DetectRecordingPolicy(IRegistryReader registry, WindowsInfo windows, GamingProfile? profile)
     {
+        var x3d = profile == GamingProfile.X3D;
         const string id = "M07.gamedvr-policy";
         var title = T("Stratégie d'enregistrement des jeux (AllowGameDVR)");
         return Guard(id, title, Recording, () =>
@@ -394,6 +394,24 @@ public sealed class GameBarModule : IFixableModule
                     Explanation =
                         T("Cette stratégie coupe les fonctions de jeu de la Game Bar. Sur un Ryzen X3D à deux CCD, la Game Bar doit rester " +
                         "pleinement active pour placer les jeux sur les cœurs dotés du V-Cache."),
+                    Advice = T("Retirer la stratégie « Active ou désactive l'enregistrement et la diffusion de jeux Windows » (AllowGameDVR)."),
+                    Fixable = true,
+                };
+            }
+
+            // Verrou optionnel du profil 1 seulement : avec l'app Xbox, ou sans profil connu, il n'a pas lieu d'être et se retire.
+            if (profile != GamingProfile.NoXbox)
+            {
+                return new Finding
+                {
+                    Id = id,
+                    Title = title,
+                    Category = Recording,
+                    Status = FindingStatusExtensions.ForDeviation(Severity.Low),
+                    Severity = Severity.Low,
+                    Current = T("enregistrement interdit (0)"),
+                    Expected = T("non configurée (ce verrou ne sert qu'au profil 1)"),
+                    Explanation = T("Cette stratégie interdit l'enregistrement des jeux pour tous les utilisateurs de ce PC. Elle ne sert que de verrou optionnel au profil 1, sans application Xbox."),
                     Advice = T("Retirer la stratégie « Active ou désactive l'enregistrement et la diffusion de jeux Windows » (AllowGameDVR)."),
                     Fixable = true,
                 };
@@ -437,27 +455,8 @@ public sealed class GameBarModule : IFixableModule
     };
 
     /// <summary>Jeux reconnus par Windows (sous-clés de <c>GameConfigStore\Children</c>), ou <c>null</c> si illisible.</summary>
-    private static int? CountRecognizedGames(IRegistryReader registry)
-    {
-        try
-        {
-            return registry.GetSubKeyNames(Hkcu, GameConfigStoreChildren).Count;
-        }
-        catch (MausAccessDeniedException)
-        {
-            return null;
-        }
-    }
+    private static int? CountRecognizedGames(IRegistryReader registry) =>
+        RegistryReaderExtensions.ValueOrNull(() => registry.GetSubKeyNames(Hkcu, GameConfigStoreChildren).Count);
 
-    private static Finding Guard(string id, string title, string category, Func<Finding> check)
-    {
-        try
-        {
-            return check();
-        }
-        catch (MausAccessDeniedException)
-        {
-            return Finding.AdminRequired(id, title, category);
-        }
-    }
+    private static Finding Guard(string id, string title, string category, Func<Finding> check) => Finding.Guard(id, title, category, check);
 }

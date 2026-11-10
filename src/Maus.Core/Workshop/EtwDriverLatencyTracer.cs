@@ -12,6 +12,8 @@ namespace Maus.Core.Workshop;
 /// heure d'entrée), « EVENT_TRACE_PROPERTIES », « StartTraceW », « OpenTraceW », « ProcessTrace », « ControlTraceW »,
 /// « EVENT_RECORD », « EnumDeviceDrivers ». Horloge : compteur de performance (ClientContext = 1) lu sans conversion
 /// (PROCESS_TRACE_MODE_RAW_TIMESTAMP), pour que l'heure de l'événement et l'heure d'entrée soient dans la même unité.
+/// La session survit au processus qui l'a ouverte : elle est refermée aussi à la sortie du processus, et celle d'un moteur
+/// tué l'est au lancement suivant, d'après <see cref="LatencySessionMarker"/>.
 /// </summary>
 public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
 {
@@ -20,9 +22,13 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
     private const uint InterruptFlag = 0x00000040;
     private const uint RealTimeMode = 0x00000100;
     private const uint TracedGuid = 0x00020000;
+    private const uint ControlQuery = 0;
     private const uint ControlStop = 1;
     private const int AlreadyExists = 183;
     private const int AccessDenied = 5;
+    private const int Cancelled = 1223;
+    private const int MoreData = 234;
+    private const int SessionNotFound = 4201;
     private const uint ProcessTraceRealTime = 0x00000100;
     private const uint ProcessTraceRawTimestamp = 0x00001000;
     private const uint ProcessTraceEventRecord = 0x10000000;
@@ -38,6 +44,39 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
 
     private static DriverLatencyAggregator? s_current;
     private static double s_ticksPerMicrosecond;
+    private static bool s_exitHooked;
+
+    /// <summary>1 tant que ce processus a une session ouverte.</summary>
+    private static int s_sessionOpen;
+
+    /// <summary>Dossier où la mesure en cours a laissé sa trace.</summary>
+    private static string? s_markerFolder;
+
+    /// <summary>Session laissée par un moteur tué en pleine mesure : refermée au lancement suivant. Sans droits : rien à faire.</summary>
+    public static void CloseLeftoverSession()
+    {
+        if (!OperatingSystem.IsWindows() || !Environment.IsPrivilegedProcess)
+        {
+            return;
+        }
+
+        try
+        {
+            Gate.Wait();
+            try
+            {
+                CloseLeftover();
+            }
+            finally
+            {
+                Gate.Release();
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            Diagnostics.Breadcrumbs.Add("latence : session précédente non vérifiée (" + ex.GetType().Name + ")");
+        }
+    }
 
     public async Task<DriverLatencyResult> MeasureAsync(TimeSpan duration, CancellationToken cancellationToken)
     {
@@ -63,6 +102,7 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
         s_ticksPerMicrosecond = frequency / 1_000_000.0;
         var aggregator = new DriverLatencyAggregator(LoadedDrivers());
         s_current = aggregator;
+        HookProcessExit();
 
         var nameBytes = (KernelLoggerName.Length + 1) * 2;
         var size = PropertiesSize + nameBytes + 2;
@@ -75,9 +115,15 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
         {
             Prepare(properties, size, DpcFlag | InterruptFlag);
             var status = StartTrace(out session, KernelLoggerName, properties);
+            if (status == AlreadyExists && CloseLeftover())
+            {
+                Prepare(properties, size, DpcFlag | InterruptFlag);
+                status = StartTrace(out session, KernelLoggerName, properties);
+            }
+
             if (status == AlreadyExists)
             {
-                throw new InvalidOperationException(T("La trace du noyau de Windows est déjà utilisée par un autre outil (LatencyMon, Process Monitor, enregistreur de performances…). Fermez-le, puis relancez la mesure."));
+                throw new InvalidOperationException(T("La trace du noyau de Windows est déjà utilisée par un autre outil (LatencyMon, Process Monitor, enregistreur de performances…) ou par une mesure de MAUS interrompue. Fermez cet outil ou redémarrez le PC, puis relancez la mesure."));
             }
 
             if (status == AccessDenied)
@@ -90,6 +136,7 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
                 throw new InvalidOperationException(T("La trace du noyau n'a pas pu démarrer (code {0}).", status));
             }
 
+            NoteSessionOpen();
             *(nint*)(logFile + 8) = loggerName;
             *(uint*)(logFile + 28) = ProcessTraceRealTime | ProcessTraceEventRecord | ProcessTraceRawTimestamp;
             *(delegate* unmanaged<byte*, void>*)(logFile + 424) = &OnEvent;
@@ -100,30 +147,37 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
             }
 
             var opened = trace;
+            var readStatus = 0;
             var reader = new Thread(() =>
             {
                 var handle = opened;
-                _ = ProcessTrace(&handle, 1, 0, 0);
+                readStatus = ProcessTrace(&handle, 1, 0, 0);
             })
             { IsBackground = true, Name = "MAUS latence des pilotes" };
             reader.Start();
             var started = DateTime.UtcNow;
             cancellationToken.WaitHandle.WaitOne(duration);
 
-            Prepare(properties, size, 0);
-            _ = ControlTrace(0, KernelLoggerName, properties, ControlStop);
+            StopSession(properties, size);
             session = 0;
             reader.Join(TimeSpan.FromSeconds(10));
             var lost = *(uint*)(properties + 88);
-            return aggregator.Result(DateTime.UtcNow - started, lost);
+            var result = aggregator.Result(DateTime.UtcNow - started, lost);
+
+            // Une lecture qui échoue dès le départ ne rend rien : ce n'est pas une mesure sans latence.
+            if (result.Events == 0 && readStatus is not (0 or Cancelled))
+            {
+                throw new InvalidOperationException(T("La trace du noyau n'a pas pu être lue (code {0}).", readStatus));
+            }
+
+            return result;
         }
         finally
         {
             if (session != 0)
             {
                 // Erreur après le démarrage : la session du noyau ne doit jamais rester ouverte.
-                Prepare(properties, size, 0);
-                _ = ControlTrace(0, KernelLoggerName, properties, ControlStop);
+                StopSession(properties, size);
             }
 
             if (trace != ulong.MaxValue)
@@ -134,6 +188,129 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
             s_current = null;
             Marshal.FreeHGlobal(loggerName);
             NativeMemory.Free(logFile);
+            NativeMemory.Free(properties);
+        }
+    }
+
+    /// <summary>La session est ouverte : si le processus disparaît maintenant, le lancement suivant saura qu'elle est à MAUS.</summary>
+    private static void NoteSessionOpen()
+    {
+        Volatile.Write(ref s_sessionOpen, 1);
+        s_markerFolder = LatencySessionMarker.ProtectedFolder();
+        if (s_markerFolder is { } folder)
+        {
+            LatencySessionMarker.ForThisProcess().Write(folder);
+        }
+    }
+
+    /// <summary>Referme la session. Sa trace n'est effacée que si Windows l'a vraiment refermée.</summary>
+    private static unsafe void StopSession(byte* properties, int size)
+    {
+        Volatile.Write(ref s_sessionOpen, 0);
+        Prepare(properties, size, 0);
+        var status = ControlTrace(0, KernelLoggerName, properties, ControlStop);
+        if (status is 0 or MoreData or SessionNotFound && s_markerFolder is { } folder)
+        {
+            LatencySessionMarker.Delete(folder);
+        }
+    }
+
+    /// <summary>
+    /// Fin du processus en pleine mesure (<see cref="Environment.Exit(int)"/>, erreur fatale) : le fil de mesure ne reprendra
+    /// pas la main, c'est ici que la session se referme.
+    /// </summary>
+    private static void HookProcessExit()
+    {
+        if (s_exitHooked)
+        {
+            return;
+        }
+
+        s_exitHooked = true;
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => StopOnExit();
+        AppDomain.CurrentDomain.UnhandledException += (_, _) => StopOnExit();
+    }
+
+    private static unsafe void StopOnExit()
+    {
+        if (Volatile.Read(ref s_sessionOpen) == 0)
+        {
+            return;
+        }
+
+        var size = PropertiesSize + ((KernelLoggerName.Length + 1) * 2) + 2;
+        var properties = (byte*)NativeMemory.AllocZeroed((nuint)size);
+        try
+        {
+            StopSession(properties, size);
+        }
+        finally
+        {
+            NativeMemory.Free(properties);
+        }
+    }
+
+    /// <summary>
+    /// Referme la session du noyau si elle a été laissée par un moteur de MAUS disparu : il faut sa trace, écrite depuis le
+    /// dernier démarrage du PC, un moteur qui ne tourne plus, et une session réglée comme les nôtres. Dans le doute, rien n'est
+    /// coupé : la session peut être celle d'un autre outil.
+    /// </summary>
+    /// <returns>Vrai si une session laissée par MAUS vient d'être refermée.</returns>
+    private static unsafe bool CloseLeftover()
+    {
+        if (LatencySessionMarker.ProtectedFolder() is not { } folder || LatencySessionMarker.Read(folder) is not { } marker)
+        {
+            return false;
+        }
+
+        var boot = LatencySessionMarker.CurrentBootUtc;
+        if (marker.IsFromEarlierBoot(boot))
+        {
+            LatencySessionMarker.Delete(folder);
+            return false;
+        }
+
+        if (!marker.IsLeftover(boot, LatencySessionMarker.IsRunning(marker.ProcessId, marker.ProcessStartUtc)))
+        {
+            return false;
+        }
+
+        var size = PropertiesSize + ((KernelLoggerName.Length + 1) * 2) + 2;
+        var properties = (byte*)NativeMemory.AllocZeroed((nuint)size);
+        try
+        {
+            Prepare(properties, size, 0);
+            var status = ControlTrace(0, KernelLoggerName, properties, ControlQuery);
+            if (status == SessionNotFound)
+            {
+                LatencySessionMarker.Delete(folder);
+                return false;
+            }
+
+            if (status != 0)
+            {
+                return false;
+            }
+
+            if (!LatencySessionMarker.LooksLikeOurSession(*(uint*)(properties + 72), *(uint*)(properties + 64), DpcFlag | InterruptFlag, RealTimeMode))
+            {
+                LatencySessionMarker.Delete(folder);
+                return false;
+            }
+
+            Prepare(properties, size, 0);
+            status = ControlTrace(0, KernelLoggerName, properties, ControlStop);
+            Diagnostics.Breadcrumbs.Add("latence : session laissée par un moteur disparu, fermeture (code " + status.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")");
+            if (status is not (0 or MoreData))
+            {
+                return false;
+            }
+
+            LatencySessionMarker.Delete(folder);
+            return true;
+        }
+        finally
+        {
             NativeMemory.Free(properties);
         }
     }
@@ -190,9 +367,13 @@ public sealed partial class EtwDriverLatencyTracer : IDriverLatencyTracer
         }
     }
 
-    /// <summary>Pilotes chargés et leur adresse (EnumDeviceDrivers, réelles seulement pour un administrateur).</summary>
+    /// <summary>
+    /// Pilotes chargés et leur adresse (EnumDeviceDrivers). Depuis Windows 11 24H2, les adresses ne sont réelles qu'avec
+    /// SeDebugPrivilege actif : il est activé le temps de cette liste, et rien n'est activé sans droits administrateur.
+    /// </summary>
     private static List<(ulong Base, string Name)> LoadedDrivers()
     {
+        using var debug = Platform.TokenPrivileges.Enable(Platform.TokenPrivileges.Debug);
         var drivers = new List<(ulong, string)>();
         var bases = new nint[2048];
         if (!EnumDeviceDrivers(bases, bases.Length * IntPtr.Size, out var needed))

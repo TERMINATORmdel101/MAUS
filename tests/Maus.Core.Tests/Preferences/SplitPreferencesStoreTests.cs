@@ -23,14 +23,50 @@ public sealed class SplitPreferencesStoreTests : IDisposable
             return Stored;
         }
 
+        /// <summary>L'enregistrement attend ce signal, comme la confirmation Oui/Non du moteur.</summary>
+        public ManualResetEventSlim? Hold { get; set; }
+
+        public ManualResetEventSlim Saving { get; } = new();
+
         public void Save(UserPreferences preferences)
         {
+            Saving.Set();
+            Hold?.Wait(TimeSpan.FromSeconds(20));
             Saves++;
             Stored = preferences;
         }
     }
 
+    private sealed class CopyingMachine : IMachinePreferences
+    {
+        public bool IsAvailable => true;
+
+        public int Saves { get; private set; }
+
+        public int Copies { get; private set; }
+
+        public UserPreferences Load() => UserPreferences.Default;
+
+        public void Save(UserPreferences preferences) => Saves++;
+
+        public void CopyIfRunning(UserPreferences preferences) => Copies++;
+    }
+
     private FilePreferencesStore UserFile() => new(_directory, new UserDirectoryProtector(), _ => { });
+
+    [Fact]
+    public void Unchanged_protected_choices_are_only_copied_and_a_change_is_saved()
+    {
+        var machine = new CopyingMachine();
+        var store = new SplitPreferencesStore(UserFile(), machine);
+        store.Refresh();
+
+        store.Save(UserPreferences.Default with { Theme = ThemeChoice.Dark });
+        Assert.Equal((0, 1), (machine.Saves, machine.Copies));
+
+        store.Save(UserPreferences.Default with { Theme = ThemeChoice.Dark, GameBarProfile = 3 });
+        Assert.Equal((1, 1), (machine.Saves, machine.Copies));
+    }
 
     public void Dispose()
     {
@@ -38,6 +74,49 @@ public sealed class SplitPreferencesStoreTests : IDisposable
         {
             Directory.Delete(_directory, recursive: true);
         }
+    }
+
+    /// <summary>Le moteur attend un « Oui » dans sa fenêtre : la fenêtre de MAUS doit pouvoir lire ses choix pendant ce temps.</summary>
+    [Fact]
+    public async Task Reading_choices_never_waits_for_the_answer_in_the_engine_window()
+    {
+        using var hold = new ManualResetEventSlim();
+        var machine = new Machine(UserPreferences.Default) { IsAvailable = true, Hold = hold };
+        var store = new SplitPreferencesStore(UserFile(), machine);
+        store.Load();
+
+        var save = Task.Run(() => store.Save(UserPreferences.Default with { GameBarProfile = 3 }));
+        Assert.True(machine.Saving.Wait(TimeSpan.FromSeconds(20)));
+
+        var read = Task.Run(store.Load);
+        var refresh = Task.Run(store.Refresh);
+        try
+        {
+            Assert.Same(read, await Task.WhenAny(read, Task.Delay(TimeSpan.FromSeconds(20))));
+            Assert.Null((await read).GameBarProfile);
+        }
+        finally
+        {
+            hold.Set();
+        }
+
+        await save;
+        await refresh;
+        Assert.Equal(3, store.Load().GameBarProfile);
+    }
+
+    [Fact]
+    public void The_engine_is_read_once_then_again_only_when_it_starts()
+    {
+        var machine = new Machine(UserPreferences.Default with { GameBarProfile = 2 }) { IsAvailable = true };
+        var store = new SplitPreferencesStore(UserFile(), machine);
+
+        store.Load();
+        store.Load();
+        Assert.Equal(1, machine.Loads);
+
+        store.Refresh();
+        Assert.Equal(2, machine.Loads);
     }
 
     [Fact]
@@ -83,7 +162,7 @@ public sealed class SplitPreferencesStoreTests : IDisposable
     }
 
     [Fact]
-    public void First_opening_after_the_update_imports_display_choices_and_keeps_a_fresh_disclaimer_consent()
+    public void Display_choices_of_the_protected_file_never_replace_those_of_the_user()
     {
         var machine = new Machine(UserPreferences.Default with { Language = "es", DisclaimerAccepted = 0, GameBarProfile = 2 });
         var store = new SplitPreferencesStore(UserFile(), machine);
@@ -94,9 +173,8 @@ public sealed class SplitPreferencesStoreTests : IDisposable
         // Le moteur démarre (première action administrateur) : les anciens choix d'affichage sont repris.
         machine.IsAvailable = true;
         var read = store.Load();
-        Assert.Equal("es", read.Language);
+        Assert.Null(read.Language);
         Assert.Equal(1, read.DisclaimerAccepted);
         Assert.Equal(2, read.GameBarProfile);
-        Assert.Equal("es", new SplitPreferencesStore(UserFile(), new Machine(UserPreferences.Default)).Load().Language);
     }
 }

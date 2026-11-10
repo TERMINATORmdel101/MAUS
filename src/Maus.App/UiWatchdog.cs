@@ -31,7 +31,15 @@ public sealed class UiWatchdog
         while (!_dispatcher.HasShutdownStarted)
         {
             _dispatcher.BeginInvoke(DispatcherPriority.Normal, () => Interlocked.Exchange(ref _lastPongTicks, DateTime.UtcNow.Ticks));
+            var before = System.Diagnostics.Stopwatch.GetTimestamp();
             Thread.Sleep(1000);
+
+            // Sommeil bien plus long que prévu : le PC était en veille, pas figé.
+            if (System.Diagnostics.Stopwatch.GetElapsedTime(before) > TimeSpan.FromSeconds(3))
+            {
+                Interlocked.Exchange(ref _lastPongTicks, DateTime.UtcNow.Ticks);
+                continue;
+            }
 
             var silence = DateTime.UtcNow - new DateTime(Interlocked.Read(ref _lastPongTicks), DateTimeKind.Utc);
             if (silence > Threshold && frozenSince is null)
@@ -51,7 +59,12 @@ public sealed class UiWatchdog
     {
         try
         {
-            var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "logs");
+            // Fenêtre lancée en administrateur sans dossier protégé : rien sur le disque (0.8.6).
+            if (Maus.Core.Diagnostics.CrashLog.Folder is not { } directory)
+            {
+                return;
+            }
+
             Directory.CreateDirectory(directory);
             var text = $"{Environment.NewLine}MAUS {Maus.Core.AppVersion.Full} · {DateTime.Now.ToString("g", CultureInfo.InvariantCulture)}{Environment.NewLine}{title}{Environment.NewLine}"
                 + string.Join(Environment.NewLine, lines.Select(l => "  " + l)) + Environment.NewLine;

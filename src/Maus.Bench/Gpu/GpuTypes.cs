@@ -36,41 +36,35 @@ public enum TextureUsage
     Sampled = 1,
     RenderTarget = 2,
     DepthStencil = 4,
-    Storage = 8,
 }
 
 public enum TextureKind
 {
     Texture2D,
-    Texture3D,
     TextureCube,
 }
 
-/// <summary>Description d'une texture : 2D, 3D (profondeur) ou cube (6 faces).</summary>
+/// <summary>Description d'une texture : 2D ou cube (6 faces).</summary>
 public sealed record TextureDesc(
     TextureKind Kind,
     int Width,
     int Height,
-    int Depth,
     int MipLevels,
     PixelFormat Format,
     TextureUsage Usage,
     string Name)
 {
-    public static TextureDesc Target(int width, int height, PixelFormat format, string name, int mips = 1, bool storage = false) =>
-        new(TextureKind.Texture2D, width, height, 1, mips, format, TextureUsage.Sampled | TextureUsage.RenderTarget | (storage ? TextureUsage.Storage : 0), name);
+    public static TextureDesc Target(int width, int height, PixelFormat format, string name, int mips = 1) =>
+        new(TextureKind.Texture2D, width, height, mips, format, TextureUsage.Sampled | TextureUsage.RenderTarget, name);
 
     public static TextureDesc DepthTarget(int width, int height, string name) =>
-        new(TextureKind.Texture2D, width, height, 1, 1, PixelFormat.D32Float, TextureUsage.DepthStencil | TextureUsage.Sampled, name);
+        new(TextureKind.Texture2D, width, height, 1, PixelFormat.D32Float, TextureUsage.DepthStencil | TextureUsage.Sampled, name);
 
     public static TextureDesc Image(int width, int height, PixelFormat format, string name, int mips = 1) =>
-        new(TextureKind.Texture2D, width, height, 1, mips, format, TextureUsage.Sampled, name);
-
-    public static TextureDesc Volume(int size, PixelFormat format, string name) =>
-        new(TextureKind.Texture3D, size, size, size, 1, format, TextureUsage.Sampled | TextureUsage.Storage, name);
+        new(TextureKind.Texture2D, width, height, mips, format, TextureUsage.Sampled, name);
 
     public static TextureDesc Cube(int size, int mips, PixelFormat format, string name, bool renderTarget = true) =>
-        new(TextureKind.TextureCube, size, size, 6, mips, format, TextureUsage.Sampled | (renderTarget ? TextureUsage.RenderTarget : 0), name);
+        new(TextureKind.TextureCube, size, size, mips, format, TextureUsage.Sampled | (renderTarget ? TextureUsage.RenderTarget : 0), name);
 
     /// <summary>Taille d'un niveau de détail.</summary>
     public int MipWidth(int mip) => Math.Max(1, Width >> mip);
@@ -85,17 +79,11 @@ public enum BufferUsage
     Vertex = 1,
     Index = 2,
 
-    /// <summary>Lu par les shaders (StructuredBuffer, ou ByteAddressBuffer avec <see cref="Raw"/>).</summary>
+    /// <summary>Lu par les shaders (StructuredBuffer).</summary>
     Structured = 4,
 
-    /// <summary>Écrit par les shaders de calcul (RWStructuredBuffer, ou RWByteAddressBuffer avec <see cref="Raw"/>).</summary>
+    /// <summary>Écrit par les shaders de calcul (RWStructuredBuffer).</summary>
     Storage = 8,
-
-    /// <summary>Vues brutes (ByteAddressBuffer) au lieu de structurées : obligatoire pour les arguments de dessin indirect.</summary>
-    Raw = 16,
-
-    /// <summary>Arguments de DrawIndexedInstancedIndirect écrits par un shader de calcul (5 entiers de 32 bits par dessin).</summary>
-    IndirectArgs = 32,
 }
 
 public sealed record BufferDesc(long SizeInBytes, BufferUsage Usage, int Stride, string Name);

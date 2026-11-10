@@ -24,9 +24,9 @@ cbuffer FrameConstants : register(b0)
     float4x4 InvView;
     float3 CameraPos;     float Time;
     float2 Resolution;    float2 InvResolution;
-    float2 Jitter;        float FrameIndex;    float DeltaTime;
+    float2 Jitter;        float FrameIndex;    float Unused0;
     float3 SunDir;        float Exposure;
-    float3 SunColor;      float SceneTime;
+    float3 SunColor;      float Unused1;
     float4 Params0;
     float4 Params1;
     float4 Params2;
@@ -102,12 +102,6 @@ uint HashU(uint x)
 float Hash11(float p)
 {
     return HashU(asuint(p) ^ 0x9E3779B9u) * (1.0 / 4294967296.0);
-}
-
-float Hash21(float2 p)
-{
-    uint2 q = asuint(int2(floor(p)));
-    return HashU(q.x * 1597334677u ^ q.y * 3812015801u ^ HashU(q.y)) * (1.0 / 4294967296.0);
 }
 
 float Hash31(float3 p)
@@ -264,6 +258,27 @@ float3 ShadeDirect(float3 albedo, float metallic, float roughness, float3 n, flo
 float Luminance(float3 c)
 {
     return dot(c, float3(0.2126, 0.7152, 0.0722));
+}
+
+// Sorties d'un shader de scène : couleur et mouvement.
+struct SceneOut
+{
+    float4 Color : SV_Target0;
+    float2 Velocity : SV_Target1;
+};
+
+// Rotation autour d'un axe unitaire (formule de Rodrigues).
+float3 RotateAxis(float3 v, float3 axis, float angle)
+{
+    float c = cos(angle), s = sin(angle);
+    return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
+}
+
+// Position dans le monde d'un pixel de l'image, d'après sa profondeur.
+float3 WorldFromDepth(float2 uv, float depth)
+{
+    float4 world = mul(float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), depth, 1.0), InvViewProj);
+    return world.xyz / world.w;
 }
 
 #endif

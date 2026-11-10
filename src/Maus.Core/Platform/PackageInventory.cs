@@ -46,6 +46,11 @@ public sealed class WinRtPackageInventory : IPackageInventory
         {
             throw new MausAccessDeniedException(T("Inventaire des applications refusé."), ex);
         }
+        catch (System.Runtime.InteropServices.COMException ex)
+        {
+            // Service de déploiement arrêté, par exemple : Lazy gardera ce message pour les appels suivants.
+            throw new DataSourceUnavailableException(T("Inventaire des applications illisible."), ex);
+        }
     }
 
     /// <summary>Dossier d'installation ; un paquet abîmé peut refuser de le donner.</summary>

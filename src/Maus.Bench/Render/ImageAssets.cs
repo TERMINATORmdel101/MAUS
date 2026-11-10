@@ -34,7 +34,7 @@ internal static class ImageAssets
         var texture = device.CreateTexture(TextureDesc.Image(first.Width, first.Height, format, Path.GetFileName(path), levels.Count - skipLevels));
         for (var i = skipLevels; i < levels.Count; i++)
         {
-            device.UploadTexture(texture, i - skipLevels, 0, levels[i].Pixels, levels[i].Width * 4);
+            device.UploadTexture(texture, i - skipLevels, levels[i].Pixels, levels[i].Width * 4);
         }
 
         return texture;
@@ -223,7 +223,7 @@ internal static class ImageAssets
                 half[(k * 4) + 3] = (Half)1f;
             }
 
-            device.UploadTexture(texture, i, 0, MemoryMarshal.AsBytes(half.AsSpan()), w * 8);
+            device.UploadTexture(texture, i, MemoryMarshal.AsBytes(half.AsSpan()), w * 8);
         }
 
         return texture;

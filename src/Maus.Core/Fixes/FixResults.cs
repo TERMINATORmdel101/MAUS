@@ -29,7 +29,8 @@ public enum ChangeStatus
     Failed,
 }
 
-public sealed record ChangeOutcome(string ChangeId, string Title, ChangeStatus Status, string Message, ChangeEffect Effect = ChangeEffect.Immediate);
+/// <param name="NotAllowed">Ignorée parce qu'elle n'a pas pu se faire ici (autre compte, valeur illisible), et non parce qu'elle était déjà en place.</param>
+public sealed record ChangeOutcome(string ChangeId, string Title, ChangeStatus Status, string Message, ChangeEffect Effect = ChangeEffect.Immediate, bool NotAllowed = false);
 
 public sealed record ApplyResult(
     JournalSession? Session,
@@ -60,13 +61,16 @@ public enum RevertStatus
 
     Failed,
 
-    /// <summary>Non autorisé dans ce contexte (compte élevé différent…).</summary>
+    /// <summary>Rien à remettre : la valeur d'origine est déjà en place.</summary>
     Skipped,
+
+    /// <summary>MAUS tourne avec un autre compte administrateur : ce réglage appartient à un autre profil, il reste à annuler.</summary>
+    WrongAccount,
 }
 
 public sealed record RevertOutcome(string ChangeId, string Title, string Setting, RevertStatus Status, string Message);
 
 public sealed record RevertResult(JournalSession? Session, IReadOnlyList<RevertOutcome> Entries, string? Error = null)
 {
-    public bool Completed => Error is null && Entries.All(e => e.Status == RevertStatus.Reverted);
+    public bool Completed => Error is null && Entries.All(e => e.Status is RevertStatus.Reverted or RevertStatus.Skipped);
 }

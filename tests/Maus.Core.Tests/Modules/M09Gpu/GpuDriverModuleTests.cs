@@ -27,7 +27,7 @@ public class GpuDriverModuleTests
         var commands = new FakeCommands()
             .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 2080 Ti\r\n")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
-        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true, EnabledByDefault: false));
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true));
 
         var findings = await Detect(TestContext.Create(cim: cim, commands: commands), scheduling);
 
@@ -52,7 +52,7 @@ public class GpuDriverModuleTests
         var commands = new FakeCommands()
             .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 2080 Ti\r\n")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
-        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true, EnabledByDefault: false));
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true));
         var later = new DateTimeOffset(2027, 1, 15, 12, 0, 0, TimeSpan.FromHours(1));
 
         var findings = await Detect(TestContext.Create(cim: cim, commands: commands, now: later), scheduling);
@@ -236,7 +236,7 @@ public class GpuDriverModuleTests
         var commands = new FakeCommands()
             .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 4070")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
-        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false, EnabledByDefault: true));
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false));
 
         var findings = await Detect(TestContext.Create(cim: cim, commands: commands), scheduling);
 
@@ -321,7 +321,7 @@ public class GpuDriverModuleTests
     public async Task Hags_off_on_older_card_is_informative()
     {
         var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
-        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: false, EnabledByDefault: false));
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: false));
 
         var findings = await Detect(TestContext.Create(cim: cim), scheduling);
 
@@ -334,7 +334,7 @@ public class GpuDriverModuleTests
     public async Task Hags_not_supported_is_informative()
     {
         var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
-        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: false, Enabled: false, EnabledByDefault: false));
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: false, Enabled: false));
 
         var findings = await Detect(TestContext.Create(cim: cim), scheduling);
 
@@ -451,7 +451,27 @@ public class GpuDriverModuleTests
     }
 
     private static Task<IReadOnlyList<Finding>> Detect(AuditContext context, IGpuSchedulingReader scheduling) =>
-        new GpuDriverModule(scheduling).DetectAsync(context, CancellationToken.None);
+        new GpuDriverModule(scheduling).DetectAsync(WithGpus(context), CancellationToken.None);
+
+    /// <summary>Le profil matériel lit les cartes une fois, par la même requête : les cartes simulées y passent de la même façon.</summary>
+    private static AuditContext WithGpus(AuditContext context)
+    {
+        IReadOnlyList<CimRow> rows;
+        try
+        {
+            rows = context.Cim.Query(VideoControllerQuery);
+        }
+        catch (MausAccessDeniedException)
+        {
+            rows = [];
+        }
+
+        var gpus = rows
+            .Where(r => r.GetString("PNPDeviceID")?.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase) == true)
+            .Select(HardwareProfileBuilder.ToGpuInfo)
+            .ToList();
+        return context with { Hardware = context.Hardware with { Gpus = gpus } };
+    }
 
     private static Finding Get(IReadOnlyList<Finding> findings, string id) => findings.Single(f => f.Id == id);
 
@@ -508,8 +528,8 @@ public class GpuDriverModuleTests
         var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx4070, width: 16, maxWidth: 16, bus: 1);
         var registry = new FakeRegistry();
-        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false, EnabledByDefault: true));
-        var audit = TestContext.Create(registry, cim: cim);
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false));
+        var audit = WithGpus(TestContext.Create(registry, cim: cim));
         var module = new GpuDriverModule(scheduling);
 
         var plan = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None));
@@ -543,6 +563,45 @@ public class GpuDriverModuleTests
         var plan = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None));
 
         Assert.DoesNotContain(plan, c => c.Id == "M09.windows-update-drivers");
+    }
+
+    [Fact]
+    public async Task Pro_round_trip_blocks_then_restores_windows_update_drivers()
+    {
+        var registry = new FakeRegistry();
+        var audit = TestContext.Create(registry);
+
+        var (plan, _) = await Fixes.RoundTrip.AssertAsync(new GpuDriverModule(new FakeScheduling()), audit, registry);
+
+        Assert.Equal(["M09.windows-update-drivers"], plan.Select(c => c.Id));
+        Assert.Null(registry.GetValue(RegistryHive.LocalMachine, @"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "ExcludeWUDriversInQualityUpdate"));
+    }
+
+    [Fact]
+    public async Task Home_round_trip_turns_off_then_restores_the_device_installation_setting()
+    {
+        const string key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\DriverSearching";
+        var registry = new FakeRegistry().Set(RegistryHive.LocalMachine, key, "SearchOrderConfig", 1);
+        var audit = TestContext.Create(registry, windows: new WindowsInfo("Windows 11 Famille", "Core", "25H2", 26200, 1000));
+
+        var (plan, _) = await Fixes.RoundTrip.AssertAsync(new GpuDriverModule(new FakeScheduling()), audit, registry);
+
+        Assert.Equal(["M09.device-installation-settings"], plan.Select(c => c.Id));
+        Assert.Equal(1, registry.GetValue(RegistryHive.LocalMachine, key, "SearchOrderConfig"));
+    }
+
+    [Fact]
+    public async Task Hags_round_trip_returns_to_the_initial_state()
+    {
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 4070", Rtx4070, "32.0.16.2101", Recent, "oem157.inf"));
+        AnswerProperties(cim, Rtx4070, width: 16, maxWidth: 16, bus: 1);
+        var registry = new FakeRegistry();
+        var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x2786, Supported: true, Enabled: false));
+        var audit = WithGpus(TestContext.Create(registry, cim: cim));
+
+        var (plan, _) = await Fixes.RoundTrip.AssertAsync(new GpuDriverModule(scheduling), audit, registry);
+
+        Assert.Contains(plan, c => c.Id == "M09.hags");
     }
 
     private sealed class FakeScheduling(params GpuSchedulingInfo[]? adapters) : IGpuSchedulingReader

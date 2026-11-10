@@ -46,22 +46,11 @@ public sealed partial class Win32SystemParametersWriter : ISystemParametersWrite
 
     public bool SetMinimizeAnimation(bool value)
     {
-        var info = new AnimationInfo { Size = (uint)Marshal.SizeOf<AnimationInfo>(), MinAnimate = value ? 1 : 0 };
-        return SystemParametersInfoW(SpiSet.Animation, info.Size, ref info, UpdateIniFile | SendChange);
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct AnimationInfo
-    {
-        public uint Size;
-        public int MinAnimate;
+        var info = new SpiAnimation.AnimationInfo { Size = (uint)Marshal.SizeOf<SpiAnimation.AnimationInfo>(), MinAnimate = value ? 1 : 0 };
+        return SpiAnimation.SystemParametersInfoW(SpiSet.Animation, info.Size, ref info, UpdateIniFile | SendChange);
     }
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SystemParametersInfoW(uint action, uint param, nint value, uint winIni);
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SystemParametersInfoW(uint action, uint param, ref AnimationInfo value, uint winIni);
 }

@@ -1,4 +1,5 @@
 using System.Text;
+using Maus.Core.Modules.M20Software;
 using Maus.Core.Platform;
 
 namespace Maus.Core.Tests.Platform;
@@ -6,12 +7,10 @@ namespace Maus.Core.Tests.Platform;
 public class ReadOnlyCommandRunnerTests
 {
     [Theory]
-    [InlineData("powercfg", new[] { "/getactivescheme" })]
-    [InlineData("powercfg.exe", new[] { "/a" })]
+    [InlineData("powercfg", new[] { "/list" })]
+    [InlineData("powercfg.exe", new[] { "/LIST" })]
     [InlineData("bcdedit", new[] { "/enum", "{current}" })]
     [InlineData("fsutil", new[] { "behavior", "query", "DisableDeleteNotify" })]
-    [InlineData("netsh", new[] { "winhttp", "show", "proxy" })]
-    [InlineData("nvidia-smi", new[] { "--query-gpu=pcie.link.gen.current", "--format=csv" })]
     [InlineData(@"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1.24_x64__8wekyb3d8bbwe\winget.exe", new[] { "upgrade", "--source", "winget", "--disable-interactivity" })]
     public void Allows_read_only_commands(string exe, string[] args) =>
         Assert.True(ReadOnlyCommandRunner.IsAllowed(exe, args));
@@ -22,7 +21,15 @@ public class ReadOnlyCommandRunnerTests
     [InlineData("powercfg", new[] { "/duplicatescheme", "e9a42b02-d5df-448d-aa00-03f14749eb61" })]
     [InlineData("bcdedit", new[] { "/set", "{current}", "nx", "OptIn" })]
     [InlineData("fsutil", new[] { "behavior", "set", "disabledeletenotify", "0" })]
-    [InlineData("netsh", new[] { "winhttp", "reset", "proxy" })]
+    [InlineData("netsh", new[] { "winhttp", "show", "proxy" })]
+    [InlineData("manage-bde", new[] { "-status" })]
+    [InlineData("dsregcmd", new[] { "/status" })]
+    [InlineData("nvidia-smi", new[] { "-q", "-f", @"C:\Windows\x.txt" })]
+    [InlineData("nvidia-smi", new[] { "--help" })]
+    [InlineData("powercfg", new[] { "/a" })]
+    [InlineData("powercfg", new[] { "/getactivescheme" })]
+    [InlineData("powercfg", new[] { "/list", "/x" })]
+    [InlineData("bcdedit", new[] { "/enum" })]
     [InlineData("reg", new[] { "add", "HKLM\\x" })]
     [InlineData("cmd", new[] { "/c", "del" })]
     [InlineData("powercfg", new string[0])]
@@ -66,6 +73,24 @@ public class ReadOnlyCommandRunnerTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             runner.RunAsync(@"C:\Users\Alex\AppData\Local\Microsoft\WindowsApps\winget.exe", ["upgrade"], TimeSpan.FromSeconds(5), CancellationToken.None));
+    }
+
+    /// <summary>
+    /// winget est un outil propre au compte de l'utilisateur : un processus élevé (moteur, fenêtre lancée en administrateur) le
+    /// refuse avant de le lancer, même celui du dossier protégé et avec les arguments admis (0.8.6).
+    /// </summary>
+    [Theory]
+    [InlineData(@"C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1.24_x64__8wekyb3d8bbwe\winget.exe")]
+    [InlineData("winget")]
+    public async Task Winget_is_refused_before_starting_in_a_process_with_administrator_rights(string winget)
+    {
+        var runner = new ReadOnlyCommandRunner(elevated: true);
+
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            runner.RunAsync(winget, Winget.ListArguments, TimeSpan.FromSeconds(5), CancellationToken.None));
+
+        Assert.True(ReadOnlyCommandRunner.IsAllowed(winget, Winget.ListArguments));
+        Assert.Contains("droits administrateur", refused.Message, StringComparison.Ordinal);
     }
 
     [Fact]

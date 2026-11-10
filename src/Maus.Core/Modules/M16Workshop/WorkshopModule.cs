@@ -40,29 +40,35 @@ public sealed class WorkshopModule : IAuditModule
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var inventory = HardwareInventoryReader.Read(context, _cpuId, _nvml);
+        // Seulement ce que ce module montre : carte mère et disques restent à l'inventaire complet de l'Atelier et au Module 11.
+        var cpu = HardwareInventoryReader.ReadCpu(context.Cim, _cpuId);
         var limits = Limits.Value;
-        var findings = new List<Finding> { DescribeCpu(inventory.Cpu, limits) };
-        findings.Add(DetectVirtualization(context.Cim, inventory.Cpu));
-        findings.AddRange(DetectMemoryVoltage(inventory.Memory, limits));
+        var findings = new List<Finding> { DescribeCpu(cpu, limits) };
+        findings.Add(DetectVirtualization(context.Cim, cpu));
+        findings.AddRange(DetectMemoryVoltage(HardwareInventoryReader.ReadMemory(context.Cim), limits));
         cancellationToken.ThrowIfCancellationRequested();
 
         var index = 0;
-        foreach (var gpu in inventory.Gpus.Where(g => g.Nvidia is not null))
+        foreach (var gpu in HardwareInventoryReader.ReadGpus(context, _nvml).Where(g => g.Nvidia is not null))
         {
             findings.Add(DetectGpuTemperature(gpu, index, limits));
             findings.Add(DetectGpuPowerLimit(gpu, index));
             index++;
         }
 
-        findings.AddRange(inventory.Batteries.Select(DetectBattery));
+        findings.AddRange(HardwareInventoryReader.ReadBatteries(context.Cim).Select(DetectBattery));
         return Task.FromResult<IReadOnlyList<Finding>>(findings);
     }
 
     private static Finding DescribeCpu(CpuIdentity cpu, SafetyLimits limits)
     {
         var limit = limits.ForCpu(cpu.Name);
-        var details = new List<string> { T("{0} cœurs, {1} threads", cpu.Cores, cpu.Threads) };
+        var details = new List<string>();
+        if (cpu.Cores > 0)
+        {
+            details.Add(T("{0} cœurs, {1} threads", cpu.Cores, cpu.Threads));
+        }
+
         if (cpu.BaseClockMhz > 0)
         {
             details.Add(T("{0} MHz de base", cpu.BaseClockMhz));
@@ -85,10 +91,13 @@ public sealed class WorkshopModule : IAuditModule
             Category = T("Processeur"),
             Status = FindingStatus.Info,
             Current = string.Join(" · ", details.Where(d => d.Length > 0)),
-            Expected = limit is null ? null : T("température maximale prévue par le fabricant : {0} °C", limit.MaxC),
+            Expected = limit is null
+                ? null
+                : limit.Verified
+                    ? T("température maximale prévue par le fabricant : {0} °C", limit.MaxC)
+                    : T("température maximale, valeur non vérifiée : {0} °C", limit.MaxC),
             Explanation = T("Identité lue directement dans le processeur (instruction CPUID) : elle ne dépend ni de Windows ni du BIOS.") +
-                          (cpu.RunningInVirtualMachine ? " " + T("MAUS tourne dans une machine virtuelle : le matériel affiché est celui qu'elle simule.") : string.Empty) +
-                          (limit is null ? string.Empty : " " + T("Source du seuil de température : {0}.", limit.Source)),
+                          (limit is null ? string.Empty : " " + T("Source du seuil de température : {0}.", T(limit.Source))),
             Advice = T("La tension et la température réelles du processeur ne se lisent qu'avec un pilote : MAUS ne les invente pas."),
         };
     }
@@ -97,11 +106,6 @@ public sealed class WorkshopModule : IAuditModule
     {
         const string id = "M16.virtualization";
         var title = T("Virtualisation du processeur (VT-x / AMD-V)");
-        if (!cpu.VirtualizationCapable)
-        {
-            return Finding.Unknown(id, title, T("Le processeur n'annonce pas la virtualisation, ou elle n'a pas pu être lue."), T("Processeur"));
-        }
-
         bool? enabled;
         try
         {
@@ -112,6 +116,12 @@ public sealed class WorkshopModule : IAuditModule
         catch (Exception ex) when (ex is MausAccessDeniedException or DataSourceUnavailableException)
         {
             enabled = null;
+        }
+
+        // Un hyperviseur en marche masque la virtualisation dans CPUID : ce silence ne prouve rien tant qu'il tourne.
+        if (!cpu.VirtualizationCapable && enabled != true)
+        {
+            return Finding.Unknown(id, title, T("Le processeur n'annonce pas la virtualisation, ou elle n'a pas pu être lue."), T("Processeur"));
         }
 
         return enabled is null
@@ -183,12 +193,15 @@ public sealed class WorkshopModule : IAuditModule
                 SafetyLevel.Dangerous => T("Cette tension dépasse le maximum absolu de la norme : risque d'usure prématurée des barrettes et d'instabilité."),
                 SafetyLevel.Elevated => T("Cette tension dépasse le repère publié ci-dessous : c'est souvent le signe d'un surcadençage manuel, ou d'un kit très rapide. Surveillez la stabilité et la température."),
                 _ => T("La tension des barrettes est dans la plage normale."),
-            } + " " + T("Source : {0}", limit.Source),
+            } + " " + T("Source : {0}", T(limit.Source)),
             Advice = level == SafetyLevel.Normal
                 ? null
                 : T("Revenez au profil XMP/EXPO d'origine dans le BIOS (voir Module 10), puis lancez le test de la RAM de l'atelier pour vérifier la stabilité."),
         };
     }
+
+    /// <summary>En dessous, la carte est considérée au repos (choisi par MAUS, annoncé par ThresholdNotes).</summary>
+    internal const int GpuIdlePercent = 20;
 
     private static Finding DetectGpuTemperature(GpuIdentity gpu, int index, SafetyLimits limits)
     {
@@ -211,7 +224,7 @@ public sealed class WorkshopModule : IAuditModule
             thresholds.Add(T("s'éteint à {0} °C", shutdown));
         }
 
-        var hot = state.SlowdownTemperatureC is { } limit && temperature >= limit - limits.GpuIdleHotMarginC && (state.UtilizationPercent ?? 0) < 20;
+        var hot = state.SlowdownTemperatureC is { } limit && temperature >= limit - limits.GpuIdleHotMarginC && state.UtilizationPercent < GpuIdlePercent;
         return new Finding
         {
             Id = id,
@@ -219,7 +232,7 @@ public sealed class WorkshopModule : IAuditModule
             Category = T("Carte graphique"),
             Status = hot ? FindingStatusExtensions.ForDeviation(Severity.Medium) : FindingStatus.Ok,
             Severity = hot ? Severity.Medium : Severity.Info,
-            Current = T("{0} °C (utilisation {1} %)", temperature, state.UtilizationPercent ?? 0),
+            Current = state.UtilizationPercent is { } utilization ? T("{0} °C (utilisation {1} %)", temperature, utilization) : T("{0} °C", temperature),
             Expected = thresholds.Count == 0 ? null : T("seuils donnés par la carte : {0}", string.Join(", ", thresholds)),
             Explanation = T("Les seuils viennent de la carte elle-même (NVML, pilote NVIDIA) : au-delà, elle baisse ses fréquences, puis s'éteint pour se protéger."),
             Advice = hot
@@ -279,10 +292,11 @@ public sealed class WorkshopModule : IAuditModule
             Category = T("Batterie"),
             Status = FindingStatus.Info,
             Severity = Severity.Info,
+            Measures = new Dictionary<string, double> { [Maus.Core.Workshop.MeasureHistory.Health] = health },
             Current = T("{0} % de la capacité d'origine ({1} / {2} mWh)", health, battery.FullChargeCapacityMwh, battery.DesignCapacityMwh)
                 + (battery.CycleCount is { } cycles ? T(", {0} cycles de charge", cycles) : string.Empty),
             Explanation = T("Une batterie perd de la capacité avec les cycles de charge et la chaleur : l'autonomie baisse d'autant. Aucun seuil d'usure n'est publié de façon générale pour les PC : MAUS donne la valeur sans la juger."),
-            Advice = T("Le rapport de batterie de Windows (Atelier > Mon PC, carte « Batterie ») montre l'évolution de la capacité depuis l'achat. Si le PC s'éteint sans prévenir ou que l'autonomie ne vous suffit plus, faites remplacer la batterie (pièce d'origine ou compatible de qualité)."),
+            Advice = T("La carte « Batterie » (Atelier > Mon PC) montre la capacité passée, à partir de la date où commencent les données que Windows garde. Si le PC s'éteint sans prévenir ou que l'autonomie ne vous suffit plus, faites remplacer la batterie (pièce d'origine ou compatible de qualité)."),
             SettingsPage = "ms-settings:batterysaver",
         };
     }

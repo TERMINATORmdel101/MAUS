@@ -16,7 +16,7 @@ public class HtmlReportTests
         new HardwareProfile
         {
             FormFactor = FormFactor.Laptop,
-            Cpu = new CpuInfo("AMD Ryzen 7 5800H", HardwareVendor.Amd, 8, 16, 3200),
+            Cpu = new CpuInfo("AMD Ryzen 7 5800H", HardwareVendor.Amd, 8, 16),
             Model = "Numéro-secret-123",
         },
         true,
@@ -75,6 +75,25 @@ public class HtmlReportTests
     }
 
     [Fact]
+    public void Findings_that_appear_or_disappear_are_listed_like_on_the_comparison_screen()
+    {
+        static ModuleResult Module(params Finding[] findings) => new("M06", "Interface et effets visuels", findings, TimeSpan.FromSeconds(1));
+        var gone = new Finding { Id = "M06.parti", Title = "Constat disparu", Status = FindingStatus.Warning, Current = "avant", Explanation = "e" };
+        var added = new Finding { Id = "M06.nouveau", Title = "Constat apparu", Status = FindingStatus.Problem, Current = "après", Explanation = "e" };
+
+        var html = HtmlReport.Build(new HtmlReportInput
+        {
+            Before = Report(FindingStatus.Ok, "0") with { Modules = [Module(gone)] },
+            After = Report(FindingStatus.Ok, "0") with { Modules = [Module(added)] },
+            Session = new JournalSession { Id = "20260925-120000-abcdef", CreatedAt = DateTimeOffset.Now },
+        });
+
+        Assert.Contains("Constat disparu", html, StringComparison.Ordinal);
+        Assert.Contains("Constat apparu", html, StringComparison.Ordinal);
+        Assert.Contains("Absent de cet audit", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Simple_audit_report_has_no_before_after_sections()
     {
         var html = HtmlReport.Build(new HtmlReportInput { After = Report(FindingStatus.Improvable, "1") });
@@ -109,5 +128,14 @@ public class HtmlReportTests
         Assert.DoesNotContain("Jean", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(@"%USERPROFILE%\Downloads", html, StringComparison.Ordinal);
         Assert.Contains("[nom-du-pc]", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_score_fills_a_ring_and_each_module_shows_its_counts()
+    {
+        var html = HtmlReport.Build(new HtmlReportInput { After = Report(FindingStatus.Problem, "0") });
+
+        Assert.Matches(@"<div class=""ring s-\w+"" style=""--p:\d+""><span><b>\d+</b>/100</span></div>", html);
+        Assert.Contains("<span class=\"tag s-problem\" title=\"", html, StringComparison.Ordinal);
     }
 }

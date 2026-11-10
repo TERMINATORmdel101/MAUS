@@ -20,11 +20,11 @@ internal struct FrameConstants
     public Vector2 InvResolution;
     public Vector2 Jitter;
     public float FrameIndex;
-    public float DeltaTime;
+    public float Unused0;
     public Vector3 SunDir;
     public float Exposure;
     public Vector3 SunColor;
-    public float SceneTime;
+    public float Unused1;
     public Vector4 Params0;
     public Vector4 Params1;
     public Vector4 Params2;

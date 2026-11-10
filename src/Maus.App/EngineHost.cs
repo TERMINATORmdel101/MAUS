@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using Maus.App.ViewModels;
 using Maus.Core.Diagnostics;
 using Maus.Core.Engine.Broker;
 using Maus.Core.Preferences;
@@ -24,6 +25,30 @@ public static class EngineHost
         set => s_current = value;
     }
 
+    /// <summary>
+    /// Fin de MAUS : le moteur rend ce qu'il tient (mesure de latence, capteurs). L'attente est bornée : une bibliothèque de
+    /// capteurs bloquée ne doit jamais garder le processus en vie sans fenêtre.
+    /// </summary>
+    internal static void Close()
+    {
+        if (s_current is not { } engine)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!Task.Run(engine.Dispose).Wait(TimeSpan.FromSeconds(6)))
+            {
+                Breadcrumbs.Add("moteur : fermeture pas encore finie à la sortie");
+            }
+        }
+        catch (AggregateException ex)
+        {
+            Breadcrumbs.Add("moteur : fermeture incomplète (" + ex.InnerException?.GetType().Name + ")");
+        }
+    }
+
     /// <summary>Moteur lancé à la demande ; <c>null</c> si MAUS a été lancé en administrateur.</summary>
     public static OnDemandMausEngine? OnDemand => s_current as OnDemandMausEngine;
 
@@ -38,15 +63,24 @@ public static class EngineHost
     /// </summary>
     public static event EventHandler? ElevationChanged;
 
+    /// <summary>Étape de la demande de droits : l'interface réagit dès le clic, sans attendre le moteur. Appelé sur n'importe quel fil.</summary>
+    public static event EventHandler<ElevationStage>? StageChanged;
+
+    internal static void ReportStage(ElevationStage stage) => StageChanged?.Invoke(null, stage);
+
     /// <summary>
     /// Le moteur s'est arrêté par sécurité : un programme a essayé de le commander (<see cref="EngineServer.MaxRefusals"/>
     /// connexions refusées). Appelé sur n'importe quel fil.
     /// </summary>
     public static event EventHandler? StoppedForSecurity;
 
+    /// <summary>Dernier code de sortie du moteur : 0 pour un arrêt normal (inactivité, ou droits refermés).</summary>
+    internal static int? LastEngineExitCode { get; private set; }
+
     /// <summary>Le processus moteur s'est terminé avec ce code de sortie (<c>null</c> si Windows ne l'a pas donné).</summary>
     internal static void OnEngineExited(int? exitCode)
     {
+        LastEngineExitCode = exitCode;
         Breadcrumbs.Add("moteur administrateur terminé (code " + (exitCode?.ToString(CultureInfo.InvariantCulture) ?? "?") + ")");
         ElevationChanged?.Invoke(null, EventArgs.Empty);
         if (exitCode == EngineServer.SecurityStopExitCode)
@@ -62,10 +96,6 @@ public static class EngineHost
         set => s_preferences = value;
     }
 
-    /// <summary>Fichier des choix d'affichage de l'utilisateur, écrit sans droits administrateur.</summary>
-    public static string UserSettingsDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MAUS", "settings");
-
     /// <summary>
     /// Prépare le moteur et les choix au démarrage de l'interface. Rien n'est lancé et aucune autorisation n'est demandée.
     /// </summary>
@@ -74,7 +104,7 @@ public static class EngineHost
         Current = Environment.IsPrivilegedProcess
             ? new LocalMausEngine()
             : new OnDemandMausEngine(new LocalMausEngine(preferences: new MemoryPreferencesStore()), EngineLauncher.StartAsync);
-        var split = new SplitPreferencesStore(new FilePreferencesStore(UserSettingsDirectory, new UserDirectoryProtector()), new EngineMachinePreferences());
+        var split = new SplitPreferencesStore(new FilePreferencesStore(FilePreferencesStore.UserDirectory, new UserDirectoryProtector()), new EngineMachinePreferences());
         Preferences = split;
         if (OnDemand is { } onDemand)
         {
@@ -102,6 +132,21 @@ public static class EngineHost
         public UserPreferences Load() => new EnginePreferencesStore(Current).Load();
 
         public void Save(UserPreferences preferences) => new EnginePreferencesStore(Current).Save(preferences);
+
+        public void CopyIfRunning(UserPreferences preferences)
+        {
+            if (OnDemand is not { } onDemand)
+            {
+                Save(preferences);
+                return;
+            }
+
+            var state = onDemand.SavePreferencesIfRunningAsync(preferences, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+            if (state?.NotSaved is { } reason)
+            {
+                throw new PreferencesNotSavedException(reason, state.Preferences);
+            }
+        }
     }
 }
 
@@ -112,10 +157,23 @@ internal static class EngineLauncher
     private const int Cancelled = 1223;
 
     /// <exception cref="EngineDeclinedException">L'utilisateur a refusé l'autorisation.</exception>
-    public static Task<ElevatedEngineSession> StartAsync(CancellationToken cancellationToken) => Task.Run(async () =>
+    public static async Task<ElevatedEngineSession> StartAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await StartEngineAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            EngineHost.ReportStage(ElevationStage.None);
+            throw;
+        }
+    }
+
+    private static Task<ElevatedEngineSession> StartEngineAsync(CancellationToken cancellationToken) => Task.Run(async () =>
     {
         // La demande d'autorisation bloque l'appel jusqu'à la réponse : elle se fait hors du fil de l'interface.
-        var exe = Environment.ProcessPath ?? throw new EngineException("MAUS.exe introuvable.");
+        var exe = Environment.ProcessPath ?? throw new EngineException(Maus.Core.Localization.Texts.T("MAUS.exe introuvable."));
 
         // MAUS lancé depuis un dossier modifiable sans droits (Téléchargements, Bureau, clé USB…) : un autre programme pourrait
         // y avoir remplacé MAUS.exe, et c'est lui que Windows lancerait avec les droits administrateur. L'utilisateur décide,
@@ -132,12 +190,15 @@ internal static class EngineLauncher
         // d'autres programmes) ; la clé elle-même est présentée par le canal privé à la première demande.
         var key = EngineKey.Create();
         Process engine;
+        EngineHost.ReportStage(ElevationStage.Asking);
         try
         {
             engine = Process.Start(new ProcessStartInfo(exe)
             {
                 UseShellExecute = true,
                 Verb = "runas",
+                // Le moteur ne prend pas pour dossier courant celui de la fenêtre (0.8.6).
+                WorkingDirectory = Maus.Core.Platform.SystemTool.WorkingFolder,
                 Arguments = $"{App.EngineArgument} {pipe} {Environment.ProcessId.ToString(CultureInfo.InvariantCulture)} {key.Fingerprint()}",
             }) ?? throw new EngineException(Maus.Core.Localization.Texts.T("Le moteur de MAUS n'a pas démarré."));
         }
@@ -148,13 +209,18 @@ internal static class EngineLauncher
         }
         catch (Win32Exception ex)
         {
-            throw new EngineException(Maus.Core.Localization.Texts.T("Le moteur de MAUS n'a pas démarré : {0}", ex.Message), ex);
+            throw new EngineException(Maus.Core.Localization.Texts.T("Le moteur de MAUS n'a pas démarré : {0}", Maus.Core.Diagnostics.ErrorText.For(ex)), ex);
         }
 
+        EngineHost.ReportStage(ElevationStage.Starting);
         var remote = new RemoteMausEngine(pipe, engine.Id, key);
         try
         {
-            await remote.PingAsync(cancellationToken).ConfigureAwait(false);
+            var ping = await PingUntilExitAsync(remote, engine, cancellationToken).ConfigureAwait(false);
+            if (!ping.IsElevatedEngine(engine.Id))
+            {
+                throw new EngineException(Maus.Core.Localization.Texts.T("Le moteur de MAUS n'a pas répondu comme prévu (autre processus, ou sans droits administrateur) : MAUS reste en mode limité."));
+            }
         }
         catch
         {
@@ -167,18 +233,44 @@ internal static class EngineLauncher
         // Fin du moteur : l'interface repasse en mode limité, et prévient l'utilisateur s'il s'est arrêté par sécurité.
         engine.Exited += (_, _) => EngineHost.OnEngineExited(ExitCodeOf(engine));
         engine.EnableRaisingEvents = true;
-        return new ElevatedEngineSession(remote, () =>
-        {
-            try
-            {
-                return engine.HasExited;
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
-            {
-                return true;
-            }
-        });
+        return new ElevatedEngineSession(remote, () => HasExited(engine));
     }, cancellationToken);
+
+    /// <summary>Attend la première réponse du moteur, sans attendre jusqu'au bout du délai un moteur déjà arrêté.</summary>
+    private static async Task<EnginePing> PingUntilExitAsync(RemoteMausEngine remote, Process engine, CancellationToken cancellationToken)
+    {
+        using var waiting = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var ping = remote.PingAsync(waiting.Token);
+        while (await Task.WhenAny(ping, Task.Delay(250, CancellationToken.None)).ConfigureAwait(false) != ping)
+        {
+            if (HasExited(engine))
+            {
+                await waiting.CancelAsync().ConfigureAwait(false);
+                break;
+            }
+        }
+
+        try
+        {
+            return await ping.ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or EngineException && !cancellationToken.IsCancellationRequested && HasExited(engine))
+        {
+            throw new EngineException(Maus.Core.Localization.Texts.T("Le moteur de MAUS s'est arrêté dès son lancement : MAUS reste en mode limité."), ex);
+        }
+    }
+
+    private static bool HasExited(Process engine)
+    {
+        try
+        {
+            return engine.HasExited;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+        {
+            return true;
+        }
+    }
 
     /// <summary>L'utilisateur a déjà accepté, pendant cette séance, de donner les droits à un MAUS hors d'un dossier protégé.</summary>
     private static volatile bool s_unprotectedAccepted;
@@ -195,16 +287,15 @@ internal static class EngineLauncher
         }
 
         var folder = Path.GetDirectoryName(exe) ?? exe;
-        var accepted = System.Windows.Application.Current?.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(
-            Maus.Core.Localization.Texts.T("Ce MAUS est lancé depuis {0}, un dossier que d'autres programmes peuvent modifier sans droits administrateur. Un virus pourrait y avoir remplacé MAUS.exe : c'est alors à lui que Windows donnerait les droits administrateur.", folder)
-                + Environment.NewLine + Environment.NewLine
-                + Maus.Core.Localization.Texts.T("Pour être protégé, installez MAUS avec son installateur (dossier Program Files), par winget ou par le Microsoft Store.")
-                + Environment.NewLine + Environment.NewLine
-                + Maus.Core.Localization.Texts.T("Donner quand même les droits administrateur à ce MAUS ?"),
+        var accepted = System.Windows.Application.Current?.Dispatcher.Invoke(() => Views.QuestionWindow.Ask(
             Maus.Core.Localization.Texts.T("MAUS n'est pas dans un dossier protégé"),
-            System.Windows.MessageBoxButton.YesNo,
-            System.Windows.MessageBoxImage.Warning,
-            System.Windows.MessageBoxResult.No) == System.Windows.MessageBoxResult.Yes) == true;
+            [
+                Maus.Core.Localization.Texts.T("Ce MAUS est lancé depuis {0}, un dossier que d'autres programmes peuvent modifier sans droits administrateur. Un virus pourrait y avoir remplacé MAUS.exe : c'est alors à lui que Windows donnerait les droits administrateur.", folder),
+                Maus.Core.Localization.Texts.T("Pour être protégé, installez MAUS avec son installateur (dossier Program Files), par winget ou par le Microsoft Store."),
+            ],
+            Maus.Core.Localization.Texts.T("Donner quand même les droits administrateur à ce MAUS ?"),
+            Maus.Core.Localization.Texts.T("Oui, donner les droits"),
+            Maus.Core.Localization.Texts.T("Non, rester en mode limité"))) == true;
         s_unprotectedAccepted = accepted;
         return accepted;
     }

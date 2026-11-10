@@ -19,13 +19,13 @@ internal static class PrivacyRegistryChecks
     /// <summary>Premier build où <c>HideRecommendedPersonalizedSites</c> existe (22H2, 22621.1928).</summary>
     private const int HideRecommendedSitesMinBuild = 22621;
 
-    private static readonly string[] SettingsSuggestionValues =
+    internal static readonly string[] SettingsSuggestionValues =
         ["SubscribedContent-338393Enabled", "SubscribedContent-353694Enabled", "SubscribedContent-353696Enabled"];
 
-    private static readonly string[] TipsAndSilentAppsValues =
+    internal static readonly string[] TipsAndSilentAppsValues =
         ["SubscribedContent-338389Enabled", "SoftLandingEnabled", "SilentInstalledAppsEnabled"];
 
-    private static readonly string[] LockScreenTipsValues =
+    internal static readonly string[] LockScreenTipsValues =
         ["RotatingLockScreenOverlayEnabled", "SubscribedContent-338387Enabled"];
 
     private static readonly string[] ActivityHistoryValues =

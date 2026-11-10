@@ -16,7 +16,7 @@ public sealed partial class RiskyChangesAuditModule
 
     private static readonly string[] CoreServices = ["CryptSvc", "TrustedInstaller", "Audiosrv", "WSearch", "WinDefend", "mpssvc", "UCPD"];
 
-    private static readonly (string Name, string Label)[] RequiredApps =
+    private static (string Name, string Label)[] RequiredApps =>
     [
         ("Microsoft.WindowsStore", "Microsoft Store"),
         ("Microsoft.SecHealthUI", T("Sécurité Windows")),
@@ -27,7 +27,7 @@ public sealed partial class RiskyChangesAuditModule
 
     private static Check AppsCheck => new("M01.system-apps", T("Microsoft Store et Sécurité Windows"), ComponentsCategory, Severity.Medium);
 
-    private static readonly Check WebViewCheck = new("M01.webview2", "Composant WebView2 et Microsoft Edge", ComponentsCategory, Severity.High);
+    private static Check WebViewCheck => new("M01.webview2", T("Composant WebView2 et Microsoft Edge"), ComponentsCategory, Severity.High);
 
     private static Check PageFileCheck => new("M01.pagefile", T("Fichier d'échange"), ComponentsCategory, Severity.Medium, Fixable: true);
 
@@ -66,7 +66,10 @@ public sealed partial class RiskyChangesAuditModule
             return AppsCheck.Unknown(T("Inventaire des applications indisponible."));
         }
 
+        // Les éditions LTSC ne fournissent ni le Store ni winget : leur absence n'y est pas une anomalie. Sécurité Windows reste exigée.
+        var ltsc = context.Windows.EditionId is "EnterpriseS" or "IoTEnterpriseS";
         var missing = RequiredApps
+            .Where(app => !(ltsc && app.Name is "Microsoft.WindowsStore" or "Microsoft.DesktopAppInstaller"))
             .Where(app => !packages.Any(p => p.Name.Equals(app.Name, StringComparison.OrdinalIgnoreCase)))
             .Select(app => app.Label)
             .ToList();
@@ -124,6 +127,8 @@ public sealed partial class RiskyChangesAuditModule
         return null;
     }
 
+    internal const int TinyPageFileMegabytes = 1024;
+
     private static Finding DetectPageFile(ICimReader cim)
     {
         var explanation = T("Le fichier d'échange sert de réserve quand la mémoire vive est pleine. Sans lui, les applications gourmandes (jeux, navigateurs) " +
@@ -153,7 +158,7 @@ public sealed partial class RiskyChangesAuditModule
             return PageFileCheck.Compliant(Join(files), expected, explanation);
         }
 
-        if (fixedMaximum.All(size => size > 0) && fixedMaximum.Sum() < 1024)
+        if (fixedMaximum.All(size => size > 0) && fixedMaximum.Sum() < TinyPageFileMegabytes)
         {
             return PageFileCheck.Deviation(T("très petit : {0}", Join(files)), expected, explanation, advice);
         }

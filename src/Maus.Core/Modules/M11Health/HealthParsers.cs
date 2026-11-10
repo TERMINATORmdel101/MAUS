@@ -100,7 +100,7 @@ internal static partial class HealthParsers
         var letters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (locator, bank) in modules)
         {
-            var letter = ChannelLetter(locator) ?? ChannelLetter(bank);
+            var letter = M10Memory.DimmSlotParser.ChannelOf(locator, bank);
             if (letter is null)
             {
                 return (Math.Min(modules.Count, 2), true);
@@ -129,41 +129,7 @@ internal static partial class HealthParsers
     /// <summary>Taille lisible en Go (1 Go = 1024³ octets, comme l'Explorateur), dans la langue de MAUS (« 465,8 Go », « 465.8 GB »).</summary>
     public static string FormatGigabytes(long bytes) => T("{0:0.0} Go", bytes / 1024d / 1024d / 1024d);
 
-    /// <summary>Type de mémoire selon SMBIOS (<c>Win32_PhysicalMemory.SMBIOSMemoryType</c>).</summary>
-    public static string? MemoryTypeLabel(long? smbiosType) => smbiosType switch
-    {
-        24 => "DDR3",
-        26 => "DDR4",
-        29 => "LPDDR3",
-        30 => "LPDDR4",
-        34 => "DDR5",
-        35 => "LPDDR5",
-        _ => null,
-    };
-
-    private static string? ChannelLetter(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-
-        var match = ChannelPattern().Match(text);
-        if (match.Success)
-        {
-            return match.Groups["letter"].Value;
-        }
-
-        match = DimmSlotPattern().Match(text);
-        return match.Success ? match.Groups["letter"].Value : null;
-    }
-
     [GeneratedRegex(@"^\s*(?<fs>NTFS|ReFS)?\s*DisableDeleteNotify\s*=\s*(?<value>\d+)", RegexOptions.IgnoreCase)]
     private static partial Regex DisableDeleteNotifyLine();
 
-    [GeneratedRegex(@"Channel\s*(?<letter>[A-H])(?![A-Z])", RegexOptions.IgnoreCase)]
-    private static partial Regex ChannelPattern();
-
-    [GeneratedRegex(@"(?:^|[_\s-])(?:DIMM[_\s-]?)?(?<letter>[A-H])[0-3](?:$|[_\s-])", RegexOptions.IgnoreCase)]
-    private static partial Regex DimmSlotPattern();
 }

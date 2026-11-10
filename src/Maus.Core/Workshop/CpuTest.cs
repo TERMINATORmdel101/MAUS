@@ -47,7 +47,7 @@ public static class CpuTest
 
         var fault = options.Fault;
         // Mode « automatique » : le tour mixte ; modes AVX et très lourd : charge vectorielle (voir CpuStress).
-        Func<ulong> round = options.Mode == CpuStressMode.Automatic ? () => Round(0) : () => CpuStress.Round(options.Mode);
+        var round = CpuStress.Kernel(options.Mode);
         var reference = round();
         long rounds = 0;
         var errors = 0;
@@ -78,9 +78,10 @@ public static class CpuTest
 
         try
         {
-            while (!Task.WhenAll(workers).IsCompleted)
+            var all = Task.WhenAll(workers);
+            while (!all.IsCompleted)
             {
-                await Task.WhenAny(Task.WhenAll(workers), Task.Delay(250, CancellationToken.None)).ConfigureAwait(false);
+                await Task.WhenAny(all, Task.Delay(250, CancellationToken.None)).ConfigureAwait(false);
                 progress?.Report(new CpuTestProgress(clock.Elapsed, Interlocked.Read(ref rounds), Volatile.Read(ref errors)));
                 if (abortReason is null && abortCheck?.Invoke() is { } reason)
                 {

@@ -17,9 +17,11 @@ public static partial class CpuClassifier
             : HardwareVendor.Other;
     }
 
-    public static bool IsX3D(string? name) => name is not null && X3DPattern().IsMatch(name);
-
-    /// <summary>7900X3D, 7950X3D, 9900X3D, 9950X3D. Le 9950X3D2 porte du V-Cache sur ses deux CCD et n'est pas concerné.</summary>
+    /// <summary>
+    /// 7900X3D, 7950X3D, 9900X3D, 9950X3D, et le portable 9955HX3D : 16 cœurs et 128 Mo de cache L3 comme le 9950X3D (fiche AMD du
+    /// 9955HX3D), donc un seul étage de V-Cache sur ses deux CCD. Le 9950X3D2 en porte sur les deux CCD et n'est pas concerné.
+    /// Le portable 7945HX3D aussi : deux CCD, 128 Mo de L3, les 64 Mo de V-Cache sur un seul CCD (fiche Notebookcheck du processeur).
+    /// </summary>
     public static bool IsAsymmetricDualCcdX3D(string? name) =>
         name is not null && AsymmetricDualCcdX3DPattern().IsMatch(name);
 
@@ -27,10 +29,7 @@ public static partial class CpuClassifier
     public static bool IsIntelRaptorLakeDesktop(string? name) =>
         name is not null && RaptorLakeDesktopPattern().IsMatch(name);
 
-    [GeneratedRegex(@"\b\d{4}X3D\d?\b", RegexOptions.IgnoreCase)]
-    private static partial Regex X3DPattern();
-
-    [GeneratedRegex(@"\b(7900|7950|9900|9950)X3D\b(?!\d)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\b(7900X3D|7950X3D|9900X3D|9950X3D|7945HX3D|9955HX3D)\b", RegexOptions.IgnoreCase)]
     private static partial Regex AsymmetricDualCcdX3DPattern();
 
     [GeneratedRegex(@"\bi[579]-1[34]\d{3}(K|KF|KS|F|T)?\b(?![A-Z])", RegexOptions.IgnoreCase)]
@@ -81,11 +80,30 @@ public static class GpuClassifier
         return vendor switch
         {
             HardwareVendor.Nvidia => false,
-            HardwareVendor.Intel => !Regex.IsMatch(text, @"Arc(\(TM\))?\s+[AB]\d{3}", RegexOptions.IgnoreCase),
-            HardwareVendor.Amd => !Regex.IsMatch(text, @"\b(RX|R[579]|Pro\s+W)\s*\d", RegexOptions.IgnoreCase),
+            HardwareVendor.Intel => !Regex.IsMatch(text, @"Arc(\(TM\))?\s+(Pro\s+)?[AB]\d{2,3}", RegexOptions.IgnoreCase),
+            HardwareVendor.Amd => !Regex.IsMatch(text, @"\b(RX|R[579]|Pro\s+WX?)\s*\d|\bRX\s+Vega\s+(56|64)\b", RegexOptions.IgnoreCase),
             _ => false,
         };
     }
+}
+
+public static class VirtualMachineClassifier
+{
+    /// <summary>
+    /// D'après <c>Win32_ComputerSystem</c> : « Microsoft Corporation / Virtual Machine » (Hyper-V), VMware, VirtualBox (« innotek GmbH »), QEMU, KVM.
+    /// Pas le bit « hyperviseur » de CPUID : il est aussi levé sur un vrai PC dès que Hyper-V ou la sécurité par virtualisation tourne.
+    /// </summary>
+    public static bool IsVirtual(string? manufacturer, string? model)
+    {
+        var maker = manufacturer ?? string.Empty;
+        var product = model ?? string.Empty;
+        return (maker.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) && product.Contains("Virtual Machine", StringComparison.OrdinalIgnoreCase))
+            || maker.Contains("innotek", StringComparison.OrdinalIgnoreCase)
+            || VirtualPlatforms.Any(name =>
+                maker.Contains(name, StringComparison.OrdinalIgnoreCase) || product.Contains(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static readonly string[] VirtualPlatforms = ["VMware", "VirtualBox", "QEMU", "KVM"];
 }
 
 public static class FormFactorClassifier

@@ -35,7 +35,7 @@ public interface IGpuBlock : IDisposable
     void Download(Span<uint> data);
 }
 
-public sealed record VramTestOptions(long Bytes, int Passes = 1);
+public sealed record VramTestOptions(long Bytes);
 
 public sealed record VramTestProgress(double Percent, string Step, long Errors);
 
@@ -44,7 +44,6 @@ public sealed record VramTestResult(
     string Adapter,
     long TestedBytes,
     long Errors,
-    IReadOnlyList<long> FirstErrorOffsets,
     double? ReadbackGigabytesPerSecond,
     TimeSpan Duration,
     bool Aborted,
@@ -65,7 +64,6 @@ public sealed record VramTestResult(
 public static class VramTest
 {
     public const int BlockBytes = 64 * 1024 * 1024;
-    private const int MaxRecordedErrors = 16;
 
     /// <summary>Test plus rapide : 60 % de la mémoire dédiée, au moins 256 Mo, en laissant 512 Mo à l'affichage.</summary>
     public static long SuggestedBytes(long dedicatedBytes) =>
@@ -99,7 +97,6 @@ public static class VramTest
         var clock = Stopwatch.StartNew();
         var blocks = new List<IGpuBlock>();
         long errors = 0;
-        var offsets = new List<long>();
         string? abortReason = null;
         var cardFull = false;
         double? readback = null;
@@ -132,57 +129,50 @@ public static class VramTest
                 (T("motif pseudo-aléatoire"), (index, seed) => Mix((uint)index + seed)),
                 (T("motif inversé"), (index, seed) => ~((uint)index ^ seed)),
             };
-            var steps = Math.Max(1, options.Passes * patterns.Length * blocks.Count * 2);
+            var steps = Math.Max(1, patterns.Length * blocks.Count * 2);
             var step = 0;
             long readBytes = 0;
             var readTime = TimeSpan.Zero;
-            for (var pass = 0; pass < options.Passes; pass++)
+            const uint seed = 0x5A5A_A5A5u;
+            for (var p = 0; p < patterns.Length; p++)
             {
-                var seed = 0x5A5A_A5A5u + (uint)pass;
-                for (var p = 0; p < patterns.Length; p++)
+                var (name, value) = patterns[p];
+
+                // Tout écrire d'abord : les données restent en mémoire vidéo pendant que les autres blocs sont remplis.
+                long baseIndex = 0;
+                foreach (var block in blocks)
                 {
-                    var (name, value) = patterns[p];
-
-                    // Tout écrire d'abord : les données restent en mémoire vidéo pendant que les autres blocs sont remplis.
-                    long baseIndex = 0;
-                    foreach (var block in blocks)
+                    Check(danger, cancellationToken, ref abortReason);
+                    var span = host.AsSpan(0, block.Bytes / 4);
+                    for (var i = 0; i < span.Length; i++)
                     {
-                        Check(danger, cancellationToken, ref abortReason);
-                        var span = host.AsSpan(0, block.Bytes / 4);
-                        for (var i = 0; i < span.Length; i++)
-                        {
-                            span[i] = value(baseIndex + i, seed);
-                        }
-
-                        block.Upload(span);
-                        baseIndex += span.Length;
-                        progress?.Report(new VramTestProgress(100.0 * ++step / steps, T("{0} : écriture", name), errors));
+                        span[i] = value(baseIndex + i, seed);
                     }
 
-                    baseIndex = 0;
-                    foreach (var block in blocks)
-                    {
-                        Check(danger, cancellationToken, ref abortReason);
-                        var span = host.AsSpan(0, block.Bytes / 4);
-                        var watch = Stopwatch.StartNew();
-                        block.Download(span);
-                        readTime += watch.Elapsed;
-                        readBytes += block.Bytes;
-                        for (var i = 0; i < span.Length; i++)
-                        {
-                            if (span[i] != value(baseIndex + i, seed))
-                            {
-                                errors++;
-                                if (offsets.Count < MaxRecordedErrors)
-                                {
-                                    offsets.Add((baseIndex + i) * 4);
-                                }
-                            }
-                        }
+                    block.Upload(span);
+                    baseIndex += span.Length;
+                    progress?.Report(new VramTestProgress(100.0 * ++step / steps, T("{0} : écriture", name), errors));
+                }
 
-                        baseIndex += span.Length;
-                        progress?.Report(new VramTestProgress(100.0 * ++step / steps, T("{0} : relecture", name), errors));
+                baseIndex = 0;
+                foreach (var block in blocks)
+                {
+                    Check(danger, cancellationToken, ref abortReason);
+                    var span = host.AsSpan(0, block.Bytes / 4);
+                    var watch = Stopwatch.StartNew();
+                    block.Download(span);
+                    readTime += watch.Elapsed;
+                    readBytes += block.Bytes;
+                    for (var i = 0; i < span.Length; i++)
+                    {
+                        if (span[i] != value(baseIndex + i, seed))
+                        {
+                            errors++;
+                        }
                     }
+
+                    baseIndex += span.Length;
+                    progress?.Report(new VramTestProgress(100.0 * ++step / steps, T("{0} : relecture", name), errors));
                 }
             }
 
@@ -207,7 +197,7 @@ public static class VramTest
         }
 
         clock.Stop();
-        return new VramTestResult(adapter.Name, blocks.Sum(b => (long)b.Bytes), errors, offsets, abortReason is null ? readback : null, clock.Elapsed, abortReason is not null, abortReason, cardFull);
+        return new VramTestResult(adapter.Name, blocks.Sum(b => (long)b.Bytes), errors, abortReason is null ? readback : null, clock.Elapsed, abortReason is not null, abortReason, cardFull);
     }
 
     private static void Check(Func<string?>? danger, CancellationToken cancellationToken, ref string? abortReason)

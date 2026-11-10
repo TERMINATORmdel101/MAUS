@@ -69,6 +69,62 @@ public class UncheckedModulesTests
         Assert.Contains("• Mises à jour Windows : Délai dépassé", detail, StringComparison.Ordinal);
         Assert.Contains("• Sécurité du noyau : Erreur inattendue : boum", detail, StringComparison.Ordinal);
         Assert.Contains("n'est pas gardé dans l'historique", detail, StringComparison.Ordinal);
+        Assert.Contains("Relancez l'audit", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_module_left_out_by_choice_is_not_told_apart_by_its_text_and_needs_no_new_audit()
+    {
+        var breakdown = HealthScore.Explain(
+        [
+            new ModuleResult("M03", "Mises à jour Windows", [], TimeSpan.Zero, "n'importe quel texte", NotChosen: true),
+        ]);
+
+        Assert.True(breakdown.IsPartial);
+        var note = HealthScore.PartialNote(breakdown);
+        Assert.Contains("n'a pas été choisi pour cet audit (Mises à jour Windows)", note, StringComparison.Ordinal);
+        Assert.DoesNotContain("n'a pas pu être vérifié", note, StringComparison.Ordinal);
+        var detail = HealthScore.PartialDetail(breakdown);
+        Assert.Contains("recochez", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Relancez l'audit", detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_audit_marks_a_skipped_module_with_a_field()
+    {
+        var results = await new AuditEngine([new SkippableModule()]).RunAsync(TestContext.Create(), skip: ["M99"]);
+
+        Assert.True(results.Single().NotChosen);
+        Assert.NotNull(results.Single().Error);
+    }
+
+    [Fact]
+    public void A_failed_module_and_a_module_left_out_are_both_named()
+    {
+        var breakdown = HealthScore.Explain(
+        [
+            new ModuleResult("M03", "Mises à jour Windows", [], TimeSpan.Zero, "Délai dépassé"),
+            new ModuleResult("M13", "Sécurité du noyau", [], TimeSpan.Zero, "non choisi", NotChosen: true),
+        ]);
+
+        var note = HealthScore.PartialNote(breakdown);
+        Assert.Contains("n'a pas pu être vérifié (Mises à jour Windows)", note, StringComparison.Ordinal);
+        Assert.Contains("n'a pas été choisi pour cet audit (Sécurité du noyau)", note, StringComparison.Ordinal);
+        Assert.Contains("Relancez l'audit", HealthScore.PartialDetail(breakdown), StringComparison.Ordinal);
+    }
+
+    private sealed class SkippableModule : IAuditModule
+    {
+        public string Id => "M99";
+
+        public string Title => "Essai";
+
+        public int Order => 1;
+
+        public TimeSpan Timeout => TimeSpan.FromSeconds(1);
+
+        public Task<IReadOnlyList<Finding>> DetectAsync(AuditContext context, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Finding>>([]);
     }
 
     [Fact]

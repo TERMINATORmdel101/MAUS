@@ -54,8 +54,27 @@ public sealed class WindowsUpdateModule : IAuditModule
     internal const int MaxSearchAgeDays = 14;
     internal const int MaxSignatureAgeDays = 3;
 
+    /// <summary>Clés de la retenue (Microsoft Learn, « Safeguard holds for Windows ») ; lisibles sans droits, vérifié le 2/11/2026.</summary>
+    internal const string HoldStatusKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Appraiser\GWX";
+    internal const string HoldIndicatorsKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\TargetVersionUpgradeExperienceIndicators";
+
+    /// <summary>
+    /// Choix de MAUS, sans source publiée : Microsoft ne définit pas d'« échec en boucle ». À partir de ce nombre d'échecs d'une même
+    /// mise à jour de Windows, sans réussite ensuite, le constat cesse d'être une simple information.
+    /// </summary>
+    internal const int LoopFailureCount = 3;
+
+    /// <summary>
+    /// Choix de MAUS, sans source publiée : un échec plus ancien n'est plus cité. Une mise à jour remplacée par une plus récente
+    /// n'est pas forcément retentée : elle resterait alors « sans réussite » pour toujours.
+    /// </summary>
+    internal const int RecentFailureDays = 90;
+
+    /// <summary>Lignes d'historique lues, les plus récentes d'abord (Microsoft Learn, « IUpdateSearcher::QueryHistory »).</summary>
+    internal const int MaxHistoryEntries = 500;
+
     /// <summary>Services dont Windows Update dépend ; « Start = 4 » signifie désactivé.</summary>
-    internal static readonly (string Name, string Label)[] UpdateServices =
+    internal static (string Name, string Label)[] UpdateServices =>
     [
         ("wuauserv", "Windows Update"),
         ("UsoSvc", T("Orchestrateur de mises à jour")),
@@ -74,6 +93,9 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static readonly string[] PauseValueNames = ["PauseUpdatesExpiryTime", "PauseQualityUpdatesEndTime"];
 
     private static readonly TimeSpan DefaultSearchTimeout = TimeSpan.FromSeconds(150);
+
+    /// <summary>L'historique est local : au-delà, le service ne répond pas et le constat dit « non lu », sans retenir l'audit.</summary>
+    private static readonly TimeSpan HistoryTimeout = TimeSpan.FromSeconds(30);
     private static readonly Lazy<WindowsLifecycleCatalog> Catalog = new(WindowsLifecycleCatalog.LoadEmbedded);
 
     private readonly IWindowsUpdateAgent _agent;
@@ -116,11 +138,14 @@ public sealed class WindowsUpdateModule : IAuditModule
 
         // La recherche en ligne tourne sur son propre fil : les lectures locales se font pendant qu'elle attend le serveur
         // (liste des correctifs : 0,6 à 0,8 s mesurés sur le PC du porteur), au lieu d'allonger la fin de l'audit.
-        var searching = SearchAsync(cancellationToken);
+        var searching = SearchAsync(!context.Offline, cancellationToken);
+        var readingHistory = ReadHistoryAsync(cancellationToken);
         var lastInstall = DetectLastInstall(context.Cim, today);
         var defender = DetectDefenderSignatures(context.Cim);
         var latestToggle = DetectLatestUpdatesToggle(context.Registry);
         var source = DetectUpdateSource(context.Registry);
+        var hold = DetectSafeguardHold(context.Registry);
+        var history = await readingHistory.ConfigureAwait(false);
         var search = await searching.ConfigureAwait(false);
 
         findings.Add(DetectPendingUpdates(search));
@@ -129,6 +154,8 @@ public sealed class WindowsUpdateModule : IAuditModule
         findings.Add(defender);
         findings.Add(DetectOptionalUpdates(search));
         findings.Add(DetectDriverUpdates(search));
+        findings.Add(DetectFailedUpdates(history, search.Updates, context.Now));
+        findings.Add(hold);
         findings.Add(latestToggle);
         findings.Add(source);
         return findings;
@@ -200,7 +227,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             if (release.EnablementPackage is { } package && channel is ServicingChannel.HomePro or ServicingChannel.EnterpriseEducation)
             {
                 advice = T("{0} Passez à {1} par le package d'activation {2} : un seul redémarrage, "
-                    + "applications, fichiers et réglages conservés. Il apparaît dans Paramètres > Windows Update ; MAUS le proposera dans une prochaine version.", status, release.EnablementTarget, package);
+                    + "applications, fichiers et réglages conservés. Il apparaît dans Paramètres > Windows Update.", status, release.EnablementTarget, package);
                 if (release.EnablementMinimumUbr is { } minimum && windows.Ubr < minimum)
                 {
                     advice += T(" Installez d'abord les mises à jour cumulatives en attente (révision {0}.{1} requise, "
@@ -239,7 +266,7 @@ public sealed class WindowsUpdateModule : IAuditModule
     private static Finding DetectServices(IRegistryReader registry)
     {
         const string id = "M03.update-services";
-        const string title = "Services de Windows Update";
+        var title = T("Services de Windows Update");
         var disabled = new List<string>();
         var missing = new List<string>();
         var denied = false;
@@ -277,7 +304,7 @@ public sealed class WindowsUpdateModule : IAuditModule
 
         if (missing.Count > 0)
         {
-            details.Add("absents : " + string.Join(", ", missing));
+            details.Add(T("absents : ") + string.Join(", ", missing));
         }
 
         return new Finding
@@ -294,7 +321,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Advice = details.Count == 0
                 ? null
                 : T("Si un outil tiers a désactivé ces services, annulez ce réglage dans cet outil. "
-                    + "La remise en service avec le démarrage d'origine sera proposée dans une prochaine version."),
+                    + "MAUS peut remettre le démarrage d'origine : correction « Services de Windows Update », page Corrections."),
             Fixable = disabled.Count > 0,
         };
     }
@@ -345,7 +372,8 @@ public sealed class WindowsUpdateModule : IAuditModule
         var advice = new List<string>();
         if (paused)
         {
-            advice.Add(T("Reprenez les mises à jour : Paramètres > Windows Update > Reprendre les mises à jour."));
+            advice.Add(T("Reprenez les mises à jour : Paramètres > Windows Update > Reprendre les mises à jour. "
+                + "Une courte pause pour attendre les premiers retours sur une mise à jour est un choix qui se défend ; une longue pause laisse ouvertes les failles corrigées entre-temps."));
         }
 
         if (byPolicy)
@@ -385,11 +413,24 @@ public sealed class WindowsUpdateModule : IAuditModule
         }
     }
 
-    private async Task<SearchOutcome> SearchAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<UpdateHistoryEntry>?> ReadHistoryAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var updates = await _agent.SearchAsync(SearchCriteria, _searchTimeout, cancellationToken).ConfigureAwait(false);
+            return await Task.Run(() => _agent.GetHistory(MaxHistoryEntries), cancellationToken).WaitAsync(HistoryTimeout, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
+        {
+            // Délai dépassé ou toute autre erreur de l'historique : « non lu » pour ce seul constat, les autres restent.
+            return null;
+        }
+    }
+
+    private async Task<SearchOutcome> SearchAsync(bool online, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updates = await _agent.SearchAsync(SearchCriteria, online, _searchTimeout, cancellationToken).ConfigureAwait(false);
             return new SearchOutcome(updates.DistinctBy(u => u.UpdateId, StringComparer.OrdinalIgnoreCase).ToList(), null);
         }
         catch (TimeoutException)
@@ -451,7 +492,7 @@ public sealed class WindowsUpdateModule : IAuditModule
 
         if (other.Count > 0)
         {
-            counts.Add(Plural(other.Count, "autre", "autres"));
+            counts.Add(Plural(other.Count, T("autre"), T("autres")));
         }
 
         return new Finding
@@ -461,17 +502,23 @@ public sealed class WindowsUpdateModule : IAuditModule
             Category = UpdateCategory,
             Status = FindingStatusExtensions.ForDeviation(severity),
             Severity = severity,
-            Current = $"{string.Join(" et ", counts)} : {TitleList([.. security, .. other])}"
+            Current = $"{string.Join(T(" et "), counts)} : {TitleList([.. security, .. other])}"
                 + (definitionsNote is null ? string.Empty : T(" ; en plus, {0}", definitionsNote)),
             Expected = T("aucune"),
             Explanation = explanation,
-            Advice = T("Installez-les depuis Paramètres > Windows Update ; MAUS les installera dans une prochaine version. Aucun pilote n'est installé ici. "
-                + "Aucun gain de performance n'est attendu : ces mises à jour servent la sécurité et la stabilité."),
+            Advice = T("Installez-les depuis Paramètres > Windows Update : MAUS n'installe et ne bloque aucune mise à jour de Windows. "
+                + "Aucun gain de performance n'est attendu : ces mises à jour servent la sécurité et la stabilité. "
+                + "Aucune mise à jour n'est tout à fait sans risque : créez d'abord un point de restauration (page Historique), gardez une sauvegarde récente, "
+                + "et regardez si votre matériel est cité dans les problèmes connus publiés par Microsoft : https://learn.microsoft.com/windows/release-health/"),
             SettingsPage = WindowsUpdatePage,
-            Fixable = true,
         };
     }
 
+    /// <summary>
+    /// Information seulement, ni blocage ni réglage. Ne dit que ce que Microsoft publie (« Update release cycle for Windows clients »,
+    /// https://learn.microsoft.com/windows/deployment/update/release-cycle) : aperçu facultatif sans correctifs de sécurité, en général la quatrième
+    /// semaine du mois, pour valider plus tôt ; contenu repris par le correctif de sécurité du mois suivant. Les correctifs de sécurité ne sont pas concernés.
+    /// </summary>
     private static Finding DetectOptionalUpdates(SearchOutcome search)
     {
         const string id = "M03.optional-updates";
@@ -488,12 +535,15 @@ public sealed class WindowsUpdateModule : IAuditModule
             Title = title,
             Category = UpdateCategory,
             Status = FindingStatus.Info,
-            Current = optional.Count == 0 ? T("aucune") : $"{Plural(optional.Count, "facultative", "facultatives")} : {TitleList(optional)}",
-            Explanation = T("Les mises à jour facultatives, comme l'aperçu non sécuritaire publié le quatrième mardi du mois, "
-                + "corrigent des bugs plus tôt. Leur contenu arrive de toute façon dans le correctif du mois suivant."),
+            Measures = new Dictionary<string, double> { [Reporting.UpdateReadiness.CountMeasure] = optional.Count },
+            Current = optional.Count == 0 ? T("aucune") : $"{Plural(optional.Count, T("facultative"), T("facultatives"))} : {TitleList(optional)}",
+            Explanation = T("Microsoft publie, en général la quatrième semaine du mois, un aperçu facultatif sans correctifs de sécurité, qui sert le plus souvent à valider plus tôt "
+                + "le contenu du correctif de sécurité du mois suivant : ce correctif reprend ce contenu. Windows Update peut aussi proposer des pilotes facultatifs : voir le constat sur les pilotes juste après. "
+                + "Les correctifs de sécurité ne sont pas concernés par cette information."),
             Advice = optional.Count == 0
                 ? null
-                : T("Les aperçus corrigent des bugs plus tôt mais peuvent en introduire. Installez-les seulement si un correctif précis vous concerne."),
+                : T("Sauf si une mise à jour facultative corrige un problème que vous avez, vous pouvez attendre : pour l'aperçu mensuel, le correctif de sécurité du mois suivant reprend son contenu. "
+                    + "Si possible, faites d'abord un point de restauration (page Historique)."),
 
             // Page d'accueil de Windows Update, point de départ de toute installation (Options avancées > Mises à jour facultatives comprises).
             SettingsPage = optional.Count == 0 ? null : WindowsUpdatePage,
@@ -503,7 +553,10 @@ public sealed class WindowsUpdateModule : IAuditModule
 
     /// <summary>
     /// Pilotes proposés par Windows Update. Information seulement : Windows les range dans les mises à jour facultatives et
-    /// précise lui-même, sur cette page, qu'ils servent surtout « si vous rencontrez un problème spécifique ».
+    /// précise lui-même, sur cette page, qu'ils servent surtout « si vous rencontrez un problème spécifique ». Microsoft écrit que Windows Update installe
+    /// les pilotes recommandés automatiquement et pas les pilotes facultatifs (« Automatically get recommended and updated hardware drivers »,
+    /// https://support.microsoft.com/windows/hardware/drivers/automatically-get-recommended-and-updated-hardware-drivers). « Par défaut » : le Module 9 laisse
+    /// à l'utilisateur le choix de bloquer ces pilotes, et ce texte ne le contredit pas.
     /// </summary>
     private static Finding DetectDriverUpdates(SearchOutcome search)
     {
@@ -538,14 +591,213 @@ public sealed class WindowsUpdateModule : IAuditModule
             Status = FindingStatus.Info,
             Current = parts.Count == 0 ? T("aucune") : string.Join(" ; ", parts),
             Explanation = T("Windows Update propose parfois des pilotes pour vos périphériques. Les pilotes facultatifs attendent votre choix dans les mises à jour facultatives : "
-                + "Windows indique lui-même qu'ils servent surtout si un périphérique pose un problème précis. Les autres sont installés automatiquement par Windows Update."),
+                + "Windows indique lui-même qu'ils servent surtout si un périphérique pose un problème précis. Les autres sont installés automatiquement par Windows Update. "
+                + "Un pilote reste un changement qui peut apporter un problème : si un périphérique fonctionne moins bien après une mise à jour, "
+                + "le Gestionnaire de périphériques permet de revenir au pilote précédent (Propriétés > Pilote > Restaurer le pilote)."),
             Advice = optional.Count == 0
                 ? null
-                : T("Installez un pilote facultatif seulement si le périphérique concerné fonctionne mal : bouton « Ouvrir dans Windows » (Windows Update > Options avancées > "
-                    + "Mises à jour facultatives), puis cochez ce pilote. Pour la carte graphique, préférez le pilote du fabricant (Module 9 et Atelier > Pilotes)."),
+                : T("N'installez un pilote facultatif que si un appareil pose problème ; sinon, par défaut, Windows Update installe de lui-même les pilotes recommandés. "
+                    + "Pour la carte graphique, préférez la version du constructeur (Module 9 et Atelier > Pilotes). Faites d'abord un point de restauration (page Historique), "
+                    + "puis bouton « Ouvrir dans Windows » (Windows Update > Options avancées > Mises à jour facultatives) et cochez ce pilote."),
             SettingsPage = optional.Count == 0 ? null : OptionalUpdatesPage,
         };
 
+    }
+
+    /// <summary>
+    /// Ce que Windows a noté, sans rien lancer. MAUS cite le code et jamais sa cause : la cause se cherche avec les outils de Microsoft.
+    /// Pilotes et applications du Store restent de simples informations, pour ne pas crier à la panne de Windows. Les définitions de
+    /// Microsoft Defender ne comptent jamais dans le seuil : la suivante remplace celle qui a échoué. Une mise à jour de Windows sans
+    /// réussite notée n'est « à améliorer » que si Windows la propose encore (<paramref name="pending"/>, lu par le même audit) ; sans
+    /// cette liste, que si aucune autre mise à jour de Windows ne s'est installée depuis son dernier échec.
+    /// </summary>
+    private static Finding DetectFailedUpdates(IReadOnlyList<UpdateHistoryEntry>? history, IReadOnlyList<PendingUpdate>? pending, DateTimeOffset now)
+    {
+        const string id = "M03.failed-updates";
+        var title = T("Mises à jour qui ont échoué");
+        if (history is null)
+        {
+            return Finding.Unknown(id, title, T("Windows ne donne pas l'historique de ses mises à jour."), UpdateCategory);
+        }
+
+        var explanation = T("MAUS lit l'historique de Windows Update, sans rien lancer : quelle mise à jour a échoué, combien de fois, avec quel code, et si elle a réussi ensuite. "
+            + "Un échec peut se régler seul à l'essai suivant. MAUS cite le code sans l'expliquer. Les pilotes et les applications du Store sont comptés à part : "
+            + "leur échec n'est pas un échec de Windows. Ce tri se fait d'après ce que note l'historique ; ce qui n'est pas reconnu reste avec Windows.");
+        if (history.Count == 0)
+        {
+            return new Finding
+            {
+                Id = id,
+                Title = title,
+                Category = UpdateCategory,
+                Status = FindingStatus.Info,
+                Current = T("historique vide"),
+                Explanation = explanation,
+            };
+        }
+
+        var since = now.UtcDateTime.AddDays(-RecentFailureDays);
+        var failed = UpdateParsers.SummarizeFailures(history, since);
+        if (failed.Count == 0)
+        {
+            // Windows peut n'avoir de traces que depuis peu : la date dite est celle du début réel de ce qui a été lu.
+            var oldest = history.Min(e => e.DateUtc);
+            var start = oldest > since ? oldest : since;
+            return new Finding
+            {
+                Id = id,
+                Title = title,
+                Category = UpdateCategory,
+                Status = FindingStatus.Info,
+                Current = T("aucun échec noté par Windows depuis le {0}", ShortDate(DateOnly.FromDateTime(start.ToLocalTime()))),
+                Explanation = explanation,
+            };
+        }
+
+        var parts = new List<string>();
+        AddFailures(parts, failed, UpdateFamily.Windows, T("Windows et autres produits Microsoft"));
+        AddFailures(parts, failed, UpdateFamily.Driver, T("Pilotes"));
+        AddFailures(parts, failed, UpdateFamily.Store, T("Applications du Store"));
+
+        var unresolved = failed.Where(f => f.SucceededAfterUtc is null).ToList();
+        var windowsUnresolved = unresolved
+            .Where(f => f.Family == UpdateFamily.Windows && !Maus.Core.Follow.CrashTimelineReader.IsDefenderDefinitions(f.Title))
+            .ToList();
+        var stillWanted = windowsUnresolved
+            .Where(f => pending is null ? !UpdateParsers.OtherWindowsSuccessAfter(history, f) : UpdateParsers.IsStillPending(f, pending))
+            .ToList();
+        var maybeReplaced = windowsUnresolved.Except(stillWanted).Any(f => UpdateParsers.OtherWindowsSuccessAfter(history, f));
+        var looping = stillWanted.Any(f => f.Failures >= LoopFailureCount);
+        var current = string.Join(" | ", parts);
+        if (history.Count >= MaxHistoryEntries)
+        {
+            current += " " + T("(sur les {0} dernières lignes de l'historique)", MaxHistoryEntries);
+        }
+
+        if (maybeReplaced)
+        {
+            current += " | " + T("D'autres mises à jour de Windows se sont installées depuis : celle-ci a peut-être été remplacée par une plus récente, MAUS ne peut pas le savoir.");
+        }
+
+        string? advice = null;
+        if (stillWanted.Count > 0)
+        {
+            advice = T("Pour en chercher la cause : utilitaire de résolution des problèmes de Microsoft, dans Paramètres > Système > Résolution des problèmes > "
+                + "Autres utilitaires de résolution des problèmes > Windows Update. Pour le passage à une nouvelle version de Windows, SetupDiag, l'outil de Microsoft, lit les journaux "
+                + "de l'installation (à lancer en administrateur) : https://learn.microsoft.com/windows/deployment/upgrade/setupdiag");
+        }
+        else if (unresolved.Count > 0 && unresolved.All(f => f.Family != UpdateFamily.Windows))
+        {
+            advice = T("Ces échecs touchent des pilotes ou des applications du Store, pas Windows lui-même : ils ne méritent votre attention que si l'appareil ou l'application concernée "
+                + "fonctionne mal. Pour en chercher la cause : utilitaire de résolution des problèmes de Microsoft, dans Paramètres > Système > Résolution des problèmes > "
+                + "Autres utilitaires de résolution des problèmes.");
+        }
+
+        return new Finding
+        {
+            Id = id,
+            Title = title,
+            Category = UpdateCategory,
+            Status = looping ? FindingStatusExtensions.ForDeviation(Severity.Low) : FindingStatus.Info,
+            Severity = looping ? Severity.Low : Severity.Info,
+            Current = current,
+            Expected = looping ? T("moins de {0} échecs d'une même mise à jour de Windows sans réussite ensuite (seuil choisi par MAUS)", LoopFailureCount) : null,
+            Explanation = explanation,
+            Advice = advice,
+            SettingsPage = stillWanted.Count > 0 ? WindowsUpdatePage : null,
+        };
+    }
+
+    private static void AddFailures(List<string> parts, List<FailedUpdate> failed, UpdateFamily family, string label)
+    {
+        var inFamily = failed.Where(f => f.Family == family).ToList();
+        if (inFamily.Count == 0)
+        {
+            return;
+        }
+
+        var listed = string.Join(" ; ", inFamily.Take(MaxListedTitles).Select(DescribeFailure));
+        parts.Add(inFamily.Count > MaxListedTitles
+            ? T("{0} : {1} (et {2} de plus)", label, listed, (inFamily.Count - MaxListedTitles).ToString(CultureInfo.InvariantCulture))
+            : T("{0} : {1}", label, listed));
+    }
+
+    private static string DescribeFailure(FailedUpdate failure)
+    {
+        var outcome = failure.SucceededAfterUtc is { } succeeded
+            ? T("réussie ensuite le {0}", ShortDate(DateOnly.FromDateTime(succeeded.ToLocalTime())))
+            : T("pas de réussite notée depuis");
+        var count = Plural(failure.Failures, T("échec"), T("échecs"));
+        var lastDate = ShortDate(DateOnly.FromDateTime(failure.LastFailureUtc.ToLocalTime()));
+        if (failure.LastCode == 0)
+        {
+            return T("{0} : {1}, dernier le {2}, sans code noté, {3}", failure.Title, count, lastDate, outcome);
+        }
+
+        return T("{0} : {1}, dernier le {2}, code {3}, {4}", failure.Title, count, lastDate, UpdateParsers.FormatCode(failure.LastCode), outcome);
+    }
+
+    /// <summary>
+    /// Retenue de Microsoft (« safeguard hold », https://learn.microsoft.com/windows/deployment/update/safeguard-holds), simple information :
+    /// il suffit d'attendre. MAUS ne propose jamais de la contourner, et il écrit ce que Windows note, car Microsoft prévient qu'une retenue peut être périmée sur un PC.
+    /// </summary>
+    private static Finding DetectSafeguardHold(IRegistryReader registry)
+    {
+        const string id = "M03.safeguard-hold";
+        var title = T("Retenue d'une nouvelle version de Windows par Microsoft");
+        return Finding.Guard(id, title, UpdateCategory, () =>
+        {
+            var indicators = registry.GetSubKeyNames(RegistryHive.LocalMachine, HoldIndicatorsKey)
+                .Select(name =>
+                {
+                    var key = $@"{HoldIndicatorsKey}\{name}";
+                    return new SafeguardIndicators(
+                        name,
+                        registry.GetString(RegistryHive.LocalMachine, key, "GStatus"),
+                        UpdateParsers.RegistryTexts(registry.GetValue(RegistryHive.LocalMachine, key, "GatedBlockId")),
+                        UpdateParsers.RegistryTexts(registry.GetValue(RegistryHive.LocalMachine, key, "GatedBlockReason")));
+                })
+                .ToList();
+            var hold = UpdateParsers.ReadHold(registry.GetString(RegistryHive.LocalMachine, HoldStatusKey, "GStatus"), indicators);
+            var explanation = T("Quand un problème connu pourrait toucher ce PC, Microsoft peut retenir la proposition d'une nouvelle version de Windows, le temps de le corriger. Ce n'est pas une panne.");
+            if (hold.Held != true)
+            {
+                return new Finding
+                {
+                    Id = id,
+                    Title = title,
+                    Category = UpdateCategory,
+                    Status = FindingStatus.Info,
+                    Current = hold.Held == false ? T("Windows n'indique aucune retenue") : T("Windows n'en dit rien sur ce PC"),
+                    Explanation = explanation,
+                };
+            }
+
+            var current = hold.TargetVersion is null ? T("Windows note une retenue") : T("Windows note une retenue pour la version {0}", hold.TargetVersion);
+            if (hold.Ids.Count > 0)
+            {
+                current += T(", numéro {0}", string.Join(", ", hold.Ids));
+            }
+
+            if (hold.Reasons.Count > 0)
+            {
+                current += T(", motif indiqué par Windows : {0}", string.Join(", ", hold.Reasons));
+            }
+
+            return new Finding
+            {
+                Id = id,
+                Title = title,
+                Category = UpdateCategory,
+                Status = FindingStatus.Info,
+                Current = current,
+                Explanation = explanation,
+                Advice = T("Il suffit d'attendre : Windows Update proposera cette version une fois la retenue levée, et Microsoft recommande de ne pas l'installer à la main d'ici là. "
+                    + "Microsoft prévient aussi qu'une retenue peut rester notée à tort si Windows n'arrive plus à rafraîchir cette information : "
+                    + "le numéro se cherche dans les problèmes connus de la version concernée, https://learn.microsoft.com/windows/release-health/"),
+                SettingsPage = WindowsUpdatePage,
+            };
+        });
     }
 
     private static Finding DetectLastInstall(ICimReader cim, DateOnly today)
@@ -594,8 +846,8 @@ public sealed class WindowsUpdateModule : IAuditModule
             Explanation = T("Microsoft publie un correctif cumulatif de sécurité le deuxième mardi de chaque mois. Si aucun n'a été "
                 + "installé depuis plus de {0} jours, Windows Update est en pause, bloqué ou en panne.", MaxInstallAgeDays),
             Advice = stale
-                ? T("Lancez une recherche dans Paramètres > Windows Update. Si l'installation échoue en boucle, "
-                    + "la réparation des composants de Windows Update (Module 2) sera proposée dans une prochaine version.")
+                ? T("Lancez une recherche dans Paramètres > Windows Update. Si l'installation échoue, "
+                    + "le constat « Mises à jour qui ont échoué » cite la mise à jour et le code noté par Windows.")
                 : null,
             SettingsPage = stale ? WindowsUpdatePage : null,
         };
@@ -626,7 +878,7 @@ public sealed class WindowsUpdateModule : IAuditModule
                 + "vieille de plus de deux semaines signale un Windows Update bloqué."),
             Advice = stale
                 ? T("Ouvrez Paramètres > Windows Update et cliquez sur « Rechercher des mises à jour ». En cas d'échec répété, "
-                    + "la réparation de Windows Update (Module 2) sera proposée dans une prochaine version.")
+                    + "la page d'aide de Windows Update de Microsoft donne la marche à suivre.")
                 : null,
             SettingsPage = stale ? WindowsUpdatePage : null,
         };
@@ -695,8 +947,7 @@ public sealed class WindowsUpdateModule : IAuditModule
             Explanation = T("Defender reçoit de nouvelles définitions de menaces plusieurs fois par jour. "
                 + "Des définitions anciennes laissent passer les logiciels malveillants récents."),
             Advice = stale
-                ? T("Ouvrez Sécurité Windows > Protection contre les virus et menaces > Mises à jour de la protection > Rechercher des mises à jour. "
-                    + "MAUS lancera cette mise à jour dans une prochaine version.")
+                ? T("Ouvrez Sécurité Windows > Protection contre les virus et menaces > Mises à jour de la protection > Rechercher des mises à jour.")
                 : null,
             SettingsPage = stale ? WindowsSecurityPage : null,
             Fixable = stale,

@@ -13,6 +13,7 @@
 # - assets/logo/maus-logo-800.jpg : logo réduit pour le README.
 #   (Ces deux-là venaient de tools/make-logo-assets.py, en Python, retiré le 12/10/2026 : moins de langages.)
 
+$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
 $logo = [System.Drawing.Bitmap]::FromFile((Join-Path $root 'assets\logo\maus-logo.jpg'))

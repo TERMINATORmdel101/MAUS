@@ -4,7 +4,13 @@
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File installer\msix\build-msix.ps1
 #
-# Résultat : artifacts\msix\MAUS-<version>.msix (et le dossier des fichiers, artifacts\msix\files).
+# Résultat : artifacts\msix\MAUS-<version>.msix, son empreinte (.sha256) et le dossier des fichiers, artifacts\msix\files.
+#
+# Le paquet n'est fabriqué que si tout compile sans avertissement et si tous les tests passent, avec exactement les
+# bibliothèques des fichiers packages.lock.json. Sur GitHub : .github/workflows/build-msix.yml, qui ajoute une attestation
+# de provenance. Un paquet déjà fabriqué pour cette version n'est jamais écrasé sans -Overwrite : c'est peut-être celui
+# qui est soumis à Microsoft.
+param([string]$OutputFolder, [switch]$Overwrite)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -15,15 +21,33 @@ $version = @($props.Project.PropertyGroup | ForEach-Object { $_.Version } | Wher
 if (-not $version) { throw "Version introuvable dans Directory.Build.props" }
 $msixVersion = "$version.0"
 
-$out = Join-Path $root 'artifacts\msix'
+$out = if ($OutputFolder) { $OutputFolder } else { Join-Path $root 'artifacts\msix' }
 $files = Join-Path $out 'files'
 $staging = Join-Path $out 'pri'
-if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+if ((Test-Path (Join-Path $out "MAUS-$version.msix")) -and -not $Overwrite) {
+    throw "Un paquet $version existe déjà dans $out : il n'est pas écrasé. Changez la version, ou relancez avec -Overwrite si vous êtes sûr de vous."
+}
+
+if (git -C $root status --porcelain) { Write-Warning "Modifications non enregistrées : ce paquet ne correspondra à aucun commit." }
+
+# 0. Compilation sans avertissement et tests : sinon, pas de paquet.
+$solution = Join-Path $root 'Maus.slnx'
+dotnet build $solution -c Release -warnaserror --disable-build-servers -nologo -p:RestoreLockedMode=true
+if ($LASTEXITCODE -ne 0) { throw "Compilation en échec (code $LASTEXITCODE) : pas de paquet" }
+dotnet test $solution -c Release --no-build -nologo
+if ($LASTEXITCODE -ne 0) { throw "Tests en échec (code $LASTEXITCODE) : pas de paquet" }
+
+# Seulement ce que ce script fabrique : le dossier de sortie peut contenir d'autres fichiers.
+foreach ($made in @($files, $staging, (Join-Path $out 'priconfig.xml'))) { if (Test-Path $made) { Remove-Item -Recurse -Force $made } }
 New-Item -ItemType Directory -Force $files, $staging | Out-Null
 
 # 1. Application autonome.
-dotnet publish (Join-Path $root 'src\Maus.App\Maus.App.csproj') -c Release -r win-x64 --self-contained true -o $files --disable-build-servers -nologo
+dotnet publish (Join-Path $root 'src\Maus.App\Maus.App.csproj') -c Release -r win-x64 --self-contained true -o $files --disable-build-servers -nologo -p:RestoreLockedMode=true
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué (code $LASTEXITCODE)" }
+
+# Empreinte du programme, affichée par « Vérifier mon installation » : à publier avec la version.
+$program = (Get-FileHash -Algorithm SHA256 (Join-Path $files 'MAUS.dll')).Hash
+"$program  MAUS.dll" | Out-File -Encoding ascii (Join-Path $out "MAUS-$version-programme.sha256")
 
 # 2. Manifeste et images.
 $manifest = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'AppxManifest.xml')).Replace('@VERSION@', $msixVersion)
@@ -56,4 +80,7 @@ if ($LASTEXITCODE -ne 0) { throw "makepri new a échoué (code $LASTEXITCODE)" }
 $package = Join-Path $out "MAUS-$version.msix"
 & $makeappx.FullName pack /d $files /p $package /o
 if ($LASTEXITCODE -ne 0) { throw "makeappx a échoué (code $LASTEXITCODE)" }
+$hash = (Get-FileHash -Algorithm SHA256 $package).Hash
+"$hash  MAUS-$version.msix" | Out-File -Encoding ascii "$package.sha256"
 "Paquet : $package ($([Math]::Round((Get-Item $package).Length / 1MB, 1)) Mo, version $msixVersion)"
+"SHA-256 : $hash"

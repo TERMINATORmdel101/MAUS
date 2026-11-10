@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   rappel:
-    runs-on: ubuntu-latest
+    # Image fixe, et non « ubuntu-latest » : GitHub peut changer celle-ci sans prévenir (équivalent aujourd'hui).
+    runs-on: ubuntu-24.04
     steps:
       - name: Ouvrir le ticket de vérification
         env:

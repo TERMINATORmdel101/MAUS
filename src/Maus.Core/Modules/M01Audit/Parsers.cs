@@ -55,43 +55,6 @@ internal enum WinHttpProxyKind
 
 internal sealed record WinHttpProxy(WinHttpProxyKind Kind, string? Server = null);
 
-/// <summary>Lecture de <c>netsh winhttp show proxy</c>, en français comme en anglais.</summary>
-internal static class WinHttpProxyParser
-{
-    private static readonly string[] DirectMarkers = ["Direct access", "Accès direct", "Acces direct", "sans serveur proxy", "no proxy server"];
-
-    public static WinHttpProxy Parse(string? output)
-    {
-        if (string.IsNullOrWhiteSpace(output))
-        {
-            return new WinHttpProxy(WinHttpProxyKind.Unknown);
-        }
-
-        if (DirectMarkers.Any(marker => output.Contains(marker, StringComparison.OrdinalIgnoreCase)))
-        {
-            return new WinHttpProxy(WinHttpProxyKind.Direct);
-        }
-
-        foreach (var rawLine in output.Split('\n'))
-        {
-            var separator = rawLine.IndexOf(':', StringComparison.Ordinal);
-            if (separator <= 0)
-            {
-                continue;
-            }
-
-            var key = rawLine[..separator].Trim();
-            var value = rawLine[(separator + 1)..].Trim();
-            if (key.Contains("proxy", StringComparison.OrdinalIgnoreCase) && value.Length > 0 && !value.StartsWith('('))
-            {
-                return new WinHttpProxy(WinHttpProxyKind.Proxy, value);
-            }
-        }
-
-        return new WinHttpProxy(WinHttpProxyKind.Unknown);
-    }
-}
-
 /// <summary>Lecture de <c>reagentc /info</c> : état de l'environnement de récupération (WinRE).</summary>
 internal static class ReAgentInfoParser
 {
@@ -127,7 +90,7 @@ internal static class ReAgentInfoParser
     }
 }
 
-internal sealed record HostsEntry(string Address, string HostName);
+internal sealed record HostsEntry(string HostName);
 
 /// <summary>Lecture du fichier hosts : lignes actives qui redirigent un domaine Microsoft.</summary>
 internal static class HostsFileParser
@@ -152,7 +115,7 @@ internal static class HostsFileParser
             var tokens = line.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
             for (var i = 1; i < tokens.Length; i++)
             {
-                entries.Add(new HostsEntry(tokens[0], tokens[i]));
+                entries.Add(new HostsEntry(tokens[i]));
             }
         }
 

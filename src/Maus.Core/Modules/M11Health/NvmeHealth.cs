@@ -23,7 +23,6 @@ public sealed record NvmeHealthLog(
     int PercentageUsed,
     ulong DataUnitsWritten,
     ulong PowerOnHours,
-    ulong UnsafeShutdowns,
     ulong MediaErrors)
 {
     /// <summary>Taille du journal (Microsoft Learn, NVME_HEALTH_INFO_LOG).</summary>
@@ -60,7 +59,6 @@ public sealed record NvmeHealthLog(
             data[5],
             Low64(data, 48),
             Low64(data, 128),
-            Low64(data, 144),
             Low64(data, 160));
     }
 
@@ -141,7 +139,7 @@ internal sealed partial class WindowsNvmeHealthReader : INvmeHealthReader
         var offset = BinaryPrimitives.ReadInt32LittleEndian(buffer[(QueryHeader + 16)..]);
         var length = BinaryPrimitives.ReadInt32LittleEndian(buffer[(QueryHeader + 20)..]);
         var start = QueryHeader + offset;
-        return offset < ProtocolSpecificDataSize || length < NvmeHealthLog.Size || start + NvmeHealthLog.Size > buffer.Length
+        return offset < ProtocolSpecificDataSize || length < NvmeHealthLog.Size || offset > buffer.Length - QueryHeader - NvmeHealthLog.Size
             ? null
             : NvmeHealthLog.Parse(buffer.Slice(start, NvmeHealthLog.Size));
     }

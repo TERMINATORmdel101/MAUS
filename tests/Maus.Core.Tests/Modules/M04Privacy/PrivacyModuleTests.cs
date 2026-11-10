@@ -38,7 +38,7 @@ public class PrivacyModuleTests
 
         foreach (var id in new[]
         {
-            "M04.diagnostic-data", "M04.diagtrack", "M04.diagnostic-logs", "M04.ceip-tasks", "M04.feedback-frequency",
+            "M04.diagnostic-data", "M04.diagnostic-logs", "M04.feedback-frequency",
             "M04.tailored-experiences", "M04.advertising-id", "M04.settings-suggestions", "M04.language-list",
             "M04.app-launch-tracking", "M04.implicit-text", "M04.implicit-ink", "M04.tips-silent-apps",
             "M04.start-recommendations", "M04.lockscreen-tips", "M04.web-search", "M04.search-highlights",
@@ -48,6 +48,15 @@ public class PrivacyModuleTests
             var finding = Single(findings, id);
             Assert.Equal(FindingStatus.Improvable, finding.Status);
             Assert.True(finding.Fixable, id);
+            Assert.False(string.IsNullOrWhiteSpace(finding.Advice), id);
+        }
+
+        // Sans correction dans MAUS : une simple information, avec le conseil, jamais une promesse.
+        foreach (var id in new[] { "M04.diagtrack", "M04.ceip-tasks" })
+        {
+            var finding = Single(findings, id);
+            Assert.Equal(FindingStatus.Info, finding.Status);
+            Assert.False(finding.Fixable, id);
             Assert.False(string.IsNullOrWhiteSpace(finding.Advice), id);
         }
 
@@ -329,8 +338,8 @@ public class PrivacyModuleTests
     }
 
     [Theory]
-    [InlineData("Auto", "Running", FindingStatus.Improvable, "démarrage automatique, en cours d'exécution")]
-    [InlineData("Manual", "Stopped", FindingStatus.Improvable, "démarrage manuel, arrêté")]
+    [InlineData("Auto", "Running", FindingStatus.Info, "démarrage automatique, en cours d'exécution")]
+    [InlineData("Manual", "Stopped", FindingStatus.Info, "démarrage manuel, arrêté")]
     [InlineData("Disabled", "Stopped", FindingStatus.Ok, "désactivé, arrêté")]
     public void DiagTrack_service_state_is_parsed(string startMode, string state, FindingStatus expected, string current)
     {
@@ -357,7 +366,7 @@ public class PrivacyModuleTests
     {
         var ready = new FakeCim().Answer(CeipTasksQuery, TaskSchedulerScope, Task("Consolidator", 3), Task("UsbCeip", 1), Task("Other", 3));
         var finding = PrivacySystemChecks.CeipTasksState(ready);
-        Assert.Equal(FindingStatus.Improvable, finding.Status);
+        Assert.Equal(FindingStatus.Info, finding.Status);
         Assert.Equal("Consolidator : prête ; UsbCeip : désactivée", finding.Current);
 
         var disabled = new FakeCim().Answer(CeipTasksQuery, TaskSchedulerScope, Task("Consolidator", 1), Task("UsbCeip", 1));

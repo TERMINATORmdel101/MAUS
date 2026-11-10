@@ -72,15 +72,43 @@ public class OverclockingModuleTests
 
         var findings = await Detect(hardware, registry);
 
-        var cpu = findings[0];
+        var cpu = findings.Single(f => f.Id == "M15.cpu");
         Assert.Equal("M15.cpu", cpu.Id);
-        Assert.Equal(FindingStatus.Warning, cpu.Status);
-        Assert.Equal(Severity.Medium, cpu.Severity);
+        Assert.Equal(FindingStatus.Info, cpu.Status);
         Assert.Equal("Processeur i9-13900K : pas d'overclocking", cpu.Title);
-        Assert.Contains("0x12F", cpu.Expected, StringComparison.Ordinal);
+        Assert.Contains("microcode", cpu.Expected, StringComparison.Ordinal);
         Assert.Contains("Module 8", cpu.Advice, StringComparison.Ordinal);
         Assert.Contains("Intel XTU 7.14.2.93 est installé", cpu.Advice, StringComparison.Ordinal);
         Assert.DoesNotContain(findings, f => f.Status == FindingStatus.Problem);
+    }
+
+    [Theory]
+    [InlineData("AMD Ryzen 5 3600 6-Core Processor", "pbo")]
+    [InlineData("AMD Ryzen Threadripper 3970X 32-Core Processor", "pbo")]
+    [InlineData("AMD Athlon 3000G with Radeon Vega Graphics", "none")]
+    [InlineData("AMD Ryzen 7 5800X 8-Core Processor", "curve")]
+    public async Task Amd_advice_follows_the_generation(string name, string expected)
+    {
+        var findings = await Detect(Pc(name, HardwareVendor.Amd, gpus: [Rx7800Xt]), new FakeRegistry());
+
+        var cpu = findings.Single(f => f.Id == "M15.cpu");
+        Assert.Equal(expected == "curve", cpu.Title.Contains("Curve Optimizer", StringComparison.Ordinal));
+        Assert.Equal(expected == "pbo", cpu.Title.Contains("et PBO", StringComparison.Ordinal));
+        Assert.Equal(expected == "none", cpu.Title.Contains("pas d'outil", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Intel Graphics Software")]
+    [InlineData("Intel(R) Arc(TM) Control")]
+    public void Intel_graphics_tool_is_recognized(string displayName)
+    {
+        Assert.Equal("intel-graphics", OverclockingParsers.MatchTool(displayName)?.Key);
+    }
+
+    [Fact]
+    public void Too_long_program_name_is_not_a_known_tool()
+    {
+        Assert.Null(OverclockingParsers.MatchTool("Intel " + new string('x', 300) + " Graphics Software"));
     }
 
     [Theory]
@@ -373,7 +401,7 @@ public class OverclockingModuleTests
         FormFactor = formFactor,
         Manufacturer = manufacturer,
         Model = model,
-        Cpu = new CpuInfo(cpuName, vendor, 8, 16, 3700),
+        Cpu = new CpuInfo(cpuName, vendor, 8, 16),
         Gpus = gpus,
     };
 }

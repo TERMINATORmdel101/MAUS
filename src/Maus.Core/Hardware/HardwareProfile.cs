@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using static Maus.Core.Localization.Texts;
+
 namespace Maus.Core.Hardware;
 
 public enum FormFactor
@@ -19,12 +22,13 @@ public sealed record CpuInfo(
     string Name,
     HardwareVendor Vendor,
     int Cores,
-    int LogicalProcessors,
-    int MaxClockMhz)
+    int LogicalProcessors)
 {
-    public static CpuInfo Unknown { get; } = new("Inconnu", HardwareVendor.Other, 0, 0, 0);
+    public static CpuInfo Unknown { get; } = new(string.Empty, HardwareVendor.Other, 0, 0);
 
-    public bool IsX3D => CpuClassifier.IsX3D(Name);
+    /// <summary>Nom à afficher : le profil garde une chaîne vide quand Windows ne donne pas le nom.</summary>
+    [JsonIgnore]
+    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? T("Inconnu") : Name;
 
     /// <summary>Ryzen X3D à deux CCD dont un seul porte le V-Cache (placement des jeux par la Game Bar, voir Modules 5 et 7).</summary>
     public bool IsAsymmetricDualCcdX3D => CpuClassifier.IsAsymmetricDualCcdX3D(Name);
@@ -39,7 +43,8 @@ public sealed record GpuInfo(
     string? DriverVersion,
     DateTime? DriverDate,
     string PnpDeviceId,
-    bool IsIntegrated);
+    bool IsIntegrated,
+    string? InfFilename = null);
 
 /// <summary>Profil matériel commun, calculé une fois et partagé par tous les modules.</summary>
 public sealed record HardwareProfile
@@ -63,7 +68,17 @@ public sealed record HardwareProfile
     /// <summary>PC joint à un domaine ou inscrit dans une gestion MDM : les corrections y sont bloquées.</summary>
     public bool IsManaged { get; init; }
 
+    /// <summary>
+    /// Domaine ou inscription MDM illisibles, sans preuve de gestion : on ne sait pas si le PC est géré. Les corrections y sont
+    /// bloquées comme sur un PC géré, le reste (audit, lectures) continue. Faux dès qu'une preuve de gestion est lue.
+    /// </summary>
+    public bool ManagementUnknown { get; init; }
+
     public bool IsLaptop => FormFactor == FormFactor.Laptop;
+
+    /// <summary>Machine virtuelle reconnue au fabricant et au modèle annoncés.</summary>
+    [JsonIgnore]
+    public bool IsVirtualMachine => VirtualMachineClassifier.IsVirtual(Manufacturer, Model);
 
     public bool HasDedicatedGpu => Gpus.Any(g => !g.IsIntegrated);
 }

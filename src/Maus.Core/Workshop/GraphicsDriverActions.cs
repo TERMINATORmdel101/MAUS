@@ -1,7 +1,5 @@
 using System.Globalization;
-using System.Text;
 using System.Text.RegularExpressions;
-using Maus.Core.Modules.M02Repair;
 using static Maus.Core.Localization.Texts;
 
 namespace Maus.Core.Workshop;
@@ -23,8 +21,8 @@ public enum GraphicsDriverAction
 }
 
 /// <summary>
-/// Commandes <c>pnputil</c> (outil de Microsoft livré avec Windows) pour la carte graphique, affichées dans une fenêtre de
-/// commande visible. Syntaxe et versions : Microsoft Learn, « PnPUtil Command Syntax » (<c>/restart-device</c>,
+/// Commandes <c>pnputil</c> (outil de Microsoft livré avec Windows) pour la carte graphique, lancées directement, sans cmd.exe, et
+/// leur résultat affiché par MAUS. Syntaxe et versions : Microsoft Learn, « PnPUtil Command Syntax » (<c>/restart-device</c>,
 /// <c>/remove-device</c> et <c>/scan-devices</c> depuis Windows 10 2004 ; <c>/export-driver</c>, <c>/delete-driver</c> et
 /// <c>/add-driver</c> depuis Windows 10 1607). MAUS ne vise que Windows 11, où toutes sont disponibles.
 /// Rien n'est fait en arrière-plan ni automatiquement.
@@ -32,12 +30,12 @@ public enum GraphicsDriverAction
 public static partial class GraphicsDriverActions
 {
     /// <summary>Dossier des sauvegardes de pilotes (protégé comme le journal, sous <c>%ProgramData%\MAUS</c>).</summary>
-    public static string BackupRoot => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "MAUS", "pilotes");
+    public static string BackupRoot => Path.Combine(Maus.Core.Platform.SystemPaths.MausData, "pilotes");
 
     public static string PnpUtilPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "pnputil.exe");
 
     /// <summary>
-    /// Identifiant d'instance acceptable dans une ligne de commande : lettres, chiffres et <c>\ &amp; _ . - # { }</c>
+    /// Identifiant d'instance acceptable : lettres, chiffres et <c>\ &amp; _ . - # { }</c>
     /// seulement (forme des identifiants PCI et USB). Tout autre caractère (guillemet, %, !, espace…) est refusé.
     /// </summary>
     public static bool IsSafeInstanceId(string? instanceId) =>
@@ -55,82 +53,75 @@ public static partial class GraphicsDriverActions
         Path.Combine(BackupRoot, now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + "-" + Path.GetFileNameWithoutExtension(infName).ToLowerInvariant());
 
     /// <summary>
-    /// Arguments de <c>cmd.exe</c> (fenêtre gardée ouverte pour lire le résultat), ou <c>null</c> si l'action n'est pas
-    /// possible pour ce pilote (identifiant douteux, pilote de Windows à sauvegarder ou supprimer, carte qui n'est pas une carte graphique).
+    /// Action possible pour ce pilote : non pour un identifiant douteux, un pilote de Windows à sauvegarder ou supprimer, une carte
+    /// qui n'est pas une carte graphique, ou un adaptateur virtuel à retirer.
     /// </summary>
-    public static string? ConsoleArguments(GraphicsDriverAction action, DriverEntry gpu, string backupFolder, string? pnputil = null)
+    public static bool CanRun(GraphicsDriverAction action, DriverEntry gpu, string backupFolder)
     {
         ArgumentNullException.ThrowIfNull(backupFolder);
         ArgumentNullException.ThrowIfNull(gpu);
 
-        if (gpu.Group != DriverGroup.Graphics || !IsSafeInstanceId(gpu.InstanceId) || !SafePath(backupFolder))
-        {
-            return null;
-        }
+        return Enum.IsDefined(action) && gpu.Group == DriverGroup.Graphics && IsSafeInstanceId(gpu.InstanceId) && SafePath(backupFolder)
+            && (action is not (GraphicsDriverAction.Backup or GraphicsDriverAction.Remove) || CanBackupOrRemove(gpu))
+            && (action != GraphicsDriverAction.Reinstall || CanReinstall(gpu));
+    }
 
-        if (action is GraphicsDriverAction.Backup or GraphicsDriverAction.Remove && !CanBackupOrRemove(gpu))
-        {
-            return null;
-        }
+    /// <param name="pnputil">Lance pnputil avec ces arguments ; rend son code de sortie.</param>
+    /// <param name="line">Reçoit le texte à afficher.</param>
+    /// <returns>Le résultat à afficher.</returns>
+    public static async Task<string> RunAsync(GraphicsDriverAction action, DriverEntry gpu, string backupFolder, Func<IReadOnlyList<string>, Task<int>> pnputil, Action<string> line)
+    {
+        ArgumentNullException.ThrowIfNull(gpu);
+        ArgumentNullException.ThrowIfNull(pnputil);
+        ArgumentNullException.ThrowIfNull(line);
 
-        if (action == GraphicsDriverAction.Reinstall && !CanReinstall(gpu))
-        {
-            return null;
-        }
-
-        var tool = Quote(pnputil ?? PnpUtilPath);
-        var device = Quote(gpu.InstanceId);
-        var inf = gpu.InfName?.ToLowerInvariant();
-        var folder = Quote(backupFolder);
-        var line = new StringBuilder("/s /k \"title MAUS & echo ").Append(RepairConsole.Escape(Intro(action, gpu))).Append(" & echo.");
+        line(Intro(action, gpu));
+        var inf = gpu.InfName?.ToLowerInvariant() ?? string.Empty;
         switch (action)
         {
             case GraphicsDriverAction.Restart:
-                line.Append(" & ").Append(tool).Append(" /restart-device ").Append(device)
-                    .Append(" & ").Append(Outcome(T("Pilote redémarré."), T("pnputil demande un redémarrage du PC pour terminer."), null, T("Le redémarrage du pilote a échoué : lisez le message de pnputil ci-dessus.")));
-                break;
+                return Outcome(await pnputil(["/restart-device", gpu.InstanceId]).ConfigureAwait(false), T("Pilote redémarré."), T("pnputil demande un redémarrage du PC pour terminer."), null,
+                    T("Le redémarrage du pilote a échoué : lisez le message de pnputil ci-dessus."));
             case GraphicsDriverAction.Reinstall:
-                line.Append(" & ").Append(tool).Append(" /remove-device ").Append(device)
-                    .Append(" & ").Append(tool).Append(" /scan-devices");
-                break;
+                await pnputil(["/remove-device", gpu.InstanceId]).ConfigureAwait(false);
+                await pnputil(["/scan-devices"]).ConfigureAwait(false);
+                return Done(action, backupFolder);
             case GraphicsDriverAction.Backup:
-                line.Append(" & (if not exist ").Append(folder).Append(" mkdir ").Append(folder).Append(')')
-                    .Append(" & ").Append(tool).Append(" /export-driver ").Append(inf).Append(' ').Append(folder);
-                break;
+                return await pnputil(["/export-driver", inf, backupFolder]).ConfigureAwait(false) == 0
+                    ? Done(action, backupFolder)
+                    : T("Sauvegarde impossible : lisez le message ci-dessus.");
             case GraphicsDriverAction.Remove:
-                // Suppression seulement si la sauvegarde a réussi (&&) ; le résultat de la suppression est lu (0, 3010 ou échec) ;
-                // le groupe finit toujours par un echo réussi, donc || ne répond qu'à l'échec de la sauvegarde.
-                line.Append(" & (if not exist ").Append(folder).Append(" mkdir ").Append(folder).Append(')')
-                    .Append(" & (").Append(tool).Append(" /export-driver ").Append(inf).Append(' ').Append(folder)
-                    .Append(" && (").Append(tool).Append(" /delete-driver ").Append(inf).Append(" /uninstall & ")
-                    .Append(Outcome(T("Pilote sauvegardé puis supprimé."), T("Pilote sauvegardé puis supprimé : redémarrez le PC pour terminer."), null,
-                        T("La sauvegarde a réussi mais la suppression a échoué : lisez le message de pnputil ci-dessus. Le pilote est toujours installé.")))
-                    .Append(") || echo ").Append(RepairConsole.Escape(T("Sauvegarde impossible : lisez le message ci-dessus. Le pilote n'a pas été supprimé."))).Append(')');
-                break;
-        }
+                // Suppression seulement si la sauvegarde a réussi.
+                if (await pnputil(["/export-driver", inf, backupFolder]).ConfigureAwait(false) != 0)
+                {
+                    return T("Sauvegarde impossible : lisez le message ci-dessus. Le pilote n'a pas été supprimé.");
+                }
 
-        line.Append(" & echo. & echo ").Append(RepairConsole.Escape(Done(action, backupFolder))).Append('"');
-        return line.ToString();
+                return Outcome(await pnputil(["/delete-driver", inf, "/uninstall"]).ConfigureAwait(false), T("Pilote sauvegardé puis supprimé."), T("Pilote sauvegardé puis supprimé : redémarrez le PC pour terminer."), null,
+                        T("La sauvegarde a réussi mais la suppression a échoué : lisez le message de pnputil ci-dessus. Le pilote est toujours installé."))
+                    + Environment.NewLine + Done(action, backupFolder);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(action));
+        }
+    }
+
+    /// <summary>Le dossier d'une sauvegarde est acceptable.</summary>
+    public static bool CanRestore(string backupFolder)
+    {
+        ArgumentNullException.ThrowIfNull(backupFolder);
+        return SafePath(backupFolder);
     }
 
     /// <summary>Réinstallation d'une sauvegarde : tous les .inf du dossier, installés sur les cartes correspondantes.</summary>
-    public static string? RestoreArguments(string backupFolder, string? pnputil = null)
+    public static async Task<string> RestoreAsync(string backupFolder, Func<IReadOnlyList<string>, Task<int>> pnputil, Action<string> line)
     {
-        ArgumentNullException.ThrowIfNull(backupFolder);
+        ArgumentNullException.ThrowIfNull(pnputil);
+        ArgumentNullException.ThrowIfNull(line);
 
-        if (!SafePath(backupFolder))
-        {
-            return null;
-        }
-
-        var intro = T("Réinstallation du pilote sauvegardé par MAUS (pnputil /add-driver). L'écran peut devenir noir quelques secondes.");
-        return new StringBuilder("/s /k \"title MAUS & echo ").Append(RepairConsole.Escape(intro)).Append(" & echo. & ")
-            .Append(Quote(pnputil ?? PnpUtilPath)).Append(" /add-driver ").Append(Quote(Path.Combine(backupFolder, "*.inf"))).Append(" /subdirs /install")
-            .Append(" & ").Append(Outcome(T("Pilote réinstallé."), T("Pilote réinstallé : redémarrez le PC pour terminer."),
-                T("Rien n'a été remplacé : la carte utilise déjà un pilote plus récent ou équivalent, ou aucune carte ne correspond à cette sauvegarde. pnputil n'installe jamais un pilote plus ancien par-dessus un plus récent."),
-                T("La réinstallation a échoué : lisez le message de pnputil ci-dessus.")))
-            .Append(" & echo. & echo ").Append(RepairConsole.Escape(T("Vous pouvez fermer cette fenêtre."))).Append('"')
-            .ToString();
+        line(T("Réinstallation du pilote sauvegardé par MAUS (pnputil /add-driver). L'écran peut devenir noir quelques secondes."));
+        return Outcome(await pnputil(["/add-driver", Path.Combine(backupFolder, "*.inf"), "/subdirs", "/install"]).ConfigureAwait(false), T("Pilote réinstallé."), T("Pilote réinstallé : redémarrez le PC pour terminer."),
+            T("Rien n'a été remplacé : la carte utilise déjà un pilote plus récent ou équivalent, ou aucune carte ne correspond à cette sauvegarde. pnputil n'installe jamais un pilote plus ancien par-dessus un plus récent."),
+            T("La réinstallation a échoué : lisez le message de pnputil ci-dessus."));
     }
 
     private static string Intro(GraphicsDriverAction action, DriverEntry gpu) => action switch
@@ -138,14 +129,16 @@ public static partial class GraphicsDriverActions
         GraphicsDriverAction.Restart => T("Redémarrage du pilote de « {0} » (pnputil /restart-device). L'écran peut devenir noir quelques secondes.", gpu.Device),
         GraphicsDriverAction.Reinstall => T("Retrait puis redétection de « {0} » (pnputil /remove-device puis /scan-devices). L'écran peut devenir noir quelques secondes.", gpu.Device),
         GraphicsDriverAction.Backup => T("Sauvegarde du pilote de « {0} » (pnputil /export-driver {1}).", gpu.Device, gpu.InfName ?? "?"),
-        _ => T("Sauvegarde puis suppression du pilote de « {0} » (pnputil /export-driver puis /delete-driver {1} /uninstall). L'écran peut devenir noir quelques secondes.", gpu.Device, gpu.InfName ?? "?"),
+        GraphicsDriverAction.Remove => T("Sauvegarde puis suppression du pilote de « {0} » (pnputil /export-driver puis /delete-driver {1} /uninstall). L'écran peut devenir noir quelques secondes.", gpu.Device, gpu.InfName ?? "?"),
+        _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
     private static string Done(GraphicsDriverAction action, string backupFolder) => action switch
     {
-        GraphicsDriverAction.Restart or GraphicsDriverAction.Reinstall => T("Terminé. Si pnputil demande un redémarrage, redémarrez le PC. Vous pouvez fermer cette fenêtre."),
+        GraphicsDriverAction.Restart or GraphicsDriverAction.Reinstall => T("Terminé. Si Windows demande un redémarrage, redémarrez le PC. Vous pouvez fermer cette fenêtre."),
         GraphicsDriverAction.Backup => T("Sauvegarde dans {0}. Vous pouvez fermer cette fenêtre.", backupFolder),
-        _ => T("Après une suppression réussie, Windows affiche avec son pilote de base, et Windows Update peut réinstaller un pilote de lui-même. La sauvegarde ({0}) se réinstalle par Atelier > Pilotes > « Réinstaller une sauvegarde », tant qu'aucun pilote plus récent n'a été installé : pnputil ne remplace pas un pilote plus récent.", backupFolder),
+        GraphicsDriverAction.Remove => T("Après une suppression réussie, Windows affiche l'image avec son pilote graphique de base, et Windows Update peut réinstaller un pilote de lui-même. La sauvegarde ({0}) se réinstalle par Atelier > Pilotes > « Réinstaller une sauvegarde », tant qu'aucun pilote plus récent n'a été installé : Windows refuse de remplacer un pilote récent par un plus ancien.", backupFolder),
+        _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
     /// <summary>
@@ -159,30 +152,22 @@ public static partial class GraphicsDriverActions
     }
 
     /// <summary>
-    /// Message selon le code de sortie de pnputil, lu au moment de l'exécution (<c>if errorlevel N</c> = code supérieur ou égal
-    /// à N). Codes documentés (Microsoft Learn, « PnPUtil Return Values ») : 0 réussi, 3010 réussi avec redémarrage nécessaire,
-    /// 259 aucun périphérique mis à jour (pilote plus récent ou équivalent déjà en place, ou aucun ne correspond) ; tout le
-    /// reste, y compris un code négatif, est un échec.
+    /// Message selon le code de sortie de pnputil. Codes documentés (Microsoft Learn, « PnPUtil Return Values ») : 0 réussi, 3010
+    /// réussi avec redémarrage nécessaire, 259 aucun périphérique mis à jour (pilote plus récent ou équivalent déjà en place, ou
+    /// aucun ne correspond) ; tout le reste, y compris un code négatif, est un échec.
     /// </summary>
-    internal static string Outcome(string success, string restart, string? unchanged, string failure)
+    internal static string Outcome(int code, string success, string restart, string? unchanged, string failure) => code switch
     {
-        var fail = "(echo " + RepairConsole.Escape(failure) + ")";
-        // Chaîne entre parenthèses : sans elles, la suite de la ligne (« & echo … ») ferait partie du dernier « else ».
-        return "(if not errorlevel 0 " + fail
-            + " else if errorlevel 3011 " + fail
-            + " else if errorlevel 3010 (echo " + RepairConsole.Escape(restart) + ")"
-            + " else if errorlevel 260 " + fail
-            + " else if errorlevel 259 " + (unchanged is null ? fail : "(echo " + RepairConsole.Escape(unchanged) + ")")
-            + " else if errorlevel 1 " + fail
-            + " else (echo " + RepairConsole.Escape(success) + "))";
-    }
+        0 => success,
+        3010 => restart,
+        259 when unchanged is not null => unchanged,
+        _ => failure,
+    };
 
-    /// <summary>Chemin sans caractère qui casserait la ligne de commande (guillemet, %, !, &amp;, |, &lt;, &gt;, ^).</summary>
+    /// <summary>Chemin sans caractère douteux (guillemet, %, !, &amp;, |, &lt;, &gt;, ^) : MAUS construit ce chemin, il n'en a jamais besoin.</summary>
     private static bool SafePath(string path) =>
         path.Length is > 0 and < 250 && path.IndexOfAny(['"', '%', '!', '&', '|', '<', '>', '^', '\r', '\n']) < 0;
 
-    private static string Quote(string value) => "\"" + value + "\"";
-
-    [GeneratedRegex(@"^[A-Za-z0-9_\\&.\-#{}]+$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\A[A-Za-z0-9_\\&.\-#{}]+\z", RegexOptions.CultureInvariant)]
     private static partial Regex SafeInstanceId();
 }

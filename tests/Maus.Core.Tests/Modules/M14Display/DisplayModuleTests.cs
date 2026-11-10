@@ -24,7 +24,7 @@ public class DisplayModuleTests
     [Fact]
     public async Task Displayport_monitor_at_max_refresh_on_dedicated_gpu_is_compliant()
     {
-        var monitor = Monitor(refresh: 164.94, color: new AdvancedColorInfo(true, false, ColorEncoding.Rgb, 8, AdvancedColorMode.Sdr));
+        var monitor = Monitor(refresh: 164.94, color: new AdvancedColorInfo(true, false, ColorEncoding.Rgb, 8));
 
         var findings = await Detect(DesktopWithDedicatedGpu, monitor);
 
@@ -66,7 +66,7 @@ public class DisplayModuleTests
     [Fact]
     public async Task Lower_refresh_in_hdr_with_full_colors_is_only_an_optimisation()
     {
-        var monitor = Monitor(refresh: 120, color: new AdvancedColorInfo(true, true, ColorEncoding.Rgb, 10, AdvancedColorMode.Hdr));
+        var monitor = Monitor(refresh: 120, color: new AdvancedColorInfo(true, true, ColorEncoding.Rgb, 10));
 
         var findings = await Detect(DesktopWithDedicatedGpu, monitor);
 
@@ -81,7 +81,7 @@ public class DisplayModuleTests
     [Fact]
     public async Task Hdr_with_chroma_subsampling_on_hdmi_is_a_warning_and_suggests_displayport()
     {
-        var monitor = Monitor(refresh: 144.0, output: OutputTechnology.Hdmi, color: new AdvancedColorInfo(true, true, ColorEncoding.YCbCr422, 10, AdvancedColorMode.Hdr)) with
+        var monitor = Monitor(refresh: 144.0, output: OutputTechnology.Hdmi, color: new AdvancedColorInfo(true, true, ColorEncoding.YCbCr422, 10)) with
         {
             Width = 3840,
             Height = 2160,
@@ -96,7 +96,7 @@ public class DisplayModuleTests
         Assert.Equal(FindingStatus.Warning, encoding.Status);
         Assert.Contains("texte bave", encoding.Explanation, StringComparison.Ordinal);
         Assert.Contains("DisplayPort", encoding.Advice, StringComparison.Ordinal);
-        Assert.True(encoding.Fixable);
+        Assert.False(encoding.Fixable);
         var connector = Get(findings, "M14.connector.display-1");
         Assert.Equal(FindingStatus.Info, connector.Status);
         Assert.Equal("HDMI", connector.Current);
@@ -107,7 +107,7 @@ public class DisplayModuleTests
     [Fact]
     public async Task Eight_bits_in_hdr_is_informative()
     {
-        var monitor = Monitor(refresh: 165, color: new AdvancedColorInfo(true, true, ColorEncoding.Rgb, 8, AdvancedColorMode.Hdr));
+        var monitor = Monitor(refresh: 165, color: new AdvancedColorInfo(true, true, ColorEncoding.Rgb, 8));
 
         var findings = await Detect(DesktopWithDedicatedGpu, monitor);
 

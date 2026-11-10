@@ -30,14 +30,16 @@ public static class MemoryDetails
     /// <summary>
     /// Lit tout ce qui est lisible ; chaque partie qui échoue devient une note, jamais une erreur bloquante.
     /// <paramref name="smn"/> et <paramref name="pm"/> sont <c>null</c> hors processeur AMD Ryzen,
-    /// <paramref name="intel"/> est <c>null</c> hors processeur Intel.
+    /// <paramref name="intel"/> est <c>null</c> hors processeur Intel. <paramref name="windowsMemoryType"/> : type déclaré par
+    /// le BIOS à Windows (« DDR5 »…), qui sert quand aucune puce SPD n'est lue.
     /// </summary>
-    public static MemoryDetailReport Read(ISpdSource spd, ISmnReader? smn, IPmTableReader? pm, bool? ddr5Hint, IntelControllerAccess? intel = null)
+    public static MemoryDetailReport Read(ISpdSource spd, ISmnReader? smn, IPmTableReader? pm, string? windowsMemoryType, IntelControllerAccess? intel = null)
     {
         ArgumentNullException.ThrowIfNull(spd);
 
         var notes = new List<string>();
         var modules = new List<SpdModule>();
+        var spdFailed = false;
         try
         {
             foreach (var image in spd.ReadAll())
@@ -45,6 +47,11 @@ public static class MemoryDetails
                 if (SpdDecoder.Decode(image) is { } module)
                 {
                     modules.Add(module);
+                    if (module.FirstPageOnly)
+                    {
+                        notes.Add(T("Barrette {0} : le BIOS protège le bus des barrettes contre l'écriture (« SPD Write Disable ») : MAUS ne lit que le début de la puce SPD. Le profil standard (JEDEC) est affiché ; la capacité, la référence et les profils XMP ou EXPO restent inconnus.", module.Slot + 1));
+                    }
+
                     if (!module.ChecksumOk)
                     {
                         notes.Add(T("Barrette {0} : somme de contrôle SPD incorrecte, valeurs à prendre avec prudence (lecture perturbée ou SPD modifiée).", module.Slot + 1));
@@ -59,15 +66,17 @@ public static class MemoryDetails
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
+            spdFailed = true;
             notes.Add(T("Puces SPD illisibles : {0}", ex.Message));
         }
 
-        if (modules.Count == 0)
+        if (modules.Count == 0 && !spdFailed)
         {
             notes.Add(T("Aucune puce SPD lue : certaines cartes mères bloquent l'accès au bus SMBus, ou le pilote PawnIO n'est pas installé."));
         }
 
-        var ddr5 = modules.Count > 0 ? modules[0].MemoryType == "DDR5" : ddr5Hint ?? false;
+        var memoryType = modules.Count > 0 ? modules[0].MemoryType : windowsMemoryType;
+        var ddr5 = memoryType == "DDR5";
         LiveMemoryTimings? live = null;
         MemoryClocks? clocks = null;
         IntelMemoryReport? intelReport = null;
@@ -79,6 +88,10 @@ public static class MemoryDetails
         {
             notes.Add(T("Timings réellement appliqués : lisibles seulement sur processeur AMD Ryzen ou Intel Core. Pour ce processeur, MAUS affiche la vitesse et la tension réelles données par Windows, et les timings des profils SPD."));
         }
+        else if (memoryType == "LPDDR5")
+        {
+            notes.Add(T("Timings réels non affichés : la disposition des registres n'est pas établie pour la mémoire LPDDR5, et MAUS ne la devine pas."));
+        }
         else
         {
             try
@@ -87,6 +100,10 @@ public static class MemoryDetails
                 if (live is null)
                 {
                     notes.Add(T("Timings réels illisibles : processeur non reconnu, ou pilote PawnIO absent."));
+                }
+                else
+                {
+                    notes.Add(T("Timings réels AMD : lecture écrite d'après les outils publiés, jamais encore comparée sur un vrai processeur Ryzen. Comparez avec ZenTimings et signalez tout écart, même s'il n'y en a pas : « Copier et signaler »."));
                 }
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -156,7 +173,7 @@ public static class MemoryDetails
 
             if (!report.VerifiedOnHardware)
             {
-                notes.Add(T("Timings réels Intel ({0}) : carte des registres tirée des documents publiés, pas encore comparée à CPU-Z sur un processeur de cette génération. Comparez avec CPU-Z (onglet Memory) et signalez tout écart.", family.DisplayName));
+                notes.Add(T("Timings réels Intel ({0}) : carte des registres tirée des documents publiés, pas encore comparée à CPU-Z sur un processeur de cette génération. Comparez avec CPU-Z (onglet Memory) et signalez tout écart.", T(family.DisplayName)));
             }
 
             if (report.DclkMhz is null)
@@ -165,7 +182,7 @@ public static class MemoryDetails
             }
             else if (report.ClockCheck == ImcClockCheck.Halved)
             {
-                notes.Add(T("Horloge mémoire : le calcul habituel du registre du contrôleur donnait le double de la vitesse déclarée par Windows ({0} MT/s). MAUS retient {1} MT/s (horloge {2:0} MHz), et les durées en nanosecondes en tiennent compte. Pour confirmer : CPU-Z, onglet Memory, « DRAM Frequency » doit indiquer {2:0} MHz.", report.WindowsSpeedMts, report.DclkMhz * 2, report.DclkMhz));
+                notes.Add(T("Horloge mémoire : le calcul habituel du registre du contrôleur donnait le double de la vitesse déclarée par Windows ({0} MT/s). MAUS retient {1:0} MT/s (horloge {2:0} MHz), et les durées en nanosecondes en tiennent compte. Pour confirmer : CPU-Z, onglet Memory, « DRAM Frequency » doit indiquer {2:0} MHz.", report.WindowsSpeedMts, report.DclkMhz * 2, report.DclkMhz));
             }
             else if (report.ClockCheck == ImcClockCheck.Unconfirmed)
             {
@@ -311,7 +328,7 @@ public static class MemoryDetails
         if (report.Intel is { } intel)
         {
             Line();
-            Line(T("Contrôleur Intel : {0}", intel.Family));
+            Line(T("Contrôleur Intel : {0}", T(intel.Family)));
             Line(IntelClocks(intel));
             if (intel.Clocks.FirstOrDefault(c => c.Key == "DCLK") is { ReferenceMhz: { } reference } dclk)
             {
@@ -344,8 +361,8 @@ public static class MemoryDetails
         {
             Line();
             Line(T("Barrette {0} : {1} {2}, {3} {4}, {5}", module.Slot + 1, module.ModuleManufacturer ?? "?", module.PartNumber,
-                Gb(module.CapacityBytes), module.MemoryType, module.ModuleType));
-            Line(T("Puces : {0} ({1}), {2}, {3} groupes de {4} banques", module.DramManufacturer ?? "?", module.Organization, module.Ecc ? "ECC" : T("sans ECC"), module.BankGroups, module.BanksPerGroup));
+                module.CapacityText, module.MemoryType, module.ModuleType));
+            Line(T("Puces : {0} ({1}), {2}, {3} groupes de {4} banques", module.DramManufacturer ?? "?", module.Organization, module.FirstPageOnly ? "?" : module.Ecc ? "ECC" : T("sans ECC"), module.BankGroups, module.BanksPerGroup));
             foreach (var profile in module.Profiles)
             {
                 Line(T("  {0} : {1} MT/s, {2}{3}", ProfileName(profile), profile.SpeedMts, profile.Summary, profile.Vdd is { } v ? string.Create(CultureInfo.InvariantCulture, $", {v:0.00} V") : string.Empty));
@@ -459,11 +476,13 @@ public static class MemoryDetails
     };
     }
 
-    private static string OnOff(bool value) => value ? T("activé") : T("désactivé");
+    public static string OnOff(bool value) => value ? T("activé") : T("désactivé");
 
-    private static string Mhz(double? value) => value is { } v ? v.ToString("0", CultureInfo.InvariantCulture) + " MHz" : "?";
+    public static string Mhz(double? value) => value is { } v ? v.ToString("0", CultureInfo.InvariantCulture) + " MHz" : "?";
 
-    private static string Volts(double? value) => value is { } v ? v.ToString("0.000", CultureInfo.InvariantCulture) + " V" : "?";
+    public static string Volts(double? value) => VoltsIn(value, CultureInfo.InvariantCulture);
 
-    private static string Gb(long bytes) => T("{0:0.#} Go", bytes / (1024.0 * 1024 * 1024));
+    /// <summary>Tension à trois décimales : point dans la fiche à copier, séparateur de l'utilisateur à l'écran.</summary>
+    public static string VoltsIn(double? value, IFormatProvider culture) => value is { } v ? v.ToString("0.000", culture) + " V" : "?";
+
 }

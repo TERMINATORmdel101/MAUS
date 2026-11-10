@@ -38,10 +38,13 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     private static RegistrySource[] RegistrySources =>     [
         new("hkcu-run", T("registre de l'utilisateur (Run)"), RegistryHive.CurrentUser, RunPath, "Run"),
         new("hklm-run", T("registre de la machine (Run)"), RegistryHive.LocalMachine, RunPath, "Run"),
-        new("hklm-run32", "registre de la machine, programmes 32 bits (WOW6432Node\\Run)", RegistryHive.LocalMachine, Wow64RunPath, "Run32"),
+        new("hklm-run32", T("registre de la machine, programmes 32 bits (WOW6432Node\\Run)"), RegistryHive.LocalMachine, Wow64RunPath, "Run32"),
         new("hkcu-runonce", T("exécution unique de l'utilisateur (RunOnce)"), RegistryHive.CurrentUser, RunOncePath, null),
         new("hklm-runonce", T("exécution unique de la machine (RunOnce)"), RegistryHive.LocalMachine, RunOncePath, null),
     ];
+
+    /// <summary>Sources des entrées de démarrage : l'identifiant d'une entrée commence par « M12.&lt;source&gt;- » (« M12.hkcu-run-… »).</summary>
+    internal static IReadOnlyList<string> EntrySourceIds { get; } = [.. RegistrySources.Select(s => s.Id), "user-folder", "common-folder", "store"];
 
     private readonly IStartupEnvironment _environment;
 
@@ -120,6 +123,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 Category = finding.Category,
                 Gain = T("Ouverture de session plus rapide, moins de mémoire occupée en arrière-plan."),
                 Recommended = finding.Status == FindingStatus.Improvable,
+                EngineQuestion = IsSecuritySoftware(match) ? T("Ne plus lancer au démarrage : {0} ? C'est un logiciel de sécurité : il peut ne plus vous protéger dès l'ouverture de session.", Fixes.SensitiveSettings.Shown(finding.Title)) : null,
                 Writes =
                 [
                     new Fixes.SettingWrite(
@@ -158,7 +162,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         var used = new HashSet<string>(StringComparer.Ordinal);
         return rows.Select(StartupParsers.ParseLogonTask)
             .OfType<LogonTaskInfo>()
-            .Where(t => t.TaskName.Length > 0)
+            .Where(t => t.TaskName.Length > 0 && IsSafeValueName(t.TaskName) && t.TaskPath.Length <= 1024 && !t.TaskPath.Any(char.IsControl))
             .Select(t => new Fixes.PlannedChange
             {
                 Id = UniqueId("M12.logon-task-" + StartupParsers.Slug(t.Name), used),
@@ -171,17 +175,24 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 Category = finding.Category,
                 Effect = Fixes.ChangeEffect.SignOut,
                 Recommended = false,
+                EngineQuestion = IsSecuritySoftware(Catalog.Value.Match(t.Name, t.Command is null ? null : StartupParsers.FileNameOf(StartupParsers.SplitCommand(t.Command).Executable), null))
+                    ? T("Désactiver la tâche planifiée : {0} ? Elle appartient à un logiciel de sécurité : il peut ne plus vous protéger dès l'ouverture de session.", Fixes.SensitiveSettings.Shown(t.Name))
+                    : null,
                 Writes = [new Fixes.SettingWrite(Fixes.SettingKey.ScheduledTask(t.TaskPath, t.TaskName), Fixes.SettingValue.Bool(false))],
             })
             .ToList();
     }
+
+    /// <summary>Le nom seul suffit ici : au pire, la confirmation du moteur est posée pour un programme qui imite ce nom.</summary>
+    private static bool IsSecuritySoftware((StartupApp App, StartupFamily Family)? match) =>
+        match is { } known && known.Family.Id.Equals("security", StringComparison.OrdinalIgnoreCase);
 
     private List<StartupEntry> CollectEntries(AuditContext context, List<Finding> findings)
     {
         var entries = new List<StartupEntry>();
         foreach (var source in RegistrySources)
         {
-            ReadRegistrySource(context.Registry, source, entries, findings);
+            ReadRegistrySource(context.Registry, context.Files, source, entries, findings);
         }
 
         ReadFolderSource(context, "user-folder", T("dossier Démarrage de l'utilisateur"), _environment.UserStartupFolder, RegistryHive.CurrentUser, entries, findings);
@@ -196,7 +207,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     /// </summary>
     private static bool IsSafeValueName(string name) => name.Length <= 255 && !name.Any(char.IsControl);
 
-    private void ReadRegistrySource(IRegistryReader registry, RegistrySource source, List<StartupEntry> entries, List<Finding> findings)
+    private void ReadRegistrySource(IRegistryReader registry, IFileSystemReader files, RegistrySource source, List<StartupEntry> entries, List<Finding> findings)
     {
         try
         {
@@ -211,7 +222,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 var approval = source.ApprovedKey is null
                     ? new ApprovalState(true, null)
                     : StartupParsers.ParseApproval(ReadApproval(registry, source.Hive, source.ApprovedKey, name));
-                var (executable, arguments) = StartupParsers.SplitCommand(_environment.Expand(command));
+                var (executable, arguments) = StartupParsers.SplitCommand(_environment.Expand(command), path => SafeExists(files, path) == true);
                 entries.Add(new StartupEntry(source.Id, source.Label, name, name, command, executable, arguments, approval, source.ApprovedKey is null, null, null)
                 {
                     ApprovalHive = source.Hive,
@@ -225,17 +236,8 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         }
     }
 
-    private static byte[]? ReadApproval(IRegistryReader registry, RegistryHive hive, string approvedKey, string name)
-    {
-        try
-        {
-            return registry.GetBinary(hive, $@"{ApprovedPath}\{approvedKey}", name);
-        }
-        catch (MausAccessDeniedException)
-        {
-            return null;
-        }
-    }
+    private static byte[]? ReadApproval(IRegistryReader registry, RegistryHive hive, string approvedKey, string name) =>
+        RegistryReaderExtensions.OrNull(() => registry.GetBinary(hive, $@"{ApprovedPath}\{approvedKey}", name));
 
     private void ReadFolderSource(AuditContext context, string id, string label, string? folder, RegistryHive approvalHive, List<StartupEntry> entries, List<Finding> findings)
     {
@@ -264,13 +266,16 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             }
 
             var isShortcut = fileName.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase);
-            var target = isShortcut ? _environment.ResolveShortcut(file) : file;
+            var shortcut = isShortcut ? _environment.ResolveShortcut(file) : null;
+            var target = isShortcut ? shortcut?.Target : file;
+            var arguments = shortcut?.Arguments ?? string.Empty;
             var approval = StartupParsers.ParseApproval(ReadApproval(context.Registry, approvalHive, "StartupFolder", fileName));
-            var command = isShortcut ? $"{file} → {target ?? "cible non lisible"}" : file;
-            entries.Add(new StartupEntry(id, label, fileName, Path.GetFileNameWithoutExtension(fileName), command, target, string.Empty, approval, false, null, null)
+            var command = isShortcut ? $"{file} → {target ?? T("cible non lisible")}{(arguments.Length > 0 ? " " + arguments : string.Empty)}" : file;
+            entries.Add(new StartupEntry(id, label, fileName, Path.GetFileNameWithoutExtension(fileName), command, target, arguments, approval, false, null, null)
             {
                 ApprovalHive = approvalHive,
                 ApprovalKey = "StartupFolder",
+                UnreadableShortcut = isShortcut && target is null,
             });
         }
     }
@@ -320,16 +325,27 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     {
         var executable = string.IsNullOrWhiteSpace(entry.Executable) ? null : entry.Executable;
         var fileName = executable is null ? null : StartupParsers.FileNameOf(executable);
-        var isLocalPath = executable is not null && Path.IsPathFullyQualified(executable);
-        var exists = isLocalPath && SafeExists(files, executable!);
-        var (company, product, _) = exists ? SafeVersionInfo(files, executable!) : (null, null, null);
+        var isLocalPath = executable is not null && Path.IsPathFullyQualified(executable) && !Maus.Core.Platform.FinalPath.IsRemote(executable);
+        bool? found = isLocalPath ? SafeExists(files, executable!) : null;
+        var (company, product, _) = found == true ? SafeVersionInfo(files, executable!) : (null, null, null);
         company = string.IsNullOrWhiteSpace(company) ? entry.Publisher : company.Trim();
 
         var match = Catalog.Value.Match(entry.MatchName, fileName, entry.PackageName);
+
+        // Nom rassurant : pour les familles « à garder », le nom seul ne suffit pas, n'importe quel programme peut le porter.
+        if (match is { Family.Advice: StartupAdvice.Keep or StartupAdvice.AlwaysKeep }
+            && (string.IsNullOrWhiteSpace(company) || (entry.PackageName is null && !IsInProtectedFolder(executable, windowsDirectory))))
+        {
+            match = null;
+        }
+
         var suspicion = executable is null ? null : StartupParsers.SuspicionReason(executable, entry.Arguments, company);
-        var orphan = isLocalPath && !exists && !IsUnder(executable!, windowsDirectory);
-        var displayName = match?.App.Name
-            ?? (string.IsNullOrWhiteSpace(product) ? entry.PackageName ?? entry.Name : product.Trim());
+
+        // Orphelin seulement si le fichier est lu absent sur un lecteur présent : erreur de lecture ou disque débranché ne prouvent rien.
+        var orphan = found == false && !IsUnder(executable!, windowsDirectory) && SafeRootExists(files, executable!);
+        var displayName = match is { } catalogued
+            ? T(catalogued.App.Name)
+            : string.IsNullOrWhiteSpace(product) ? entry.PackageName ?? entry.Name : product.Trim();
 
         var id = UniqueId($"M12.{entry.SourceId}-{StartupParsers.Slug(entry.PackageName is null ? entry.Name : $"{entry.PackageName}-{entry.Name}")}", usedIds);
         var enabled = entry.Approval.Enabled;
@@ -363,13 +379,22 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             explanation += T(" Signal d'alerte : {0}.", suspicion);
         }
 
+        if (entry.UnreadableShortcut)
+        {
+            advice = T("MAUS ne peut pas juger ce raccourci : sa cible n'est pas lisible. Regardez ce qu'il lance dans ses propriétés (clic droit sur le fichier). ") + advice;
+        }
+
         if (orphan)
         {
             explanation += T(" Le programme visé n'existe plus sur le disque : l'entrée ne sert plus à rien.");
         }
+        else if (isLocalPath && found is null)
+        {
+            explanation += T(" MAUS n'a pas pu vérifier si le programme visé existe encore : Windows a refusé de lire son chemin.");
+        }
 
         var title = match is { } m
-            ? $"{m.App.Name} ({T(m.Family.Item)})"
+            ? $"{T(m.App.Name)} ({T(m.Family.Item)})"
             : T("{0} (non répertorié)", displayName);
 
         return new Finding
@@ -382,9 +407,11 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Current = publisher is null ? state : $"{state} · {publisher}",
             Expected = expected,
             Explanation = explanation,
+            ExplanationHasPcData = true,
             Advice = advice,
             SettingsPage = settingsPage,
             Fixable = fixable,
+            Enabled = enabled,
         };
     }
 
@@ -401,7 +428,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         {
             var advice = T("Lancez une analyse complète avec Microsoft Defender (voir Module 1). En cas de doute, désactivez l'entrée et ne lancez pas ce programme.");
             return enabled
-                ? (FindingStatusExtensions.ForDeviation(Severity.Medium), Severity.Medium, T("vérifié par une analyse antivirus"), advice, false, SuspiciousCategory, null)
+                ? (FindingStatusExtensions.ForDeviation(Severity.Medium), Severity.Medium, T("vérifié par une analyse antivirus"), advice, false, SuspiciousCategory, StartupAppsPage)
                 : (FindingStatus.Info, Severity.Medium, T("vérifié par une analyse antivirus"), T("L'entrée est déjà désactivée. ") + advice, false, SuspiciousCategory, null);
         }
 
@@ -547,6 +574,8 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Current = T("{0} s, le {1}", seconds.Value.ToString("0.0", Culture), boot.TimeCreated.ToString("d", Culture)),
             Explanation = explanation,
             Advice = T("Notez cette durée, désactivez les entrées inutiles, redémarrez, puis comparez."),
+            Measures = Follow.HealthLog.BootMeasures(events.Where(e => e.Id == 100)
+                .Select(e => (e.TimeCreated, StartupParsers.ParseMilliseconds(e.Data, "BootTime")))),
         };
     }
 
@@ -576,7 +605,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     /// <summary>Tâches planifiées hors dossier \Microsoft\, activées et lancées à l'ouverture de session (MSFT_ScheduledTask).</summary>
     private static Finding DetectLogonTasks(ICimReader cim)
     {
-        const string id = "M12.logon-tasks";
+        const string id = Follow.WhatChanged.TasksFindingId;
         var title = T("Tâches planifiées lancées à l'ouverture de session");
         IReadOnlyList<CimRow> rows;
         try
@@ -592,11 +621,8 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             return Finding.Unknown(id, title, T("La liste des tâches planifiées est indisponible sur ce PC."), OtherSourcesCategory);
         }
 
-        var found = rows
-            .Select(StartupParsers.ParseLogonTask)
-            .OfType<LogonTaskInfo>()
-            .Select(t => $"{t.Name} ({t.Command ?? "action non exécutable"})")
-            .ToList();
+        var tasks = rows.Select(StartupParsers.ParseLogonTask).OfType<LogonTaskInfo>().ToList();
+        var found = tasks.Select(t => $"{t.Name} ({t.Command ?? T("action non exécutable")})").ToList();
 
         return new Finding
         {
@@ -611,6 +637,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
                 + (found.Count == 0 ? string.Empty : T(" Tâches trouvées : ") + string.Join(" ; ", found) + "."),
             Advice = found.Count == 0 ? null : T("Onglet Corrections : chaque tâche peut être désactivée (jamais celles de Windows), puis réactivée avec « Annuler »."),
             Fixable = found.Count > 0,
+            Followed = Follow.WhatChanged.KeptTasks(tasks.Select(t => t.Name)),
         };
     }
 
@@ -670,18 +697,52 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
             Current = T("{0} service(s) tiers en démarrage automatique", services.Count),
             Explanation = T("Services installés par d'autres éditeurs que Microsoft (pilotes, antivirus, outils de mise à jour, anti-triche) : "
                 + "ils démarrent avec Windows, avant même l'ouverture de session.")
-                + (services.Count == 0 ? string.Empty : $" {list}{(services.Count > shown ? $", et {services.Count - shown} autre(s)" : string.Empty)}."),
+                + (services.Count == 0 ? string.Empty : $" {list}{(services.Count > shown ? T(", et {0} autre(s)", services.Count - shown) : string.Empty)}."),
             Advice = T("Affichage seul : ne désactivez pas un service sans savoir à quoi il sert. MAUS ne les modifiera pas."),
         };
     }
 
-    private static bool SafeExists(IFileSystemReader files, string path)
+    /// <summary>Le fichier existe-t-il ? <c>null</c> si la lecture a échoué : ce n'est pas une absence.</summary>
+    private static bool? SafeExists(IFileSystemReader files, string path)
     {
         try
         {
-            return files.FileExists(path);
+            return files.IsFilePresent(path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or MausAccessDeniedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool SafeRootExists(IFileSystemReader files, string path)
+    {
+        try
+        {
+            return Path.GetPathRoot(path) is { Length: > 0 } root && files.DirectoryExists(root);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or MausAccessDeniedException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Sous le dossier Windows ou Program Files, où écrire demande les droits administrateur ; chemin normalisé, « .. » ne compte pas.</summary>
+    private static bool IsInProtectedFolder(string? path, string windowsDirectory)
+    {
+        if (path is null || !Path.IsPathFullyQualified(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var full = Path.GetFullPath(path);
+            return IsUnder(full, windowsDirectory)
+                || IsUnder(full, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles))
+                || IsUnder(full, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return false;
         }
@@ -733,5 +794,8 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
         public RegistryHive ApprovalHive { get; init; }
 
         public string? ApprovalKey { get; init; }
+
+        /// <summary>Raccourci dont la cible n'a pas pu être lue : MAUS ne peut pas dire ce qu'il lance.</summary>
+        public bool UnreadableShortcut { get; init; }
     }
 }

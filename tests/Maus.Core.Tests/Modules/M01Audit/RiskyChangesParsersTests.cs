@@ -31,21 +31,6 @@ public class RiskyChangesParsersTests
     public void Bcdedit_errors_give_no_elements(string? output) => Assert.Empty(BcdEditParser.Parse(output));
 
     [Theory]
-    [InlineData(M01Pc.WinHttpDirectFr, "Direct", null)]
-    [InlineData("\r\nCurrent WinHTTP proxy settings:\r\n\r\n    Direct access (no proxy server).\r\n", "Direct", null)]
-    [InlineData("\r\nParamètres de proxy WinHTTP actuels :\r\n\r\n    Serveur(s) proxy :  proxy.local:8080\r\n    Liste de contournement     :  (aucun)\r\n", "Proxy", "proxy.local:8080")]
-    [InlineData("\r\nCurrent WinHTTP proxy settings:\r\n\r\n    Proxy Server(s) :  10.0.0.1:3128\r\n    Bypass List     :  <local>\r\n", "Proxy", "10.0.0.1:3128")]
-    [InlineData("Erreur inattendue", "Unknown", null)]
-    [InlineData(null, "Unknown", null)]
-    public void Winhttp_proxy_output_is_parsed_in_french_and_english(string? output, string kind, string? server)
-    {
-        var proxy = WinHttpProxyParser.Parse(output);
-
-        Assert.Equal(Enum.Parse<WinHttpProxyKind>(kind), proxy.Kind);
-        Assert.Equal(server, proxy.Server);
-    }
-
-    [Theory]
     [InlineData(M01Pc.ReAgentEnabledFr, true)]
     [InlineData("    Windows RE status:         Enabled\r\n", true)]
     [InlineData("    Windows RE status:         Disabled\r\n", false)]
@@ -72,7 +57,6 @@ public class RiskyChangesParsersTests
         Assert.Equal(
             ExpectedHosts,
             entries.Select(e => e.HostName));
-        Assert.All(entries, e => Assert.Equal("0.0.0.0", e.Address));
         Assert.Empty(HostsFileParser.FindMicrosoftEntries(null));
     }
 

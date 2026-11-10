@@ -16,6 +16,29 @@ public enum LaptopPowerChoice
     Battery,
 }
 
+/// <summary>
+/// Ce que l'audit hebdomadaire affiche à la fin. Le choix se change par le moteur, mais cet audit tourne sans droits et lit sa
+/// copie dans le fichier de l'utilisateur : c'est un confort d'affichage, pas une barrière contre un programme du même compte.
+/// </summary>
+public enum WeeklyNotification
+{
+    /// <summary>Seulement s'il trouve un problème rouge (recommandé).</summary>
+    RedOnly,
+
+    /// <summary>Un résumé à chaque audit.</summary>
+    Always,
+
+    /// <summary>Jamais : le résultat se lit dans l'historique des scores.</summary>
+    Never,
+}
+
+/// <summary>Taille et position de la fenêtre principale à sa dernière fermeture.</summary>
+public sealed record WindowPlacement(double Left, double Top, double Width, double Height, bool Maximized)
+{
+    /// <summary>Taille à rétablir : le minimum gagne, même sur un bureau plus petit que lui (écran à 200 %, bureau à distance).</summary>
+    public static double FitSize(double saved, double minimum, double screen) => Math.Clamp(saved, minimum, Math.Max(screen, minimum));
+}
+
 /// <summary>Coin de l'écran principal où s'affiche le compteur d'images par seconde au-dessus du jeu.</summary>
 public enum OverlayCorner
 {
@@ -29,7 +52,30 @@ public enum OverlayCorner
 /// Constat marqué « voulu » par l'utilisateur. Il est lié à la valeur constatée ce jour-là, écrite dans la langue
 /// de MAUS à ce moment-là : si la situation change, MAUS le signale de nouveau.
 /// </summary>
-public sealed record Acknowledgement(string FindingId, string? Current, DateTimeOffset At, string? Language = null);
+public sealed record Acknowledgement(string FindingId, string? Current, DateTimeOffset At, string? Language = null)
+{
+    /// <summary>Longueur la plus grande d'une valeur gardée, celle que le moteur accepte (<c>prefs.save</c>).</summary>
+    public const int MaxCurrentLength = 2000;
+
+    /// <summary>
+    /// Valeur telle qu'elle est gardée et comparée. Une valeur trop longue (une liste de périphériques, par exemple) devient son
+    /// début suivi de son empreinte : la comparaison mot pour mot reste juste, un changement dans la partie coupée se voit encore.
+    /// </summary>
+    public static string? Bounded(string? current)
+    {
+        if (current is null || current.Length <= MaxCurrentLength)
+        {
+            return current;
+        }
+
+        var digest = " … #" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(current)));
+        var kept = MaxCurrentLength - digest.Length;
+        return current[..(char.IsHighSurrogate(current[kept - 1]) ? kept - 1 : kept)] + digest;
+    }
+}
+
+/// <summary>Fréquence d'écran gardée après un essai : de quoi revenir en arrière depuis l'Historique (0.8.6).</summary>
+public sealed record KeptRefreshRate(string SourceName, string Label, int Width, int Height, int FromHz, int ToHz, DateTimeOffset At);
 
 /// <summary>Choix de l'utilisateur qui changent ce que MAUS recommande. Aucun ne modifie le PC par lui-même.</summary>
 public sealed record UserPreferences
@@ -72,20 +118,49 @@ public sealed record UserPreferences
     /// </summary>
     public bool OfferAllFeatures { get; init; } = true;
 
+    /// <summary>Date des dernières corrections qui demandent un redémarrage ; effacée dès que le PC a redémarré depuis.</summary>
+    public DateTimeOffset? RestartPendingSince { get; init; }
+
+    /// <summary>Lancer l'audit dès que l'utilisateur a accepté les droits administrateur (jamais de demande d'autorisation pour autant).</summary>
+    public bool AuditWhenElevated { get; init; }
+
+    /// <summary>Mode technicien (0.8.6) : les détails techniques sont dépliés partout et les erreurs gardent leur message d'origine.</summary>
+    public bool TechnicianMode { get; init; }
+
+    /// <summary>Petits messages d'aide au survol coupés (ils sont affichés par défaut).</summary>
+    public bool HelpTipsOff { get; init; }
+
+    public WeeklyNotification WeeklyNotification { get; init; }
+
     /// <summary>
-    /// Accueil complet (toutes les cartes, comme avant la 0.8.4) au lieu de l'accueil simple recommandé. Choix d'affichage
-    /// seulement : rien n'est retiré, ce qui quitte l'accueil simple reste dans « Plus d'outils » et dans l'Atelier.
+    /// Modules à ne pas auditer (0.8.6). Choix protégé : un programme sans droits ne peut pas faire disparaître un module de
+    /// l'audit du moteur. Le score devient partiel, et l'audit de la semaine reste complet.
     /// </summary>
-    public bool HomeComplete { get; init; }
+    public IReadOnlyList<string> SkippedModules { get; init; } = [];
 
-    /// <summary>Zone « Plus d'outils » de l'accueil simple ouverte (état gardé d'une ouverture à l'autre).</summary>
-    public bool HomeMoreToolsOpen { get; init; }
+    /// <summary>Fréquences d'écran gardées après un essai, annulables depuis l'Historique.</summary>
+    public IReadOnlyList<KeptRefreshRate> KeptRefreshRates { get; init; } = [];
 
-    /// <summary>Fond « Mica » de Windows 11 derrière la fenêtre (coupé de lui-même si Windows a désactivé la transparence).</summary>
-    public bool MicaBackdrop { get; init; } = true;
+    /// <summary>Taille de l'affichage de la fenêtre principale (1 = normale) : Paramètres, ou Ctrl + molette.</summary>
+    public double UiZoom { get; init; } = 1;
+
+    /// <summary>Taille réellement utilisée : un fichier modifié à la main ne peut pas rendre la fenêtre illisible.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double UiZoomUsed => double.IsFinite(UiZoom) ? Math.Clamp(UiZoom, 0.8, 1.5) : 1;
+
+    /// <summary>Taille et position de la fenêtre ; <c>null</c> = celles par défaut.</summary>
+    public WindowPlacement? MainWindow { get; init; }
+
+    /// <summary>Dernier onglet ouvert (<c>0</c> = accueil) et sous-partie de l'atelier.</summary>
+    public int LastTab { get; init; }
+
+    public int LastWorkshopSection { get; init; }
 
     /// <summary>Dernière version dont les nouveautés ont été montrées (« Quoi de neuf ») ; <c>null</c> avant la 0.8.2.</summary>
     public string? LastSeenVersion { get; init; }
+
+    /// <summary>Dernière fois que la carte « Les audits de la semaine » de la page Suivi a vraiment été vue ; <c>null</c> avant. Sert à l'affichage seulement.</summary>
+    public DateTimeOffset? LastFollowVisit { get; init; }
 
     /// <summary>Compteur d'images par seconde affiché au-dessus du jeu pendant la mesure.</summary>
     public bool OverlayEnabled { get; init; } = true;
@@ -105,14 +180,18 @@ public sealed record UserPreferences
     [System.Text.Json.Serialization.JsonIgnore]
     public double OverlayOpacityUsed => double.IsFinite(OverlayOpacity) ? Math.Clamp(OverlayOpacity, 0.2, 1) : 0.85;
 
-    /// <summary>Entrée de la carte mère choisie par l'utilisateur comme tension de la mémoire (étalonnage), ou <c>null</c>.</summary>
-    public Workshop.Memory.DramVoltageCalibration? DramVoltage { get; init; }
-
     /// <summary>Intervalle réellement utilisé : une valeur hors de la liste proposée (fichier modifié à la main) revient à 1 seconde.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public TimeSpan RefreshInterval => TimeSpan.FromMilliseconds(RefreshChoices.Contains(RefreshMilliseconds) ? RefreshMilliseconds : 1000);
 
     public IReadOnlyList<Acknowledgement> Acknowledged { get; init; } = [];
+
+    /// <summary>
+    /// Réglages écrits par une version plus récente de MAUS : celle-ci ne s'en sert pas, mais les réécrit tels quels, pour
+    /// qu'un retour à une version plus ancienne ne les efface pas. Ils restent dans le fichier d'où ils viennent.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? UnknownSettings { get; init; }
 
     /// <summary>Marque « voulu » la valeur actuelle du constat (remplace une marque précédente).</summary>
     public UserPreferences Acknowledge(Finding finding, DateTimeOffset now)
@@ -120,22 +199,26 @@ public sealed record UserPreferences
         ArgumentNullException.ThrowIfNull(finding);
         return this with
     {
-        Acknowledged = [.. Acknowledged.Where(a => a.FindingId != finding.Id), new Acknowledgement(finding.Id, finding.Current, now, Localization.Texts.Language)],
+        Acknowledged = [.. Acknowledged.Where(a => a.FindingId != finding.Id), new Acknowledgement(finding.Id, Acknowledgement.Bounded(finding.Current), now, Localization.Texts.Language)],
     };
     }
 
     public UserPreferences Unacknowledge(string findingId) => this with
     {
-        Acknowledged = Acknowledged.Where(a => a.FindingId != findingId).ToList(),
+        Acknowledged = Acknowledged.Where(a => !a.FindingId.Equals(findingId, StringComparison.OrdinalIgnoreCase)).ToList(),
     };
 
     /// <summary>
     /// Marque valable pour ce constat, c'est-à-dire posée sur la même valeur constatée. Une marque posée dans une autre
     /// langue ne peut pas être comparée mot pour mot : elle reste valable jusqu'à <see cref="RebindLanguage"/>.
     /// </summary>
-    public Acknowledgement? AcknowledgementFor(Finding finding) =>
-        Acknowledged.FirstOrDefault(a => a.FindingId == finding.Id
-            && (string.Equals(a.Current, finding.Current, StringComparison.Ordinal) || IsOtherLanguage(a)));
+    public Acknowledgement? AcknowledgementFor(Finding finding)
+    {
+        ArgumentNullException.ThrowIfNull(finding);
+        var current = Acknowledgement.Bounded(finding.Current);
+        return Acknowledged.FirstOrDefault(a => a.FindingId == finding.Id
+            && (string.Equals(a.Current, current, StringComparison.Ordinal) || IsOtherLanguage(a)));
+    }
 
     /// <summary>
     /// Après un changement de langue : réécrit dans la langue active la valeur des marques qui s'appliquent aux constats
@@ -153,7 +236,7 @@ public sealed record UserPreferences
             }
 
             changed = true;
-            return a with { Current = finding.Current, Language = Localization.Texts.Language };
+            return a with { Current = Acknowledgement.Bounded(finding.Current), Language = Localization.Texts.Language };
         }).ToList();
         return changed ? this with { Acknowledged = list } : this;
     }

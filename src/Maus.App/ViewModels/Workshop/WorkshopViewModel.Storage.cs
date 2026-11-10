@@ -9,6 +9,8 @@ namespace Maus.App.ViewModels.Workshop;
 /// <summary>Une ligne de l'analyse de l'espace : dossier, gros fichier, ou petits fichiers regroupés.</summary>
 public sealed class SpaceEntryViewModel
 {
+    public override string ToString() => Name;
+
     public SpaceEntryViewModel(string name, string path, long bytes, long parentBytes, bool isFolder, string? hint, Action<SpaceEntryViewModel>? open)
     {
         Name = name;
@@ -22,12 +24,10 @@ public sealed class SpaceEntryViewModel
         OpenCommand = new AsyncCommand(() =>
         {
             open?.Invoke(this);
-            return Task.CompletedTask;
         });
         ShowCommand = new AsyncCommand(() =>
         {
             ShellLauncher.ShowInFolder(Path);
-            return Task.CompletedTask;
         });
     }
 
@@ -81,6 +81,9 @@ public sealed partial class WorkshopViewModel
     public ObservableCollection<SpaceEntryViewModel> SpaceEntries { get; } = [];
 
     public ObservableCollection<SpaceEntryViewModel> LargestFiles { get; } = [];
+
+    /// <summary>Avant une analyse, la carte n'a rien à montrer : elle ne prend pas de place, la ligne d'état dit quoi faire.</summary>
+    public bool HasLargestFiles => LargestFiles.Count > 0;
 
     public bool IsScanning
     {
@@ -150,14 +153,14 @@ public sealed partial class WorkshopViewModel
     {
         try
         {
-            foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed))
+            foreach (var drive in DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady))
             {
                 Drives.Add(new(T("{0} · {1} libres sur {2}", drive.Name.TrimEnd('\\'), FormatSize(drive.AvailableFreeSpace), FormatSize(drive.TotalSize)), drive.RootDirectory.FullName));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ScanStatus = T("La liste des lecteurs n'a pas pu être lue : {0}", ex.Message);
+            ScanStatus = T("La liste des lecteurs n'a pas pu être lue : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
 
         Drive = Drives.FirstOrDefault();
@@ -175,19 +178,28 @@ public sealed partial class WorkshopViewModel
         IsScanning = true;
         SpaceEntries.Clear();
         LargestFiles.Clear();
+        OnPropertyChanged(nameof(HasLargestFiles));
+        _current = null;
+        OnPropertyChanged(nameof(CurrentPath));
+        OnPropertyChanged(nameof(CanGoUp));
         try
         {
             ScanStatus = T("Analyse en cours…");
             var progress = new Progress<long>(files => ScanStatus = T("Analyse en cours… {0:N0} fichiers parcourus", files));
             var report = await EngineHost.Current.ScanSpaceAsync(root, progress, cancellation.Token);
+
+            // Comme ce qui revient du moteur : l'arbre reste en mémoire tant que MAUS est ouvert, sans ses milliers de petits dossiers.
+            await Task.Run(() => SpaceAnalyzer.Compact(report.Root, SpaceAnalyzer.MaxChannelEntries));
             foreach (var file in report.Largest)
             {
                 LargestFiles.Add(new SpaceEntryViewModel(file.Name, file.Path, file.Bytes, report.Root.Bytes, false, SpaceHints.Describe(file.Path), null));
             }
 
+            OnPropertyChanged(nameof(HasLargestFiles));
+
             Show(report.Root);
             ScanStatus = T("{0:N0} fichiers dans {1:N0} dossiers, analysés en {2:0} s.", report.Files, report.Folders, report.Duration.TotalSeconds)
-                + (report.Inaccessible > 0 ? " " + T("{0} dossier(s) illisible(s), non comptés.", report.Inaccessible) : string.Empty)
+                + (report.Inaccessible > 0 ? " " + T("{0} dossier(s) illisible(s) ou réservé(s) à un autre compte, non comptés.", report.Inaccessible) : string.Empty)
                 + " " + T("MAUS ne supprime rien : pour libérer de la place sans risque, utilisez l'Assistant de stockage de Windows.");
         }
         catch (OperationCanceledException)
@@ -196,7 +208,7 @@ public sealed partial class WorkshopViewModel
         }
         catch (Exception ex)
         {
-            ScanStatus = T("L'analyse n'a pas pu aboutir : {0}", ex.Message);
+            ScanStatus = T("L'analyse n'a pas pu aboutir : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
         finally
         {
@@ -258,7 +270,7 @@ public sealed partial class WorkshopViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            DiskStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
+            DiskStatus = T("Le test n'a pas pu se dérouler : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
             return;
         }
 
@@ -268,14 +280,12 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        if (!_confirm(T("Lancer le test de vitesse du disque ?"), T("MAUS va écrire puis relire un fichier temporaire de {0} sur {1}, puis le supprimer. Rien d'autre n'est touché. Le test dure de quelques secondes à une minute.", FormatSize(DiskSize.Value), root) + Environment.NewLine + Environment.NewLine + Maus.Core.Legal.Disclaimer.TestReminder + Environment.NewLine + Environment.NewLine + T("Continuer ?")))
+        if (!Ask(T("Lancer le test de vitesse du disque ?"), Maus.Core.Reporting.ConfirmationText.Build(T("MAUS va écrire puis relire un fichier temporaire de {0} sur {1}, puis le supprimer. Rien d'autre n'est touché. Le test dure de quelques secondes à une minute.", FormatSize(DiskSize.Value), root), reminder: Maus.Core.Legal.Disclaimer.TestReminder)))
         {
             return;
         }
 
-        using var cancellation = new CancellationTokenSource();
-        await StartTestAsync(cancellation);
-        try
+        await RunGuardedTestAsync(status => DiskStatus = status, async cancellationToken =>
         {
             DiskStatus = T("Test en cours…");
             var progress = new Progress<DiskSpeedProgress>(p =>
@@ -283,25 +293,19 @@ public sealed partial class WorkshopViewModel
                 DiskProgress = p.Percent;
                 DiskStatus = T("{0} · {1:0} %", p.Step, p.Percent);
             });
-            var result = await DiskSpeedTest.RunAsync(folder, DiskSize.Value, progress, cancellation.Token);
+            var result = await DiskSpeedTest.RunAsync(folder, DiskSize.Value, progress, cancellationToken);
             DiskProgress = 100;
             if (result.Aborted)
             {
+                Report(TestOutcome.Stopped);
                 DiskStatus = T("Test interrompu.");
                 return;
             }
 
-            SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry("disk-read", result.ReadMegabytesPerSecond ?? 0, true, DateTimeOffset.Now, root));
+            Report(TestOutcome.Good);
+            SaveScore(BenchmarkHistory.CreateDefault(), new BenchmarkEntry(ScoreTrends.DiskKind(root), result.ReadMegabytesPerSecond ?? 0, true, DateTimeOffset.Now, root));
             DiskStatus = T("Écriture : {0:N0} Mo/s · lecture : {1:N0} Mo/s · accès aléatoires : {2:N0} par seconde ({3:0.00} ms chacun).", result.WriteMegabytesPerSecond, result.ReadMegabytesPerSecond, result.RandomReadsPerSecond, result.RandomLatencyMilliseconds)
-                + " " + T("Repères : disque dur 100 à 250 Mo/s et environ 100 accès par seconde ; SSD SATA 450 à 550 Mo/s ; SSD NVMe 2 000 à 7 000 Mo/s et plus, avec des milliers d'accès par seconde. Mesure simple : les chiffres des fabricants, obtenus avec beaucoup de demandes en parallèle, sont plus élevés.");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            DiskStatus = T("Le test n'a pas pu se dérouler : {0}", ex.Message);
-        }
-        finally
-        {
-            await StopTestAsync();
-        }
+                + " " + T("Repères : disque dur 100 à 250 Mo/s et environ 100 accès par seconde ; SSD SATA 450 à 550 Mo/s ; SSD NVMe 2 000 à 7 000 Mo/s et plus, avec des milliers d'accès par seconde. Mesure simple : les chiffres des fabricants, obtenus avec beaucoup de demandes en parallèle, sont plus élevés. Ces repères sont choisis par MAUS, sans source publiée.");
+        });
     }
 }
