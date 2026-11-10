@@ -8,6 +8,8 @@
 
 **Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha 0.8.5**
 
+**Disponible sur le [Microsoft Store](https://apps.microsoft.com/detail/9NXNPZX2LFQF)** depuis novembre 2026. Ou avec winget :
+
 ```powershell
 winget install TERMINATORmdel101.MAUS
 ```
@@ -20,7 +22,7 @@ Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATO
 2. **Choisissez vos corrections** : chacune explique son gain réel et son risque. Point de restauration vérifié, et bouton « Annuler » pour tout remettre comme avant.
 3. **Allez plus loin dans l'Atelier** : fiche du matériel, températures en direct, tests du processeur, de la mémoire et de la carte graphique, benchmark visuel.
 
-*In English:* MAUS is a free, open-source Windows 11 utility. It first runs a **read-only audit** (updates, privacy, startup, drivers, hardware health…) and explains every finding in plain language, then lets you choose **reversible fixes** (verified restore point, original values logged, one-click undo). It opens without administrator rights and asks Windows for permission only when an action needs it. No telemetry, no exaggerated performance claims. Available in English, French and Spanish. Alpha version, built with Claude (an AI by Anthropic) under the author's direction. Help: [MAUS help site](https://sites.google.com/view/maus-help/accueil).
+*In English:* MAUS is a free, open-source Windows 11 utility. It first runs a **read-only audit** (updates, privacy, startup, drivers, hardware health…) and explains every finding in plain language, then lets you choose **reversible fixes** (verified restore point, original values logged, one-click undo). It opens without administrator rights and asks Windows for permission only when an action needs it. No telemetry, no exaggerated performance claims. Available in English, French and Spanish. Alpha version, built with Claude (an AI by Anthropic) under the author's direction. Help: [MAUS help site](https://sites.google.com/view/maus-help/accueil). Available on the [Microsoft Store](https://apps.microsoft.com/detail/9NXNPZX2LFQF).
 
 ## Captures d'écran
 
@@ -83,13 +85,15 @@ Dernières versions (le détail de toutes les versions est dans [CHANGELOG.md](C
 | 0.8.3 | Mode limité clair (options grisées, bandeau « Toutes les fonctionnalités »), sécurité du moteur administrateur : messages signés et protégés contre le rejeu, coupure après 3 tentatives refusées, outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |
 | 0.8.2 | « Pourquoi mon PC démarre lentement ? », « Pourquoi se réveille-t-il la nuit ? », écrans bleus expliqués, points de restauration, Wi-Fi voisin ; nouvelles corrections réversibles (tâches d'ouverture de session, Recall, valeurs Windows des effets visuels, fréquence maximale de l'écran avec retour automatique) ; bouton d'aide et « Quoi de neuf » |
 
-À venir : publication sur le **Microsoft Store** (en cours), signature du code, et des essais sur d'autres PC (processeurs AMD, mémoire DDR5, cartes graphiques AMD et Intel).
+MAUS est disponible sur le [Microsoft Store](https://apps.microsoft.com/detail/9NXNPZX2LFQF) depuis novembre 2026. À venir : signature du code, et des essais sur d'autres PC (processeurs AMD, mémoire DDR5, cartes graphiques AMD et Intel).
 
 Configuration requise : Windows 11 23H2 (build 22631) ou plus récent, processeur x64.
 
 ## Installer
 
-**Le plus simple : winget**, le gestionnaire de logiciels intégré à Windows 11. Dans PowerShell ou le Terminal :
+**Le plus simple : le [Microsoft Store](https://apps.microsoft.com/detail/9NXNPZX2LFQF)**. Ouvrez la fiche de MAUS (ou cherchez « MAUS » dans le Store), puis « Obtenir ». Le paquet du Store est signé par Microsoft : Windows n'affiche pas l'avertissement SmartScreen, et le Store installe les mises à jour.
+
+**Ou avec winget**, le gestionnaire de logiciels intégré à Windows 11. Dans PowerShell ou le Terminal :
 
 ```powershell
 winget install TERMINATORmdel101.MAUS
@@ -113,7 +117,7 @@ Désinstaller : Paramètres > Applications > Applications installées > MAUS > D
 
 MAUS has applied for free code signing by [SignPath.io](https://about.signpath.io), with a certificate from the [SignPath Foundation](https://signpath.org).
 
-**Status:** the application was **declined for now** (October 2026: the project is still too new and not yet widely known); it will be submitted again later. Current releases are **not signed**. If it is accepted, only installers built by the project's own build from this repository's source code will be signed.
+**Status:** the application was **declined for now** (October 2026: the project is still too new and not yet widely known); it will be submitted again later. Current releases on GitHub and winget are **not signed**; the Microsoft Store package is signed by Microsoft as part of Store distribution. If it is accepted, only installers built by the project's own build from this repository's source code will be signed.
 
 Team roles:
 
