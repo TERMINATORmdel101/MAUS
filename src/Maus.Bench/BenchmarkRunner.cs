@@ -841,6 +841,8 @@ internal sealed class BenchmarkRunner : IDisposable
                 ? T("Entrée pour fermer. L'historique de MAUS est illisible : ces résultats n'y ont pas été enregistrés.")
                 : _record == BenchmarkRecord.NotKept
                 ? T("Entrée pour fermer. Avec les droits administrateur, ces résultats ne sont pas enregistrés : lancez le benchmark depuis MAUS pour les garder.")
+                : _options.OutputFolder is not null
+                ? T("Entrée pour fermer. Les résultats sont rendus à MAUS, qui dit sur la page Benchmark s'il les a gardés.")
                 : report.Image is not null
                     ? T("Entrée pour fermer. Résultats et image à partager enregistrés dans MAUS (page Benchmark).")
                     : T("Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark).");

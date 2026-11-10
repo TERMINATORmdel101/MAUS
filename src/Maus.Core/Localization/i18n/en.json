@@ -1322,6 +1322,7 @@
   "Entrée pour fermer. Avec les droits administrateur, ces résultats ne sont pas enregistrés : lancez le benchmark depuis MAUS pour les garder.": "Press Enter to close. With administrator rights, these results are not saved: start the benchmark from MAUS to keep them.",
   "Entrée pour fermer. L'historique de MAUS est illisible : ces résultats n'y ont pas été enregistrés.": "Press Enter to close. The MAUS history is unreadable: these results were not saved to it.",
   "Entrée pour fermer. Les résultats sont enregistrés dans MAUS (page Benchmark).": "Press Enter to close. The results are saved in MAUS (Benchmark page).",
+  "Entrée pour fermer. Les résultats sont rendus à MAUS, qui dit sur la page Benchmark s'il les a gardés.": "Enter to close. The results are handed back to MAUS, which says on the Benchmark page whether it kept them.",
   "Entrée pour fermer. Résultats et image à partager enregistrés dans MAUS (page Benchmark).": "Press Enter to close. Results and the shareable image are saved in MAUS (Benchmark page).",
   "Epic Games Launcher": "Epic Games Launcher",
   "Erreur imprévue ({0}). Que faire : réessayez ; si cela continue, « Demander de l'aide » prépare un résumé à partager.": "Unexpected error ({0}). What to do: retry; if it continues, \"Ask for help\" prepares a summary to share.",
