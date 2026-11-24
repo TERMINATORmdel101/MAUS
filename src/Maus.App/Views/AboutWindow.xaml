@@ -21,11 +21,12 @@
     </Window.Resources>
     <DockPanel>
         <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
+            <!-- Le site d'aide s'ouvre par le bouton rond de la barre de gauche (0.8.7 : plus de bouton ici). -->
             <WrapPanel HorizontalAlignment="Right">
-                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.HelpSite}" Margin="0,0,8,4" Click="OnHelpSite" />
                 <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ReportProblem}" Margin="0,0,8,4" Click="OnReport"
                         Background="{DynamicResource PastelRose}" BorderBrush="{DynamicResource PastelRoseStroke}" />
-                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CheckNewVersion}" ToolTip="{x:Static app:Ui.CheckNewVersionTip}" Margin="0,0,8,4" Click="OnLatestRelease" />
+                <!-- Caché pour une installation par le Microsoft Store, qui fait lui-même les mises à jour (0.8.7). -->
+                <Button x:Name="NewVersionButton" Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CheckNewVersion}" ToolTip="{x:Static app:Ui.CheckNewVersionTip}" Margin="0,0,8,4" Click="OnLatestRelease" />
                 <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.ProjectPage}" Margin="0,0,8,4" Click="OnProject"
                         Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" />
                 <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.LicensesFolder}" Margin="0,0,8,4" Click="OnLicenses" />

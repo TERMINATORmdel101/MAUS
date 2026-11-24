@@ -52,12 +52,6 @@ public class MaskingOrderTests
     }
 
     [Fact]
-    public void A_mention_or_a_ticket_number_does_not_become_a_link_in_the_copied_text()
-    {
-        Assert.Equal(@"- jeu \@pseudo \#12", HelpSummary.ToMarkdown("- jeu @pseudo #12"));
-    }
-
-    [Fact]
     public void A_field_of_the_json_export_is_masked_value_by_value()
     {
         const string value = @"C:\Users\camille.dupont\Downloads";

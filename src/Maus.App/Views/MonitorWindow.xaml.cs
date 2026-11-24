@@ -24,11 +24,8 @@ public partial class MonitorWindow : Window
 
         var topmost = DependencyPropertyDescriptor.FromProperty(TopmostProperty, typeof(Window));
         EventHandler onTopHandler = (_, _) => onTopChanged(Topmost);
+        // La case « Toujours au premier plan » de cette fenêtre est le seul endroit où ce choix se règle (0.8.7) : il est retenu.
         topmost.AddValueChanged(this, onTopHandler);
-
-        // La case des Paramètres agit aussi quand cette fenêtre est déjà ouverte.
-        EventHandler onAppearance = (_, _) => Topmost = AppearanceManager.Current.MonitorOnTop;
-        AppearanceManager.Changed += onAppearance;
         Loaded += async (_, _) =>
         {
             Motion.Enter(Page, offset: 16);
@@ -45,7 +42,6 @@ public partial class MonitorWindow : Window
         Closed += (_, _) =>
         {
             topmost.RemoveValueChanged(this, onTopHandler);
-            AppearanceManager.Changed -= onAppearance;
             _model.Dispose();
         };
     }

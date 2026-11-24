@@ -22,12 +22,12 @@ public enum TestOutcome
 /// </summary>
 public sealed partial class WorkshopViewModel
 {
-    private const int FamilyCpu = 0;
-    private const int FamilyRam = 1;
-    private const int FamilyGpu = 2;
-    private const int FamilyDisk = 3;
-    private const int FamilyNet = 4;
-    private const int FamilyDevices = 5;
+    public const int FamilyCpu = 0;
+    public const int FamilyRam = 1;
+    public const int FamilyGpu = 2;
+    public const int FamilyDisk = 3;
+    public const int FamilyNet = 4;
+    public const int FamilyDevices = 5;
 
     private int _testFamily;
     private bool _seriesConfirmed;
@@ -134,6 +134,9 @@ public sealed partial class WorkshopViewModel
         get => _outcomeText;
         private set => SetProperty(ref _outcomeText, value);
     }
+
+    /// <summary>Choisit la tuile affichée (une ligne de « Que se passe-t-il ? » mène ainsi au bon test).</summary>
+    public void ShowTestFamily(int family) => ShowFamily(true, family);
 
     private void ShowFamily(bool chosen, int family)
     {

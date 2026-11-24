@@ -262,33 +262,6 @@ public static partial class HelpSummary
         return done + " " + T("MAUS ne repère pas un nom complet ni une adresse IP, et ne les masque donc pas : relisez le texte avant de le partager.");
     }
 
-    /// <summary>
-    /// Le résumé relu par l'utilisateur, prêt à coller sur un forum en Markdown : titres en gras, listes conservées, caractères
-    /// de mise en forme neutralisés.
-    /// </summary>
-    public static string ToMarkdown(string summary)
-    {
-        ArgumentNullException.ThrowIfNull(summary);
-
-        var lines = summary.Split('\n').Select(line =>
-        {
-            var trimmed = line.TrimEnd();
-            if (trimmed.StartsWith("- ", StringComparison.Ordinal))
-            {
-                return "- " + MarkdownEscape(trimmed[2..]);
-            }
-
-            return trimmed.EndsWith(':') ? "**" + MarkdownEscape(trimmed) + "**" : MarkdownEscape(trimmed);
-        });
-        return string.Join('\n', lines);
-    }
-
-    /// <summary>« @ » et « # » aussi : sur GitHub, ils préviendraient une personne ou renverraient à un ticket.</summary>
-    [GeneratedRegex(@"[\\`*_\[\]<>@#]", RegexOptions.CultureInvariant)]
-    private static partial Regex MarkdownSpecial();
-
-    private static string MarkdownEscape(string text) => MarkdownSpecial().Replace(text, @"\$0");
-
     private static string Machine(AuditReport report)
     {
         var hardware = report.Hardware;

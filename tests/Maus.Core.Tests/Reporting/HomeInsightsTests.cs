@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Maus.Core.Tests.Reporting;
 
-/// <summary>Lot B de la 0.8.6 : corrections qui rapportent le plus, pilotes, CSV, anonymisation visible, Markdown, classement.</summary>
+/// <summary>Lot B de la 0.8.6 : corrections qui rapportent le plus, pilotes, CSV, anonymisation visible, classement (la copie en Markdown est retirée en 0.8.7).</summary>
 public class HomeInsightsTests
 {
     private static Finding Costly(string id, FindingStatus status, Severity severity) =>
@@ -121,14 +121,6 @@ public class HomeInsightsTests
         Assert.Contains("nom du PC", note, StringComparison.Ordinal);
         Assert.DoesNotContain("adresse e-mail", note, StringComparison.Ordinal);
         Assert.DoesNotContain("Camille", note, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Markdown_keeps_lists_bolds_titles_and_neutralises_formatting()
-    {
-        var markdown = HelpSummary.ToMarkdown("Mon problème : jeu_lent\r\n\r\nPoints relevés :\r\n- [PROBLÈME] *pilote* <b>\r\n");
-
-        Assert.Equal("Mon problème : jeu\\_lent\n\n**Points relevés :**\n- \\[PROBLÈME\\] \\*pilote\\* \\<b\\>\n", markdown);
     }
 
     [Fact]

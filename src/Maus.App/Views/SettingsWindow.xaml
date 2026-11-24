@@ -120,15 +120,8 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource OptionCard}" Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}">
-                                <StackPanel>
-                                    <TextBlock Text="{x:Static app:Ui.MonitorTitle}" Style="{StaticResource CardTitle}" />
-                                    <TextBlock Text="{x:Static app:Ui.MonitorIntro}" Style="{StaticResource OptionNote}" Margin="0,0,0,8" />
-                                    <CheckBox Content="{x:Static app:Ui.MonitorOnTop}" IsChecked="{Binding MonitorOnTop}" />
-                                    <TextBlock Text="{x:Static app:Ui.MonitorOnTopNote}" Style="{StaticResource OptionNote}" Margin="0,4,0,10" />
-                                    <Button Content="{x:Static app:Ui.OpenMonitor}" Command="{Binding OpenMonitorCommand}" HorizontalAlignment="Left" Padding="16,6" />
-                                </StackPanel>
-                            </Border>
+                            <!-- Fenêtre de surveillance (0.8.7) : plus de carte ici. Elle s'ouvre par le bouton rond de la barre de gauche ou par
+                                 les Tests, et son seul réglage, « Toujours au premier plan », est dans la fenêtre elle-même (choix retenu). -->
 
                             <!-- Mode technicien (0.8.6) -->
                             <Border Style="{StaticResource OptionCard}" Background="{DynamicResource PastelLilac}" BorderBrush="{DynamicResource PastelLilacStroke}">

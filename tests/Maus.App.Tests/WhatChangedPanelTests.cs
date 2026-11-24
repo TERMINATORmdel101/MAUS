@@ -13,7 +13,8 @@ namespace Maus.App.Tests;
 /// <summary>« Qu'est-ce qui a changé ? » dans la page Suivi : tout vient des résumés gardés, rien n'est lancé à l'ouverture.</summary>
 public sealed class WhatChangedPanelTests
 {
-    private const string Version = "0.8.6";
+    // Version du MAUS qui tourne : l'audit fait pendant le test la porte aussi.
+    private static readonly string Version = Maus.Core.AppVersion.Display;
 
     private static readonly DateTimeOffset Day = new(2026, 10, 2, 9, 0, 0, TimeSpan.Zero);
 

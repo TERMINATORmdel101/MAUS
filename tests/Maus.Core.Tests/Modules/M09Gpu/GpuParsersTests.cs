@@ -127,6 +127,7 @@ public class GpuParsersTests
     [Theory]
     [InlineData(HardwareVendor.Nvidia, "NVIDIA GeForce RTX 2080 Ti", "nvidia-game-ready")]
     [InlineData(HardwareVendor.Nvidia, "NVIDIA GeForce GTX 1660 SUPER", "nvidia-game-ready")]
+    [InlineData(HardwareVendor.Nvidia, "NVIDIA RTX Spark N1X", "nvidia-game-ready")]
     [InlineData(HardwareVendor.Nvidia, "NVIDIA GeForce GTX 1080 Ti", "nvidia-r580-legacy")]
     [InlineData(HardwareVendor.Nvidia, "NVIDIA GeForce GTX 970", "nvidia-r580-legacy")]
     [InlineData(HardwareVendor.Amd, "Radeon RX 580 Series", "amd-polaris-vega")]

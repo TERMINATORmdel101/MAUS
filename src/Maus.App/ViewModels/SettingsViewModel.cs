@@ -1,4 +1,3 @@
-using System.Windows.Input;
 using System.Windows.Media;
 using Maus.App.Appearance;
 using Maus.Core.Diagnostics;
@@ -44,7 +43,7 @@ public sealed class AccentOptionViewModel(AccentChoice value, string label, stri
     }
 }
 
-/// <summary>Paramètres de MAUS : apparence, animations, fréquence des mesures, fenêtre de surveillance. Tout s'applique à chaud.</summary>
+/// <summary>Paramètres de MAUS : apparence, animations, fréquence des mesures, mode technicien, droits administrateur. Tout s'applique à chaud.</summary>
 public sealed class SettingsViewModel : ObservableObject
 {
     private readonly IPreferencesStore _store;
@@ -52,10 +51,9 @@ public sealed class SettingsViewModel : ObservableObject
     private AccentOptionViewModel _accent;
     private ChoiceOption<AnimationChoice> _animations;
     private ChoiceOption<int> _refresh;
-    private bool _monitorOnTop;
     private string _status = string.Empty;
 
-    public SettingsViewModel(IPreferencesStore store, Action openMonitor)
+    public SettingsViewModel(IPreferencesStore store)
     {
         _store = store;
         var current = AppearanceManager.Current;
@@ -97,15 +95,10 @@ public sealed class SettingsViewModel : ObservableObject
         _accent = AccentOptions.FirstOrDefault(o => o.Value == current.Accent) ?? AccentOptions[0];
         _animations = AnimationOptions.FirstOrDefault(o => o.Value == current.Animations) ?? AnimationOptions[0];
         _refresh = RefreshOptions.FirstOrDefault(o => o.Value == (int)current.RefreshInterval.TotalMilliseconds) ?? RefreshOptions[1];
-        _monitorOnTop = current.MonitorOnTop;
         _offerAllFeatures = current.OfferAllFeatures;
         _auditWhenElevated = current.AuditWhenElevated;
         _technicianMode = current.TechnicianMode;
         _helpTips = !current.HelpTipsOff;
-        OpenMonitorCommand = new AsyncCommand(() =>
-        {
-            openMonitor();
-        });
     }
 
     public IReadOnlyList<ChoiceOption<ThemeChoice>> ThemeOptions { get; }
@@ -115,8 +108,6 @@ public sealed class SettingsViewModel : ObservableObject
     public IReadOnlyList<ChoiceOption<AnimationChoice>> AnimationOptions { get; }
 
     public IReadOnlyList<ChoiceOption<int>> RefreshOptions { get; }
-
-    public ICommand OpenMonitorCommand { get; }
 
     public ChoiceOption<ThemeChoice> Theme
     {
@@ -209,12 +200,6 @@ public sealed class SettingsViewModel : ObservableObject
     {
         get => _technicianMode;
         set => Set(ref _technicianMode, value, (p, v) => p with { TechnicianMode = v });
-    }
-
-    public bool MonitorOnTop
-    {
-        get => _monitorOnTop;
-        set => Set(ref _monitorOnTop, value, (p, v) => p with { MonitorOnTop = v });
     }
 
     /// <summary>Message si l'enregistrement échoue (le choix vaut alors pour cette ouverture de MAUS).</summary>

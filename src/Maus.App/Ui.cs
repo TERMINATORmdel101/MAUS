@@ -147,7 +147,7 @@ public static class Ui
 
     public static string HomeLayoutTitle => T("Accueil");
 
-    public static string HomeLayoutNote => T("L'accueil est simple : le score, la prochaine étape et trois outils. Les autres outils restent dans l'Atelier, dans les Corrections et dans la barre de gauche. Le mode technicien (onglet Comportement) montre l'accueil complet.");
+    public static string HomeLayoutNote => T("L'accueil est simple : le score, la prochaine étape, votre PC en un coup d'œil et la liste « Que se passe-t-il ? », qui mène aux outils. Les autres outils restent dans l'Atelier, dans les Corrections et dans la barre de gauche. Le mode technicien (onglet Comportement) montre l'accueil complet.");
 
     public static string SymptomsTitle => T("Que se passe-t-il ?");
 
@@ -158,8 +158,6 @@ public static class Ui
     public static string WhatsNewClose => T("Compris");
 
     public static string WhatsNewAll => T("Toutes les nouveautés");
-
-    public static string FamiliesLine => T("Points à voir par famille (cliquez pour ouvrir les Constats)");
 
     public static string NoAuditIllustration => T("Aucun audit pour l'instant");
 
@@ -528,7 +526,8 @@ public static class Ui
 
     public static string ExportCsv => T("Enregistrer en CSV");
 
-    public static string ScoreHistoryTitle => T("Historique des scores");
+    /// <summary>« Historique » seul désigne la page des annulations (0.8.7) : ici, les résultats gardés des tests.</summary>
+    public static string ScoreHistoryTitle => T("Mes résultats précédents");
 
     public static string ScoreHistoryIntro => T("Chaque test réussi est gardé sur ce PC (rien n'est envoyé) : la courbe montre l'effet d'un réglage, d'un nettoyage ou d'une mise à jour. Un écart de quelques pour cent d'une mesure à l'autre est normal.");
 
@@ -821,8 +820,6 @@ public static class Ui
 
     public static string MonitorTitle => T("Fenêtre de surveillance");
 
-    public static string MonitorIntro => T("Une fenêtre à part, à garder ouverte pendant un test de stabilité ou un jeu : température, consommation et fréquence de chaque composant (actuelle, minimale, maximale), erreurs matérielles et erreurs de Windows depuis son ouverture.");
-
     public static string MonitorOnTop => T("Toujours au premier plan");
 
     public static string OfferAllFeaturesTitle => T("Droits administrateur");
@@ -933,10 +930,6 @@ public static class Ui
     public static string FilterHidesAll => T("Aucun constat ne correspond à ce filtre, mais d'autres restent à traiter : changez le filtre pour les voir.");
 
     public static string RevertTodayTip => T("Annule toutes les corrections faites aujourd'hui, de la plus récente à la plus ancienne. Une valeur changée entre-temps n'est pas écrasée.");
-
-    public static string CopyMarkdown => T("Copier pour un forum");
-
-    public static string CopyMarkdownTip => T("Le même texte, mis en forme en Markdown (Reddit, GitHub, Discord…)");
 
     public static string BenchmarkRankingTitle => T("Mon classement");
 

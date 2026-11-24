@@ -4,7 +4,7 @@ using static Maus.Core.Localization.Texts;
 
 namespace Maus.App.ViewModels.Workshop;
 
-/// <summary>Atelier, Tests : historique des scores (courbe et derniers résultats), pour voir l'effet d'un réglage dans le temps.</summary>
+/// <summary>Atelier, Tests : « Mes résultats précédents » (courbe et derniers résultats), pour voir l'effet d'un réglage dans le temps.</summary>
 public sealed partial class WorkshopViewModel
 {
     private IReadOnlyList<BenchmarkEntry> _scoreEntries = [];

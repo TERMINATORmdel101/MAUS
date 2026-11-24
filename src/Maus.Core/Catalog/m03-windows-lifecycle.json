@@ -1,15 +1,19 @@
 // Module 3 — Fin de maintenance des versions de Windows 11 (dernier jour de correctifs, heure du Pacifique).
-// Sources, vérifiées le 24/09/2026 :
-//   https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information (page du 22/09/2026)
-//   https://learn.microsoft.com/en-us/lifecycle/products/windows-11-home-and-pro
-//   https://learn.microsoft.com/en-us/lifecycle/products/windows-11-enterprise-and-education
+// Sources, vérifiées le 24/11/2026 :
+//   https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information (page du 19/11/2026)
+//   https://learn.microsoft.com/en-us/lifecycle/products/windows-11-home-and-pro (mise à jour du 29/09/2026)
+//   https://learn.microsoft.com/en-us/lifecycle/products/windows-11-enterprise-and-education (mise à jour du 06/10/2026)
+//   https://learn.microsoft.com/en-us/lifecycle/products/windows-11-enterprise-ltsc-2024 et windows-11-iot-enterprise-ltsc-2024
+// Les dates viennent de la page release-information (dernier jour de correctifs). Pour 26H2, les pages de cycle de vie écrivent
+// « 10/10/2028 6:59:59 AM » et « 10/9/2029 8:00:00 AM », dans un format différent de leurs autres lignes : on garde
+// 2028-10-10 et 2029-10-09 de la page release-information (deuxièmes mardis d'octobre).
 // homePro : Famille, Pro, Pro Éducation, Pro pour stations de travail.
 // enterpriseEducation : Entreprise, Éducation, IoT Entreprise, Entreprise multisession.
 // ltsc / iotLtsc : Entreprise LTSC 2024 (sans support étendu) et IoT Entreprise LTSC 2024.
 // newDevicesOnly : 26H1 équipe seulement des PC neufs, jamais proposée en mise à jour d'un PC existant.
-// Dates revérifiées le 25/09/2026 sur la page release-information (mise à jour du 22/09/2026).
+// 26H2 (build 26300) : sortie le 29/09/2026, proposée en mise à jour aux PC en 24H2 et 25H2.
 {
-  "reviewed": "2026-09-24",
+  "reviewed": "2026-11-24",
   "source": "https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information",
   "windows10EndOfSupport": "2025-10-14",
   "releases": [
@@ -19,6 +23,12 @@
       "homePro": "2028-03-14",
       "enterpriseEducation": "2029-03-13",
       "newDevicesOnly": true
+    },
+    {
+      "build": 26300,
+      "version": "26H2",
+      "homePro": "2028-10-10",
+      "enterpriseEducation": "2029-10-09"
     },
     {
       "build": 26200,

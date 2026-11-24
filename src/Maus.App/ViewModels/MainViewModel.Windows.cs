@@ -52,7 +52,7 @@ public sealed partial class MainViewModel
             return;
         }
 
-        var window = new SettingsWindow(new SettingsViewModel(PreferencesStore, OpenMonitor)) { Owner = Application.Current?.MainWindow };
+        var window = new SettingsWindow(new SettingsViewModel(PreferencesStore)) { Owner = Application.Current?.MainWindow };
         window.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow = window;
         window.Show();

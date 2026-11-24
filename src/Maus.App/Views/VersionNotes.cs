@@ -8,6 +8,12 @@ public static class VersionNotes
     /// <summary>Nouveautés de chaque version, en quelques lignes ; vide si rien n'est prévu pour cette version.</summary>
     public static IReadOnlyList<string> For(string version) => version switch
     {
+        "0.8.7" =>
+        [
+            T("Accueil plus simple : une seule façon d'entrer dans les outils, la liste « Que se passe-t-il ? », et moins de boutons en double."),
+            T("« Internet rame » et « Le son craque » ouvrent maintenant la bonne tuile de la page Tests."),
+            T("Catalogues revérifiés le 24/11/2026 : derniers pilotes NVIDIA, AMD et Intel, et Windows 11 version 26H2 avec ses dates de fin de maintenance."),
+        ],
         "0.8.6" =>
         [
             T("Nouvelle page Suivi (Ctrl+7) : ce que Windows a défait, ce qui a changé entre deux audits, carnet de santé, plantages des 30 derniers jours, avant et après une séance, dossier du PC à imprimer."),

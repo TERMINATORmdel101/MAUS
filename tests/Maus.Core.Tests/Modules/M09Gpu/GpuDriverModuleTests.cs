@@ -22,10 +22,10 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Up_to_date_nvidia_card_on_full_link_is_compliant()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2140", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx2080Ti, width: 16, maxWidth: 16, bus: 1);
         var commands = new FakeCommands()
-            .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 2080 Ti\r\n")
+            .Answer(NvidiaQuery, "00000000:01:00.0, 621.40, NVIDIA GeForce RTX 2080 Ti\r\n")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true));
 
@@ -34,7 +34,7 @@ public class GpuDriverModuleTests
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.basic-display-driver").Status);
         var driver = Get(findings, "M09.driver.nvidia");
         Assert.Equal(FindingStatus.Ok, driver.Status);
-        Assert.StartsWith("621.01 (version Windows 32.0.16.2101)", driver.Current, StringComparison.Ordinal);
+        Assert.StartsWith("621.40 (version Windows 32.0.16.2140)", driver.Current, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.pcie-link.nvidia").Status);
         Assert.Equal(FindingStatus.Ok, Get(findings, "M09.hags").Status);
         Assert.Null(Get(findings, "M09.hags").SettingsPage);
@@ -46,11 +46,11 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Old_catalog_cannot_say_up_to_date_forever()
     {
-        // Même pilote « à jour », mais le catalogue intégré (vérifié le 27/10/2026) a plus de 45 jours au moment de l'audit.
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2101", Recent, "oem157.inf"));
+        // Même pilote « à jour », mais le catalogue intégré (vérifié le 24/11/2026) a plus de 45 jours au moment de l'audit.
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.2140", Recent, "oem157.inf"));
         AnswerProperties(cim, Rtx2080Ti, width: 16, maxWidth: 16, bus: 1);
         var commands = new FakeCommands()
-            .Answer(NvidiaQuery, "00000000:01:00.0, 621.01, NVIDIA GeForce RTX 2080 Ti\r\n")
+            .Answer(NvidiaQuery, "00000000:01:00.0, 621.40, NVIDIA GeForce RTX 2080 Ti\r\n")
             .Answer(NvidiaMemory, MemoryOutput("00000000:01:00.0", 256));
         var scheduling = new FakeScheduling(new GpuSchedulingInfo(0x10DE, 0x1E04, Supported: true, Enabled: true));
         var later = new DateTimeOffset(2027, 1, 15, 12, 0, 0, TimeSpan.FromHours(1));
@@ -80,7 +80,7 @@ public class GpuDriverModuleTests
     [Fact]
     public async Task Slightly_older_driver_is_only_informative()
     {
-        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1690", new DateTime(2026, 8, 20), "oem12.inf"));
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("NVIDIA GeForce RTX 2080 Ti", Rtx2080Ti, "32.0.16.1690", new DateTime(2026, 9, 17), "oem12.inf"));
 
         var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
 
@@ -355,7 +355,7 @@ public class GpuDriverModuleTests
         var driver = Get(findings, "M09.driver.amd");
         Assert.Equal(FindingStatus.Improvable, driver.Status);
         Assert.StartsWith("25.11.1 (version Windows 32.0.21001.9024)", driver.Current, StringComparison.Ordinal);
-        Assert.StartsWith("26.10.1", driver.Expected, StringComparison.Ordinal);
+        Assert.StartsWith("26.11.2", driver.Expected, StringComparison.Ordinal);
         Assert.Contains("amd.com", driver.Advice, StringComparison.Ordinal);
 
         // Sur une Radeon, la largeur lue peut être celle du commutateur interne : simple information.

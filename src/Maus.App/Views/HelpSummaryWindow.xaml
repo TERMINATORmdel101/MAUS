@@ -23,7 +23,6 @@
             <WrapPanel HorizontalAlignment="Right" Margin="0,6,0,0">
                 <Button Style="{StaticResource PrimaryButton}" Content="{x:Static app:Ui.ReportOnGitHub}" Padding="16,6" Margin="0,0,8,0"
                     Click="OnGitHub" ToolTip="{x:Static app:Ui.ReportOnGitHubTip}" />
-                <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CopyMarkdown}" Margin="0,0,8,0" Click="OnCopyMarkdown" ToolTip="{x:Static app:Ui.CopyMarkdownTip}" />
                 <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CopyText}" Margin="0,0,8,0" IsDefault="True" Click="OnCopy"
                     Background="{DynamicResource PastelBlue}" BorderBrush="{DynamicResource PastelBlueStroke}" />
                 <Button Style="{StaticResource SoftButton}" Content="{x:Static app:Ui.CloseWindow}" IsCancel="True" />

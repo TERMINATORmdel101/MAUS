@@ -196,7 +196,7 @@ public sealed class SmallViewModelsTests
         Maus.App.Appearance.AppearanceManager.SetZoom(1.05);
         try
         {
-            var settings = new SettingsViewModel(bench.Store, () => { });
+            var settings = new SettingsViewModel(bench.Store);
 
             Assert.Equal(1.05, settings.Zoom.Value);
             Assert.Contains("105 %", settings.Zoom.Label, StringComparison.Ordinal);
@@ -221,6 +221,45 @@ public sealed class SmallViewModelsTests
         {
             Assert.Equal(probe.HashOf(Path.Combine(AppContext.BaseDirectory, library.Key + ".dll")), library.Value, ignoreCase: true);
         }
+    }
+
+    [Theory]
+    [InlineData(@"C:\Program Files\WindowsApps\Editeur.MAUS_0.8.7.0_x64__6c0b8wp3bzq1y\MAUS.exe", false)]
+    [InlineData(@"C:\Program Files\MAUS\MAUS.exe", true)]
+    public void The_new_version_page_is_not_offered_to_a_store_installation(string executable, bool offered) =>
+        Assert.Equal(offered, AboutWindow.OffersNewVersionPage(executable));
+
+    /// <summary>0.8.7 : une seule porte par chose, sans retirer la chose elle-même.</summary>
+    [Fact]
+    public void Duplicate_doors_are_gone_and_one_door_stays()
+    {
+        var folder = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(folder, "Maus.slnx")))
+        {
+            folder = Path.GetDirectoryName(folder)!;
+        }
+
+        string Read(string file) => File.ReadAllText(Path.Combine(folder, "src", "Maus.App", file));
+        static int Count(string text, string part) => text.Split(part).Length - 1;
+        var main = Read("MainWindow.xaml");
+        var settings = Read(Path.Combine("Views", "SettingsWindow.xaml"));
+
+        // Fenêtre de surveillance : le bouton rond et la carte de sécurité des Tests ; un seul « toujours au premier plan ».
+        Assert.Equal(2, Count(main, "Command=\"{Binding OpenMonitorCommand}\""));
+        Assert.DoesNotContain("OpenMonitorCommand", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ui.MonitorOnTop}", settings, StringComparison.Ordinal);
+        Assert.Equal(1, Count(Read(Path.Combine("Views", "MonitorWindow.xaml")), "Content=\"{x:Static app:Ui.MonitorOnTop}\""));
+
+        // Aide : le site d'aide reste sur le bouton rond ; le résumé garde « Copier le texte ».
+        Assert.Equal(1, Count(main, "Command=\"{Binding OpenHelpSiteCommand}\""));
+        Assert.DoesNotContain("Ui.HelpSite}", Read(Path.Combine("Views", "AboutWindow.xaml")), StringComparison.Ordinal);
+        var help = Read(Path.Combine("Views", "HelpSummaryWindow.xaml"));
+        Assert.DoesNotContain("Markdown", help, StringComparison.Ordinal);
+        Assert.Contains("Ui.CopyText}", help, StringComparison.Ordinal);
+
+        // Accueil simple : plus de ligne de boutons des familles ; « Pourquoi mon PC est lent ? » n'a plus qu'une carte (accueil complet).
+        Assert.Equal(1, Count(main, "Command=\"{Binding SlowPcCommand}\""));
+        Assert.DoesNotContain("CompactLabel", main, StringComparison.Ordinal);
     }
 
     [Fact]

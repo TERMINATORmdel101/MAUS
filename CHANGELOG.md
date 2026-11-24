@@ -2,6 +2,31 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…). Depuis la 0.3.3-alpha, une partie des fonctions est aussi essayée sur le PC Windows du porteur : un seul PC, et pas toutes les fonctions (pour la 0.8.6, voir « Essais sur un vrai PC »).
 
+## 0.8.7 — en préparation
+
+### Catalogues revérifiés (24/11/2026)
+
+- **Pilotes graphiques** : NVIDIA Game Ready 621.40, AMD Adrenalin 26.11.2 (version recommandée ; la 26.11.1, facultative, n'est pas retenue), Intel Arc 32.0.101.9175 ; les autres branches n'ont pas changé. Les PC NVIDIA « RTX Spark » sont reconnus. MAUS dit le catalogue « à jour » jusqu'au 8 janvier 2027.
+- **Windows 11** : la version 26H2 (build 26300) est ajoutée, avec ses dates de fin de maintenance publiées par Microsoft ; elle n'est plus dite « plus récente que le catalogue ».
+
+### Essais sur un vrai PC
+
+- **Processeur AMD et mémoire DDR5** : l'audit sans droits administrateur a tourné sur un second PC du porteur (AMD Ryzen 9 9900X3D, 2 × 16 Go de DDR5, carte NVIDIA et puce graphique AMD) : processeur, mémoire DDR5 (type, vitesse annoncée et appliquée, double canal), deux cartes graphiques et leurs pilotes lus correctement, aucun module en erreur. Pas encore essayés sur AMD : la fiche mémoire détaillée et le test Curve Optimizer (droits administrateur).
+
+### Fabrication
+
+- Outils de fabrication de GitHub mis à jour (setup-dotnet 6.1.0, upload-artifact 7.0.2, CodeQL 4.39.3), toujours épinglés sur leur empreinte exacte.
+
+### Interface plus simple
+
+Des boutons en double s'en vont et un chemin est réparé.
+
+- **Accueil simple** : une seule façon d'entrer dans les outils, la liste « Que se passe-t-il ? ». « Mon PC est lent » n'y apparaît plus deux fois. Les cartes d'outils (« Pourquoi mon PC est lent ? », « Tester mon PC », « Mon matériel ») et les familles M·A·U·S restent sur l'accueil complet (mode technicien) ; les tests et la fiche du matériel restent dans l'Atelier. Un bouton « Voir les constats » remplace les quatre boutons des familles, qui menaient tous aux Constats. Le texte « Accueil » des Paramètres dit ce que montre vraiment l'accueil.
+- **« Internet rame » et « Le son craque »** : MAUS ouvre la page Tests sur la bonne tuile (Réseau, Processeur). Avant, il ouvrait la page sur la tuile Processeur et disait « en bas de la page », alors que le test de connexion est sous la tuile Réseau.
+- **Fenêtre de surveillance** : elle s'ouvre par le bouton rond de la barre de gauche et par la carte de sécurité des Tests ; les boutons en double des Capteurs et des Paramètres sont retirés. « Toujours au premier plan » se règle à un seul endroit, dans la fenêtre elle-même, et reste retenu.
+- **« Historique »** ne désigne plus que la page des annulations : dans les Tests, « Historique des scores » devient « Mes résultats précédents ».
+- **Aide** : « Site d'aide » n'est plus en double dans « À propos » (le bouton rond suffit) ; le résumé pour demander de l'aide garde « Copier le texte », sans « Copier pour un forum » (Markdown) ; « Y a-t-il une nouvelle version ? » est caché quand MAUS vient du Microsoft Store, qui fait lui-même les mises à jour.
+
 ## 0.8.6 — 10/11/2026 — page Suivi, BitLocker, audit sans droits, réparation suivie pas à pas
 
 ### Nouvelle page Suivi (Ctrl+7)

@@ -222,14 +222,14 @@ public class WindowsUpdateModuleTests
     }
 
     [Fact]
-    public async Task Unsupported_23H2_points_to_25H2_not_to_new_device_release()
+    public async Task Unsupported_23H2_points_to_26H2_not_to_new_device_release()
     {
         var windows = new WindowsInfo("Windows 11 Pro", "Professional", "23H2", 22631, 5000);
 
         var finding = Get(await Detect(windows: windows), "M03.windows-support");
 
         Assert.Equal(FindingStatus.Problem, finding.Status);
-        Assert.Contains("25H2", finding.Advice, StringComparison.Ordinal);
+        Assert.Contains("26H2", finding.Advice, StringComparison.Ordinal);
         Assert.DoesNotContain("26H1", finding.Advice, StringComparison.Ordinal);
         Assert.False(finding.Fixable);
     }
@@ -799,6 +799,8 @@ public class WindowsUpdateModuleTests
         var catalog = WindowsLifecycleCatalog.LoadEmbedded();
 
         Assert.Equal(new DateOnly(2025, 10, 14), catalog.Windows10EndOfSupport);
+        Assert.Equal(new DateOnly(2028, 10, 10), catalog.Find(26300)!.HomePro);
+        Assert.Equal(new DateOnly(2029, 10, 9), catalog.Find(26300)!.EnterpriseEducation);
         Assert.Equal(new DateOnly(2027, 10, 12), catalog.Find(26200)!.HomePro);
         Assert.Equal(new DateOnly(2028, 10, 10), catalog.Find(26200)!.EnterpriseEducation);
         Assert.Equal(new DateOnly(2026, 10, 13), catalog.Find(26100)!.HomePro);

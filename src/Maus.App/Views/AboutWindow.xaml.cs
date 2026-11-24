@@ -45,8 +45,15 @@ public partial class AboutWindow : Window
     public AboutWindow()
     {
         InitializeComponent();
+        NewVersionButton.Visibility = OffersNewVersionPage(TaskSchedulerClient.Executable) ? Visibility.Visible : Visibility.Collapsed;
         Loaded += (_, _) => Appearance.Motion.Enter(Page, offset: 12);
     }
+
+    /// <summary>
+    /// « Y a-t-il une nouvelle version ? » : seulement hors du Microsoft Store. Installé par le Store (dossier de son paquet),
+    /// MAUS reçoit ses mises à jour du Store lui-même, et le bouton ne ferait qu'ouvrir une page inutile.
+    /// </summary>
+    internal static bool OffersNewVersionPage(string executable) => !ScheduledAudit.IsInStoreFolder(executable);
 
     private void OnClose(object sender, RoutedEventArgs e) => Close();
 
@@ -63,8 +70,6 @@ public partial class AboutWindow : Window
         InstallationResults.ItemsSource = InstallationRow.Build(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "MAUS.exe"), new WindowsInstallationProbe());
         InstallationResults.Visibility = Visibility.Visible;
     }
-
-    private void OnHelpSite(object sender, RoutedEventArgs e) => ShellLauncher.OpenUrl(Maus.Core.ProjectLinks.HelpSite);
 
     /// <summary>Dossier des licences livré avec MAUS (licence, composants tiers, LGPL-2.1, marque).</summary>
     private void OnLicenses(object sender, RoutedEventArgs e) => ShellLauncher.OpenFolder(Path.Combine(AppContext.BaseDirectory, "licenses"));

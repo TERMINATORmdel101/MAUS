@@ -23,18 +23,11 @@ public sealed class FamilyViewModel(FamilySummary summary, bool audited = true)
 
     public IReadOnlyList<ChipViewModel> Chips { get; } = audited ? BuildChips(summary) : [new(T("pas encore audité"), Tone.Grey)];
 
-    /// <summary>Accueil simple : nombre de points à voir (« 3 à voir », « en ordre », « — » avant l'audit).</summary>
+    /// <summary>Nombre de points à voir (« 3 à voir », « en ordre », « — » avant l'audit), pour les lecteurs d'écran.</summary>
     public string CompactText { get; } = !audited ? "—"
         : summary.Problems + summary.Warnings + summary.Improvements is var n and > 0 ? T("{0} à voir", n)
         : summary.Unchecked > 0 ? T("non vérifié")
         : summary.AllClear ? T("en ordre") : T("indéterminé");
-
-    /// <summary>Couleur du plus grave : rouge (problème), sable (à surveiller), bleu (optimisation), menthe (en ordre).</summary>
-    public Tone CompactTone { get; } = !audited ? Tone.Grey
-        : summary.Problems > 0 ? Tone.Rose
-        : summary.Warnings > 0 ? Tone.Sand
-        : summary.Improvements > 0 ? Tone.Blue
-        : summary.AllClear && summary.Unchecked == 0 ? Tone.Mint : Tone.Grey;
 
     /// <summary>Nom lu par les lecteurs d'écran (« Maintenance : 3 à voir »).</summary>
     public string CompactLabel => T("{0} : {1}", Name, CompactText);
@@ -230,7 +223,7 @@ public sealed partial class MainViewModel
 
     private void NotifyJourney()
     {
-        foreach (var name in new[] { nameof(JourneyStep), nameof(ShowJourney), nameof(JourneySteps), nameof(ShowReadFindingsButton), nameof(ShowFixNowButton), nameof(NextStepTitle), nameof(NextStepText), nameof(NextStepTone) })
+        foreach (var name in new[] { nameof(JourneyStep), nameof(ShowJourney), nameof(JourneySteps), nameof(ShowReadFindingsButton), nameof(ShowSeeFindingsButton), nameof(ShowFixNowButton), nameof(NextStepTitle), nameof(NextStepText), nameof(NextStepTone) })
         {
             OnPropertyChanged(name);
         }

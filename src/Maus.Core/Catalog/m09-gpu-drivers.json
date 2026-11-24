@@ -1,11 +1,14 @@
 {
-  // Dernières versions officielles connues, par fabricant et par branche. Vérifié le 01/11/2026 sur les pages officielles : NVIDIA (listes de
-  // téléchargement : Game Ready 621.01 du 21/10 ; pilote de sécurité 582.78 du 30/09), AMD (notes 26.10.1, « October 20th », dernière version
-  // recommandée ; la 26.10.2 du 30/10 est facultative, donc pas retenue ici ; AMD y donne deux versions internes sans dire laquelle va avec
-  // quelle carte : seule la version commerciale est comparée), Intel (Arc 32.0.101.9150 du 02/10, 11e-14e 32.0.101.7092 du 25/09,
-  // 7e-10e 31.0.101.2145 du 22/09). Branche Polaris / Vega : 26.5.2 reste la dernière (notes AMD du 21/05).
+  // Dernières versions officielles connues, par fabricant et par branche. Vérifié le 24/11/2026 sur les pages officielles : NVIDIA (listes de
+  // téléchargement : Game Ready 621.40 du 24/11, même date dans ses notes de version ; pilote de sécurité 582.78 du 30/09, toujours le dernier),
+  // AMD (notes 26.11.2, « November 18th », et pages de téléchargement des RX 5000 à 9000 : « WHQL (Recommended) », 2026-11-18 ; la 26.11.1
+  // du 12/11 est facultative, donc pas retenue ici ; AMD y donne deux versions internes sans dire laquelle va avec quelle carte : seule la
+  // version commerciale est comparée), Intel (Arc 32.0.101.9175 du 04/11 ; 11e-14e 32.0.101.7092 du 25/09 et 7e-10e 31.0.101.2145 du 22/09,
+  // inchangées). Branche Polaris / Vega : 26.5.2 reste la dernière (page de téléchargement de la RX 580 : « WHQL Recommended », 2026-05-21).
+  // RTX Spark (PC Windows sur Arm de NVIDIA, sortis le 16/10/2026) : même pilote Game Ready (notes 621.40 pour Arm64 : « NVIDIA RTX Spark N1X »),
+  // d'où « RTX\s*Spark » dans le motif Game Ready, ajouté le 24/11/2026.
   // Les branches sont testées dans l'ordre : la première dont le motif correspond au nom du GPU l'emporte.
-  "checkedOn": "2026-11-01",
+  "checkedOn": "2026-11-24",
   // Les trois durées qui suivent sont choisies par MAUS, sans source publiée : annoncées dans les détails du constat (ThresholdNotes, contrôlé par un test).
   "significantGapDays": 90,
   "maxDriverAgeDays": 183,
@@ -26,10 +29,10 @@
       "id": "nvidia-game-ready",
       "vendor": "Nvidia",
       "label": "GeForce Game Ready",
-      "namePattern": "GeForce\\s+RTX|GTX\\s*16\\d0|MX\\s*[45]\\d0\\b|\\bT\\d{3,4}\\b",
+      "namePattern": "GeForce\\s+RTX|RTX\\s*Spark|GTX\\s*16\\d0|MX\\s*[45]\\d0\\b|\\bT\\d{3,4}\\b",
       "scheme": "NvidiaMarketing",
-      "latestVersion": "621.01",
-      "releasedOn": "2026-10-21",
+      "latestVersion": "621.40",
+      "releasedOn": "2026-11-24",
       "downloadUrl": "https://www.nvidia.com/fr-fr/drivers/",
       "note": "Aussi disponible dans l'application NVIDIA App."
     },
@@ -50,8 +53,8 @@
       "label": "Adrenalin, branche RX 5000 et RX 6000",
       "namePattern": "RX\\s*(5[5-7]00|6[4-9]\\d0)|Radeon\\S*\\s*(610|6[6-8]0)M\\b",
       "scheme": "AmdSoftware",
-      "latestVersion": "26.10.1",
-      "releasedOn": "2026-10-20",
+      "latestVersion": "26.11.2",
+      "releasedOn": "2026-11-18",
       "downloadUrl": "https://www.amd.com/fr/support/download/drivers.html"
     },
     {
@@ -60,8 +63,8 @@
       "label": "Adrenalin",
       "namePattern": "RX\\s*(7[6-9]\\d0|9\\d{3})|Radeon\\S*\\s*(7[4-8]0M|8[4-9]0M|80[4-6]0S)\\b",
       "scheme": "AmdSoftware",
-      "latestVersion": "26.10.1",
-      "releasedOn": "2026-10-20",
+      "latestVersion": "26.11.2",
+      "releasedOn": "2026-11-18",
       "downloadUrl": "https://www.amd.com/fr/support/download/drivers.html"
     },
     {
@@ -70,9 +73,9 @@
       "label": "Intel Arc et Core Ultra",
       "namePattern": "\\bArc\\b|^Intel\\(R\\)\\s*Graphics$",
       "scheme": "WindowsDriver",
-      "latestVersion": "32.0.101.9150",
-      "latestDriverVersion": "32.0.101.9150",
-      "releasedOn": "2026-10-02",
+      "latestVersion": "32.0.101.9175",
+      "latestDriverVersion": "32.0.101.9175",
+      "releasedOn": "2026-11-04",
       "downloadUrl": "https://www.intel.com/content/www/us/en/download/785597/intel-arc-graphics-windows.html",
       "note": "Aussi disponible dans l'application Intel Graphics Software."
     },

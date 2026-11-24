@@ -24,10 +24,6 @@ public partial class HelpSummaryWindow : Window
 
     private void OnCopy(object sender, RoutedEventArgs e) => CopyStatus.Text = Copy() ? Ui.Copied : Ui.CopyFailed;
 
-    /// <summary>Le texte relu (et complété) par l'utilisateur, mis en forme pour un forum.</summary>
-    private void OnCopyMarkdown(object sender, RoutedEventArgs e) =>
-        CopyStatus.Text = Copy(Maus.Core.Reporting.HelpSummary.ToMarkdown(Summary.Text)) ? Ui.Copied : Ui.CopyFailed;
-
     /// <summary>
     /// Signalement sur GitHub : le résumé relu par l'utilisateur est copié, puis la page « nouveau signalement » du dépôt
     /// s'ouvre dans le navigateur, où il le colle. Rien ne passe par l'adresse de la page, et MAUS n'envoie rien lui-même.

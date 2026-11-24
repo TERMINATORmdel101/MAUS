@@ -41,7 +41,8 @@ public sealed record BestFixRow(string Title, string Gain, System.Windows.Input.
 /// <summary>
 /// Accueil simple, ou complet en mode technicien (0.8.6, un seul interrupteur) : rien n'est retiré, seulement rangé dans
 /// l'Atelier, les Corrections et la barre de gauche ; score qui se remplit à la fin de l'audit ; « Quoi de neuf » en carte ; carte « Votre PC en un coup d'œil »
-/// faite avec ce que l'audit a déjà lu (aucune nouvelle lecture du système).
+/// faite avec ce que l'audit a déjà lu (aucune nouvelle lecture du système). Depuis la 0.8.7, l'accueil simple n'a qu'une façon
+/// d'entrer dans les outils, la liste « Que se passe-t-il ? » ; les cartes d'outils et les familles M·A·U·S sont dans l'accueil complet.
 /// </summary>
 public sealed partial class MainViewModel
 {
@@ -55,14 +56,14 @@ public sealed partial class MainViewModel
 
     public bool IsHomeSimple => !IsHomeComplete;
 
-    /// <summary>« Voir les constats » : accueil complet seulement (l'accueil simple a la ligne des familles, qui y mène).</summary>
-    public bool ShowSeeFindingsButton => HasAudit && IsHomeComplete;
+    /// <summary>
+    /// « Voir les constats », dans les deux accueils : la seule porte de l'accueil vers les Constats. Effacé à l'étape 2 du
+    /// parcours, où le bouton principal porte déjà ce nom.
+    /// </summary>
+    public bool ShowSeeFindingsButton => HasAudit && !ShowReadFindingsButton;
 
     /// <summary>« Relancer l'audit » : l'accueil simple n'a qu'un bouton principal, « Corriger maintenant » s'il y a des corrections.</summary>
     public bool ShowRerunButton => HasAudit && (IsHomeComplete || !HasProposedChanges);
-
-    /// <summary>Cartes d'outils sur une ligne : trois dans l'accueil simple, quatre dans le complet.</summary>
-    public int ToolColumns => IsHomeComplete ? 4 : 3;
 
     /// <summary>
     /// Score affiché (anneau et chiffre) : il monte jusqu'au score à la fin de l'audit, sauf si les animations sont coupées.
@@ -82,7 +83,7 @@ public sealed partial class MainViewModel
     private void OnAppearanceChanged(object? sender, EventArgs e)
     {
         _homeComplete = AppearanceManager.Current.TechnicianMode;
-        foreach (var name in new[] { nameof(IsHomeComplete), nameof(IsHomeSimple), nameof(ShowSeeFindingsButton), nameof(ShowRerunButton), nameof(ToolColumns), nameof(ShowDriverCard) })
+        foreach (var name in new[] { nameof(IsHomeComplete), nameof(IsHomeSimple), nameof(ShowRerunButton), nameof(ShowDriverCard) })
         {
             OnPropertyChanged(name);
         }

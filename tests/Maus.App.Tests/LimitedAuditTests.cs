@@ -575,6 +575,59 @@ public sealed class LimitedAuditTests
     });
 
     [Fact]
+    public void Internet_and_crackling_sound_open_the_tests_on_their_own_tile() => UiThread.Run(() =>
+    {
+        using var bench = new TestBench();
+        var model = bench.ViewModel;
+        var workshop = model.Workshop;
+
+        // Atelier arrêté : seule la navigation est vérifiée, sans lecture du matériel de ce PC.
+        workshop.Stop();
+        workshop.ShowRamTests = true;
+
+        Row(model, "Internet rame").Action.Execute(null);
+
+        Assert.Equal(MainViewModel.TabWorkshop, model.SelectedTab);
+        Assert.Equal(Maus.App.ViewModels.Workshop.WorkshopViewModel.SectionTests, workshop.Section);
+        Assert.True(workshop.ShowNetTests);
+        Assert.False(workshop.ShowRamTests);
+        Assert.Contains("tuile Réseau", Row(model, "Internet rame").Detail, StringComparison.Ordinal);
+
+        model.SelectedTab = 0;
+        Row(model, "Le son craque ou les jeux saccadent").Action.Execute(null);
+
+        Assert.Equal(MainViewModel.TabWorkshop, model.SelectedTab);
+        Assert.Equal(Maus.App.ViewModels.Workshop.WorkshopViewModel.SectionTests, workshop.Section);
+        Assert.True(workshop.ShowCpuTests);
+        Assert.False(workshop.ShowNetTests);
+        Assert.Contains("tuile Processeur", Row(model, "Le son craque ou les jeux saccadent").Detail, StringComparison.Ordinal);
+        Assert.All(model.Symptoms, s => Assert.DoesNotContain("en bas de la page", s.Detail, StringComparison.Ordinal));
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public void The_home_has_one_see_findings_button_at_a_time() => UiThread.Run(async () =>
+    {
+        using var bench = new TestBench();
+        bench.Results.Add(new("M06", "Effets visuels", [TestBench.Finding("M06.a")], TimeSpan.Zero));
+        var model = bench.ViewModel;
+        Assert.False(model.ShowSeeFindingsButton);
+
+        await model.RunAuditAsync();
+
+        // Étape 2 du parcours : le bouton principal mène déjà aux constats, pas de second bouton du même nom.
+        Assert.True(model.ShowReadFindingsButton);
+        Assert.False(model.ShowSeeFindingsButton);
+
+        model.SelectedTab = MainViewModel.TabFindings;
+        model.SelectedTab = 0;
+
+        // Ensuite, dans l'accueil simple comme dans le complet, une seule porte vers les Constats.
+        Assert.False(model.ShowReadFindingsButton);
+        Assert.True(model.ShowSeeFindingsButton);
+    });
+
+    [Fact]
     public void Help_keeps_its_own_command_once_audited() => UiThread.Run(async () =>
     {
         using var bench = Limited();

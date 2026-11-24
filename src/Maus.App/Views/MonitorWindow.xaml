@@ -25,7 +25,8 @@
     <DockPanel x:Name="Page" Margin="16,14,16,12" Grid.IsSharedSizeScope="True">
         <!-- En-tête : depuis quand, remise à zéro, premier plan -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-            <CheckBox DockPanel.Dock="Right" Content="{x:Static app:Ui.MonitorOnTop}" VerticalAlignment="Center" Margin="12,0,0,0"
+            <!-- Le seul réglage « Toujours au premier plan » de MAUS (0.8.7) : retenu pour la prochaine ouverture. -->
+            <CheckBox DockPanel.Dock="Right" Content="{x:Static app:Ui.MonitorOnTop}" ToolTip="{x:Static app:Ui.MonitorOnTopNote}" VerticalAlignment="Center" Margin="12,0,0,0"
                       IsChecked="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" />
             <Button DockPanel.Dock="Right" Content="{x:Static app:Ui.MonitorReset}" Command="{Binding ResetCommand}" Padding="12,4" Margin="12,0,0,0" />
             <StackPanel>
