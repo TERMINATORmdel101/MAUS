@@ -2,7 +2,7 @@
 
 Les versions sont testées avec des simulations (faux registre, faux WMI, faux registres de contrôleur mémoire…). Depuis la 0.3.3-alpha, une partie des fonctions est aussi essayée sur le PC Windows du porteur : un seul PC, et pas toutes les fonctions (pour la 0.8.6, voir « Essais sur un vrai PC »).
 
-## 0.8.7 — en préparation
+## 0.8.7 — 24/11/2026 — accueil plus simple, catalogues revérifiés
 
 ### Catalogues revérifiés (24/11/2026)
 

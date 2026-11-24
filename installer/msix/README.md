@@ -81,9 +81,15 @@ Différences avec l'installateur classique :
 >
 > Source code (GPL-3.0): https://github.com/TERMINATORmdel101/MAUS
 
-### Nouveautés de la version (« Nouveautés de cette version », 0.8.6)
+### Nouveautés de la version (« Nouveautés de cette version », 0.8.7)
 
-Le lien vise `main` : il ne décrit la 0.8.6 qu'après la fusion. À la soumission, le remplacer par un lien figé sur le commit soumis.
+> **Français** — Accueil plus simple : une seule entrée vers les outils (« Que se passe-t-il ? ») et moins de boutons en double. « Internet rame » et « Le son craque » ouvrent le bon test. Catalogues revérifiés le 24/11/2026 : derniers pilotes NVIDIA, AMD et Intel, et Windows 11 26H2 avec ses dates de fin de maintenance. Le moteur administrateur et ses 31 opérations ne changent pas.
+>
+> **English** — Simpler home page: one way into the tools ("What's going on?") and fewer duplicate buttons. "The Internet is slow" and "Sound crackles" open the right test. Catalogs rechecked on 24 November 2026: latest NVIDIA, AMD and Intel drivers, and Windows 11 26H2 with its end-of-servicing dates. The administrator engine and its 31 operations are unchanged.
+>
+> **Español** — Inicio más sencillo: una sola entrada a las herramientas («¿Qué pasa?») y menos botones repetidos. «Internet va lento» y «El sonido cruje» abren la prueba correcta. Catálogos revisados el 24/11/2026: últimos controladores de NVIDIA, AMD e Intel, y Windows 11 26H2 con sus fechas de fin de mantenimiento. El motor de administrador y sus 31 operaciones no cambian.
+
+#### 0.8.6 (pour mémoire)
 
 > **Français** — Nouvelle page Suivi : ce que Windows a défait, ce qui a changé entre deux audits, carnet de santé, plantages des 30 derniers jours, avant et après une séance, dossier du PC à imprimer. L'audit marche aussi sans autorisation administrateur. Il dit si BitLocker chiffre le disque (MAUS ne lit jamais la clé), avec un encadré avant une mise à jour du BIOS, quelle mise à jour échoue, et si Microsoft retient une nouvelle version. « Mon PC a planté » distingue les causes notées par Windows, et le dernier vrai redémarrage est indiqué. Plus de sécurité : le moteur refuse toute clé de registre hors de sa liste, et l'audit de la semaine tourne sans droits ni réseau. Document de sécurité : https://github.com/TERMINATORmdel101/MAUS/blob/main/docs/store-security-design.md
 >
