@@ -39,6 +39,18 @@ public sealed class AuditSnapshotsTests : IDisposable
     }
 
     [Fact]
+    public void Compare_marks_a_verdict_changed_between_two_maus_versions()
+    {
+        var older = Audit(findings: [F("a", FindingStatus.Ok), F("b", FindingStatus.Problem)]);
+        var newer = Audit(findings: [F("a", FindingStatus.Warning), F("b", FindingStatus.Ok)]);
+
+        Assert.All(AuditComparison.Compare(older, newer), c => Assert.False(c.MausVersionChanged));
+        Assert.All(AuditComparison.Compare(older, newer with { MausVersion = "2" }), c => Assert.True(c.MausVersionChanged));
+        Assert.All(AuditComparison.Compare(older with { MausVersion = null }, newer), c => Assert.True(c.MausVersionChanged));
+        Assert.Equal(2, AuditComparison.Compare(older, newer with { MausVersion = "2" }).Count);
+    }
+
+    [Fact]
     public void Compare_never_treats_an_unread_module_or_status_as_a_change()
     {
         var older = Audit(findings: [F("a", FindingStatus.Problem, "M01"), F("b", FindingStatus.Ok, "M02"), F("d", FindingStatus.Problem, "M04"), F("keep", FindingStatus.Ok, "M04")]);
@@ -62,6 +74,36 @@ public sealed class AuditSnapshotsTests : IDisposable
 
         Assert.Equal("n", change.Title);
         Assert.Equal(AuditChangeKind.New, change.Kind);
+    }
+
+    [Fact]
+    public void Compare_never_compares_two_different_devices_at_the_same_place()
+    {
+        // Portable : capot ouvert, l'écran 1 est la dalle intégrée ; sur la station d'accueil, l'écran 1 est l'écran externe.
+        var older = Audit(findings: [new("M14.refresh.display-1", "M14", "Fréquence : écran intégré", FindingStatus.Ok, Item: "internal")]);
+        var newer = Audit(findings: [new("M14.refresh.display-1", "M14", "Fréquence : DELL", FindingStatus.Improvable, Item: "DELL U2720Q")]);
+        var sameScreen = Audit(findings: [new("M14.refresh.display-1", "M14", "Fréquence : écran intégré", FindingStatus.Improvable, Item: "internal")]);
+        var oldSummary = Audit(findings: [new("M14.refresh.display-1", "M14", "Fréquence", FindingStatus.Ok)]);
+
+        var change = Assert.Single(AuditComparison.Compare(older, newer));
+        Assert.Equal(AuditChangeKind.NotComparable, change.Kind);
+        Assert.True(change.OtherDevice);
+        Assert.Equal(AuditChangeKind.Worse, Assert.Single(AuditComparison.Compare(older, sameScreen)).Kind);
+
+        // Un résumé écrit avant ce champ ne dit pas quel appareil : comparé comme avant.
+        Assert.Equal(AuditChangeKind.Worse, Assert.Single(AuditComparison.Compare(oldSummary, newer)).Kind);
+    }
+
+    [Fact]
+    public void The_device_of_a_finding_is_kept_in_the_summary()
+    {
+        var path = Path.Combine(_folder, "audit-snapshots.json");
+        var store = new AuditSnapshotStore(path);
+        var finding = new Finding { Id = "M11.disk-0-health", Title = "Santé", Status = FindingStatus.Ok, Explanation = "e", MeasuredItem = "CT500P2SSD8" };
+
+        store.Add(AuditSnapshot.From([new ModuleResult("M11", "Santé", [finding], TimeSpan.Zero)], "1", Day));
+
+        Assert.Equal("CT500P2SSD8", Assert.Single(store.Load()).Findings.Single().Item);
     }
 
     [Fact]

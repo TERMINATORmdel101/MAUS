@@ -57,7 +57,7 @@ public sealed class DevicesModule : IAuditModule
         var waiting = devices.Where(d => Transient.Contains(d.Code)).ToList();
 
         var findings = new List<Finding> { Summary(failing, disabled, waiting) };
-        findings.AddRange(failing.Select(Describe));
+        findings.AddRange(DeviceFindingId.ForEach(failing.Select(d => d.PnpId.Length > 0 ? d.PnpId : d.Name).ToList()).Zip(failing, (id, device) => Describe(device, id)));
         if (UnsignedDrivers(context.Cim) is { } unsigned)
         {
             findings.Add(unsigned);
@@ -134,14 +134,14 @@ public sealed class DevicesModule : IAuditModule
         SettingsPage = failing.Count == 0 ? null : OptionalUpdatesPage,
     };
 
-    private static Finding Describe(Device device)
+    private static Finding Describe(Device device, string id)
     {
         var (meaning, advice, settingsPage) = Explain(device.Code);
         var critical = device.Class is "Display" or "SCSIAdapter" or "HDC" && device.Code is 10 or 28 or 31 or 39 or 43;
         var severity = critical ? Severity.High : Severity.Medium;
         return new Finding
         {
-            Id = "M17.device." + Slug(device.PnpId.Length > 0 ? device.PnpId : device.Name),
+            Id = id,
             Title = T("Périphérique en erreur : {0}", device.Name),
             Category = Category,
             Status = FindingStatusExtensions.ForDeviation(severity),
@@ -203,7 +203,51 @@ public sealed class DevicesModule : IAuditModule
         _ => pnpClass,
     };
 
-    private static string Slug(string value) => FindingSlug.Of(value, 60);
-
     private sealed record Device(string Name, string PnpId, string Class, long Code, bool Present);
+}
+
+/// <summary>
+/// Identifiant du constat d'un appareil en erreur (0.8.7.1) : le bus lu au début de l'identifiant de Windows (« usb », « pci »,
+/// « bthenum »…) et une empreinte courte. Jusqu'à la 0.8.7, il reprenait l'identifiant de Windows entier, dont la fin est le numéro
+/// de série d'un appareil USB ou l'adresse d'un appareil Bluetooth : ils sortaient avec lui dans « Demander de l'aide », le CSV et
+/// le JSON. L'empreinte, de 16 bits seulement, ne permet pas de les retrouver ; elle est calculée sur l'ancien identifiant, ce qui
+/// permet de reprendre les marques « voulu » posées avant (<see cref="Upgrade"/>).
+/// </summary>
+internal static class DeviceFindingId
+{
+    public const string Prefix = "M17.device.";
+
+    /// <summary>Identifiants des appareils, dans l'ordre reçu ; deux empreintes égales sur ce PC sont départagées par « .2 », « .3 »…</summary>
+    public static IReadOnlyList<string> ForEach(IReadOnlyList<string> pnpIdsOrNames)
+    {
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        return [.. pnpIdsOrNames.Select(value =>
+        {
+            var id = Of(value);
+            seen[id] = seen.TryGetValue(id, out var count) ? count + 1 : 1;
+            return seen[id] == 1 ? id : id + "." + seen[id].ToString(System.Globalization.CultureInfo.InvariantCulture);
+        })];
+    }
+
+    /// <summary>Identifiant d'un appareil, d'après son identifiant de Windows (ou son nom, s'il n'en a pas).</summary>
+    public static string Of(string pnpIdOrName) => FromLegacy(FindingSlug.Of(pnpIdOrName, 60));
+
+    /// <summary>
+    /// Marque « voulu » posée avant la 0.8.7.1 : l'ancien identifiant (sans point après le préfixe, l'ancien calcul n'en produisant
+    /// jamais) devient le nouveau. Tout autre identifiant reste tel quel.
+    /// </summary>
+    public static string Upgrade(string findingId)
+    {
+        ArgumentNullException.ThrowIfNull(findingId);
+        return findingId.StartsWith(Prefix, StringComparison.Ordinal) && findingId.Length > Prefix.Length && !findingId.AsSpan(Prefix.Length).Contains('.')
+            ? FromLegacy(findingId[Prefix.Length..])
+            : findingId;
+    }
+
+    private static string FromLegacy(string legacy)
+    {
+        var bus = legacy.Split('-')[0];
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(legacy));
+        return Prefix + (bus.Length > 16 ? bus[..16] : bus) + "." + Convert.ToHexStringLower(hash.AsSpan(0, 2));
+    }
 }

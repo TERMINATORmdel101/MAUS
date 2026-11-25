@@ -209,36 +209,25 @@ public sealed record UserPreferences
     };
 
     /// <summary>
-    /// Marque valable pour ce constat, c'est-à-dire posée sur la même valeur constatée. Une marque posée dans une autre
-    /// langue ne peut pas être comparée mot pour mot : elle reste valable jusqu'à <see cref="RebindLanguage"/>.
+    /// Marque valable pour ce constat, c'est-à-dire posée sur la même valeur constatée, mot pour mot. Une marque posée quand
+    /// MAUS était dans une autre langue ne vaut donc pas pour une valeur écrite autrement : rien ne permet de dire que la
+    /// situation est la même, le constat est de nouveau signalé (<see cref="OtherLanguageMarkFor"/>) jusqu'à ce que
+    /// l'utilisateur le marque de nouveau, avec la confirmation du moteur.
     /// </summary>
     public Acknowledgement? AcknowledgementFor(Finding finding)
     {
         ArgumentNullException.ThrowIfNull(finding);
         var current = Acknowledgement.Bounded(finding.Current);
-        return Acknowledged.FirstOrDefault(a => a.FindingId == finding.Id
-            && (string.Equals(a.Current, current, StringComparison.Ordinal) || IsOtherLanguage(a)));
+        return Acknowledged.FirstOrDefault(a => a.FindingId == finding.Id && string.Equals(a.Current, current, StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// Après un changement de langue : réécrit dans la langue active la valeur des marques qui s'appliquent aux constats
-    /// de cet audit, pour que la comparaison mot pour mot reprenne. Renvoie la même instance si rien ne change.
-    /// </summary>
-    public UserPreferences RebindLanguage(IEnumerable<Finding> findings)
+    /// <summary>Marque de ce constat posée dans une autre langue de MAUS, qui ne s'applique pas à la valeur lue ; sinon <c>null</c>.</summary>
+    public Acknowledgement? OtherLanguageMarkFor(Finding finding)
     {
-        var byId = findings.Where(f => f.AcknowledgedFrom is not null).GroupBy(f => f.Id).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-        var changed = false;
-        var list = Acknowledged.Select(a =>
-        {
-            if (!IsOtherLanguage(a) || !byId.TryGetValue(a.FindingId, out var finding))
-            {
-                return a;
-            }
-
-            changed = true;
-            return a with { Current = Acknowledgement.Bounded(finding.Current), Language = Localization.Texts.Language };
-        }).ToList();
-        return changed ? this with { Acknowledged = list } : this;
+        ArgumentNullException.ThrowIfNull(finding);
+        return AcknowledgementFor(finding) is null
+            ? Acknowledged.FirstOrDefault(a => a.FindingId == finding.Id && IsOtherLanguage(a))
+            : null;
     }
 
     private static bool IsOtherLanguage(Acknowledgement mark) =>

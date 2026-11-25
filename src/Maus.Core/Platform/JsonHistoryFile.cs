@@ -1,3 +1,4 @@
+using System.IO.MemoryMappedFiles;
 using System.Text.Json;
 
 namespace Maus.Core.Platform;
@@ -16,6 +17,7 @@ namespace Maus.Core.Platform;
 /// <param name="isValid">JSON valide mais vidé de son contenu : faux, et le fichier est traité comme abîmé.</param>
 /// <param name="kept">Choix des entrées gardées, à la place de <c>keep</c>, parmi toutes les entrées triées.</param>
 /// <param name="clean">Ce qui est montré d'une entrée relue ; <c>null</c> : elle n'est pas montrée. Le fichier garde l'entrée telle quelle, une horloge remise à l'heure peut la rendre valable.</param>
+/// <param name="gateWait">Attente du verrou sans qu'aucune écriture n'y passe avant de renoncer (remplaçable pour les tests).</param>
 public sealed class JsonHistoryFile<T>(
     string path,
     JsonSerializerOptions options,
@@ -25,9 +27,14 @@ public sealed class JsonHistoryFile<T>(
     Action<TimeSpan>? wait = null,
     Func<List<T>, bool>? isValid = null,
     Func<IReadOnlyList<T>, IEnumerable<T>>? kept = null,
-    Func<T, T?>? clean = null)
+    Func<T, T?>? clean = null,
+    TimeSpan? gateWait = null)
     where T : class
 {
+    /// <summary>
+    /// Attente du verrou sans qu'aucune écriture n'y passe : au-delà, celle qui le tient est bloquée et l'écriture est refusée.
+    /// Tant que les écritures passent l'une après l'autre, même nombreuses sur un PC lent, l'attente continue.
+    /// </summary>
     private static readonly TimeSpan GateWait = TimeSpan.FromSeconds(5);
 
     /// <summary>Entrées gardées, de la plus ancienne à la plus récente ; vide si le fichier est absent ou illisible.</summary>
@@ -74,7 +81,7 @@ public sealed class JsonHistoryFile<T>(
     /// Ajoute une entrée ; rend les entrées gardées. Lire, ajouter et réécrire se fait d'un seul tenant, y compris face à un autre
     /// processus de MAUS (audit de la semaine) : deux écritures au même instant ne s'effacent pas.
     /// </summary>
-    /// <exception cref="IOException">Fichier momentanément illisible (laissé intact), occupé trop longtemps ou écriture impossible.</exception>
+    /// <exception cref="IOException">Fichier momentanément illisible (laissé intact), verrou tenu par une écriture bloquée ou écriture impossible.</exception>
     /// <exception cref="UnauthorizedAccessException">Écriture refusée.</exception>
     public IReadOnlyList<T> Add(T entry)
     {
@@ -84,7 +91,8 @@ public sealed class JsonHistoryFile<T>(
             return AddNow(entry);
         }
 
-        if (!Enter(gate))
+        using var passages = GatePassages.Open(GateName(path));
+        if (!Enter(gate, passages))
         {
             throw new IOException(unreadable(null));
         }
@@ -95,16 +103,20 @@ public sealed class JsonHistoryFile<T>(
         }
         finally
         {
+            passages?.CountOne();
             gate.ReleaseMutex();
         }
     }
+
+    /// <summary>Nom du verrou d'un fichier : son nom seul, pour qu'un même fichier n'ait jamais deux verrous, quelle que soit la façon d'écrire son chemin.</summary>
+    private static string GateName(string path) => @"Local\MAUS.Historique." + Path.GetFileName(path);
 
     /// <summary>Verrou partagé par les processus de cette session ; <c>null</c> s'il ne s'ouvre pas (créé par un processus administrateur) : on écrit comme avant.</summary>
     private Mutex? OpenGate()
     {
         try
         {
-            return new Mutex(false, @"Local\MAUS.Historique." + Path.GetFileName(path));
+            return new Mutex(false, GateName(path));
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or WaitHandleCannotBeOpenedException)
         {
@@ -112,11 +124,28 @@ public sealed class JsonHistoryFile<T>(
         }
     }
 
-    private static bool Enter(Mutex gate)
+    /// <summary>
+    /// Attend le verrou. Les écritures passent l'une après l'autre : sur un PC lent, la dernière d'une file peut attendre bien plus
+    /// que <see cref="GateWait"/> sans que rien ne soit bloqué. L'écriture n'est donc refusée qu'après une attente entière sans
+    /// aucun passage, ou sans compteur pour le savoir (version plus ancienne de MAUS, compteur inaccessible) : comme avant.
+    /// </summary>
+    private bool Enter(Mutex gate, GatePassages? passages)
     {
+        var seen = passages?.Count;
         try
         {
-            return gate.WaitOne(GateWait);
+            while (!gate.WaitOne(gateWait ?? GateWait))
+            {
+                var now = passages?.Count;
+                if (now is null || now == seen)
+                {
+                    return false;
+                }
+
+                seen = now;
+            }
+
+            return true;
         }
         catch (AbandonedMutexException)
         {
@@ -174,5 +203,53 @@ public sealed class JsonHistoryFile<T>(
         {
             return null;
         }
+    }
+}
+
+/// <summary>
+/// Nombre d'écritures passées par le verrou d'un historique, partagé comme lui par les processus de la session : tant qu'il
+/// change, la file d'attente avance. Seule l'écriture qui tient le verrou l'augmente, juste avant de le rendre.
+/// </summary>
+internal sealed class GatePassages : IDisposable
+{
+    private readonly MemoryMappedFile _shared;
+    private readonly MemoryMappedViewAccessor _view;
+
+    private GatePassages(MemoryMappedFile shared)
+    {
+        _shared = shared;
+        _view = shared.CreateViewAccessor(0, sizeof(long));
+    }
+
+    /// <summary>Compteur du verrou <paramref name="gateName"/> ; <c>null</c> s'il ne s'ouvre pas (créé par un processus administrateur).</summary>
+    public static GatePassages? Open(string gateName)
+    {
+        MemoryMappedFile? shared = null;
+        try
+        {
+            shared = MemoryMappedFile.CreateOrOpen(gateName + ".Passages", sizeof(long));
+            var passages = new GatePassages(shared);
+            shared = null;
+            return passages;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or PlatformNotSupportedException)
+        {
+            return null;
+        }
+        finally
+        {
+            shared?.Dispose();
+        }
+    }
+
+    public long Count => _view.ReadInt64(0);
+
+    /// <summary>Compte une écriture : à n'appeler qu'en tenant le verrou, seul à écrire ce nombre.</summary>
+    public void CountOne() => _view.Write(0, Count + 1);
+
+    public void Dispose()
+    {
+        _view.Dispose();
+        _shared.Dispose();
     }
 }

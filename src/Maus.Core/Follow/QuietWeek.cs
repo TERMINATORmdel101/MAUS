@@ -105,7 +105,7 @@ public static class QuietWeek
             return new(QuietWeekState.NotComparable, $"{count}, {T("pas encore de point de comparaison.")}", recent.Count, [], [LastAudit(latest)]);
         }
 
-        var points = Compare(chain);
+        var (points, withMaus) = Compare(chain);
         var notes = new List<string> { LastAudit(latest) };
         if (older is null)
         {
@@ -128,28 +128,46 @@ public static class QuietWeek
             notes.Add(T("MAUS a changé de version entre ces audits : ce qu'un nouveau contrôle a pu faire apparaître n'est pas compté."));
         }
 
+        // Verdict aggravé en même temps que MAUS a changé de version : la règle a pu changer avec lui, pas le PC (0.8.7.1).
+        if (withMaus.Count > 0)
+        {
+            notes.Add(T("Verdict changé en même temps que la version de MAUS, non compté (la règle a pu changer avec MAUS, sans que le PC bouge) : {0}.",
+                string.Join(", ", withMaus.Take(QuietWeekSummary.ShownPoints).Select(title => T(title)))));
+        }
+
         notes.Add(T("Seuls les audits allés au bout sont gardés et comptés."));
         return new(points.Count == 0 ? QuietWeekState.Quiet : QuietWeekState.News, $"{count}, {NewsText(points.Count)}{ScopeText(latest, recent.Count)}.", recent.Count, [.. points.Take(QuietWeekSummary.ShownPoints)], notes);
     }
 
-    /// <summary>D'audit en audit : ce qui est apparu puis reparti entre deux visites est dit aussi, à sa date. Un constat marqué « voulu » n'est pas nouveau.</summary>
-    private static List<QuietWeekPoint> Compare(List<AuditSnapshot> chain)
+    /// <summary>
+    /// D'audit en audit : ce qui est apparu puis reparti entre deux visites est dit aussi, à sa date. Un constat marqué « voulu » n'est
+    /// pas nouveau. Un verdict aggravé entre deux versions de MAUS est mis à part (titres seulement), sans compter comme une aggravation.
+    /// </summary>
+    private static (List<QuietWeekPoint> Points, List<string> WithMaus) Compare(List<AuditSnapshot> chain)
     {
         var seen = new HashSet<(string, string)>();
         var points = new List<QuietWeekPoint>();
+        var withMaus = new List<string>();
         for (var i = 1; i < chain.Count; i++)
         {
             var notWanted = chain[i] with { Findings = [.. chain[i].Findings.Where(f => !f.Acknowledged)] };
             foreach (var change in AuditComparison.Compare(chain[i - 1], notWanted))
             {
-                if (change.Kind is AuditChangeKind.New or AuditChangeKind.Worse && seen.Add((change.ModuleId, change.Title)))
+                if (change.Kind is AuditChangeKind.Worse && change.MausVersionChanged)
+                {
+                    if (!withMaus.Contains(change.Title, StringComparer.Ordinal))
+                    {
+                        withMaus.Add(change.Title);
+                    }
+                }
+                else if (change.Kind is AuditChangeKind.New or AuditChangeKind.Worse && seen.Add((change.ModuleId, change.Title)))
                 {
                     points.Add(new(change.Title, chain[i].At, change.Kind == AuditChangeKind.Worse));
                 }
             }
         }
 
-        return points;
+        return (points, withMaus);
     }
 
     private static QuietWeekSummary Without(QuietWeekState state, string headline) => new(state, headline, 0, [], []);

@@ -105,6 +105,11 @@ internal static class FixCommands
             }
         }
 
+        if (selected.Any(c => c.SetsPolicy))
+        {
+            output.WriteLine(PlannedChange.PolicyNotice);
+        }
+
         output.WriteLine(options.CreateRestorePoint
             ? T("Un point de restauration sera créé et vérifié avant toute modification.")
             : T("Aucun point de restauration ne sera créé (le journal permettra quand même d'annuler)."));

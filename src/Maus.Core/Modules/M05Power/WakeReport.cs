@@ -21,7 +21,6 @@ public static partial class WakeReport
     internal const string TasksQuery = "SELECT TaskName, TaskPath, State, Settings FROM MSFT_ScheduledTask";
     private const int Days = 30;
     private const int Shown = 8;
-    private const long DisabledTaskState = 1;
 
     private static CultureInfo Culture => CultureInfo.CurrentCulture;
 
@@ -62,11 +61,15 @@ public static partial class WakeReport
             _ => T("Appareils autorisés à réveiller le PC : {0}.", string.Join(", ", devices)),
         });
 
+        // Sans droits administrateur, Windows cache une partie des tâches (le dossier UpdateOrchestrator, celui des mises à jour,
+        // paraît vide, voir Module 1) : la liste est partielle, et une liste vide ne prouve rien.
         var tasks = ReadWakeTasks(context.Cim);
         parts.Add(tasks switch
         {
             null => T("Liste des tâches planifiées : illisible."),
+            { Count: 0 } when !context.IsElevated => T("Tâches planifiées réglées pour réveiller le PC : liste partielle sans droits administrateur (certains dossiers de Windows, comme celui des mises à jour, paraissent vides) ; rien de trouvé dans la partie visible. Relancez l'audit en administrateur pour la liste complète."),
             { Count: 0 } => T("Aucune tâche planifiée active n'est réglée pour réveiller le PC."),
+            _ when !context.IsElevated => T("Tâches planifiées réglées pour réveiller le PC (liste partielle sans droits administrateur) : {0}.", string.Join(", ", tasks)),
             _ => T("Tâches planifiées réglées pour réveiller le PC : {0}.", string.Join(", ", tasks)),
         });
 
@@ -156,7 +159,7 @@ public static partial class WakeReport
         try
         {
             return cim.Query(TasksQuery, CimScopes.TaskScheduler)
-                .Where(t => t.GetInt64("State") != DisabledTaskState && t.GetRow("Settings")?.GetBool("WakeToRun") == true)
+                .Where(t => Fixes.WindowsScheduledTaskAccessor.IsEnabled(t) && t.GetRow("Settings")?.GetBool("WakeToRun") == true)
                 .Select(t => $"{t.GetString("TaskPath") ?? @"\"}{t.GetString("TaskName")}".TrimStart('\\'))
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToList();

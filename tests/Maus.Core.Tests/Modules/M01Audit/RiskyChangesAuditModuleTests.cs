@@ -331,6 +331,47 @@ public class RiskyChangesAuditModuleTests
     }
 
     [Fact]
+    public async Task On_a_managed_pc_policies_set_by_the_organisation_are_information_but_uac_stays_judged()
+    {
+        var pc = new M01Pc { HardwareManaged = true };
+        pc.Registry
+            .Set(Hklm, M01Pc.WuPolicy + @"\AU", "NoAutoUpdate", 1)
+            .Set(Hklm, M01Pc.Policies + @"\Windows\System", "EnableSmartScreen", 0)
+            .Set(Hklm, @"SOFTWARE\Policies\Microsoft\WindowsFirewall\DomainProfile", "EnableFirewall", 0)
+            .Set(Hklm, M01Pc.UacKey, "EnableLUA", 0);
+
+        var findings = await pc.RunAsync();
+
+        foreach (var id in new[] { "M01.wu-auto-update", "M01.smartscreen", "M01.firewall" })
+        {
+            var finding = findings.Single(f => f.Id == id);
+            Assert.Equal(FindingStatus.Info, finding.Status);
+            Assert.False(finding.Fixable, id);
+            Assert.Contains("service informatique", finding.Explanation, StringComparison.Ordinal);
+        }
+
+        // UAC coupé hors de la clé des stratégies : un programme peut aussi l'avoir fait, il reste signalé (sans correction sur un PC géré).
+        Assert.Equal(FindingStatus.Problem, findings.Single(f => f.Id == "M01.uac").Status);
+
+        // Le même PC, non géré : les mêmes valeurs sont des écarts.
+        pc.HardwareManaged = false;
+        var personal = await pc.RunAsync();
+        Assert.Equal(FindingStatus.Problem, personal.Single(f => f.Id == "M01.wu-auto-update").Status);
+        Assert.True(personal.Single(f => f.Id == "M01.smartscreen").Fixable);
+        Assert.Equal(FindingStatus.Warning, personal.Single(f => f.Id == "M01.firewall").Status);
+    }
+
+    [Fact]
+    public async Task On_a_managed_pc_a_firewall_profile_off_outside_policies_stays_flagged()
+    {
+        var pc = new M01Pc { HardwareManaged = true };
+        pc.Registry.Set(Hklm, @"SOFTWARE\Policies\Microsoft\WindowsFirewall\DomainProfile", "EnableFirewall", 0);
+        pc.Cim.Answer(RiskyChangesAuditModule.FirewallProfileQuery, CimScopes.StandardCimv2, M01Pc.Profile("Domain", 1), M01Pc.Profile("Private", 0), M01Pc.Profile("Public", 1));
+
+        Assert.Equal(FindingStatus.Problem, (await pc.RunAsync("M01.firewall")).Status);
+    }
+
+    [Fact]
     public async Task Unmanaged_pc_with_wsus_leftovers_is_flagged()
     {
         var pc = new M01Pc { HardwareManaged = false };
@@ -522,6 +563,20 @@ public class RiskyChangesAuditModuleTests
 
         Assert.Equal(FindingStatus.Improvable, finding.Status);
         Assert.Contains("Ancien", finding.Current, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Startup_program_with_an_unverifiable_signature_is_not_called_signed()
+    {
+        // Signature au résultat inconnu (par exemple certificat expiré) : ni « tous signés » ni « non signé ».
+        var pc = new M01Pc();
+        pc.Signatures.Statuses[@"C:\Program Files (x86)\Steam\steam.exe"] = SignatureStatus.Unknown;
+
+        var finding = await pc.RunAsync("M01.unsigned-startup");
+
+        Assert.Equal(FindingStatus.Info, finding.Status);
+        Assert.StartsWith("1 signé(s), 1 non vérifié(s) : Steam", finding.Current, StringComparison.Ordinal);
+        Assert.DoesNotContain("tous signés", finding.Current, StringComparison.Ordinal);
     }
 
     [Fact]

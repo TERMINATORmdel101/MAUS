@@ -305,37 +305,18 @@ public class SensitiveSettingsTests
         Assert.True(result.Blocked);
     }
 
-    private static readonly Finding Audited = new() { Id = "M01.defender", Title = "t", Status = FindingStatus.Info, Current = "valeur lue", Explanation = "e" };
-
-    /// <summary>Une marque reprise dans la langue de l'audit du moteur après un changement de langue.</summary>
+    /// <summary>
+    /// Une marque reprise dans une autre langue (0.8.7.1) : le moteur ne peut pas dire que la situation est la même, il pose la
+    /// question, même si le texte est celui de son propre audit.
+    /// </summary>
     [Fact]
-    public void A_mark_taken_over_after_a_language_change_must_match_the_audit_of_the_engine()
+    public void A_mark_taken_over_after_a_language_change_is_asked()
     {
         var old = new Acknowledgement("M01.defender", "ancien texte", DateTimeOffset.UnixEpoch, "fr");
-        var taken = old with { Current = "valeur lue", Language = "en" };
 
-        Assert.True(LocalMausEngine.IsKnownAcknowledgement(taken, [old], [Audited], "en"));
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(taken with { Current = "autre valeur" }, [old], [Audited], "en"));
-    }
-
-    [Fact]
-    public void A_mark_taken_over_without_an_audit_of_the_engine_is_asked()
-    {
-        var old = new Acknowledgement("M01.defender", "ancien texte", DateTimeOffset.UnixEpoch, "fr");
-        var taken = old with { Current = "valeur lue", Language = "en" };
-
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(taken, [old], [], null));
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(taken, [old], [Audited], null));
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(taken, [old], [], "en"));
-    }
-
-    [Fact]
-    public void Changing_only_the_language_of_a_mark_is_asked()
-    {
-        var old = new Acknowledgement("M01.defender", "valeur lue", DateTimeOffset.UnixEpoch, "fr");
-
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Language = "en" }, [old], [Audited], "fr"));
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Language = null }, [old], [Audited], "fr"));
+        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Current = "valeur lue", Language = "en" }, [old]));
+        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Language = "en" }, [old]));
+        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Language = null }, [old]));
     }
 
     [Fact]
@@ -343,7 +324,7 @@ public class SensitiveSettingsTests
     {
         var old = new Acknowledgement("M01.defender", "ancien texte", DateTimeOffset.UnixEpoch);
 
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Current = "valeur lue", Language = "en" }, [old], [Audited], "en"));
+        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Current = "valeur lue", Language = "en" }, [old]));
     }
 
     [Fact]
@@ -351,12 +332,15 @@ public class SensitiveSettingsTests
     {
         var old = new Acknowledgement("M01.defender", "ancien texte", DateTimeOffset.UnixEpoch, "fr");
 
-        Assert.True(LocalMausEngine.IsKnownAcknowledgement(old, [old], [], null));
+        Assert.True(LocalMausEngine.IsKnownAcknowledgement(old, [old]));
     }
 
-    /// <summary>Le parcours normal : audit du moteur dans la nouvelle langue, puis marque réécrite, sans aucune question.</summary>
+    /// <summary>
+    /// Après un changement de langue, la fenêtre ne réécrit plus les marques en silence : une marque réécrite dans la nouvelle
+    /// langue passe par la question du moteur, et un « non » laisse l'ancienne telle quelle.
+    /// </summary>
     [Fact]
-    public async Task Rewriting_a_mark_after_the_audit_of_the_engine_asks_nothing()
+    public async Task Rewriting_a_mark_in_another_language_is_asked_even_after_the_audit_of_the_engine()
     {
         var no = new Answer(false);
         var store = new MemoryPreferencesStore();
@@ -368,8 +352,8 @@ public class SensitiveSettingsTests
 
         var state = await engine.SavePreferencesAsync(UserPreferences.Default with { Acknowledged = [new Acknowledgement(read.Id, read.Current, DateTimeOffset.UnixEpoch, language)] }, CancellationToken.None);
 
-        Assert.Null(state.NotSaved);
-        Assert.Empty(no.Asked);
-        Assert.Equal(read.Current, Assert.Single(store.Load().Acknowledged).Current);
+        Assert.NotNull(state.NotSaved);
+        Assert.NotEmpty(no.Asked);
+        Assert.Equal("ancien texte", Assert.Single(store.Load().Acknowledged).Current);
     }
 }

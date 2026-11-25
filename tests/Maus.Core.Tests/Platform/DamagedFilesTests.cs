@@ -956,7 +956,7 @@ public sealed class DamagedFilesTests : IDisposable
         Assert.Empty(preferences.Acknowledged);
         Assert.Null(preferences.AcknowledgementFor(AFinding));
         Assert.Empty(preferences.Unacknowledge("M01.a").Acknowledged);
-        Assert.Same(preferences, preferences.RebindLanguage([AFinding]));
+        Assert.Null(preferences.OtherLanguageMarkFor(AFinding));
         Assert.Equal(FindingStatus.Warning, Assert.Single(Acknowledgements.Apply(new ModuleResult("M01", "M", [AFinding], TimeSpan.Zero), preferences).Findings).Status);
 
         store.Save(preferences);

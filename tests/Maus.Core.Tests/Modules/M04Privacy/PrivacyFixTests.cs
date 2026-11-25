@@ -78,6 +78,41 @@ public class PrivacyFixTests
         Assert.Single(plan.Single(c => c.Id == "M04.advertising-id").Writes);
     }
 
+    /// <summary>
+    /// Une stratégie posée fait dire à Paramètres « géré par votre organisation » et grise l'interrupteur : chaque correction qui
+    /// en pose une le dit avant d'appliquer, y compris sur Famille ; celles qui n'en posent pas ne le disent pas.
+    /// </summary>
+    [Theory]
+    [InlineData("Professional", "Windows 11 Pro")]
+    [InlineData("Core", "Windows 11 Famille")]
+    public async Task Every_change_that_sets_a_policy_says_what_settings_will_show(string edition, string name)
+    {
+        var audit = TestContext.Create(WindowsDefaults(), windows: new WindowsInfo(name, edition, "25H2", 26200, 1000));
+        var module = new PrivacyModule();
+
+        var plan = module.Plan(audit, await module.DetectAsync(audit, CancellationToken.None));
+
+        Assert.Contains(plan, c => c.SetsPolicy && c.Recommended);
+        Assert.All(plan.Where(c => c.SetsPolicy), c => Assert.Contains("gérés par votre organisation", c.Risk, StringComparison.Ordinal));
+        Assert.All(plan.Where(c => !c.SetsPolicy), c => Assert.DoesNotContain("organisation", c.Risk ?? string.Empty, StringComparison.Ordinal));
+        Assert.Contains("Windows Insider", plan.Single(c => c.Id == "M04.diagnostic-data").Risk, StringComparison.Ordinal);
+        Assert.Contains("gérés par votre organisation", plan.Single(c => c.Id == "M04.activity-history").Risk, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Removing_a_policy_or_writing_outside_policies_is_not_setting_a_policy()
+    {
+        static Maus.Core.Fixes.PlannedChange With(params Maus.Core.Fixes.SettingWrite[] writes) => new() { Id = "x", ModuleId = "M04", Title = "t", Description = "d", Writes = writes };
+        var policy = Maus.Core.Fixes.SettingKey.Registry("HKLM", @"SOFTWARE\Policies\Microsoft\Windows\System", "EnableActivityFeed");
+        var plain = Maus.Core.Fixes.SettingKey.Registry("HKCU", @"Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo", "Enabled");
+
+        Assert.True(With(new Maus.Core.Fixes.SettingWrite(policy, Maus.Core.Fixes.SettingValue.Dword(0))).SetsPolicy);
+        Assert.False(With(new Maus.Core.Fixes.SettingWrite(policy, null)).SetsPolicy);
+        Assert.False(With(new Maus.Core.Fixes.SettingWrite(plain, Maus.Core.Fixes.SettingValue.Dword(0))).SetsPolicy);
+        Assert.Null(Maus.Core.Fixes.PlannedChange.WithPolicyRisk(null, setsPolicy: false));
+        Assert.StartsWith("Risque.", Maus.Core.Fixes.PlannedChange.WithPolicyRisk("Risque.", setsPolicy: true), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Level_zero_is_offered_but_not_preselected_on_enterprise()
     {

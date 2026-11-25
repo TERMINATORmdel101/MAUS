@@ -46,6 +46,9 @@ public enum NotComparableReason
 
     /// <summary>Des contrôles lus dans un audit et indéterminés dans l'autre.</summary>
     Undetermined,
+
+    /// <summary>Un autre appareil (écran, disque, carte graphique) occupe la même place dans les deux audits : son verdict n'est pas comparé.</summary>
+    OtherDevice,
 }
 
 /// <summary>
@@ -394,6 +397,11 @@ public static partial class WhatChanged
 
         private NotComparableNote NoteFor(AuditChange change, string name)
         {
+            if (change.OtherDevice)
+            {
+                return new(ChangeFamily.Finding, NotComparableReason.OtherDevice, name, newer.At, Side: ChangeType.Changed);
+            }
+
             var side = change.After is null ? ChangeType.Gone : ChangeType.Appeared;
             if (!_sameAccount)
             {

@@ -243,19 +243,12 @@ public sealed partial class MainViewModel : ObservableObject
             SystemSummary = $"{context.Windows.ProductName} {context.Windows.DisplayVersion} (build {context.Windows.FullBuild}) · " +
                             $"{Labels.Of(context.Hardware.FormFactor)} · {context.Hardware.Cpu.DisplayName}";
             _results = [.. run.Results];
-            var findings = _results.SelectMany(r => r.Findings).ToList();
             // Les comptes sont déjà sous le score et dans « À traiter d'abord » : ici, seulement l'heure de l'audit.
             StatusText = context.IsElevated ? T("Audit terminé à {0:t}.", DateTime.Now) : T("Audit sans droits administrateur terminé à {0:t}.", DateTime.Now);
             OnPropertyChanged(nameof(SelectedModule));
 
             _lastContext = context;
             fresh = true;
-
-            // Sans droits : tout ce qui suit et passe par le moteur demanderait une autorisation que personne n'a voulue.
-            if (!IsLimitedAudit && CanReadJournalSilently())
-            {
-                await RebindAcknowledgementsAsync(findings);
-            }
 
             OnPropertyChanged(nameof(HasAudit));
             OnPropertyChanged(nameof(IsFirstAudit));
@@ -277,7 +270,7 @@ public sealed partial class MainViewModel : ObservableObject
 
             if (IsLimitedAudit)
             {
-                BlockingReason = context.Hardware is { IsManaged: true } or { ManagementUnknown: true } ? context.BlockingReason : T("Les corrections demandent les droits administrateur : cliquez sur « Toutes les fonctionnalités », en haut de la fenêtre, puis relancez l'audit.");
+                BlockingReason = context.Hardware is { IsManaged: true } or { ManagementUnknown: true } ? context.BlockingReason : LimitedBlockingReason;
                 ForgetPlan();
                 ForgetComparison();
                 RefreshDashboard();
@@ -285,10 +278,12 @@ public sealed partial class MainViewModel : ObservableObject
                 return fresh;
             }
 
-            BlockingReason = context.BlockingReason
-                ?? (context.ElevatedAsAnotherUser
-                    ? T("MAUS a été lancé avec un autre compte administrateur : les réglages de votre profil (effets visuels, confidentialité, Game Bar) seront ignorés. Relancez MAUS depuis votre propre session.")
-                    : null);
+            // Autre compte administrateur : pas un blocage. Le moteur a mis à part les constats de profil et saute ces écritures ;
+            // les corrections communes au PC restent possibles.
+            BlockingReason = context.BlockingReason;
+            OtherAccountNotice = context.ElevatedAsAnotherUser
+                ? T("MAUS a été ouvert avec un autre compte administrateur que le vôtre (par exemple en tapant son mot de passe). Depuis ce compte, MAUS voit le profil de cet autre compte, pas le vôtre : les réglages de profil à corriger (effets visuels, confidentialité, Game Bar, programmes de la session) sont marqués « Indéterminé » et ne sont pas proposés. Les autres corrections (sécurité, mises à jour, alimentation…) restent possibles. Pour votre profil, réglez ces points vous-même dans Paramètres ; si votre compte est administrateur, fermez MAUS et rouvrez-le normalement.")
+                : null;
             await ReplanAsync();
             RefreshDashboard();
             await RecordHealthAsync();

@@ -170,6 +170,7 @@ public sealed partial class MainViewModel
         2 => T("Étape 2 sur 3 : lire les constats"),
         3 => T("Étape 3 sur 3 : appliquer les corrections recommandées"),
         _ when !HasAudit => T("Relancez l'audit pour voir l'état actuel"),
+        _ when RightsOpenedSinceLimitedAudit => T("Droits ouverts : relancez l'audit"),
         _ when IsLimitedAudit => T("Pour les corrections : toutes les fonctionnalités"),
         _ => Changes.Count > 1
             ? T("{0} corrections proposées", Changes.Count)
@@ -186,6 +187,7 @@ public sealed partial class MainViewModel
             : T("L'audit n'a rien relevé qui demande une action. Les constats conformes restent à lire dans l'onglet Constats."),
         3 => T("Réversibles, sauf ce qu'elles signalent, avec un point de restauration vérifié (option recommandée). Vous choisissez lesquelles appliquer."),
         _ when !HasAudit => T("MAUS lit la configuration de votre PC sans rien modifier. Le dernier audit gardé reste affiché, daté, jusqu'au nouveau."),
+        _ when RightsOpenedSinceLimitedAudit => LimitedAuditRightsOpen,
         _ when IsLimitedAudit => T("Cet audit s'est fait sans droits administrateur : MAUS n'a préparé aucune correction. Cliquez sur « Toutes les fonctionnalités », puis relancez l'audit pour les voir."),
         _ => Changes.Count > 0
             ? T("Réversibles, sauf ce qu'elles signalent, avec un point de restauration vérifié (option recommandée). Vous choisissez lesquelles appliquer.")
@@ -346,10 +348,43 @@ public sealed partial class MainViewModel
         }
     }
 
+    /// <summary>
+    /// Audit fait sans droits, et les droits sont ouverts depuis (0.8.7.1) : le bouton « Toutes les fonctionnalités » a disparu, il ne
+    /// reste qu'à relancer l'audit. Les textes qui demandaient de cliquer dessus le disent à la place.
+    /// </summary>
+    private bool RightsOpenedSinceLimitedAudit => IsLimitedAudit && EngineHost.IsElevated;
+
+    private static string LimitedAuditRightsOpen => T("Cet audit s'est fait sans droits administrateur. Les droits sont maintenant ouverts : relancez l'audit pour voir tous les constats et les corrections.");
+
+    /// <summary>Raison du blocage des corrections après un audit sans droits, selon que les droits sont ouverts ou non.</summary>
+    private static string LimitedBlockingReason => EngineHost.IsElevated
+        ? T("Les droits administrateur sont ouverts : relancez l'audit pour voir tous les constats et les corrections.")
+        : T("Les corrections demandent les droits administrateur : cliquez sur « Toutes les fonctionnalités », en haut de la fenêtre, puis relancez l'audit.");
+
+    /// <summary>Les droits viennent de s'ouvrir ou de se refermer : les consignes d'un audit sans droits déjà affiché suivent.</summary>
+    private void RefreshLimitedAuditTexts()
+    {
+        if (!IsLimitedAudit)
+        {
+            return;
+        }
+
+        if (IsPlainLimitedAudit)
+        {
+            BlockingReason = LimitedBlockingReason;
+        }
+
+        OnPropertyChanged(nameof(ChangesSummary));
+        NotifyJourney();
+    }
+
     /// <summary>Droits accordés : lance l'audit si l'utilisateur l'a choisi. Ne peut pas provoquer de demande d'autorisation : le moteur tourne déjà.</summary>
     private void OnElevationChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(JournalSummary));
+
+        // Appelé sur n'importe quel fil : les textes de l'audit sans droits se mettent à jour sur celui de la fenêtre.
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => RefreshLimitedAuditTexts());
         if (!EngineHost.IsElevated)
         {
             return;

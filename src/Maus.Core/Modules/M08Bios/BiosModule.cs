@@ -23,6 +23,22 @@ public sealed class BiosModule : IAuditModule
     internal const string TpmWmiProvider = "Microsoft-Windows-TPM-WMI";
     internal const uint RequiredMicrocode = 0x12F;
 
+    /// <summary>
+    /// Événements du fournisseur Microsoft-Windows-TPM-WMI, d'après les textes que ce fournisseur publie (relus le 25/11/2026 sur
+    /// Windows 11, build 26300) : 1808 = clés et autorités de certification Secure Boot mises à jour ; 1801 = certificats disponibles
+    /// mais « pas encore appliqués au microprogramme » (une attente, pas une erreur) ; 1795 = le microprogramme a renvoyé une erreur ;
+    /// 1796 = la mise à jour n'a pas pu écrire une variable Secure Boot ; 1802 = mise à jour « bloquée en raison d'un problème de
+    /// microprogramme connu », avec la consigne de vérifier auprès du fournisseur s'il existe une mise à jour du microprogramme ;
+    /// 1803 = aucune clé KEK signée par la clé de plateforme, avec la consigne de vérifier auprès du fabricant de l'appareil.
+    /// </summary>
+    internal const int SecureBootUpdated = 1808;
+
+    /// <summary>Certificats disponibles, pas encore appliqués au microprogramme : une attente (voir <see cref="SecureBootUpdated"/>).</summary>
+    internal const int SecureBootPending = 1801;
+
+    /// <summary>Échecs de la mise à jour (voir <see cref="SecureBootUpdated"/>) : 1795, 1796, 1802, 1803.</summary>
+    internal static readonly int[] SecureBootFailures = [1795, 1796, 1802, 1803];
+
     /// <summary>Page Windows Update des Paramètres (Microsoft Learn, « Launch Windows Settings »).</summary>
     internal const string WindowsUpdatePage = "ms-settings:windowsupdate";
 
@@ -403,7 +419,7 @@ public sealed class BiosModule : IAuditModule
             Current = $"code 0x{servicing.Error.Value:X8}",
             Expected = T("aucune"),
             Explanation = explanation,
-            Advice = T("Consultez le journal Système (source TPM-WMI, événements 1795 et 1801), puis installez le dernier BIOS du fabricant. ") + PageAdvice(target),
+            Advice = T("Consultez le journal Système (source TPM-WMI, événements 1795, 1796 et 1802), puis installez le dernier BIOS du fabricant. ") + PageAdvice(target),
         };
     }
 
@@ -411,12 +427,14 @@ public sealed class BiosModule : IAuditModule
     {
         const string id = "M08.secure-boot-events";
         var title = T("Journal Système : mise à jour Secure Boot appliquée");
-        var explanation = T("Windows journalise l'installation des certificats dans le firmware : 1808 quand elle réussit, 1801 quand les certificats " +
-            "ne sont pas encore appliqués, 1795 quand le firmware renvoie une erreur.");
+        var explanation = T("Windows journalise l'installation des certificats dans le firmware : 1808 quand elle réussit ; 1801 quand les certificats " +
+            "attendent d'être appliqués (ce n'est pas une erreur) ; 1795 ou 1796 quand l'écriture échoue ; 1802 quand elle est bloquée par un problème " +
+            "connu du firmware ; 1803 quand la clé KEK de l'appareil manque.");
+        var expected = T("événement 1808, sans échec plus récent (1795, 1796, 1802 ou 1803)");
         IReadOnlyList<EventRecordInfo> events;
         try
         {
-            events = context.EventLogs.Query("System", TpmWmiProvider, [1801, 1795, 1808], context.Now.AddDays(-EventWindowDays).LocalDateTime);
+            events = context.EventLogs.Query("System", TpmWmiProvider, [SecureBootPending, .. SecureBootFailures, SecureBootUpdated], context.Now.AddDays(-EventWindowDays).LocalDateTime);
         }
         catch (MausAccessDeniedException)
         {
@@ -427,12 +445,25 @@ public sealed class BiosModule : IAuditModule
             return Finding.Unknown(id, title, T("Journal Système illisible."), CertificatesCategory);
         }
 
-        var lastSuccess = events.Where(e => e.Id == 1808).OrderByDescending(e => e.TimeCreated).FirstOrDefault();
-        var lastFailure = events.Where(e => e.Id is 1801 or 1795).OrderByDescending(e => e.TimeCreated).FirstOrDefault();
-        if (lastFailure is not null && (lastSuccess is null || lastFailure.TimeCreated > lastSuccess.TimeCreated))
+        var lastSuccess = events.Where(e => e.Id == SecureBootUpdated).OrderByDescending(e => e.TimeCreated).FirstOrDefault();
+        bool SinceSuccess(EventRecordInfo e) => lastSuccess is null || e.TimeCreated > lastSuccess.TimeCreated;
+
+        // Un échec (1795, 1796, 1802, 1803) plus récent que la dernière réussite : le firmware est en cause, le conseil du BIOS vaut.
+        var lastFailure = events.Where(e => SecureBootFailures.Contains(e.Id) && SinceSuccess(e)).OrderByDescending(e => e.TimeCreated).FirstOrDefault();
+        if (lastFailure is not null)
         {
             var severity = secureBootEnabled == true ? Severity.Medium : Severity.Info;
-            var what = lastFailure.Id == 1795 ? T("erreur renvoyée par le firmware") : T("certificats non appliqués au firmware");
+            var (what, advice) = lastFailure.Id switch
+            {
+                1802 => (T("mise à jour bloquée par un problème connu du firmware"),
+                    T("Windows indique que la mise à jour est bloquée par un problème connu du firmware : vérifiez auprès du fabricant de l'appareil s'il existe une mise à jour du BIOS qui le corrige. ")),
+                1803 => (T("clé KEK de l'appareil introuvable"),
+                    T("Windows ne trouve pas de clé KEK signée pour cet appareil : vérifiez auprès du fabricant de l'appareil que cette clé est bien fournie. ")),
+                1796 => (T("échec de l'écriture d'une variable Secure Boot"),
+                    T("Installez le dernier BIOS du fabricant, puis laissez Windows Update terminer le déploiement. ")),
+                _ => (T("erreur renvoyée par le firmware"),
+                    T("Installez le dernier BIOS du fabricant, puis laissez Windows Update terminer le déploiement. ")),
+            };
             return new Finding
             {
                 Id = id,
@@ -441,9 +472,28 @@ public sealed class BiosModule : IAuditModule
                 Status = FindingStatusExtensions.ForDeviation(severity),
                 Severity = severity,
                 Current = T("événement {0} ({1}) le {2}", lastFailure.Id, what, FormatDate(lastFailure.TimeCreated)),
-                Expected = T("événement 1808, sans 1801 ni 1795 plus récent"),
+                Expected = expected,
                 Explanation = explanation,
-                Advice = T("Installez le dernier BIOS du fabricant, puis laissez Windows Update terminer le déploiement. ") + PageAdvice(target),
+                Advice = advice + PageAdvice(target),
+            };
+        }
+
+        // 1801 seul : les certificats attendent d'être appliqués. Ce n'est pas une erreur du firmware : pas de conseil de BIOS.
+        var lastPending = events.Where(e => e.Id == SecureBootPending && SinceSuccess(e)).OrderByDescending(e => e.TimeCreated).FirstOrDefault();
+        if (lastPending is not null)
+        {
+            return new Finding
+            {
+                Id = id,
+                Title = title,
+                Category = CertificatesCategory,
+                Status = FindingStatus.Info,
+                Current = T("événement 1801 (certificats en attente d'être appliqués) le {0}", FormatDate(lastPending.TimeCreated)),
+                Expected = expected,
+                Explanation = explanation,
+                Advice = T("Ce n'est pas une erreur : Windows signale que les nouveaux certificats attendent d'être appliqués au firmware. " +
+                    "Installez les mises à jour de Windows Update, redémarrez, puis relancez l'audit."),
+                SettingsPage = WindowsUpdatePage,
             };
         }
 
@@ -457,7 +507,7 @@ public sealed class BiosModule : IAuditModule
                 Status = FindingStatus.Ok,
                 Severity = Severity.Medium,
                 Current = T("événement 1808 (mise à jour appliquée) le {0}", FormatDate(lastSuccess.TimeCreated)),
-                Expected = T("événement 1808, sans 1801 ni 1795 plus récent"),
+                Expected = expected,
                 Explanation = explanation,
             };
         }
@@ -468,7 +518,7 @@ public sealed class BiosModule : IAuditModule
             Title = title,
             Category = CertificatesCategory,
             Status = FindingStatus.Info,
-            Current = T("aucun événement 1801, 1795 ou 1808 depuis {0} jours", EventWindowDays),
+            Current = T("aucun événement de mise à jour Secure Boot depuis {0} jours", EventWindowDays),
             Expected = T("événement 1808"),
             Explanation = explanation,
         };

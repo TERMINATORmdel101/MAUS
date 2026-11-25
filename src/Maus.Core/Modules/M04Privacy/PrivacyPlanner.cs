@@ -6,8 +6,11 @@ using static Maus.Core.Modules.M04Privacy.PrivacyKeys;
 namespace Maus.Core.Modules.M04Privacy;
 
 /// <summary>
-/// Étape Plan du Module 4 : lignes « Standard » de la fiche qui passent par le registre. Les stratégies ne sont posées
-/// que sur Pro et plus ; ailleurs, MAUS écrit l'interrupteur de l'utilisateur, celui que change l'application Paramètres.
+/// Étape Plan du Module 4 : lignes « Standard » de la fiche qui passent par le registre. Les stratégies d'appoint ne sont posées
+/// que sur Pro et plus ; ailleurs, MAUS écrit l'interrupteur de l'utilisateur, celui que change l'application Paramètres. Deux
+/// corrections n'ont qu'une stratégie et la posent aussi sur Famille (décision du 31/10/2026) : données de diagnostic et
+/// historique des activités. Toute correction qui pose une stratégie dit ce que Paramètres affichera ensuite
+/// (<see cref="PlannedChange.PolicyRisk"/>).
 /// Recall : stratégie DisableAIDataAnalysis (Pro et plus). Copilot n'a pas de stratégie officielle sur Famille et Pro : renvoi vers Paramètres.
 /// Le service DiagTrack et les tâches planifiées CEIP n'ont pas de correction : leurs constats restent de simples informations.
 /// </summary>
@@ -48,7 +51,13 @@ internal static class PrivacyPlanner
                         Recommended = false,
                         Risk = T("Au niveau 0, les informations d'échec des mises à jour ne partent plus vers Microsoft (voir Module 3)."),
                     }
-                    : c);
+                    : c with
+                    {
+                        // Policy CSP System/AllowTelemetry (Microsoft Learn) : la valeur 1 désactive l'interrupteur des données
+                        // facultatives dans Paramètres ; « Get started with the Windows Insider Program » (Microsoft Learn) : le
+                        // programme peut demander de l'activer.
+                        Risk = T("Dans Paramètres, l'interrupteur « Envoyer des données de diagnostic facultatives » sera grisé (Microsoft Learn, Policy CSP System/AllowTelemetry). Le programme Windows Insider peut demander de l'activer (Microsoft Learn, « Get started with the Windows Insider Program ») : pour y entrer, annulez d'abord cette correction."),
+                    });
         }
 
         if (plan.Deviates("M04.diagnostic-logs") && plan.Policies)
@@ -225,7 +234,8 @@ internal static class PrivacyPlanner
                 Gain = T("Moins de collecte de données et de publicités ; gain de vitesse faible."),
                 Writes = writes.ToList(),
             };
-            Changes.Add(tune is null ? change : tune(change));
+            change = tune is null ? change : tune(change);
+            Changes.Add(change with { Risk = PlannedChange.WithPolicyRisk(change.Risk, change.SetsPolicy) });
         }
 
         public void AddContentDelivery(string id, string title, string[] names, string category)

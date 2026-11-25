@@ -82,6 +82,49 @@ public sealed class EngineBrokerTests
         });
     }
 
+    /// <summary>
+    /// Moteur sous un autre compte administrateur (compte standard élevé avec le mot de passe d'un autre) : les constats lus dans
+    /// le profil de ce compte sont gris, jamais présentés comme ceux de l'utilisateur, dès leur arrivée ; aucune correction de
+    /// profil n'est proposée ; une correction commune au PC (stratégie des Widgets) reste proposée et s'applique.
+    /// </summary>
+    [Fact]
+    public async Task Under_another_account_profile_findings_are_set_aside_and_machine_fixes_stay()
+    {
+        var registry = new FakeRegistry().Set(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton", 1);
+        var parameters = new FakeSystemParameters { MinimizeAnimation = true };
+        var journal = new InMemoryJournalStore();
+        var audit = TestContext.Create(registry, parameters: parameters, elevated: true, packages: new FakePackages().Add("MicrosoftWindows.Client.WebExperience"));
+        using var engine = new LocalMausEngine(
+            new AuditEngine([new VisualEffectsModule()]),
+            () => audit,
+            context => TestFixContext.Create(context, registry, parameters, journal, new FakeSystemRestore(), new FakeNotifier(), elevatedAsAnotherUser: true),
+            new MemoryPreferences(),
+            journal);
+        var progressed = new List<ModuleResult>();
+
+        var run = await engine.RunAuditAsync(new SyncProgress<ModuleResult>(progressed.Add), CancellationToken.None);
+
+        Assert.True(run.Snapshot.ElevatedAsAnotherUser);
+        foreach (var findings in new[] { run.Results.Single().Findings, progressed.Single().Findings })
+        {
+            var taskView = findings.Single(f => f.Id == "M06.taskview");
+            Assert.Equal(FindingStatus.Unknown, taskView.Status);
+            Assert.False(taskView.Fixable);
+            Assert.Null(taskView.Current);
+            Assert.Contains("pas dans le vôtre", taskView.Explanation, StringComparison.Ordinal);
+            Assert.Equal(FindingStatus.Unknown, findings.Single(f => f.Id == "M06.minimize-animation").Status);
+            Assert.Equal(FindingStatus.Improvable, findings.Single(f => f.Id == "M06.widgets").Status);
+        }
+
+        var plan = await engine.PlanAsync(CancellationToken.None);
+        Assert.DoesNotContain(plan, c => c.IsUserScoped);
+        Assert.Contains(plan, c => c.Id == "M06.widgets");
+
+        var applied = await engine.ApplyAsync(["M06.widgets"], new ApplyOptions { CreateRestorePoint = false }, CancellationToken.None);
+        Assert.Equal(ChangeStatus.Applied, applied.Changes.Single().Status);
+        Assert.Equal(1, registry.GetDword(RegistryHive.CurrentUser, Advanced, "ShowTaskViewButton"));
+    }
+
     [Fact]
     public async Task Unknown_changes_are_ignored_and_bad_identifiers_or_operations_are_refused()
     {

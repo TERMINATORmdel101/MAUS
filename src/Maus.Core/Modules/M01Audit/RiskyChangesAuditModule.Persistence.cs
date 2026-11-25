@@ -186,8 +186,9 @@ public sealed partial class RiskyChangesAuditModule
             "n'est pas forcément dangereux (petits logiciels gratuits), mais c'est aussi l'emplacement préféré des logiciels malveillants.");
         var expected = T("programmes signés par leur éditeur");
         var unsigned = new List<string>();
+        var unverified = new List<string>();
         var orphans = new List<string>();
-        var checkedCount = 0;
+        var signedCount = 0;
         var readable = false;
         foreach (var (hive, path) in RunKeys)
         {
@@ -231,10 +232,18 @@ public sealed partial class RiskyChangesAuditModule
                     continue;
                 }
 
-                checkedCount++;
-                if (_signatures.Verify(executable) is SignatureStatus.Unsigned or SignatureStatus.Invalid)
+                // Signature au résultat inconnu (certificat expiré, chaîne incomplète, fichier illisible…) : ni signé ni non signé.
+                switch (_signatures.Verify(executable))
                 {
-                    unsigned.Add($"{name} ({executable})");
+                    case SignatureStatus.Signed:
+                        signedCount++;
+                        break;
+                    case SignatureStatus.Unknown:
+                        unverified.Add($"{name} ({executable})");
+                        break;
+                    default:
+                        unsigned.Add($"{name} ({executable})");
+                        break;
                 }
             }
         }
@@ -245,27 +254,40 @@ public sealed partial class RiskyChangesAuditModule
         }
 
         var orphanNote = orphans.Count > 0 ? T(" ; {0} entrée(s) sans programme : {1}", orphans.Count, Join(orphans, 3)) : string.Empty;
+        var unverifiedNote = unverified.Count > 0 ? T(" ; {0} signature(s) non vérifiée(s) : {1}", unverified.Count, Join(unverified, 3)) : string.Empty;
+        var unverifiedExplanation = T("La signature de certains programmes n'a pas pu être vérifiée (certificat expiré, chaîne de certificats incomplète, " +
+            "fichier illisible ou format inconnu) : MAUS ne peut dire ni qu'ils sont signés, ni qu'ils ne le sont pas.");
         if (unsigned.Count > 0)
         {
             return StartupCheck.Deviation(
-                T("{0} programme(s) non signé(s) : {1}{2}", unsigned.Count, Join(unsigned, 4), orphanNote),
+                T("{0} programme(s) non signé(s) : {1}{2}", unsigned.Count, Join(unsigned, 4), orphanNote) + unverifiedNote,
                 expected,
-                explanation,
+                unverified.Count > 0 ? explanation + " " + unverifiedExplanation : explanation,
                 T("Vérifier que vous reconnaissez chaque programme listé ; sinon, le désactiver (voir Module 12) et lancer une analyse antivirus."));
         }
 
         if (orphans.Count > 0)
         {
             return StartupCheck.Deviation(
-                T("{0} entrée(s) sans programme : {1}", orphans.Count, Join(orphans)),
+                T("{0} entrée(s) sans programme : {1}", orphans.Count, Join(orphans)) + unverifiedNote,
                 expected,
-                T("Ces entrées lancent un programme qui n'existe plus : elles sont inutiles mais sans danger."),
+                T("Ces entrées lancent un programme qui n'existe plus : elles sont inutiles mais sans danger.") + (unverified.Count > 0 ? " " + unverifiedExplanation : string.Empty),
                 T("Retirer ces entrées orphelines (voir Module 12)."),
                 Severity.Low);
         }
 
+        // « Tous signés » seulement si chaque signature a été vérifiée.
+        if (unverified.Count > 0)
+        {
+            return StartupCheck.Neutral(
+                T("{0} signé(s), {1} non vérifié(s) : {2}", signedCount, unverified.Count, Join(unverified, 4)),
+                expected,
+                unverifiedExplanation + " " + explanation,
+                T("Vérifier que vous reconnaissez ces programmes : clic droit sur le fichier, Propriétés, onglet « Signatures numériques »."));
+        }
+
         return StartupCheck.Compliant(
-            checkedCount == 0 ? T("aucun programme") : T("{0} programme(s), tous signés", checkedCount),
+            signedCount == 0 ? T("aucun programme") : T("{0} programme(s), tous signés", signedCount),
             expected,
             explanation);
     }

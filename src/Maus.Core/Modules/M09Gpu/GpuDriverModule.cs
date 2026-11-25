@@ -154,11 +154,13 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
     private static Finding DetectDriverVersion(AuditContext context, GpuDriverCatalog catalog, GpuDevice gpu, IReadOnlyList<GpuDevice> all, NvidiaSmiData smi)
     {
         var id = $"M09.driver.{gpu.Slug}";
-        var title = T("Pilote à jour : {0}", gpu.Name);
         var branch = catalog.FindBranch(gpu.Vendor, gpu.Name);
         var versions = ResolveVersions(context.Registry, gpu, all, smi, branch);
         var date = gpu.Info.DriverDate;
+        var comparison = versions.Installed is not null && versions.Latest is not null ? versions.Installed.CompareTo(versions.Latest) : (int?)null;
 
+        // « À jour » n'est écrit qu'après une vraie comparaison avec la dernière version connue ; sinon, un titre neutre.
+        var title = comparison is null ? T("Pilote : {0}", gpu.Name) : T("Pilote à jour : {0}", gpu.Name);
         if (versions.InstalledLabel is null && date is null)
         {
             return Finding.Unknown(id, title, T("Version et date du pilote illisibles dans WMI."), DriverCategory);
@@ -166,11 +168,12 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
         var ageDays = date is null ? (int?)null : (int)(context.Now.Date - date.Value.Date).TotalDays;
         var gapDays = date is null || branch is null ? (int?)null : branch.ReleasedOn.DayNumber - DateOnly.FromDateTime(date.Value).DayNumber;
-        var comparison = versions.Installed is not null && versions.Latest is not null ? versions.Installed.CompareTo(versions.Latest) : (int?)null;
         var old = ageDays > catalog.MaxDriverAgeDays || gapDays > catalog.SignificantGapDays;
         // Catalogue trop ancien : une version plus récente a pu sortir depuis, MAUS ne peut pas affirmer « à jour ».
         var staleCatalog = (DateOnly.FromDateTime(context.Now.Date).DayNumber - catalog.CheckedOn.DayNumber) > catalog.CatalogMaxAgeDays;
 
+        // Sans comparaison, seul l'âge est jugé : ancien = optimisation ; récent = simple information (jamais « à jour ») ;
+        // date illisible = indéterminé, rien n'a été jugé.
         var status = comparison switch
         {
             >= 0 when staleCatalog => FindingStatus.Info,
@@ -178,7 +181,8 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
             < 0 when old => FindingStatusExtensions.ForDeviation(Severity.Low),
             < 0 => FindingStatus.Info,
             null when ageDays > catalog.MaxDriverAgeDays => FindingStatusExtensions.ForDeviation(Severity.Low),
-            null => FindingStatus.Ok,
+            null when ageDays is null => FindingStatus.Unknown,
+            null => FindingStatus.Info,
         };
 
         var current = versions.InstalledLabel ?? T("version illisible");
@@ -199,7 +203,18 @@ public sealed partial class GpuDriverModule : Fixes.IFixableModule
 
         var explanation = branch is null
             ? T("MAUS ne connaît pas la dernière version pour cette carte : il juge seulement l'âge du pilote (plus de {0} mois = ancien).", catalog.MaxDriverAgeDays / 30)
-            : T("MAUS compare le pilote installé à la dernière version officielle connue (catalogue vérifié le {0}).", FormatDate(catalog.CheckedOn));
+            : comparison is null
+                ? T("MAUS connaît la dernière version pour cette carte, mais n'a pas pu la comparer à la version installée : il juge seulement l'âge du pilote (plus de {0} mois = ancien).", catalog.MaxDriverAgeDays / 30)
+                : T("MAUS compare le pilote installé à la dernière version officielle connue (catalogue vérifié le {0}).", FormatDate(catalog.CheckedOn));
+        if (comparison is null && ageDays is null)
+        {
+            explanation += " " + T("La date du pilote est illisible : MAUS ne peut pas dire s'il est récent.");
+        }
+        else if (comparison is null && status == FindingStatus.Info)
+        {
+            explanation += " " + T("Ce pilote est récent, mais MAUS ne peut pas dire si c'est la dernière version : vérifiez sur la page officielle du fabricant.");
+        }
+
         explanation += T(" Un pilote plus récent n'améliore les performances que dans certains jeux récents, mais il corrige aussi des bugs et des failles.");
         if (branch?.Note is { } note)
         {

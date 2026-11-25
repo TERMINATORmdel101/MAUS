@@ -19,6 +19,45 @@ public sealed class SmallViewModelsTests
         Assert.Contains("le PC a gelé ou redémarré", WorkshopViewModel.DescribeCrash(trace, started.AddHours(1)), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void The_usb_test_never_promises_that_existing_files_are_safe_and_asks_about_them()
+    {
+        var (emptyTitle, empty) = WorkshopViewModel.UsbConfirmation(@"E:\", 1L << 30, existing: 0, leftovers: 1);
+        var (fullTitle, full) = WorkshopViewModel.UsbConfirmation(@"E:\", 1L << 30, existing: 3, leftovers: 0);
+        var (_, unread) = WorkshopViewModel.UsbConfirmation(@"E:\", 1L << 30, existing: -1, leftovers: 0);
+
+        foreach (var text in new[] { empty, full, unread, Ui.UsbTestIntro })
+        {
+            Assert.DoesNotContain("ne sont pas touchés", text, StringComparison.Ordinal);
+            Assert.Contains("contrefaite", text, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("laissés par un test interrompu", empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("contient des fichiers", emptyTitle, StringComparison.Ordinal);
+        Assert.Contains("contient des fichiers", fullTitle, StringComparison.Ordinal);
+        Assert.Contains("3 fichier(s)", full, StringComparison.Ordinal);
+        Assert.Contains("n'a pas pu lire", unread, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_usb_test_gives_a_verdict_when_the_drive_answers_with_an_error()
+    {
+        const long Planned = 4L << 20;
+        var refused = WorkshopViewModel.UsbVerdict(new(2L << 20, 2L << 20, false) { WriteFailed = true }, Planned);
+        var unreadable = WorkshopViewModel.UsbVerdict(new(Planned, 1L << 20, false) { ReadFailed = true, LeftFiles = 2 }, Planned);
+        var good = WorkshopViewModel.UsbVerdict(new(Planned, Planned, false), Planned);
+        var stopped = WorkshopViewModel.UsbVerdict(new(1L << 20, 0, true), Planned);
+
+        Assert.Equal(TestOutcome.Problem, refused.Outcome);
+        Assert.Contains("refusé d'écrire", refused.Text, StringComparison.Ordinal);
+        Assert.Contains("retirée pendant le test", refused.Text, StringComparison.Ordinal);
+        Assert.Equal(TestOutcome.Problem, unreadable.Outcome);
+        Assert.Contains("erreur à la relecture", unreadable.Text, StringComparison.Ordinal);
+        Assert.Contains("2 fichier(s) MAUS-capacite", unreadable.Text, StringComparison.Ordinal);
+        Assert.Equal(TestOutcome.Good, good.Outcome);
+        Assert.Equal(TestOutcome.Stopped, stopped.Outcome);
+    }
+
     private sealed class NoActions : IFindingActions
     {
         public Task AcknowledgeAsync(string moduleId, Finding finding, bool acknowledge) => Task.CompletedTask;

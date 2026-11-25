@@ -74,8 +74,17 @@ public sealed class DisplayModule : IAuditModule
         }
 
         findings.Add(DetectWindowsGraphicsSettings(context.Registry));
-        return Task.FromResult<IReadOnlyList<Finding>>(findings);
+        return Task.FromResult<IReadOnlyList<Finding>>([.. findings.Select(f => WithScreen(f, screens))]);
     }
+
+    /// <summary>
+    /// L'identifiant d'un constat d'écran ne dit que sa place dans la liste de Windows (« display-1 »), qui change quand un écran est
+    /// branché ou débranché : le nom de l'écran l'accompagne, pour que deux audits ne comparent jamais deux écrans différents.
+    /// </summary>
+    private static Finding WithScreen(Finding finding, IReadOnlyList<Screen> screens) =>
+        screens.FirstOrDefault(s => finding.Id.EndsWith("." + s.Slug, StringComparison.Ordinal)) is { Identity: { } identity }
+            ? finding with { MeasuredItem = identity }
+            : finding;
 
     // ----- Carte graphique qui pilote l'écran -----
 
@@ -480,6 +489,11 @@ public sealed class DisplayModule : IAuditModule
     private sealed record Screen(DisplayPath Path, int Index, string Label)
     {
         public string Slug => $"display-{Index}";
+
+        /// <summary>Nom de l'écran (EDID), sinon « internal » pour une dalle intégrée sans nom ; <c>null</c> si rien ne le désigne.</summary>
+        public string? Identity => !string.IsNullOrWhiteSpace(Path.MonitorName) ? Path.MonitorName.Trim()
+            : DisplayParsers.IsInternal(Path.Output) ? "internal"
+            : null;
 
         public string Category => T("Écran {0} : {1}", Index, Label);
     }

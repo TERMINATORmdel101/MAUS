@@ -6,7 +6,7 @@
 
 > MAUS est conçu et codé avec Claude, une IA d'Anthropic, sous la direction de son auteur.
 
-**Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha 0.8.7**
+**Gratuit · Libre (GPL-3.0) · Aucune donnée collectée · Version alpha 0.8.7.1**
 
 **Disponible sur le [Microsoft Store](https://apps.microsoft.com/detail/9NXNPZX2LFQF)** depuis novembre 2026. Ou avec winget :
 
@@ -14,7 +14,7 @@
 winget install TERMINATORmdel101.MAUS
 ```
 
-Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATORmdel101/MAUS/releases/latest) (voir [Installer](#installer)). Windows 11 23H2 ou plus récent. Aide et questions : [site d'aide de MAUS](https://sites.google.com/view/maus-help/accueil).
+Ou téléchargez l'installateur dans les [Releases](https://github.com/TERMINATORmdel101/MAUS/releases/latest) (voir [Installer](#installer)) : la 0.8.7.1, une demi-version de corrections, n'est que sur GitHub ; le Microsoft Store et winget restent en 0.8.7 jusqu'à la 0.8.8. Windows 11 23H2 ou plus récent. Aide et questions : [site d'aide de MAUS](https://sites.google.com/view/maus-help/accueil).
 
 ## En bref
 
@@ -79,7 +79,7 @@ Ces droits ne sont donnés qu'à un **moteur** séparé : il n'accepte qu'une li
 
 ## État du projet
 
-Version actuelle : **0.8.7** (novembre 2026), en **alpha** : à essayer d'abord sur un PC dont les données sont sauvegardées. Elle passe plus de 3 300 tests automatiques, avec registre, WMI et matériel simulés.
+Version actuelle : **0.8.7.1** (novembre 2026, sur GitHub ; 0.8.7 sur le Microsoft Store et winget), en **alpha** : à essayer d'abord sur un PC dont les données sont sauvegardées. Elle passe plus de 3 500 tests automatiques, avec registre, WMI et matériel simulés.
 
 **Essayé en vrai sur les PC Windows du porteur du projet** : pendant la préparation de la 0.8.6, l'audit avec et sans droits administrateur, une correction appliquée puis annulée, un point de restauration, la page Suivi, la fenêtre de confirmation du moteur, « Refermer les droits », le benchmark complet en 1440p et en 4K (processeur Intel) ; pour la 0.8.7, l'audit sans droits administrateur sur un PC AMD Ryzen 9 9900X3D avec de la mémoire DDR5, une carte NVIDIA et une puce graphique AMD.
 
@@ -89,7 +89,8 @@ Dernières versions (le détail de toutes les versions est dans [CHANGELOG.md](C
 
 | Version | Nouveautés |
 |---|---|
-| **0.8.7** | Accueil plus simple (une seule entrée vers les outils, moins de boutons en double), « Internet rame » et « Le son craque » qui ouvrent la bonne tuile, catalogues des pilotes et des versions de Windows revérifiés (26H2 ajoutée), premier essai sur un PC AMD avec de la DDR5 |
+| **0.8.7.1** | Demi-version de corrections, sur GitHub seulement : test de la clé USB honnête (une clé contrefaite peut écrire sur les fichiers présents), plus de numéro de série d'appareil USB dans les rapports, MAUS n'affirme plus ce qu'il n'a pas lu (Secure Boot, pilote graphique, réveils, Windows Famille, PC géré, disques), corrections plus justes (autre compte administrateur, tâches planifiées, stratégies de Windows), changement de langue sûr pendant une opération |
+| 0.8.7 | Accueil plus simple (une seule entrée vers les outils, moins de boutons en double), « Internet rame » et « Le son craque » qui ouvrent la bonne tuile, catalogues des pilotes et des versions de Windows revérifiés (26H2 ajoutée), premier essai sur un PC AMD avec de la DDR5 |
 | 0.8.6 | Nouvelle page Suivi (ce que Windows a défait de vos corrections, ce qui a changé entre deux audits, carnet de santé, plantages des 30 derniers jours) ; BitLocker visible et encadré avant une mise à jour du BIOS ; audit sans droits administrateur ; mises à jour qui échouent expliquées ; DISM, SFC et pnputil lancés directement par le moteur avec leur progression ; accueil, Atelier, tests et Paramètres simplifiés ; protections renforcées du moteur |
 | 0.8.5 | Relecture complète du code : moteur plus strict (rapport de batterie jamais par le moteur, annulation forcée refusée, actions sur le pilote graphique confirmées par le moteur), fenêtre qui ne se fige plus pendant l'installation de PawnIO, un audit ne double plus l'autre, profils de corrections traduits, document de sécurité du Store rendu exact |
 | 0.8.4 (avec la 0.8.3, jamais publiée seule) | Accueil plus simple et plus joli (score qui se remplit, « Votre PC en un coup d'œil », raccourcis clavier) ; confirmation affichée par le moteur administrateur lui-même pour les actions sensibles (fermer un programme, pilote graphique, PawnIO, constat « voulu ») ; benchmark administrateur protégé, « Ouvrir MAUS » après l'audit de la semaine sans droits, bibliothèques verrouillées par leur empreinte ; mode limité clair (options grisées, bandeau « Toutes les fonctionnalités »), sécurité du moteur administrateur : messages signés et protégés contre le rejeu, coupure après 3 tentatives refusées, outils de Windows pris dans System32 seulement, mise à jour des logiciels par winget réparée après un redémarrage du moteur, garde-fous automatiques de sécurité |

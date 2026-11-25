@@ -131,7 +131,10 @@ public class VisualEffectsFixTests
         var (plan, _) = await Fixes.RoundTrip.AssertAsync(new VisualEffectsModule(), audit, registry, parameters);
 
         Assert.Equal("M06.visualfx-mode", plan[^1].Id);
-        Assert.Contains(plan, c => c.Id == "M06.widgets");
+        var widgets = plan.Single(c => c.Id == "M06.widgets");
+        Assert.True(widgets.SetsPolicy);
+        Assert.Contains("gérés par votre organisation", widgets.Risk, StringComparison.Ordinal);
+        Assert.Contains("AllowNewsAndInterests", widgets.Risk, StringComparison.Ordinal);
         Assert.DoesNotContain(plan, c => c.Id.StartsWith("M06.keep", StringComparison.Ordinal));
         Assert.Null(registry.GetValue(Microsoft.Win32.RegistryHive.LocalMachine, @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests"));
     }

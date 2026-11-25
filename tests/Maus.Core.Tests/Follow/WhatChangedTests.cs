@@ -110,6 +110,20 @@ public sealed class WhatChangedTests : IDisposable
     }
 
     [Fact]
+    public void Another_screen_at_the_same_place_is_a_note_not_an_aggravation()
+    {
+        var older = Audit(0, Summary, new SnapshotFinding("M14.refresh.display-1", "M14", "Fréquence : écran intégré", FindingStatus.Ok, Item: "internal"));
+        var newer = Audit(1, Summary, new SnapshotFinding("M14.refresh.display-1", "M14", "Fréquence : DELL", FindingStatus.Improvable, Item: "DELL U2720Q"));
+
+        var report = Compare(older, newer);
+
+        Assert.Empty(report.Changes);
+        var note = Assert.Single(report.NotComparable);
+        Assert.Equal(NotComparableReason.OtherDevice, note.Reason);
+        Assert.Equal("Fréquence : DELL", note.Name);
+    }
+
+    [Fact]
     public void Compare_never_counts_a_new_control_as_an_aggravation()
     {
         var older = new AuditSnapshot(Day, "1", 80, [F("a", module: "M05")], MausVersion: "0.8.5");

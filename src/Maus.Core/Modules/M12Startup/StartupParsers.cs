@@ -317,16 +317,16 @@ internal static partial class StartupParsers
     }
 
     /// <summary>
-    /// Instance <c>MSFT_ScheduledTask</c> : renvoie la tâche si elle est hors dossier <c>\Microsoft\</c>, activée (<c>State</c> ≠ 1)
+    /// Instance <c>MSFT_ScheduledTask</c> : renvoie la tâche si elle est hors dossier <c>\Microsoft\</c>, activée (interrupteur
+    /// <c>Settings.Enabled</c>, pas l'état d'exécution : <see cref="Fixes.WindowsScheduledTaskAccessor.IsEnabled(CimRow)"/>)
     /// et porte un déclencheur d'ouverture de session actif, sinon <c>null</c>. Les propriétés système (classe) n'étant pas lues,
     /// un déclencheur d'ouverture de session (<c>MSFT_TaskLogonTrigger</c>) se reconnaît à sa propriété <c>UserId</c>,
     /// sans la propriété <c>StateChange</c> propre au déclencheur de changement de session.
     /// </summary>
     public static LogonTaskInfo? ParseLogonTask(CimRow task)
     {
-        const long disabledState = 1;
         var path = task.GetString("TaskPath") ?? @"\";
-        if (path.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase) || task.GetInt64("State") == disabledState)
+        if (path.StartsWith(@"\Microsoft\", StringComparison.OrdinalIgnoreCase) || !Fixes.WindowsScheduledTaskAccessor.IsEnabled(task))
         {
             return null;
         }

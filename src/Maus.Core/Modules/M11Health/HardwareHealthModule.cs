@@ -27,6 +27,7 @@ public sealed class HardwareHealthModule : IAuditModule
     internal const int WearWarningPercent = 80;
 
     internal const double FreeSpaceWarningRatio = 0.15;
+    /// <summary>Lecture la plus lente au-delà de laquelle MAUS en dit un mot : une information seulement (valeur choisie par MAUS, voir ThresholdNotes).</summary>
     internal const long ReadLatencyProblemMs = 10_000;
     internal const int FirmwareThrottlingEventId = 37;
     internal const int FirmwareThrottlingDays = 30;
@@ -210,6 +211,7 @@ public sealed class HardwareHealthModule : IAuditModule
             Status = status,
             Severity = disk.HealthStatus == 1 ? Severity.Medium : Severity.High,
             Current = $"{label} · {disk.MediaLabel}{bus}{size}",
+            MeasuredItem = disk.Name,
             Expected = T("sain"),
             Explanation = T("État de santé global que Windows attribue au disque d'après ses propres diagnostics (SMART). "
                 + "Un disque en avertissement ou défaillant peut perdre des données à tout moment."),
@@ -374,6 +376,7 @@ public sealed class HardwareHealthModule : IAuditModule
         var shown = new List<string>();
         var problems = new List<string>();
         var warnings = new List<string>();
+        var notes = new List<string>();
         if (wear is not null)
         {
             shown.Add(T("usure {0} %", wear));
@@ -383,12 +386,14 @@ public sealed class HardwareHealthModule : IAuditModule
             }
         }
 
+        // TemperatureMax : selon le disque, sa limite de fonctionnement ou la plus haute température qu'il a déjà connue. Sans savoir
+        // laquelle, l'atteindre n'est qu'une information ; l'alerte de température d'un SSD NVMe, elle, vient du disque (son journal).
         if (temperature is > 0)
         {
-            shown.Add(temperatureMax is > 0 ? T("{0} °C (limite {1} °C)", temperature, temperatureMax) : $"{temperature} °C");
+            shown.Add(temperatureMax is > 0 ? T("{0} °C (maximum indiqué par le disque : {1} °C)", temperature, temperatureMax) : $"{temperature} °C");
             if (temperatureMax is > 0 && temperature >= temperatureMax)
             {
-                problems.Add(T("température à la limite de fonctionnement du disque"));
+                notes.Add(T("La température atteint le maximum indiqué par le disque ({0} °C). Selon le disque, ce maximum est sa limite de fonctionnement ou la plus haute température qu'il a déjà connue : MAUS ne sait pas lequel. Si elle reste à ce niveau, vérifiez la ventilation du disque.", temperatureMax));
             }
         }
 
@@ -401,12 +406,14 @@ public sealed class HardwareHealthModule : IAuditModule
             }
         }
 
+        // ReadLatencyMax garde la lecture la plus lente depuis la remise à zéro du compteur : un disque dur qui sort de veille met
+        // plusieurs secondes à reprendre sa rotation. Seule, cette valeur ne dit pas qu'un disque est en panne : une information.
         if (latency is > 0)
         {
             shown.Add(T("lecture la plus lente : {0} ms", latency));
             if (latency > ReadLatencyProblemMs)
             {
-                problems.Add(T("une lecture a pris plus de 10 secondes"));
+                notes.Add(T("Une lecture a pris plus de {0} secondes. Cela peut venir de la sortie de veille d'un disque dur (le temps de reprendre sa rotation) : seule, cette valeur ne dit pas que le disque est en panne. Surveillez surtout les erreurs de lecture non corrigées.", ReadLatencyProblemMs / 1000));
             }
         }
 
@@ -427,14 +434,14 @@ public sealed class HardwareHealthModule : IAuditModule
             Id = id,
             Title = title,
             Category = StorageCategory,
-            Status = deviating ? FindingStatusExtensions.ForDeviation(severity) : FindingStatus.Ok,
+            Status = deviating ? FindingStatusExtensions.ForDeviation(severity) : notes.Count > 0 ? FindingStatus.Info : FindingStatus.Ok,
             Severity = severity,
             Current = string.Join(" · ", shown),
             Measures = ReliabilityMeasures(wear, temperature, readErrors),
             MeasuredItem = disk.Name,
             Expected = wearInNvmeLog
-                ? T("aucune erreur non corrigée, température sous la limite")
-                : T("usure < {0} %, aucune erreur non corrigée, température sous la limite", WearWarningPercent),
+                ? T("aucune erreur non corrigée")
+                : T("usure < {0} %, aucune erreur non corrigée", WearWarningPercent),
             Explanation = wearInNvmeLog
                 ? T("Compteurs tenus par le disque lui-même : erreurs de lecture non corrigées, température et temps de réponse. "
                     + "L'usure de ce SSD est jugée par son journal de santé NVMe.")
@@ -443,7 +450,8 @@ public sealed class HardwareHealthModule : IAuditModule
             Advice = deviating
                 ? T("À surveiller : {0}. Sauvegardez vos données importantes", string.Join(", ", problems.Concat(warnings)))
                     + (problems.Count > 0 ? T(" sans attendre et prévoyez le remplacement du disque.") : T(" et prévoyez le remplacement du disque à moyen terme."))
-                : null,
+                    + (notes.Count > 0 ? " " + string.Join(" ", notes) : string.Empty)
+                : notes.Count > 0 ? string.Join(" ", notes) : null,
         };
     }
 

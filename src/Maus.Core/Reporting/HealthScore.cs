@@ -53,7 +53,7 @@ public sealed record ScoreGain(Finding Finding, int Points);
 /// <list type="bullet">
 /// <item>gravité de chaque constat : celle qu'il déclare, sinon celle de sa couleur (rouge = importante, orange = moyenne, bleu = faible) ;</item>
 /// <item>points retirés : critique 20, importante 10, moyenne 4, faible 1, les optimisations (faibles) comptant au plus 10 points en tout ;</item>
-/// <item>un même sujet contrôlé par deux modules (Secure Boot, modules 1 et 8) ne compte qu'une fois ;</item>
+/// <item>un même sujet contrôlé deux fois (Secure Boot, modules 1 et 8 ; certificats Secure Boot 2023, trois lectures du module 8) ne compte qu'une fois ;</item>
 /// <item>le score baisse de moins en moins vite : 100 × e^(−points / 100), une longue liste de petits écarts ne mène pas à 0 ;</item>
 /// <item>plafond selon le constat le plus grave : critique = 49 au plus (« à corriger en priorité »), importante = 74 au plus (« à améliorer ») ;</item>
 /// <item>un indéterminé, une information ou un constat marqué « voulu » ne coûte rien ;</item>
@@ -75,13 +75,19 @@ public static class HealthScore
     /// <summary>Plafond du score quand un constat de gravité importante est présent (sous « bon »).</summary>
     public const int HighCap = 74;
 
-    /// <summary>Constats qui décrivent le même sujet que le premier de la liste : seul le plus grave compte.</summary>
+    /// <summary>
+    /// Constats qui décrivent le même sujet que le premier de la liste : seul le plus grave compte. Le déploiement des certificats
+    /// Secure Boot 2023 est lu trois fois par le Module 8 (état, code d'erreur, journal) : une seule cause, que l'utilisateur ne lève
+    /// que par Windows Update ou un BIOS du fabricant. Les clés par défaut du firmware (<c>M08.dbdefault</c>) restent à part : leur
+    /// conseil (ne pas les restaurer) ne doit pas être caché derrière une autre carte.
+    /// </summary>
     private static readonly string[][] SameSubject =
     [
         ["M01.secure-boot", "M08.secure-boot"],
         ["M01.wu-services", "M03.update-services"],
         ["M01.wu-pause", "M03.automatic-updates"],
         ["M01.wu-auto-update", "M03.automatic-updates"],
+        ["M08.ca2023-status", "M08.ca2023-error", "M08.secure-boot-events"],
     ];
 
     /// <summary>

@@ -2,6 +2,7 @@ using Maus.App.ViewModels;
 using Maus.Core;
 using Maus.Core.Engine.Broker;
 using Maus.Core.Fixes;
+using Maus.Core.Preferences;
 
 namespace Maus.App.Tests;
 
@@ -156,6 +157,30 @@ public sealed class MainViewModelTests
         Assert.Contains("Ceci coupe le Wi-Fi", bench.Questions[0].Message, StringComparison.Ordinal);
     });
 
+    /// <summary>Une stratégie posée fait parler Paramètres d'« organisation » : la question le dit avant, et seulement dans ce cas.</summary>
+    [Fact]
+    public void A_policy_among_the_checked_fixes_is_announced_in_the_question() => UiThread.Run(async () =>
+    {
+        var policy = TestBench.Change("M06.widgets") with
+        {
+            Writes = [new SettingWrite(SettingKey.Registry("HKLM", @"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests"), SettingValue.Dword(0))],
+        };
+        using var bench = Audited(policy, TestBench.Change("M06.a"));
+        await bench.ViewModel.RunAuditAsync();
+        bench.Answer = (_, _) => false;
+
+        await bench.ViewModel.ApplyAsync();
+        foreach (var change in bench.ViewModel.Changes)
+        {
+            change.IsSelected = change.Change.Id == "M06.a";
+        }
+
+        await bench.ViewModel.ApplyAsync();
+
+        Assert.Contains("gérés par votre organisation", bench.Questions[0].Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("organisation", bench.Questions[1].Message, StringComparison.Ordinal);
+    });
+
     [Fact]
     public void A_blocking_reason_stops_every_fix() => UiThread.Run(async () =>
     {
@@ -250,15 +275,39 @@ public sealed class MainViewModelTests
         Assert.False(bench.ViewModel.IsScheduleOutdated);
     });
 
+    /// <summary>
+    /// Compte standard élevé avec le mot de passe d'un autre administrateur : un avertissement qui dit ce qui se passe, pas un
+    /// blocage. Les corrections que le moteur propose (communes au PC) restent applicables.
+    /// </summary>
     [Fact]
-    public void Another_administrator_account_blocks_the_fixes_too() => UiThread.Run(async () =>
+    public void Another_administrator_account_is_told_without_blocking_the_fixes_of_the_pc() => UiThread.Run(async () =>
     {
-        using var bench = Audited(TestBench.Change("M06.a"));
+        using var bench = Audited(TestBench.Change("M01.uac"));
+        ApplyAnswersOk(bench, "S1");
         bench.Snapshot = bench.Snapshot with { ElevatedAsAnotherUser = true };
 
         await bench.ViewModel.RunAuditAsync();
 
-        Assert.Contains("autre compte", bench.ViewModel.BlockingReason, StringComparison.Ordinal);
+        Assert.Null(bench.ViewModel.BlockingReason);
+        Assert.False(bench.ViewModel.IsBlocked);
+        Assert.True(bench.ViewModel.HasOtherAccountNotice);
+        Assert.Contains("autre compte administrateur", bench.ViewModel.OtherAccountNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("Relancez MAUS depuis votre propre session", bench.ViewModel.OtherAccountNotice, StringComparison.Ordinal);
+        Assert.True(bench.ViewModel.CanApply);
+
+        await bench.ViewModel.ApplyAsync();
+
+        Assert.Contains("ApplyAsync", bench.Fake.Calls);
+    });
+
+    [Fact]
+    public void The_own_account_has_no_other_account_notice() => UiThread.Run(async () =>
+    {
+        using var bench = Audited(TestBench.Change("M06.a"));
+
+        await bench.ViewModel.RunAuditAsync();
+
+        Assert.False(bench.ViewModel.HasOtherAccountNotice);
     });
 
     [Fact]
@@ -799,4 +848,65 @@ public sealed class MainViewModelTests
     [Fact]
     public void Without_two_scores_there_is_no_score_change() =>
         Assert.Null(MainViewModel.ScoreChange(-1, 80, partial: false));
+
+    /// <summary>La fenêtre recréée emporterait le suivi de la réparation : la langue attend la fin de l'outil.</summary>
+    [Fact]
+    public void The_language_waits_for_a_windows_tool_to_finish() => UiThread.Run(async () =>
+    {
+        using var bench = new TestBench();
+        var other = bench.ViewModel.LanguageOptions.First(o => o.Value != Maus.Core.Localization.Texts.Language);
+        var finish = new TaskCompletionSource<ToolOutcome>();
+        var tool = Views.ToolWindow.RunAsync("Réparation de Windows", _ => finish.Task);
+
+        bench.ViewModel.LanguageChoice = other;
+        await Task.Delay(50);
+
+        Assert.Empty(bench.LanguageSwitches);
+        Assert.Null(bench.Store.Load().Language);
+        Assert.Contains("Attendez la fin", bench.ViewModel.StatusText, StringComparison.Ordinal);
+
+        finish.SetResult(new ToolOutcome(true));
+        await tool;
+        bench.ViewModel.LanguageChoice = other;
+        for (var i = 0; i < 200 && bench.LanguageSwitches.Count == 0; i++)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.Equal([other.Value], bench.LanguageSwitches);
+        Assert.Equal(other.Value, bench.Store.Load().Language);
+    });
+
+    [Fact]
+    public void The_language_does_not_change_while_a_restore_point_is_created() => UiThread.Run(async () =>
+    {
+        using var bench = new TestBench();
+        bench.Fake.Answers["CreateRestorePointAsync"] = _ => new TaskCompletionSource<Maus.Core.Fixes.RestorePointOutcome>().Task;
+        bench.ViewModel.CreateManualRestorePointCommand.Execute(null);
+        Assert.True(bench.ViewModel.IsCreatingRestorePoint);
+
+        bench.ViewModel.LanguageChoice = bench.ViewModel.LanguageOptions.First(o => o.Value != Maus.Core.Localization.Texts.Language);
+        await Task.Delay(50);
+
+        Assert.Empty(bench.LanguageSwitches);
+        Assert.Contains("Attendez la fin", bench.ViewModel.StatusText, StringComparison.Ordinal);
+    });
+
+    [Fact]
+    public void A_refused_window_change_puts_the_previous_language_back_in_the_choices() => UiThread.Run(async () =>
+    {
+        using var bench = new TestBench { RefuseWindowChange = true };
+        bench.Store.Update(p => p with { Language = "fr" });
+        var other = bench.ViewModel.LanguageOptions.First(o => o.Value != Maus.Core.Localization.Texts.Language);
+
+        bench.ViewModel.LanguageChoice = other;
+        for (var i = 0; i < 200 && !(bench.ViewModel.StatusText ?? string.Empty).Contains("Attendez la fin", StringComparison.Ordinal); i++)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.Equal([other.Value], bench.LanguageSwitches);
+        Assert.Contains("Attendez la fin", bench.ViewModel.StatusText, StringComparison.Ordinal);
+        Assert.Equal("fr", bench.Store.Load().Language);
+    });
 }

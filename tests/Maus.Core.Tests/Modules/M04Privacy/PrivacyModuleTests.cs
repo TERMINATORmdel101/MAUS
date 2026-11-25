@@ -118,6 +118,9 @@ public class PrivacyModuleTests
     [InlineData(null, 1, "Professional", FindingStatus.Ok)]
     [InlineData(null, 0, "Professional", FindingStatus.Info)]
     [InlineData(0, null, "Core", FindingStatus.Info)]
+    [InlineData(1, 3, "Core", FindingStatus.Info)]
+    [InlineData(1, 1, "Core", FindingStatus.Ok)]
+    [InlineData(3, 3, "Core", FindingStatus.Improvable)]
     [InlineData(1, 3, "Professional", FindingStatus.Ok)]
     [InlineData(3, 1, "Professional", FindingStatus.Improvable)]
     [InlineData(0, 3, "Enterprise", FindingStatus.Ok)]
@@ -203,6 +206,25 @@ public class PrivacyModuleTests
         Assert.Equal(FindingStatus.Improvable, PrivacyRegistryChecks.TailoredExperiences(registry, policiesHonored: false).Status);
         Assert.Equal(FindingStatus.Improvable, PrivacyRegistryChecks.FeedbackFrequency(registry, policiesHonored: false).Status);
         Assert.Equal(FindingStatus.Improvable, PrivacyRegistryChecks.SearchHighlights(registry, policiesHonored: false).Status);
+    }
+
+    [Fact]
+    public void Activity_history_policies_are_never_green_on_home()
+    {
+        var registry = new FakeRegistry()
+            .Set(Hklm, @"SOFTWARE\Policies\Microsoft\Windows\System", "EnableActivityFeed", 0)
+            .Set(Hklm, @"SOFTWARE\Policies\Microsoft\Windows\System", "PublishUserActivities", 0)
+            .Set(Hklm, @"SOFTWARE\Policies\Microsoft\Windows\System", "UploadUserActivities", 0);
+
+        var home = PrivacyRegistryChecks.ActivityHistory(registry, Home);
+        var pro = PrivacyRegistryChecks.ActivityHistory(registry, Pro);
+
+        Assert.Equal(FindingStatus.Info, home.Status);
+        Assert.False(home.Fixable);
+        Assert.Contains("effet non garanti", home.Current, StringComparison.Ordinal);
+        Assert.DoesNotContain("relira", home.Explanation, StringComparison.Ordinal);
+        Assert.Equal(FindingStatus.Ok, pro.Status);
+        Assert.Equal(FindingStatus.Improvable, PrivacyRegistryChecks.ActivityHistory(new FakeRegistry(), Home).Status);
     }
 
     [Fact]

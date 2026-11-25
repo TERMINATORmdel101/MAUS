@@ -41,8 +41,17 @@ public sealed partial class MainViewModel
     public IReadOnlyList<ChoiceOption<string>> LanguageOptions { get; } =
         [.. Maus.Core.Localization.Texts.Languages.Select(l => new ChoiceOption<string>(l.Name, l.Code))];
 
-    /// <summary>Changement de langue (enregistré, puis fenêtre recréée) ; remplaçable pour les tests.</summary>
-    public Action<string, bool> SwitchLanguage { get; init; } = App.SwitchLanguage;
+    /// <summary>
+    /// Changement de langue (fenêtre recréée) ; <c>false</c> si la fenêtre n'a pas été remplacée. Remplaçable pour les tests.
+    /// </summary>
+    public Func<string, bool, bool> SwitchLanguage { get; init; } = App.SwitchLanguage;
+
+    /// <summary>
+    /// Une opération qu'un changement de langue couperait : la fenêtre est recréée, et l'ancienne emporterait en se fermant le
+    /// suivi d'une réparation, d'une annulation ou d'un point de restauration (après la question « Fermer MAUS ? »).
+    /// </summary>
+    internal bool IsBusyForLanguageChange =>
+        IsRunning || IsWriting || Workshop.IsTesting || Views.ToolWindow.IsRunning || IsCreatingRestorePoint || Workshop.IsCreatingRestorePoint;
 
     public ChoiceOption<string> LanguageChoice
     {
@@ -54,11 +63,11 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            // Changer de langue recrée la fenêtre : jamais pendant un audit, une correction ou un test.
-            if (IsRunning || IsApplying || Workshop.IsTesting)
+            // Changer de langue recrée la fenêtre : jamais pendant un audit, une correction, une annulation, un test, un outil
+            // de Windows ou la création d'un point de restauration.
+            if (IsBusyForLanguageChange)
             {
-                StatusText = T("Attendez la fin de l'opération en cours pour changer de langue.");
-                OnPropertyChanged(nameof(LanguageChoice));
+                RefuseLanguageChange();
                 return;
             }
 
@@ -66,12 +75,25 @@ public sealed partial class MainViewModel
         }
     }
 
+    private void RefuseLanguageChange()
+    {
+        StatusText = T("Attendez la fin de l'opération en cours pour changer de langue.");
+        OnPropertyChanged(nameof(LanguageChoice));
+    }
+
     private async Task ChangeLanguageAsync(string code)
     {
         await Task.Yield();
+        string? previous = null;
+        var saved = false;
         try
         {
-            await Task.Run(() => PreferencesStore.Update(p => p with { Language = code }));
+            await Task.Run(() => PreferencesStore.Update(p =>
+            {
+                previous = p.Language;
+                return p with { Language = code };
+            }));
+            saved = true;
         }
         catch (Exception ex) when (ex is JournalUnsafeException or Maus.Core.Engine.Broker.EngineException or System.IO.IOException or UnauthorizedAccessException)
         {
@@ -79,7 +101,25 @@ public sealed partial class MainViewModel
             StatusText = T("Votre choix n'a pas pu être enregistré : {0}", Maus.Core.Diagnostics.ErrorText.For(ex));
         }
 
-        SwitchLanguage(code, HasAudit);
+        // Une opération a pu commencer pendant l'enregistrement : la fenêtre reste, dans sa langue, et le choix précédent revient.
+        if (!IsBusyForLanguageChange && SwitchLanguage(code, HasAudit))
+        {
+            return;
+        }
+
+        if (saved)
+        {
+            try
+            {
+                await Task.Run(() => PreferencesStore.Update(p => p with { Language = previous }));
+            }
+            catch (Exception ex) when (ex is JournalUnsafeException or Maus.Core.Engine.Broker.EngineException or System.IO.IOException or UnauthorizedAccessException)
+            {
+                Maus.Core.Diagnostics.Breadcrumbs.Add("langue précédente non remise après un changement refusé (" + ex.GetType().Name + ")");
+            }
+        }
+
+        RefuseLanguageChange();
     }
 
     public bool IsLaptop
@@ -231,25 +271,6 @@ public sealed partial class MainViewModel
         }
 
         return related;
-    }
-
-    /// <summary>Après un changement de langue, les marques « voulu » sont réécrites dans la nouvelle langue.</summary>
-    private async Task RebindAcknowledgementsAsync(IEnumerable<Finding> findings)
-    {
-        if (_lastContext is not { } context || context.Preferences.RebindLanguage(findings) is not { } rebound || ReferenceEquals(rebound, context.Preferences))
-        {
-            return;
-        }
-
-        try
-        {
-            var saved = await Task.Run(() => PreferencesStore.Update(p => p.RebindLanguage(findings)));
-            _lastContext = context with { Preferences = saved };
-        }
-        catch (Exception ex) when (ex is JournalUnsafeException or System.IO.IOException or UnauthorizedAccessException)
-        {
-            // Les marques restent valables telles quelles ; elles seront réécrites au prochain audit.
-        }
     }
 
     /// <summary>Enregistre un choix et relance les modules concernés.</summary>

@@ -437,20 +437,28 @@ public sealed class FakeNotifier : ISettingChangeNotifier
 }
 
 /// <summary>
-/// Tâches planifiées en mémoire, partagées avec les lignes du faux CIM : désactiver une tâche change son « State »
-/// (1 = désactivée, 3 = prête), et le prochain audit le voit.
+/// Tâches planifiées en mémoire, partagées avec les lignes du faux CIM : désactiver une tâche change son interrupteur
+/// (« Settings.Enabled ») et son « State » (1 = désactivée, 3 = prête), et le prochain audit le voit. Comme Windows, une tâche
+/// dont le programme tourne encore garde « State » = 4 (en cours), même désactivée.
 /// </summary>
 public sealed class FakeScheduledTasks(params Dictionary<string, object?>[] rows) : IScheduledTaskAccessor
 {
+    private const long Running = 4;
+
     public List<(string Path, string Name, bool Enabled)> Calls { get; } = [];
 
     public bool? IsEnabled(string taskPath, string taskName) =>
-        Find(taskPath, taskName) is { } row ? Convert.ToInt64(row["State"], System.Globalization.CultureInfo.InvariantCulture) != 1 : null;
+        Find(taskPath, taskName) is { } row ? WindowsScheduledTaskAccessor.IsEnabled(new Maus.Core.Platform.CimRow(row)) : null;
 
     public void SetEnabled(string taskPath, string taskName, bool enabled)
     {
         var row = Find(taskPath, taskName) ?? throw new InvalidOperationException("tâche absente");
-        row["State"] = enabled ? 3L : 1L;
+        row["Settings"] = new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Enabled"] = enabled });
+        if (Convert.ToInt64(row["State"], System.Globalization.CultureInfo.InvariantCulture) != Running)
+        {
+            row["State"] = enabled ? 3L : 1L;
+        }
+
         Calls.Add((taskPath, taskName, enabled));
     }
 

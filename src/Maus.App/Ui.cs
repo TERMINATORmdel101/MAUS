@@ -412,6 +412,7 @@ public static class Ui
 
     public static string SoftwareUpdateSelected => T("Mettre à jour la sélection");
 
+    /// <summary>« Annuler » au sens de renoncer (« Cancel ») : défaire une correction s'écrit « Annuler cette correction », « Annuler cette séance »…</summary>
     public static string Cancel => T("Annuler");
 
     public static string PawnIoTitle => T("Capteurs avancés (pilote PawnIO)");
@@ -776,7 +777,7 @@ public static class Ui
 
     public static string UsbTestTitle => T("Clé USB : vraie capacité");
 
-    public static string UsbTestIntro => T("Détecte les clés contrefaites : écrit sur toute la place libre, relit, puis retire ses fichiers. Vos fichiers ne sont pas touchés.");
+    public static string UsbTestIntro => T("Détecte les clés contrefaites : écrit sur toute la place libre, relit, puis retire ses fichiers. Utilisez une clé vide ou sauvegardée : une clé contrefaite peut abîmer les fichiers qu'elle contient déjà.");
 
     public static string BeforeAfterTitle => T("Avant et après, en vrai");
 

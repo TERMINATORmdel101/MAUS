@@ -130,8 +130,21 @@ internal sealed class TestBench : IDisposable
                 LaptopQuestions++;
                 return null;
             },
+
+            // Jamais la vraie fenêtre recréée dans un test : le changement de langue est seulement noté.
+            SwitchLanguage = (code, _) =>
+            {
+                LanguageSwitches.Add(code);
+                return !RefuseWindowChange;
+            },
         };
     }
+
+    /// <summary>Langues demandées par la fenêtre (fenêtre recréée), dans l'ordre.</summary>
+    public List<string> LanguageSwitches { get; } = [];
+
+    /// <summary>La fenêtre n'a pas été remplacée (sa fermeture a été refusée).</summary>
+    public bool RefuseWindowChange { get; set; }
 
     public IMausEngine Engine { get; }
 

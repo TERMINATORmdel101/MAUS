@@ -38,6 +38,37 @@ public class DevicesModuleTests
         Assert.Equal("ms-settings:windowsupdate-optionalupdates", device.SettingsPage);
     }
 
+    /// <summary>
+    /// 0.8.7.1 : la fin de l'identifiant de Windows est le numéro de série d'un appareil USB, ou l'adresse d'un appareil Bluetooth ;
+    /// l'identifiant du constat, repris dans « Demander de l'aide », le CSV et le JSON, ne la contient plus.
+    /// </summary>
+    [Theory]
+    [InlineData(@"USB\VID_0781&PID_5581\4C530001234567890123", "4c530001234567890123", "M17.device.usb.")]
+    [InlineData(@"BTHENUM\DEV_A1B2C3D4E5F6\7&1A2B3C4D&0&BLUETOOTHDEVICE_A1B2C3D4E5F6", "a1b2c3d4e5f6", "M17.device.bthenum.")]
+    public async Task A_device_finding_id_never_carries_the_serial_number_or_address(string pnpId, string secret, string prefix)
+    {
+        var device = Device("Clé USB", "USB", 10);
+        device["PNPDeviceID"] = pnpId;
+
+        var findings = await Detect(new FakeCim().Answer(DevicesModule.ProblemQuery, device));
+
+        var id = findings.Single(f => f.Id.StartsWith("M17.device.", StringComparison.Ordinal)).Id;
+        Assert.StartsWith(prefix, id, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, id, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(pnpId.Split('\\')[^1], id, StringComparison.OrdinalIgnoreCase);
+
+        // Stable d'un audit à l'autre, et l'identifiant d'avant la 0.8.7.1 (gardé par une marque « voulu ») mène au même.
+        Assert.Equal(id, DeviceFindingId.Of(pnpId));
+        Assert.Equal(id, DeviceFindingId.Upgrade("M17.device." + FindingSlug.Of(pnpId, 60)));
+        Assert.Equal(id, DeviceFindingId.Upgrade(id));
+        Assert.Equal("M17.devices", DeviceFindingId.Upgrade("M17.devices"));
+        Assert.Equal("M05.fast-startup", DeviceFindingId.Upgrade("M05.fast-startup"));
+    }
+
+    [Fact]
+    public void Two_devices_with_the_same_fingerprint_keep_two_findings() =>
+        Assert.Equal([DeviceFindingId.Of("a"), DeviceFindingId.Of("a") + ".2", DeviceFindingId.Of("b")], DeviceFindingId.ForEach(["a", "a", "b"]));
+
     [Fact]
     public async Task The_name_of_a_device_is_marked_as_read_on_the_pc()
     {

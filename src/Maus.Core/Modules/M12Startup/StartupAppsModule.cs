@@ -21,7 +21,7 @@ public sealed class StartupAppsModule : Fixes.IFixableModule
     internal const string ServicesQuery = "SELECT Name, DisplayName, PathName, StartMode FROM Win32_Service WHERE StartMode = 'Auto'";
     internal const string PerformanceLog = "Microsoft-Windows-Diagnostics-Performance/Operational";
     internal const string TaskSchedulerScope = CimScopes.TaskScheduler;
-    internal const string TasksQuery = "SELECT TaskName, TaskPath, State, Triggers, Actions FROM MSFT_ScheduledTask";
+    internal const string TasksQuery = "SELECT TaskName, TaskPath, State, Settings, Triggers, Actions FROM MSFT_ScheduledTask";
 
     private static string SummaryCategory => T("Vue d'ensemble");
     private static string UnknownCategory => T("Inconnu");

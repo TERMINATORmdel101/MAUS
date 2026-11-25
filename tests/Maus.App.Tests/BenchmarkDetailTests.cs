@@ -93,18 +93,17 @@ public sealed class BenchmarkDetailTests
     [InlineData("11,805")]
     [InlineData("72")]
     [InlineData("Score : 1 234 points")]
-    public void A_rolling_number_ends_on_the_exact_text(string text) => UiThread.Run(async () =>
+    public void A_rolling_number_ends_on_the_exact_text(string text) => UiThread.Run(() =>
     {
-        // Une animation n'avance que si une fenêtre est ouverte : celle-ci reste hors de l'écran.
+        // WPF n'avance une animation qu'en dessinant une fenêtre, au rythme de l'horloge réelle : sur une machine chargée, une
+        // attente fixe ne suffit pas toujours. L'essai mène lui-même l'horloge du nombre à sa fin, sans fenêtre ni attente.
         var block = new System.Windows.Controls.TextBlock();
-        var window = new System.Windows.Window { Content = block, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = System.Windows.WindowStartupLocation.Manual, Left = -4000, Width = 200, Height = 100 };
-        window.Show();
 
         Maus.App.Appearance.Motion.SetRollingText(block, text);
-        await Task.Delay(1100);
-        window.Close();
+        Maus.App.Appearance.Motion.FinishRolling(block);
 
         Assert.Equal(text, block.Text);
+        return Task.CompletedTask;
     });
 
     private static readonly double[] LineValues = [1, 2, 3];

@@ -383,13 +383,16 @@ public sealed class WindowsUpdateModule : IAuditModule
                 : T("Une stratégie bloque l'installation automatique : si vous ne l'avez pas voulue, supprimez-la (gpedit.msc ou l'outil qui l'a posée)."));
         }
 
+        // PC géré, installation réglée par une stratégie seulement (sans pause) : un choix du service informatique, dit sans couleur.
+        // Une pause, elle, se pose depuis Paramètres et reste signalée.
+        var byOrganisation = isManaged && byPolicy && !paused;
         return new Finding
         {
             Id = id,
             Title = title,
             Category = UpdateCategory,
-            Status = reasons.Count == 0 ? FindingStatus.Ok : FindingStatusExtensions.ForDeviation(Severity.Medium),
-            Severity = Severity.Medium,
+            Status = reasons.Count == 0 ? FindingStatus.Ok : byOrganisation ? FindingStatus.Info : FindingStatusExtensions.ForDeviation(Severity.Medium),
+            Severity = byOrganisation ? Severity.Info : Severity.Medium,
             Current = reasons.Count == 0 ? T("active") : string.Join(" ; ", reasons),
             Expected = T("active, sans pause"),
             Explanation = T("Windows installe seul les correctifs de sécurité publiés chaque mois. Une pause ou une stratégie qui "

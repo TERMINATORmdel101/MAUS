@@ -59,4 +59,22 @@ public sealed class WakeReportTests
         Assert.Contains("Liste des tâches planifiées : illisible.", limited.Explanation, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Unknown, denied.Status);
     }
+
+    [Fact]
+    public void Without_rights_the_task_list_is_said_partial_and_never_empty_for_sure()
+    {
+        var settingsWake = new CimRow(new Dictionary<string, object?> { ["WakeToRun"] = true });
+        var empty = new FakeCim().Answer(WakeReport.TasksQuery, CimScopes.TaskScheduler);
+        var one = new FakeCim().Answer(WakeReport.TasksQuery, CimScopes.TaskScheduler,
+            new Dictionary<string, object?> { ["TaskName"] = "Sauvegarde", ["TaskPath"] = @"\", ["State"] = 3L, ["Settings"] = settingsWake });
+
+        var limitedEmpty = WakeReport.Detect(TestContext.Create(cim: empty, elevated: false, now: Now), "c");
+        var limitedOne = WakeReport.Detect(TestContext.Create(cim: one, elevated: false, now: Now), "c");
+        var elevatedEmpty = WakeReport.Detect(TestContext.Create(cim: new FakeCim().Answer(WakeReport.TasksQuery, CimScopes.TaskScheduler), now: Now), "c");
+
+        Assert.Contains("liste partielle sans droits administrateur", limitedEmpty.Explanation, StringComparison.Ordinal);
+        Assert.DoesNotContain("Aucune tâche planifiée", limitedEmpty.Explanation, StringComparison.Ordinal);
+        Assert.Contains("(liste partielle sans droits administrateur) : Sauvegarde.", limitedOne.Explanation, StringComparison.Ordinal);
+        Assert.Contains("Aucune tâche planifiée active n'est réglée pour réveiller le PC.", elevatedEmpty.Explanation, StringComparison.Ordinal);
+    }
 }

@@ -70,6 +70,58 @@ public class StartupFixTests
         Assert.Equal(@"Tâche planifiée \Vendor\Tray Helper", plan.Single(c => c.Id.EndsWith("tray-helper", StringComparison.Ordinal)).Writes.Single().Key.Describe());
     }
 
+    /// <summary>
+    /// Le programme lancé à l'ouverture de session tourne encore : Windows laisse alors « State » à 4 (en cours) même après la
+    /// désactivation. La relecture se fait sur l'interrupteur, sinon la correction serait défaite à chaque fois.
+    /// </summary>
+    [Fact]
+    public async Task A_logon_task_whose_program_still_runs_is_disabled_and_enabled_again_through_its_switch()
+    {
+        var afterburner = new Dictionary<string, object?>
+        {
+            ["TaskPath"] = @"\",
+            ["TaskName"] = "MSIAfterburner",
+            ["State"] = 4u,
+            ["Settings"] = new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Enabled"] = true }),
+            ["Triggers"] = new[] { new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Enabled"] = true, ["UserId"] = "Bob" }) },
+            ["Actions"] = new[] { new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Execute"] = @"C:\Program Files (x86)\MSI Afterburner\MSIAfterburner.exe", ["Arguments"] = null }) },
+        };
+        var cim = new FakeCim().Answer(StartupAppsModule.TasksQuery, StartupAppsModule.TaskSchedulerScope, afterburner);
+        var tasks = new FakeScheduledTasks(afterburner);
+        var registry = new FakeRegistry();
+
+        var (plan, applied) = await Fixes.RoundTrip.AssertAsync(new StartupAppsModule(new FakeStartupEnvironment()), TestContext.Create(registry, cim: cim), registry, tasks: tasks);
+
+        Assert.Equal("M12.logon-task-msiafterburner", Assert.Single(plan).Id);
+        Assert.Equal(1, applied.AppliedCount);
+        Assert.Equal([(@"\", "MSIAfterburner", false), (@"\", "MSIAfterburner", true)], tasks.Calls);
+        Assert.Equal(4u, afterburner["State"]);
+    }
+
+    [Fact]
+    public void A_task_is_enabled_according_to_its_switch_and_its_state_only_when_the_switch_is_unreadable()
+    {
+        static Maus.Core.Platform.CimRow Row(object state, bool? enabled) => new(new Dictionary<string, object?>
+        {
+            ["State"] = state,
+            ["Settings"] = enabled is null ? null : new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Enabled"] = enabled }),
+        });
+
+        Assert.False(Maus.Core.Fixes.WindowsScheduledTaskAccessor.IsEnabled(Row(4u, enabled: false)));
+        Assert.True(Maus.Core.Fixes.WindowsScheduledTaskAccessor.IsEnabled(Row(4u, enabled: true)));
+        Assert.False(Maus.Core.Fixes.WindowsScheduledTaskAccessor.IsEnabled(Row(1u, enabled: null)));
+        Assert.True(Maus.Core.Fixes.WindowsScheduledTaskAccessor.IsEnabled(Row(3u, enabled: null)));
+        Assert.Null(StartupParsers.ParseLogonTask(new Maus.Core.Platform.CimRow(new Dictionary<string, object?>
+        {
+            ["TaskPath"] = @"\",
+            ["TaskName"] = "Outil",
+            ["State"] = 4u,
+            ["Settings"] = new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Enabled"] = false }),
+            ["Triggers"] = new[] { new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Enabled"] = true, ["UserId"] = "Bob" }) },
+            ["Actions"] = new[] { new Maus.Core.Platform.CimRow(new Dictionary<string, object?> { ["Execute"] = @"C:\Outil\outil.exe", ["Arguments"] = null }) },
+        })));
+    }
+
     [Fact]
     public void Task_names_are_escaped_for_wql()
     {

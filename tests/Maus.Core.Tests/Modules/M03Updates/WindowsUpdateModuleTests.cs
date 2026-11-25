@@ -327,6 +327,20 @@ public class WindowsUpdateModuleTests
     }
 
     [Fact]
+    public async Task On_a_managed_pc_a_pause_stays_a_warning_even_with_an_organisation_policy()
+    {
+        var registry = HealthyRegistry()
+            .Set(RegistryHive.LocalMachine, WindowsUpdateModule.AuPolicyKey, "NoAutoUpdate", 1)
+            .Set(RegistryHive.LocalMachine, WindowsUpdateModule.UxSettingsKey, "PauseUpdatesExpiryTime", "2026-10-08T09:30:00Z");
+
+        var finding = Get(
+            await Detect(registry: registry, hardware: new HardwareProfile { FormFactor = FormFactor.Desktop, IsManaged = true }),
+            "M03.automatic-updates");
+
+        Assert.Equal(FindingStatus.Warning, finding.Status);
+    }
+
+    [Fact]
     public async Task Expired_pause_is_compliant()
     {
         var registry = HealthyRegistry()
@@ -339,9 +353,9 @@ public class WindowsUpdateModuleTests
     }
 
     [Theory]
-    [InlineData(false, "gpedit.msc")]
-    [InlineData(true, "service informatique")]
-    public async Task Policy_blocking_automatic_updates_is_a_warning(bool managed, string advice)
+    [InlineData(false, "gpedit.msc", FindingStatus.Warning)]
+    [InlineData(true, "service informatique", FindingStatus.Info)]
+    public async Task Policy_blocking_automatic_updates_is_a_warning_except_on_a_managed_pc(bool managed, string advice, FindingStatus expected)
     {
         var registry = HealthyRegistry()
             .Set(RegistryHive.LocalMachine, WindowsUpdateModule.AuPolicyKey, "NoAutoUpdate", 1)
@@ -351,7 +365,8 @@ public class WindowsUpdateModuleTests
             await Detect(registry: registry, hardware: new HardwareProfile { FormFactor = FormFactor.Desktop, IsManaged = managed }),
             "M03.automatic-updates");
 
-        Assert.Equal(FindingStatus.Warning, finding.Status);
+        // Sur un PC géré, la stratégie relève du service informatique : information, sans couleur.
+        Assert.Equal(expected, finding.Status);
         Assert.Contains("NoAutoUpdate", finding.Current, StringComparison.Ordinal);
         Assert.Contains("DisableWindowsUpdateAccess", finding.Current, StringComparison.Ordinal);
         Assert.Contains(advice, finding.Advice, StringComparison.Ordinal);

@@ -135,7 +135,25 @@ public class HealthScoreTests
     {
         Assert.Equal("M01.secure-boot", HealthScore.SubjectOf("M01.secure-boot"));
         Assert.Equal("M01.secure-boot", HealthScore.SubjectOf("M08.secure-boot"));
-        Assert.Null(HealthScore.SubjectOf("M08.secure-boot-events"));
+        Assert.Equal("M08.ca2023-status", HealthScore.SubjectOf("M08.secure-boot-events"));
+        Assert.Null(HealthScore.SubjectOf("M08.dbdefault"));
         Assert.Equal("M01.wu-services", HealthScore.SubjectOf("M03.update-services"));
+    }
+
+    [Fact]
+    public void Secure_boot_2023_certificates_read_three_times_cost_points_once()
+    {
+        // Firmware qui refuse les certificats : état, code d'erreur et journal disent la même chose. Les clés par défaut restent à part.
+        var score = HealthScore.Explain([new ModuleResult("M08", "BIOS",
+        [
+            Costly("M08.ca2023-status", FindingStatus.Warning, Severity.Medium),
+            Costly("M08.ca2023-error", FindingStatus.Warning, Severity.Medium),
+            Costly("M08.secure-boot-events", FindingStatus.Warning, Severity.Medium),
+            Costly("M08.dbdefault", FindingStatus.Warning, Severity.Medium),
+        ], TimeSpan.Zero)]);
+
+        Assert.Equal(8, score.Points);
+        Assert.Single(score.Lines, l => l.FindingId is "M08.ca2023-status" or "M08.ca2023-error" or "M08.secure-boot-events");
+        Assert.Single(score.Lines, l => l.FindingId == "M08.dbdefault");
     }
 }

@@ -163,6 +163,12 @@ public sealed class VisualEffectsModule : IFixableModule
             {
                 Gain = T("Moins de contenu en ligne chargé en arrière-plan (actualités, météo, publicités)."),
                 Effect = ChangeEffect.ExplorerRestart,
+
+                // Policy CSP NewsAndInterests/AllowNewsAndInterests (Microsoft Learn) : « applies to the entire widgets experience,
+                // including content on the taskbar ».
+                Risk = PlannedChange.WithPolicyRisk(
+                    T("Tant que la stratégie est posée, les Widgets ne reviennent pas par Paramètres : elle s'applique à toute l'expérience Widgets, barre des tâches comprise (Microsoft Learn, Policy CSP NewsAndInterests/AllowNewsAndInterests)."),
+                    setsPolicy: true),
             });
         }
 

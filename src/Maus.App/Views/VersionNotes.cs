@@ -8,6 +8,13 @@ public static class VersionNotes
     /// <summary>Nouveautés de chaque version, en quelques lignes ; vide si rien n'est prévu pour cette version.</summary>
     public static IReadOnlyList<string> For(string version) => version switch
     {
+        "0.8.7.1" =>
+        [
+            T("Test de la clé USB plus honnête : une clé contrefaite peut écrire par-dessus les fichiers déjà présents, MAUS le dit et demande une clé vide ou sauvegardée."),
+            T("Le numéro de série d'un appareil USB et l'adresse d'un appareil Bluetooth ne sortent plus dans les rapports ni dans « Demander de l'aide »."),
+            T("MAUS n'affirme plus ce qu'il n'a pas pu lire : Secure Boot, pilote graphique, réveils du PC, Windows Famille, PC géré, disques."),
+            T("Corrections plus justes : compte d'un autre administrateur, tâche planifiée d'un programme ouvert, stratégies de Windows, et changement de langue sûr pendant une opération."),
+        ],
         "0.8.7" =>
         [
             T("Accueil plus simple : une seule façon d'entrer dans les outils, la liste « Que se passe-t-il ? », et moins de boutons en double."),

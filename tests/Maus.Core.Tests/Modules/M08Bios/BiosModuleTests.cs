@@ -180,11 +180,47 @@ public class BiosModuleTests
         Assert.Null(Single(findings, "M08.ca2023-error").SettingsPage);
         Assert.Equal(FindingStatus.Warning, Single(findings, "M08.ca2023-error").Status);
         Assert.Equal("code 0x80070015", Single(findings, "M08.ca2023-error").Current);
+        // 1801 = certificats en attente d'être appliqués : une information, sans conseil de BIOS.
         var journal = Single(findings, "M08.secure-boot-events");
-        Assert.Equal(FindingStatus.Warning, journal.Status);
+        Assert.Equal(FindingStatus.Info, journal.Status);
         Assert.Contains("1801", journal.Current);
+        Assert.DoesNotContain("BIOS", journal.Advice, StringComparison.Ordinal);
         Assert.Equal(FindingStatus.Info, Single(findings, "M08.boot-manager-2023").Status);
         Assert.DoesNotContain(findings, f => f.Id == "M08.dbdefault");
+    }
+
+    [Theory]
+    [InlineData(1795, "erreur renvoyée par le firmware", "dernier BIOS")]
+    [InlineData(1796, "variable Secure Boot", "dernier BIOS")]
+    [InlineData(1802, "problème connu du firmware", "fabricant de l'appareil")]
+    [InlineData(1803, "clé KEK", "fabricant de l'appareil")]
+    public async Task Secure_boot_failure_events_are_a_warning_with_firmware_advice(int eventId, string what, string advice)
+    {
+        // L'échec reste signalé même si un 1801 (attente) a suivi : aucune réussite (1808) ne l'a effacé.
+        var events = new FakeEventLogs()
+            .Add("System", BiosModule.TpmWmiProvider, 1808, new DateTime(2026, 6, 1))
+            .Add("System", BiosModule.TpmWmiProvider, eventId, new DateTime(2026, 9, 10))
+            .Add("System", BiosModule.TpmWmiProvider, 1801, new DateTime(2026, 9, 20));
+
+        var findings = await Detect(Context(MsiDesktop, registry: Registry(status: "InProgress", capable: 1), events: events));
+
+        var journal = Single(findings, "M08.secure-boot-events");
+        Assert.Equal(FindingStatus.Warning, journal.Status);
+        Assert.StartsWith("événement " + eventId.ToString(System.Globalization.CultureInfo.InvariantCulture), journal.Current, StringComparison.Ordinal);
+        Assert.Contains(what, journal.Current, StringComparison.Ordinal);
+        Assert.Contains(advice, journal.Advice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Failure_older_than_the_last_success_is_forgotten()
+    {
+        var events = new FakeEventLogs()
+            .Add("System", BiosModule.TpmWmiProvider, 1802, new DateTime(2026, 6, 1))
+            .Add("System", BiosModule.TpmWmiProvider, 1808, new DateTime(2026, 9, 20));
+
+        var findings = await Detect(Context(MsiDesktop, events: events));
+
+        Assert.Equal(FindingStatus.Ok, Single(findings, "M08.secure-boot-events").Status);
     }
 
     [Fact]

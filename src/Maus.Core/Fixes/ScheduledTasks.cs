@@ -15,7 +15,7 @@ public interface IScheduledTaskAccessor
 }
 
 /// <summary>
-/// Lecture par CIM (<c>MSFT_ScheduledTask</c>, état 1 = désactivée) et écriture par l'outil de Windows
+/// Lecture par CIM (<c>MSFT_ScheduledTask</c>, interrupteur <c>Settings.Enabled</c>) et écriture par l'outil de Windows
 /// <c>schtasks /Change /TN … /ENABLE|/DISABLE</c> (Microsoft Learn, « schtasks change »), lancé depuis System32 avec ses
 /// arguments séparés : aucun texte n'est interprété par un interpréteur de commandes.
 /// </summary>
@@ -28,10 +28,21 @@ public sealed class WindowsScheduledTaskAccessor(ICimReader cim) : IScheduledTas
     {
         ArgumentNullException.ThrowIfNull(taskPath);
         ArgumentNullException.ThrowIfNull(taskName);
-        var wql = $"SELECT State FROM MSFT_ScheduledTask WHERE TaskPath = '{Escape(taskPath)}' AND TaskName = '{Escape(taskName)}'";
+        var wql = $"SELECT State, Settings FROM MSFT_ScheduledTask WHERE TaskPath = '{Escape(taskPath)}' AND TaskName = '{Escape(taskName)}'";
         var rows = cim.Query(wql, CimScopes.TaskScheduler);
-        var row = rows.Count == 0 ? null : rows[0];
-        return row is null ? null : row.GetInt64("State") != DisabledState;
+        return rows.Count == 0 ? null : IsEnabled(rows[0]);
+    }
+
+    /// <summary>
+    /// Interrupteur de la tâche (<c>Settings.Enabled</c>, celui que change « Désactiver » ou <c>schtasks /DISABLE</c>), et non
+    /// son état d'exécution : <c>State</c> ne vaut « Disabled » (1) que si la tâche est désactivée et qu'aucune instance n'est en
+    /// file ou en cours (Microsoft Learn, « TASK_STATE enumeration (taskschd.h) ») ; une tâche désactivée dont le programme
+    /// tourne encore reste « Running » (4). <c>State</c> ne sert que si l'interrupteur est illisible.
+    /// </summary>
+    public static bool IsEnabled(CimRow task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return task.GetRow("Settings")?.GetBool("Enabled") ?? task.GetInt64("State") != DisabledState;
     }
 
     public void SetEnabled(string taskPath, string taskName, bool enabled)

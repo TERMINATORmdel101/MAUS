@@ -85,7 +85,11 @@ public sealed record Finding
     /// <summary>Tâches ou pilotes relevés par ce contrôle, gardés dans le résumé de l'audit pour les comparer au suivant ; <c>null</c> si la liste n'a pas pu être lue.</summary>
     public IReadOnlyList<FollowedItem>? Followed { get; init; }
 
-    /// <summary>Ce qui a été mesuré, tel que le matériel se nomme (modèle du disque) : deux disques ne se mélangent pas dans une même courbe.</summary>
+    /// <summary>
+    /// Ce qui a été mesuré ou contrôlé, tel que le matériel se nomme (modèle du disque, nom de l'écran ou de la carte graphique) : deux
+    /// disques ne se mélangent pas dans une même courbe, et quand l'identifiant ne dit que la place d'un appareil, deux audits ne
+    /// comparent pas deux appareils différents (<see cref="Reporting.AuditComparison"/>).
+    /// </summary>
     public string? MeasuredItem { get; init; }
 
     public static Finding Unknown(string id, string title, string reason, string? category = null) => new()

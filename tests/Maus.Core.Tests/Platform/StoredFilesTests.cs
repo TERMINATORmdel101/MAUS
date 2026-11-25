@@ -104,6 +104,26 @@ public sealed class StoredFilesTests : IDisposable
         Assert.Equal("contenu", read.Text);
     }
 
+    /// <summary>0.8.7.1 : une marque « voulu » posée sur un appareil USB avec l'ancien identifiant (qui contenait son numéro de série) suit l'appareil.</summary>
+    [Fact]
+    public void A_wanted_mark_on_a_device_keeps_working_with_the_identifier_without_serial_number()
+    {
+        const string PnpId = @"USB\VID_0781&PID_5581\4C530001234567890123";
+        var at = new DateTimeOffset(2026, 10, 5, 10, 0, 0, TimeSpan.Zero);
+        new FilePreferencesStore(_directory, new Protector()).Save(UserPreferences.Default with
+        {
+            Acknowledged = [new("M17.device.usb-vid-0781-pid-5581-4c530001234567890123", "code 10", at, "fr"), new("M05.fast-startup", "activé", at, "fr")],
+        });
+
+        var store = new FilePreferencesStore(_directory, new Protector());
+        var marks = store.Load().Acknowledged;
+
+        Assert.Equal([Maus.Core.Modules.M17Devices.DeviceFindingId.Of(PnpId), "M05.fast-startup"], marks.Select(m => m.FindingId));
+        Assert.DoesNotContain("4c53", marks[0].FindingId, StringComparison.Ordinal);
+        Assert.Equal(PreferencesFileState.Read, store.State);
+        Assert.Empty(Copies("preferences.json"));
+    }
+
     [Fact]
     public void Locked_preferences_are_kept_in_memory_and_never_overwritten()
     {
@@ -214,6 +234,43 @@ public sealed class StoredFilesTests : IDisposable
         Assert.Equal(original, File.ReadAllText(path));
         history.Add(second);
         Assert.Equal(2, history.Load().Count);
+    }
+
+    [Fact]
+    public async Task A_writer_behind_a_stuck_one_gives_up_without_touching_the_file_and_the_stuck_one_still_writes()
+    {
+        // Nom unique : le verrou d'un historique suit le nom du fichier, cet essai ne bloque ainsi aucun autre.
+        var path = PathOf("stuck-" + Guid.NewGuid().ToString("N") + ".json");
+        var first = new BenchmarkEntry("cpu", 100, true, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero));
+        JsonHistoryFile<BenchmarkEntry> History(Action<TimeSpan>? wait = null) =>
+            new(path, System.Text.Json.JsonSerializerOptions.Default, 10, e => e.At, _ => "occupé", wait, gateWait: TimeSpan.FromMilliseconds(50));
+        History().Add(first);
+        using var stuck = new ManualResetEventSlim();
+        using var freed = new ManualResetEventSlim();
+        var holder = Lock(path);
+
+        // La première écriture tient le verrou, coincée devant un fichier illisible jusqu'à ce que l'essai la libère.
+        var blocked = Task.Run(() => History(_ =>
+        {
+            stuck.Set();
+            freed.Wait();
+            holder.Dispose();
+        }).Add(first with { Score = 200, At = first.At.AddDays(1) }));
+        try
+        {
+            Assert.True(stuck.Wait(TimeSpan.FromMinutes(1)));
+
+            // Personne ne passe le verrou : la seconde renonce au lieu d'attendre sans fin, sans rien écrire.
+            Assert.Throws<IOException>(() => History().Add(first with { Score = 300, At = first.At.AddDays(2) }));
+        }
+        finally
+        {
+            freed.Set();
+        }
+
+        await blocked.WaitAsync(TimeSpan.FromMinutes(1));
+        // La première écrit ensuite normalement ; la seconde n'a rien laissé.
+        Assert.Equal([100, 200], History().Load().Select(e => e.Score));
     }
 
     [Fact]

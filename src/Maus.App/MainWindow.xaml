@@ -931,6 +931,12 @@
                             Visibility="{Binding ShowBlockingBanner, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding BlockingReason}" TextWrapping="Wrap" FontWeight="SemiBold" />
                     </Border>
+                    <!-- Autre compte administrateur : un avertissement, pas un blocage. -->
+                    <Border Style="{StaticResource SoftCard}" Padding="14,10" Margin="0,0,0,10" BorderThickness="5,1,1,1"
+                            Background="{DynamicResource PastelSand}" BorderBrush="{DynamicResource PastelSandStroke}"
+                            Visibility="{Binding HasOtherAccountNotice, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding OtherAccountNotice, Mode=OneWay}" TextWrapping="Wrap" />
+                    </Border>
                     <WrapPanel Margin="0,0,0,4" Visibility="{Binding HasProposedChanges, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{x:Static app:Ui.OneClickProfiles}" VerticalAlignment="Center" Margin="0,0,10,6" />
                         <ItemsControl Focusable="False" ItemsSource="{Binding Profiles}" ItemsPanel="{StaticResource WrapItems}">

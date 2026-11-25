@@ -124,7 +124,26 @@ public class HardwareHealthModuleTests
 
         Assert.Equal(FindingStatus.Warning, Status(await Detect(worn), "M11.disk-0-reliability"));
         Assert.Equal(FindingStatus.Problem, Status(await Detect(broken), "M11.disk-0-reliability"));
-        Assert.Equal(FindingStatus.Problem, Status(await Detect(hot), "M11.disk-0-reliability"));
+
+        // TemperatureMax peut être la plus haute température déjà atteinte, pas une limite : l'atteindre n'est qu'une information.
+        var warm = (await Detect(hot)).Single(f => f.Id == "M11.disk-0-reliability");
+        Assert.Equal(FindingStatus.Info, warm.Status);
+        Assert.Contains("maximum indiqué par le disque : 70 °C", warm.Current, StringComparison.Ordinal);
+        Assert.DoesNotContain("remplacement", warm.Advice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task One_slow_read_alone_never_calls_for_replacing_the_disk()
+    {
+        // Disque dur sorti de veille : la première lecture attend la remise en rotation.
+        var spunUp = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Temperature", (byte)35), ("TemperatureMax", (byte)60), ("ReadErrorsUncorrected", 0UL), ("ReadLatencyMax", 12_000UL)));
+        var failing = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("ReadErrorsUncorrected", 2UL), ("ReadLatencyMax", 12_000UL)));
+
+        var slow = (await Detect(spunUp)).Single(f => f.Id == "M11.disk-0-reliability");
+        Assert.Equal(FindingStatus.Info, slow.Status);
+        Assert.Contains("sortie de veille", slow.Advice, StringComparison.Ordinal);
+        Assert.DoesNotContain("remplacement", slow.Advice, StringComparison.Ordinal);
+        Assert.Equal(FindingStatus.Problem, Status(await Detect(failing), "M11.disk-0-reliability"));
     }
 
     [Fact]
@@ -204,7 +223,7 @@ public class HardwareHealthModuleTests
         var hot = Context(NvmeDisk(), trimOutput: FrenchTrimOn, reliability: Row(("DeviceId", "0"), ("Temperature", (byte)75), ("TemperatureMax", (byte)70)));
 
         Assert.Equal(FindingStatus.Problem, Status(await Detect(broken, Healthy), "M11.disk-0-reliability"));
-        Assert.Equal(FindingStatus.Problem, Status(await Detect(hot, Healthy), "M11.disk-0-reliability"));
+        Assert.Equal(FindingStatus.Info, Status(await Detect(hot, Healthy), "M11.disk-0-reliability"));
     }
 
     [Fact]

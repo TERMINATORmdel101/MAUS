@@ -199,6 +199,10 @@ public static partial class Motion
     private static readonly DependencyProperty RollPartsProperty = DependencyProperty.RegisterAttached(
         "RollParts", typeof(string[]), typeof(Motion));
 
+    /// <summary>Horloge du nombre qui roule, gardée pour pouvoir le mener à sa fin (<see cref="FinishRolling"/>).</summary>
+    private static readonly DependencyProperty RollClockProperty = DependencyProperty.RegisterAttached(
+        "RollClock", typeof(AnimationClock), typeof(Motion));
+
     private static readonly Duration RollDuration = new(TimeSpan.FromMilliseconds(800));
 
     private const double Nudge = 3;
@@ -580,6 +584,7 @@ public static partial class Motion
         if (!IsEnabled || !next.Success)
         {
             block.BeginAnimation(RollProperty, null);
+            block.ClearValue(RollClockProperty);
             block.Text = text;
             return;
         }
@@ -588,7 +593,25 @@ public static partial class Motion
         var from = previous.Success ? Digits(previous.Groups[2].Value) : 0;
         var separator = new string(next.Groups[2].Value.Where(c => !char.IsAsciiDigit(c)).Take(1).ToArray());
         block.SetValue(RollPartsProperty, new[] { next.Groups[1].Value, next.Groups[3].Value, separator });
-        block.BeginAnimation(RollProperty, new DoubleAnimation(from, Digits(next.Groups[2].Value), RollDuration) { EasingFunction = Ease });
+
+        // Comme BeginAnimation, mais l'horloge reste accessible.
+        var roll = new DoubleAnimation(from, Digits(next.Groups[2].Value), RollDuration) { EasingFunction = Ease }.CreateClock();
+        block.SetValue(RollClockProperty, roll);
+        block.ApplyAnimationClock(RollProperty, roll);
+    }
+
+    /// <summary>
+    /// Mène tout de suite le nombre qui roule à sa fin, comme si l'animation avait eu le temps de finir. WPF n'avance une
+    /// animation qu'en dessinant la fenêtre, au rythme de l'horloge réelle : un essai vérifie ainsi la dernière image sans
+    /// fenêtre ni attente.
+    /// </summary>
+    internal static void FinishRolling(TextBlock block)
+    {
+        ArgumentNullException.ThrowIfNull(block);
+        if (block.GetValue(RollClockProperty) is AnimationClock { Controller: { } controller })
+        {
+            controller.SeekAlignedToLastTick(RollDuration.TimeSpan, TimeSeekOrigin.BeginTime);
+        }
     }
 
     private static double Digits(string number) =>

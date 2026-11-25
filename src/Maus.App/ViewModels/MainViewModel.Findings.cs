@@ -113,8 +113,8 @@ public sealed partial class MainViewModel : IFindingActions
     public string PriorityMergedNote => _priorityMerged == 0
         ? string.Empty
         : _priorityTotal > 1
-            ? T("{0} constats pour {1} points à traiter : un même sujet signalé par plusieurs modules ne compte qu'une fois.", _priorityTotal + _priorityMerged, _priorityTotal)
-            : T("{0} constats pour {1} point à traiter : un même sujet signalé par plusieurs modules ne compte qu'une fois.", _priorityTotal + _priorityMerged, _priorityTotal);
+            ? T("{0} constats pour {1} points à traiter : un même sujet signalé plusieurs fois ne compte qu'une fois.", _priorityTotal + _priorityMerged, _priorityTotal)
+            : T("{0} constats pour {1} point à traiter : un même sujet signalé plusieurs fois ne compte qu'une fois.", _priorityTotal + _priorityMerged, _priorityTotal);
 
     public bool HasPriorityMergedNote => _priorityMerged > 0;
 
@@ -236,12 +236,17 @@ public sealed partial class MainViewModel : IFindingActions
                 continue;
             }
 
-            // Même sujet signalé par plusieurs modules (Secure Boot dans M01 et M08) : une seule carte, la plus grave.
+            // Même sujet signalé plusieurs fois (Secure Boot dans M01 et M08, certificats 2023 lus trois fois par M08) : une seule carte,
+            // la plus grave. « Aussi signalé par » ne nomme que les autres modules.
             if (Maus.Core.Reporting.HealthScore.SubjectOf(finding.Id) is { } subject)
             {
                 if (subjects.TryGetValue(subject, out var first))
                 {
-                    first.AddAlsoIn(finding.Module);
+                    if (!string.Equals(first.ModuleId, finding.ModuleId, StringComparison.Ordinal))
+                    {
+                        first.AddAlsoIn(finding.Module);
+                    }
+
                     cards.First(c => c.Card == first).ModuleIds.Add(finding.ModuleId);
                     _priorityMerged++;
                     continue;

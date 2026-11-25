@@ -310,7 +310,10 @@ public static class HtmlReport
         html.Append(CultureInfo.InvariantCulture, $"<table><thead><tr><th>{E(T("Constat"))}</th><th>{E(T("Avant"))}</th><th>{E(T("Après"))}</th></tr></thead><tbody>");
         foreach (var change in changed)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<tr><td>{E(change.Title)}{(change.Kind == AuditChangeKind.NotComparable ? " " + E(T("(pas forcément un changement du PC : MAUS a changé de version)")) : string.Empty)}</td>{ChangeCell(change.Before, change.CurrentBefore)}{ChangeCell(change.After, change.CurrentAfter)}</tr>");
+            var note = change.OtherDevice
+                ? " " + E(T("(un autre appareil occupe cette place : pas de comparaison)"))
+                : change.Kind == AuditChangeKind.NotComparable || change.MausVersionChanged ? " " + E(T("(pas forcément un changement du PC : MAUS a changé de version)")) : string.Empty;
+            html.Append(CultureInfo.InvariantCulture, $"<tr><td>{E(change.Title)}{note}</td>{ChangeCell(change.Before, change.CurrentBefore)}{ChangeCell(change.After, change.CurrentAfter)}</tr>");
         }
 
         html.Append("</tbody></table></section>");

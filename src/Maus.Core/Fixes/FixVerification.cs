@@ -60,6 +60,15 @@ public static class FixVerification
                 return new VerifiedOutcome(outcome, EffectCheck.NotChecked, T("Appliqué ; l'effet n'a pas pu être relu par le nouvel audit."));
             }
 
+            var policy = change.Writes.Any(w => (w.Key.Path ?? string.Empty).Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase));
+
+            // Sur Famille, une stratégie posée devient une simple information (son effet n'est pas garanti, l'état réel n'est pas lu) :
+            // ce n'est pas une confirmation.
+            if (finding.Status == FindingStatus.Info && windows.IsHomeEdition && policy)
+            {
+                return new VerifiedOutcome(outcome, EffectCheck.NotChecked, T("Écrit ; sur Windows Famille, l'effet de cette stratégie n'est pas garanti et MAUS ne peut pas le relire. Vous pouvez l'annuler depuis l'Historique."));
+            }
+
             if (finding.Status is FindingStatus.Ok or FindingStatus.Info)
             {
                 return new VerifiedOutcome(outcome, EffectCheck.Confirmed, T("Appliqué et confirmé par le nouvel audit."));
@@ -70,7 +79,13 @@ public static class FixVerification
                 return new VerifiedOutcome(outcome, EffectCheck.PendingRestart, T("Appliqué : {0}.", Reporting.Labels.Of(change.Effect)));
             }
 
-            var policy = change.Writes.Any(w => (w.Key.Path ?? string.Empty).Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase));
+            // Constat partagé par plusieurs corrections (une par programme détourné, par service, par tâche…) : il reste signalé
+            // tant qu'un seul de ses éléments demeure, même si celui-ci a disparu. Rien ne permet d'y lire « sans effet ».
+            if (change.FindingId is not null)
+            {
+                return new VerifiedOutcome(outcome, EffectCheck.NotChecked, T("Appliqué et relu. Ce constat regroupe plusieurs éléments et reste signalé : le nouvel audit ne dit pas si c'est pour celui-ci ou pour un autre encore présent."));
+            }
+
             var message = windows.IsHomeEdition && policy
                 ? T("Écrit, mais sans effet sur votre édition : Windows Famille ignore cette stratégie. Vous pouvez l'annuler depuis l'Historique.")
                 : T("Écrit, mais Windows n'en tient pas compte pour l'instant (un autre réglage ou une application le remplace peut-être). Vous pouvez l'annuler depuis l'Historique.");

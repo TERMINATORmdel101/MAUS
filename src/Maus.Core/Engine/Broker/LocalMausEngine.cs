@@ -20,8 +20,11 @@ public sealed partial class LocalMausEngine : IMausEngine
     private AuditContext? _context;
     private IReadOnlyList<ModuleResult> _results = [];
 
-    /// <summary>Langue dans laquelle <see cref="_results"/> est écrit ; <c>null</c> sans audit, ou s'il mêle plusieurs langues.</summary>
-    private string? _auditLanguage;
+    /// <summary>
+    /// Le moteur tourne sous un autre compte que la personne de la session (<see cref="FixContext.ElevatedAsAnotherUser"/>) :
+    /// les constats de profil sont mis à part, et aucune correction de profil n'est proposée (elle serait sautée).
+    /// </summary>
+    private bool _anotherAccount;
 
     public LocalMausEngine(
         AuditEngine? audit = null,
@@ -65,13 +68,22 @@ public sealed partial class LocalMausEngine : IMausEngine
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var language = Localization.Texts.Language;
             var context = await Task.Run(_createContext, cancellationToken).ConfigureAwait(false);
-            var results = await _audit.RunAsync(context, progress, cancellationToken: cancellationToken, skip: context.Preferences.SkippedModules).ConfigureAwait(false);
+            var snapshot = await SnapshotAsync(context).ConfigureAwait(false);
+            var anotherAccount = snapshot.ElevatedAsAnotherUser;
+
+            // Autre compte : chaque module arrive déjà avec ses constats de profil mis à part, jamais présentés comme ceux de l'utilisateur.
+            var shown = anotherAccount && progress is not null ? new ChangedProgress(progress, r => SetAside(r, context)) : progress;
+            var results = await _audit.RunAsync(context, shown, cancellationToken: cancellationToken, skip: context.Preferences.SkippedModules).ConfigureAwait(false);
+            if (anotherAccount)
+            {
+                results = await Task.Run(() => (IReadOnlyList<ModuleResult>)[.. results.Select(r => SetAside(r, context))], cancellationToken).ConfigureAwait(false);
+            }
+
             _context = context;
             _results = results;
-            _auditLanguage = language == Localization.Texts.Language ? language : null;
-            return new AuditRun(await SnapshotAsync(context).ConfigureAwait(false), results);
+            _anotherAccount = anotherAccount;
+            return new AuditRun(snapshot, results);
         }
         finally
         {
@@ -92,11 +104,13 @@ public sealed partial class LocalMausEngine : IMausEngine
             // Les choix de l'utilisateur ont pu changer (c'est souvent la raison de la relance) : relus avant le module.
             _context = _context.WithPreferences(_preferences.Load());
             var result = await AuditEngine.RunModuleAsync(module, _context, cancellationToken).ConfigureAwait(false);
-            _results = [.. _results.Where(r => r.ModuleId != module.Id), result];
-            if (_auditLanguage != Localization.Texts.Language)
+            if (_anotherAccount)
             {
-                _auditLanguage = null;
+                var context = _context;
+                result = await Task.Run(() => SetAside(result, context), cancellationToken).ConfigureAwait(false);
             }
+
+            _results = [.. _results.Where(r => r.ModuleId != module.Id), result];
 
             return result;
         }
@@ -121,7 +135,8 @@ public sealed partial class LocalMausEngine : IMausEngine
             {
                 var context = audited.WithPreferences(_preferences.Load());
                 _context = context;
-                return FixEngine.Plan(_audit, _results, context);
+                var plan = FixEngine.Plan(_audit, _results, context);
+                return _anotherAccount ? [.. plan.Where(c => !c.IsUserScoped)] : plan;
             }, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -206,15 +221,12 @@ public sealed partial class LocalMausEngine : IMausEngine
         Task.Run(() => State(_preferences.Load()), cancellationToken);
 
     /// <summary>
-    /// Marque déjà accordée pour cette valeur, ou simple reprise, après un changement de langue, d'une marque posée dans une
-    /// autre langue : sa langue et son texte sont alors ceux de l'audit que le moteur a lui-même fait. Tout le reste demande la
-    /// confirmation du moteur : une marque ne vaut que pour la valeur que l'utilisateur a vue.
+    /// Marque déjà accordée pour cette valeur, écrite dans cette langue. Tout le reste demande la confirmation du moteur, y
+    /// compris une marque reprise après un changement de langue (0.8.7.1) : une marque ne vaut que pour la valeur que l'utilisateur
+    /// a vue, et un texte d'une autre langue ne permet pas de dire que la situation est la même.
     /// </summary>
-    internal static bool IsKnownAcknowledgement(Acknowledgement mark, IEnumerable<Acknowledgement> known, IReadOnlyList<Finding> audited, string? auditLanguage) =>
-        known.Any(old => old.FindingId == mark.FindingId
-            && ((old.Current == mark.Current && old.Language == mark.Language)
-                || (auditLanguage is not null && mark.Language == auditLanguage && old.Language is not null && old.Language != auditLanguage
-                    && audited.FirstOrDefault(f => f.Id == mark.FindingId) is { } finding && Acknowledgement.Bounded(finding.Current) == mark.Current)));
+    internal static bool IsKnownAcknowledgement(Acknowledgement mark, IEnumerable<Acknowledgement> known) =>
+        known.Any(old => old.FindingId == mark.FindingId && old.Current == mark.Current && old.Language == mark.Language);
 
     public Task<PreferencesState> SavePreferencesAsync(UserPreferences preferences, CancellationToken cancellationToken) =>
         Task.Run(() =>
@@ -223,8 +235,7 @@ public sealed partial class LocalMausEngine : IMausEngine
             {
                 // Nouveau constat marqué « voulu » : l'audit de la semaine ne le signalera plus, confirmation du moteur.
                 var current = _preferences.Load();
-                var audited = _results.SelectMany(r => r.Findings).ToList();
-                var added = preferences.Acknowledged.Where(a => !IsKnownAcknowledgement(a, current.Acknowledged, audited, _auditLanguage))
+                var added = preferences.Acknowledged.Where(a => !IsKnownAcknowledgement(a, current.Acknowledged))
                     .Select(a => a.FindingId).Distinct(StringComparer.Ordinal).ToList();
                 if (added.Count > 0 && !Confirmed(T("constat « voulu »"),
                         T("Marquer comme « voulu » : {0} ? MAUS ne le signalera plus, ni dans l'audit ni dans celui de la semaine, tant que la situation ne change pas.", FindingNames(added)), cancellationToken))
@@ -280,6 +291,16 @@ public sealed partial class LocalMausEngine : IMausEngine
 
     private PreferencesState State(UserPreferences preferences) =>
         new(preferences, _preferences is FilePreferencesStore files ? files.State : PreferencesFileState.Read, _preferences.Notice);
+
+    /// <summary>Résultat d'un module, constats de profil mis à part (voir <see cref="FixEngine.SetAsideProfileOfAnotherAccount"/>).</summary>
+    private ModuleResult SetAside(ModuleResult result, AuditContext context) =>
+        FixEngine.SetAsideProfileOfAnotherAccount([result], FixEngine.Plan(_audit, [result], context))[0];
+
+    /// <summary>Transmet chaque résultat de module après l'avoir changé.</summary>
+    private sealed class ChangedProgress(IProgress<ModuleResult> target, Func<ModuleResult, ModuleResult> change) : IProgress<ModuleResult>
+    {
+        public void Report(ModuleResult value) => target.Report(change(value));
+    }
 
     private async Task<EngineSnapshot> SnapshotAsync(AuditContext context)
     {

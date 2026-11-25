@@ -132,6 +132,9 @@ public sealed class LimitedAuditTests
     public void A_limited_audit_does_not_pretend_there_is_nothing_to_fix() => UiThread.Run(async () =>
     {
         using var bench = Limited(TestBench.Change("M06.a"));
+        // Fenêtre sans droits, moteur à la demande pas encore lancé, même quand les tests tournent en administrateur (GitHub Actions).
+        using var onDemand = new OnDemandMausEngine(bench.Engine, _ => Task.FromResult(new ElevatedEngineSession(bench.Engine, () => false)));
+        EngineHost.Current = onDemand;
 
         await bench.ViewModel.RunAuditAsync();
         bench.ViewModel.SelectedTab = MainViewModel.TabFindings;
@@ -146,6 +149,27 @@ public sealed class LimitedAuditTests
         Assert.Contains("Toutes les fonctionnalités", bench.ViewModel.BlockingReason, StringComparison.Ordinal);
         Assert.Empty(bench.ViewModel.BestFixes);
         Assert.DoesNotContain(bench.ViewModel.PriorityFindings, f => f.CanFix);
+    });
+
+    /// <summary>0.8.7.1 : une fois les droits ouverts, le bouton « Toutes les fonctionnalités » a disparu ; il ne reste qu'à relancer l'audit.</summary>
+    [Fact]
+    public void Once_the_rights_are_open_a_limited_audit_only_asks_to_run_the_audit_again() => UiThread.Run(async () =>
+    {
+        using var bench = Limited(TestBench.Change("M06.a"));
+        using var onDemand = new OnDemandMausEngine(bench.Engine, _ => Task.FromResult(new ElevatedEngineSession(bench.Engine, () => false)));
+        EngineHost.Current = onDemand;
+        await bench.ViewModel.RunAuditAsync();
+        bench.ViewModel.SelectedTab = MainViewModel.TabFindings;
+        Assert.Contains("Toutes les fonctionnalités", bench.ViewModel.NextStepText, StringComparison.Ordinal);
+        Assert.Contains("Toutes les fonctionnalités", bench.ViewModel.ChangesSummary, StringComparison.Ordinal);
+
+        await onDemand.EnsureElevatedAsync(CancellationToken.None);
+
+        foreach (var text in new[] { bench.ViewModel.NextStepTitle, bench.ViewModel.NextStepText, bench.ViewModel.ChangesSummary })
+        {
+            Assert.DoesNotContain("Toutes les fonctionnalités", text, StringComparison.Ordinal);
+            Assert.Contains("relancez l'audit", text, StringComparison.Ordinal);
+        }
     });
 
     [Fact]
@@ -187,7 +211,7 @@ public sealed class LimitedAuditTests
     });
 
     [Fact]
-    public void The_same_audit_with_rights_rebinds_the_marks_and_asks_the_laptop_question() => UiThread.Run(async () =>
+    public void The_same_audit_with_rights_asks_the_laptop_question_and_never_rewrites_a_mark_of_another_language() => UiThread.Run(async () =>
     {
         using var bench = new TestBench();
         bench.Results.Add(new("M06", "Effets visuels", [TestBench.Finding("M06.a", FindingStatus.Info) with { AcknowledgedFrom = FindingStatus.Improvable }], TimeSpan.Zero));
@@ -198,8 +222,9 @@ public sealed class LimitedAuditTests
 
         await bench.ViewModel.RunAuditAsync();
 
+        // Depuis la 0.8.7.1, une marque d'une autre langue n'est plus réécrite en silence : l'utilisateur la repose lui-même.
         Assert.Equal(1, bench.LaptopQuestions);
-        Assert.NotEqual(mark, Assert.Single(bench.Store.Load().Acknowledged));
+        Assert.Equal(mark, Assert.Single(bench.Store.Load().Acknowledged));
     });
 
     [Fact]
@@ -503,6 +528,23 @@ public sealed class LimitedAuditTests
 
         Assert.True(bench.ViewModel.HasBuildNotice);
         return Task.CompletedTask;
+    });
+
+    /// <summary>0.8.7.1 : la comparaison ne désigne pas la mise à jour de Windows comme cause, et un verdict changé avec MAUS reste gris.</summary>
+    [Fact]
+    public void The_comparison_names_no_culprit_and_greys_a_verdict_changed_with_maus() => UiThread.Run(async () =>
+    {
+        using var bench = new TestBench(new AuditSnapshot(Day, "ancien", 81, [Kept("M06.a", FindingStatus.Ok)], MausVersion: "0.0.1"));
+        bench.Results.Add(new("M06", "Effets visuels", [TestBench.Finding("M06.a")], TimeSpan.Zero));
+
+        await bench.ViewModel.RunAuditAsync();
+
+        Assert.DoesNotContain("mise à jour de Windows a changé", bench.ViewModel.ComparisonTitle, StringComparison.Ordinal);
+        Assert.Contains("Windows est passé du build ancien", bench.ViewModel.ComparisonTitle, StringComparison.Ordinal);
+        Assert.DoesNotContain("1 aggravé", bench.ViewModel.ComparisonTitle, StringComparison.Ordinal);
+        var row = Assert.Single(bench.ViewModel.AuditChanges);
+        Assert.Equal(Maus.App.Appearance.Tone.Grey, row.Tone);
+        Assert.Contains("MAUS a changé de version", row.Detail, StringComparison.Ordinal);
     });
 
     // ----- Que se passe-t-il ? -----

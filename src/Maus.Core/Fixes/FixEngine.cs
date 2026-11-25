@@ -45,6 +45,38 @@ public sealed class FixEngine
         return changes;
     }
 
+    /// <summary>
+    /// MAUS tourne sous un autre compte que celui de la session (compte standard élevé avec le mot de passe d'un administrateur,
+    /// ou « Exécuter en tant qu'autre utilisateur ») : un constat dont la correction écrirait le profil (HKCU, paramètres système
+    /// de l'utilisateur) a été lu dans le profil de ce compte-là, pas dans celui de la personne devant l'écran. Il n'est ni jugé
+    /// ni corrigé : gris, avec la raison (les écritures de profil seraient de toute façon sautées, voir <see cref="FixContext.ElevatedAsAnotherUser"/>).
+    /// </summary>
+    public static IReadOnlyList<ModuleResult> SetAsideProfileOfAnotherAccount(IReadOnlyList<ModuleResult> results, IEnumerable<PlannedChange> plan)
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        ArgumentNullException.ThrowIfNull(plan);
+
+        var profile = plan.Where(c => c.IsUserScoped).Select(c => c.FindingId ?? c.Id).ToHashSet(StringComparer.Ordinal);
+        return profile.Count == 0
+            ? results
+            : results.Select(r => r.Findings.Any(f => profile.Contains(f.Id))
+                ? r with { Findings = [.. r.Findings.Select(f => profile.Contains(f.Id) ? ReadInAnotherProfile(f) : f)] }
+                : r).ToList();
+    }
+
+    private static Finding ReadInAnotherProfile(Finding finding) => finding with
+    {
+        Status = FindingStatus.Unknown,
+        Severity = Severity.Info,
+        Current = null,
+        Expected = null,
+        Fixable = false,
+        Measures = null,
+        Explanation = T("Lu dans le profil du compte administrateur qui a ouvert MAUS, pas dans le vôtre : MAUS ne le juge pas et ne le corrige pas ici."),
+        ExplanationHasPcData = false,
+        Advice = T("Pour votre propre profil, vérifiez ce réglage dans Paramètres. Si votre compte est administrateur, fermez MAUS et rouvrez-le normalement depuis votre session."),
+    };
+
     /// <summary>Raison qui interdit toute correction sur ce PC, ou <c>null</c>.</summary>
     public string? GetBlockingReason()
     {
@@ -250,7 +282,7 @@ public sealed class FixEngine
         if (change.IsUserScoped && _context.ElevatedAsAnotherUser)
         {
             return Outcome(ChangeStatus.Skipped,
-                T("MAUS a été lancé avec un autre compte administrateur : ce réglage irait dans le mauvais profil. Relancez MAUS depuis votre propre session."), notAllowed: true);
+                T("MAUS a été ouvert avec un autre compte administrateur : ce réglage irait dans le profil de ce compte, pas dans le vôtre. Réglez-le vous-même dans Paramètres ; si votre compte est administrateur, rouvrez MAUS normalement depuis votre session."), notAllowed: true);
         }
 
         if (change.Writes.Any(w => written.Contains(w.Key.Identity)))

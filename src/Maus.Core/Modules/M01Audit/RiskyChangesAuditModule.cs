@@ -78,19 +78,19 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
 
         // Defender
         findings.Add(Guard(RealtimeCheck, () => DetectRealtimeProtection(context.Registry, defender, antivirus)));
-        findings.Add(Catalog("M01.defender-policy", context.Registry));
+        findings.Add(Catalog("M01.defender-policy", context.Registry, managed));
         findings.Add(Guard(TamperCheck, () => DetectTamperProtection(defender, antivirus)));
         findings.Add(Guard(ExclusionsCheck, () => DetectExclusions(context)));
 
         // Défenses
-        findings.Add(Catalog("M01.smartscreen", context.Registry));
-        findings.Add(Catalog("M01.uac", context.Registry));
+        findings.Add(Catalog("M01.smartscreen", context.Registry, managed));
+        findings.Add(Catalog("M01.uac", context.Registry, managed));
         findings.Add(Guard(UacPromptCheck, () => DetectUacPrompt(context.Registry)));
         findings.Add(Guard(FirewallCheck, () => DetectFirewall(context, firewalls)));
 
         // Windows Update
         findings.Add(Guard(UpdateServicesCheck, () => DetectUpdateServices(context.Registry)));
-        findings.Add(Catalog("M01.wu-auto-update", context.Registry));
+        findings.Add(Catalog("M01.wu-auto-update", context.Registry, managed));
         findings.Add(Guard(WsusCheck, () => DetectWsus(context.Registry, managed)));
         findings.Add(Guard(PauseCheck, () => DetectUpdatePause(context)));
         findings.Add(Guard(TargetVersionCheck, () => DetectTargetVersion(context.Registry, managed)));
@@ -133,14 +133,42 @@ public sealed partial class RiskyChangesAuditModule : IAuditModule
         return findings;
     }
 
-    /// <summary>Évalue une règle du catalogue JSON ; restaurer une stratégie consiste à supprimer sa valeur, d'où « corrigeable ».</summary>
-    private static Finding Catalog(string id, IRegistryReader registry)
+    /// <summary>
+    /// Évalue une règle du catalogue JSON ; restaurer une stratégie consiste à supprimer sa valeur, d'où « corrigeable ». Sur un PC
+    /// géré, une valeur posée sous la clé des stratégies (<c>SOFTWARE\Policies</c>, où écrivent les stratégies de groupe et la gestion
+    /// à distance) relève de l'organisation : simple information, sans correction (<see cref="OrganisationPolicy"/>). Une valeur hors
+    /// de cette clé (<c>EnableLUA</c>, que d'autres outils écrivent aussi) reste jugée, par prudence.
+    /// </summary>
+    private static Finding Catalog(string id, IRegistryReader registry, bool managed)
     {
-        var finding = RegistryRuleEvaluator.Evaluate(Rules.Value.Single(r => r.Id == id), registry);
-        return finding.Status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable
-            ? finding with { Fixable = true }
-            : finding;
+        var rule = Rules.Value.Single(r => r.Id == id);
+        var finding = RegistryRuleEvaluator.Evaluate(rule, registry);
+        if (finding.Status is not (FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable))
+        {
+            return finding;
+        }
+
+        return managed && IsPolicyKey(rule.Path) ? OrganisationPolicy(finding) : finding with { Fixable = true };
     }
+
+    /// <summary>Clé où Windows range les stratégies (de groupe, ou posées par une gestion à distance).</summary>
+    private static bool IsPolicyKey(string path) => path.StartsWith(@"SOFTWARE\Policies\", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Sur un PC géré, ce qu'impose une stratégie est d'abord un choix du service informatique : le constat le dit, sans couleur.</summary>
+    private static string ManagedPolicyNote => T("Sur ce PC géré, ce réglage est posé par une stratégie : il relève du service informatique de votre organisation.");
+
+    private static string ManagedPolicyAdvice => T("Si personne ne l'a voulu, signalez-le au service informatique qui gère ce PC.");
+
+    /// <summary>Écart dû à une stratégie, sur un PC géré : information, sans correction ni page des Paramètres.</summary>
+    private static Finding OrganisationPolicy(Finding finding) => finding with
+    {
+        Status = FindingStatus.Info,
+        Severity = Severity.Info,
+        Explanation = finding.Explanation + " " + ManagedPolicyNote,
+        Advice = ManagedPolicyAdvice,
+        SettingsPage = null,
+        Fixable = false,
+    };
 
     /// <summary>Un contrôle qui échoue ne doit jamais faire échouer le module : droits manquants ou source absente donnent « indéterminé ».</summary>
     private static Finding Guard(Check check, Func<Finding> detect) => Finding.Guard(check.Id, check.Title, check.Category, detect);

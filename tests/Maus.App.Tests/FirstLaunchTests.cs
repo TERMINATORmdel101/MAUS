@@ -61,6 +61,9 @@ public sealed class FirstLaunchTests
     {
         using var bench = new TestBench();
         bench.Snapshot = bench.Snapshot with { IsElevated = false };
+        // Fenêtre sans droits, moteur à la demande pas encore lancé, même quand les tests tournent en administrateur (GitHub Actions).
+        using var onDemand = new OnDemandMausEngine(bench.Engine, _ => Task.FromResult(new ElevatedEngineSession(bench.Engine, () => false)));
+        EngineHost.Current = onDemand;
 
         await bench.ViewModel.RunAuditAsync();
 

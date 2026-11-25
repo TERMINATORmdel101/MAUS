@@ -68,4 +68,27 @@ public sealed record PlannedChange
 
     /// <summary>Au moins une écriture vise le profil de l'utilisateur de la session.</summary>
     public bool IsUserScoped => Writes.Any(w => w.Key.IsUserScoped);
+
+    /// <summary>
+    /// La correction pose une stratégie de Windows (valeur écrite sous <c>…\Policies\…</c> ; retirer une stratégie ne compte pas) :
+    /// Paramètres peut alors dire que le réglage est géré par une organisation et ne plus laisser changer l'interrupteur.
+    /// </summary>
+    public bool SetsPolicy => Writes.Any(w => w.Value is not null && w.Key.Kind == SettingKind.Registry
+        && (w.Key.Path ?? string.Empty).Contains(@"\Policies\", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Ce qu'une stratégie posée change dans Paramètres. Windows affiche « Certains de ces paramètres sont gérés par votre
+    /// organisation » dès qu'une stratégie est posée, PC personnel compris (Microsoft Q&amp;A, « Windows 11 says "Some of these
+    /// settings are managed by your organization" even though my PC isn't connected to an organization », questions 6004558 et
+    /// 4288372) ; une stratégie fixe le réglage, que l'interrupteur ne change plus (exemple documenté : Policy CSP
+    /// System/AllowTelemetry, Microsoft Learn).
+    /// </summary>
+    public static string PolicyRisk => Localization.Texts.T("Stratégie de Windows : Paramètres peut afficher « Certains de ces paramètres sont gérés par votre organisation », même sur un PC personnel, et ne plus laisser changer ce réglage. C'est l'effet normal d'une stratégie ; pour revenir en arrière, utilisez « Annuler » dans l'Historique de MAUS.");
+
+    /// <summary>Rappel de <see cref="PolicyRisk"/> dans la question posée avant d'appliquer, si une correction cochée pose une stratégie.</summary>
+    public static string PolicyNotice => Localization.Texts.T("Certaines de ces corrections posent une stratégie de Windows : Paramètres peut ensuite afficher « Certains de ces paramètres sont gérés par votre organisation », même sur un PC personnel, et ne plus laisser changer ces réglages. Pour revenir en arrière, utilisez « Annuler » dans l'Historique de MAUS.");
+
+    /// <summary>Le risque d'une correction, complété par <see cref="PolicyRisk"/> si elle pose une stratégie.</summary>
+    public static string? WithPolicyRisk(string? risk, bool setsPolicy) =>
+        !setsPolicy ? risk : risk is null ? PolicyRisk : risk + " " + PolicyRisk;
 }

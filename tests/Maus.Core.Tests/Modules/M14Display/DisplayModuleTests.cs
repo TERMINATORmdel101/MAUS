@@ -43,6 +43,10 @@ public class DisplayModuleTests
         Assert.DoesNotContain(findings, f => f.Id == "M14.bit-depth.display-1");
         Assert.DoesNotContain(findings, f => f.Status is FindingStatus.Problem or FindingStatus.Warning or FindingStatus.Improvable or FindingStatus.Unknown);
         Assert.Equal("Écran 1 : AW3423DWF", refresh.Category);
+
+        // L'identifiant ne dit que la place de l'écran : son nom l'accompagne, pour comparer deux audits sans confondre deux écrans.
+        Assert.All(findings.Where(f => f.Id.EndsWith(".display-1", StringComparison.Ordinal)), f => Assert.Equal("AW3423DWF", f.MeasuredItem));
+        Assert.Null(Get(findings, "M14.vrr").MeasuredItem);
     }
 
     [Fact]

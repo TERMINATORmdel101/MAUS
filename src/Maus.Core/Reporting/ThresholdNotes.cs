@@ -38,7 +38,7 @@ public static class ThresholdNotes
         ("M09.driver.*", () => Chosen(T("pilote de plus de {0} jours, ou plus de {1} jours derrière le dernier ; catalogue jugé ancien après {2} jours", 183, 90, 45))),
         ("M09.resizable-bar.*", () => Chosen(T("fenêtre mémoire de plus de {0} Mio = Resizable BAR actif", GpuDriverModule.ResizableBarMinMiB))),
         ("M10.xmp", () => Chosen(T("écart toléré de {0} MT/s entre deux vitesses", MemorySpeeds.Tolerance))),
-        ("M11.disk-*-reliability", () => Chosen(T("usure à partir de {0} % (pour un SSD NVMe, MAUS se fie à l'usure donnée par le disque lui-même), lecture de plus de {1} s",HardwareHealthModule.WearWarningPercent, HardwareHealthModule.ReadLatencyProblemMs / 1000))),
+        ("M11.disk-*-reliability", () => Chosen(T("usure à partir de {0} % (pour un SSD NVMe, MAUS se fie à l'usure donnée par le disque lui-même) ; une lecture de plus de {1} s n'est qu'une information", HardwareHealthModule.WearWarningPercent, HardwareHealthModule.ReadLatencyProblemMs / 1000))),
         ("M11.free-space", () => Sourced(T("moins de {0:0} % d'espace libre", HardwareHealthModule.FreeSpaceWarningRatio * 100), T("Microsoft Learn, commande defrag : il en faut au moins 15 % pour défragmenter complètement un volume"))),
         ("M11.firmware-throttling", () => Chosen(T("événement {0} sur {1} jours", HardwareHealthModule.FirmwareThrottlingEventId, HardwareHealthModule.FirmwareThrottlingDays))),
         ("M16.gpu-temperature.*", () => Chosen(T("{0} °C sous le seuil de ralentissement de la carte, au repos (moins de {1} % d'utilisation)", 15, WorkshopModule.GpuIdlePercent))),

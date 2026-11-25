@@ -79,15 +79,17 @@ public sealed partial class RiskyChangesAuditModule
         var expected = T("activé sur les 3 profils");
 
         var off = new SortedSet<string>(StringComparer.Ordinal);
-        var byPolicy = false;
+        var offByPolicy = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var (key, profile) in FirewallPolicyProfiles)
         {
             if (context.Registry.GetDword(Hklm, FirewallPolicyKey + key, "EnableFirewall") == 0)
             {
                 off.Add(profile);
-                byPolicy = true;
+                offByPolicy.Add(profile);
             }
         }
+
+        var byPolicy = offByPolicy.Count > 0;
 
         var profiles = CimQueryResult.Run(context.Cim, FirewallProfileQuery, CimScopes.StandardCimv2);
         foreach (var row in profiles.Rows ?? [])
@@ -116,6 +118,13 @@ public sealed partial class RiskyChangesAuditModule
                 T("{0} ; {1} actif", current, thirdParty.Name),
                 expected,
                 T("Un autre pare-feu ({0}) protège ce PC : le pare-feu Windows peut alors être coupé. C'est un fonctionnement normal.", thirdParty.Name));
+        }
+
+        // PC géré dont chaque profil coupé l'est par une stratégie : un choix de l'organisation, dit comme tel. Un profil coupé hors
+        // stratégie reste signalé.
+        if (context.Hardware.IsManaged && off.SetEquals(offByPolicy))
+        {
+            return FirewallCheck.Neutral(current, expected, explanation + " " + ManagedPolicyNote, ManagedPolicyAdvice);
         }
 
         var advice = T("Supprimer les stratégies EnableFirewall éventuelles, puis réactiver le pare-feu pour tous les profils dans Sécurité Windows > Pare-feu et protection du réseau.");

@@ -53,17 +53,16 @@ public class CheckedPreferencesTests
         Assert.Null(Acknowledgement.Bounded(null));
     }
 
-    /// <summary>Après un changement de langue, le moteur reconnaît une marque longue reprise de son propre audit, sans reposer la question.</summary>
+    /// <summary>Une marque longue gardée telle quelle est reconnue ; reprise dans une autre langue, elle repasse par la question.</summary>
     [Fact]
-    public void A_long_mark_taken_over_after_a_language_change_is_still_known_to_the_engine()
+    public void A_long_mark_is_known_as_it_was_and_asked_again_in_another_language()
     {
         var value = new string('v', 5000);
-        var audited = new Finding { Id = "M17.x", Title = "t", Status = FindingStatus.Info, Current = value, Explanation = "e" };
-        var old = new Acknowledgement("M17.x", "ancien texte", DateTimeOffset.UnixEpoch, "fr");
-        var taken = old with { Current = Acknowledgement.Bounded(value), Language = "en" };
+        var old = new Acknowledgement("M17.x", Acknowledgement.Bounded(value), DateTimeOffset.UnixEpoch, "fr");
 
-        Assert.True(LocalMausEngine.IsKnownAcknowledgement(taken, [old], [audited], "en"));
-        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Current = Acknowledgement.Bounded(value + "x"), Language = "en" }, [old], [audited], "en"));
+        Assert.True(LocalMausEngine.IsKnownAcknowledgement(old, [old]));
+        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Language = "en" }, [old]));
+        Assert.False(LocalMausEngine.IsKnownAcknowledgement(old with { Current = Acknowledgement.Bounded(value + "x") }, [old]));
     }
 
     [Fact]

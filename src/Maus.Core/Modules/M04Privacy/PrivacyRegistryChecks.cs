@@ -32,8 +32,9 @@ internal static class PrivacyRegistryChecks
         ["EnableActivityFeed", "PublishUserActivities", "UploadUserActivities"];
 
     /// <summary>
-    /// Niveau des données de diagnostic : la stratégie prime sur l'état choisi dans Paramètres.
-    /// 0 n'est honoré que sur Entreprise, Éducation et Server ; ailleurs, Windows le traite comme 1.
+    /// Niveau des données de diagnostic : la stratégie prime sur l'état choisi dans Paramètres, sauf sur Famille où son effet n'est
+    /// pas garanti (si les deux diffèrent, simple information). 0 n'est honoré que sur Entreprise, Éducation et Server ; ailleurs,
+    /// Windows le traite comme 1.
     /// </summary>
     public static Finding DiagnosticData(IRegistryReader registry, WindowsInfo windows)
     {
@@ -42,16 +43,30 @@ internal static class PrivacyRegistryChecks
         return Guard(id, title, Diagnostic, () =>
         {
             var policy = registry.GetDword(Hklm, DataCollectionPolicy, "AllowTelemetry");
-            var level = policy ?? registry.GetDword(Hklm, DataCollectionState, "AllowTelemetry");
+            var state = registry.GetDword(Hklm, DataCollectionState, "AllowTelemetry");
+            var explanation = T("Windows envoie à Microsoft des données de diagnostic sur l'état du PC. Le niveau « Requises » se limite à ce qui " +
+                "garde Windows sûr et à jour ; « Facultatives » y ajoute des informations sur votre usage (sites visités, applications, " +
+                "saisie). Le gain de vitesse est faible : le bénéfice est surtout moins de collecte.");
+
+            // Sur Famille, l'effet de la stratégie n'est pas garanti : elle ne passe pas avant l'état choisi dans Paramètres. Si les deux
+            // diffèrent (ou si l'état manque), MAUS ne sait pas quel niveau Windows applique : une information, jamais un vert.
+            if (windows.IsHomeEdition && policy is not null && (state is null || Math.Max(1, state.Value) != Math.Max(1, policy.Value)))
+            {
+                return Info(id, title, Diagnostic,
+                    T("stratégie : {0} ; Paramètres : {1}", DescribeDiagnosticLevel(policy.Value), state is null ? T("non lu") : DescribeDiagnosticLevel(state.Value)),
+                    T("1 (Requises), le minimum sur Famille et Pro"),
+                    explanation + " " + T("Sur Windows Famille, l'effet de la stratégie n'est pas garanti : MAUS ne peut pas dire quel niveau Windows applique."),
+                    T("Vérifier que « Envoyer des données de diagnostic facultatives » est désactivé dans Paramètres > Confidentialité et sécurité > Diagnostics et commentaires."),
+                    settingsPage: FeedbackPage);
+            }
+
+            var level = policy ?? state;
             if (level is null)
             {
                 return Finding.Unknown(id, title, T("Le niveau des données de diagnostic n'a pas été trouvé dans le registre."), Diagnostic);
             }
 
             var current = DescribeDiagnosticLevel(level.Value) + (policy is null ? string.Empty : T(" (imposé par stratégie)"));
-            var explanation = T("Windows envoie à Microsoft des données de diagnostic sur l'état du PC. Le niveau « Requises » se limite à ce qui " +
-                "garde Windows sûr et à jour ; « Facultatives » y ajoute des informations sur votre usage (sites visités, applications, " +
-                "saisie). Le gain de vitesse est faible : le bénéfice est surtout moins de collecte.");
 
             if (windows.IsEnterpriseOrEducation)
             {
@@ -330,14 +345,21 @@ internal static class PrivacyRegistryChecks
             var explanation =
                 T("L'historique des activités garde la trace des applications, fichiers et pages que vous ouvrez. " +
                 "Les trois stratégies coupent son enregistrement et son envoi à Microsoft.");
+            var advice = T("Couper « Stocker mon historique d'activités sur cet appareil » dans Paramètres > Confidentialité et sécurité > Historique des activités.");
+            var off = values.All(v => v.Value == 0);
             if (windows.IsHomeEdition)
             {
-                explanation += T(" Sur Windows Famille, ces stratégies ne sont pas garanties : MAUS relira l'état réel après correction.");
+                // Aucune valeur documentée ne donne l'état réel de l'interrupteur : sur Famille, des stratégies posées ne prouvent rien.
+                explanation += T(" Sur Windows Famille, l'effet de ces stratégies n'est pas garanti, et MAUS ne sait pas lire l'état réel de l'historique : même après correction, il ne peut pas confirmer qu'il est coupé.");
+                if (off)
+                {
+                    return Info(id, title, Search, T("stratégies posées (0, 0, 0), effet non garanti sur Windows Famille"), T("désactivé (0, 0, 0)"), explanation,
+                        T("Vérifier l'interrupteur « Stocker mon historique d'activités sur cet appareil » dans Paramètres > Confidentialité et sécurité > Historique des activités."),
+                        settingsPage: ActivityHistoryPage);
+                }
             }
 
-            return Choice(id, title, Search, values.All(v => v.Value == 0), current, T("désactivé (0, 0, 0)"), explanation,
-                T("Couper « Stocker mon historique d'activités sur cet appareil » dans Paramètres > Confidentialité et sécurité > Historique des activités."),
-                ActivityHistoryPage);
+            return Choice(id, title, Search, off, current, T("désactivé (0, 0, 0)"), explanation, advice, ActivityHistoryPage);
         });
     }
 

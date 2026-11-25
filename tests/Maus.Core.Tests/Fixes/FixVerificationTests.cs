@@ -46,6 +46,42 @@ public class FixVerificationTests
         Assert.Equal(EffectCheck.PendingRestart, home[2].Check);
     }
 
+    /// <summary>
+    /// Deux programmes détournés, un seul corrigé : le constat commun reste rouge à cause de l'autre. La correction faite n'est
+    /// pas dite « sans effet », et rien n'est noté dans le journal.
+    /// </summary>
+    [Fact]
+    public void A_shared_finding_still_flagged_after_one_of_its_fixes_is_never_without_effect()
+    {
+        var change = Change("M01.ifeo-debugger.notepad.exe", @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\notepad.exe") with { FindingId = "M01.ifeo-debugger" };
+        var applied = new ApplyResult(null, [new ChangeOutcome(change.Id, change.Title, ChangeStatus.Applied, "ok", ChangeEffect.Immediate)], null);
+        var after = new[] { new ModuleResult("M01", "t", [Found("M01.ifeo-debugger", FindingStatus.Problem)], TimeSpan.Zero) };
+
+        var verified = FixVerification.CompareWithAudit([change], applied, after, Pro).Single();
+        var alone = FixVerification.CompareWithAudit([change with { FindingId = null, Id = "M01.ifeo-debugger" }],
+            new ApplyResult(null, [new ChangeOutcome("M01.ifeo-debugger", "t", ChangeStatus.Applied, "ok", ChangeEffect.Immediate)], null), after, Pro).Single();
+
+        Assert.Equal(EffectCheck.NotChecked, verified.Check);
+        Assert.Contains("regroupe plusieurs éléments", verified.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("n'en tient pas compte", verified.Message, StringComparison.Ordinal);
+        Assert.Equal(EffectCheck.NoEffect, alone.Check);
+    }
+
+    [Fact]
+    public void Policy_that_only_becomes_information_on_home_is_not_confirmed()
+    {
+        PlannedChange[] changes = [Change("M04.activity-history", @"SOFTWARE\Policies\Microsoft\Windows\System")];
+        var applied = new ApplyResult(null, [new ChangeOutcome("M04.activity-history", "t", ChangeStatus.Applied, "ok", ChangeEffect.Immediate)], null);
+        var after = new[] { new ModuleResult("M04", "t", [Found("M04.activity-history", FindingStatus.Info)], TimeSpan.Zero) };
+
+        var home = FixVerification.CompareWithAudit(changes, applied, after, Home).Single();
+        var pro = FixVerification.CompareWithAudit(changes, applied, after, Pro).Single();
+
+        Assert.Equal(EffectCheck.NotChecked, home.Check);
+        Assert.Contains("n'est pas garanti", home.Message, StringComparison.Ordinal);
+        Assert.Equal(EffectCheck.Confirmed, pro.Check);
+    }
+
     [Fact]
     public void Failed_verification_audit_leaves_changes_not_checked_instead_of_without_effect()
     {

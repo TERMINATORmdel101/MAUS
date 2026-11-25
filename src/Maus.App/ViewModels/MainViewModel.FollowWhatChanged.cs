@@ -307,6 +307,7 @@ public sealed partial class MainViewModel
                 ? T("Plus dans l'audit du {0:g}, fait par une autre version de MAUS : le contrôle a peut-être changé, pas forcément votre PC.", at)
                 : T("Seulement dans l'audit du {0:g}, fait par une autre version de MAUS : c'est peut-être un contrôle ajouté, pas un changement du PC.", at)),
             NotComparableReason.OtherAccount => new(note.Name ?? string.Empty, T("L'audit du {0:g} a été fait avec un autre compte administrateur : ce qui est propre à l'utilisateur n'est pas comparé.", at)),
+            NotComparableReason.OtherDevice => new(note.Name ?? string.Empty, T("À l'audit du {0:g}, un autre appareil (écran, disque ou carte graphique) occupe cette place : MAUS ne compare pas son verdict à celui de l'appareil d'avant.", at)),
             _ => new(T("Contrôles non lus : {0}", note.Count), note.WithoutRights
                 ? T("Non lus sans droits administrateur à l'audit du {0:g} : ils ne sont pas comparés.", at)
                 : T("Indéterminés à l'audit du {0:g} (droits administrateur manquants ou source indisponible) : ils ne sont pas comparés.", at)),

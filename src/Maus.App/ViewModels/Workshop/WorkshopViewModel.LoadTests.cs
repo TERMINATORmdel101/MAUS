@@ -266,9 +266,8 @@ public sealed partial class WorkshopViewModel
             return;
         }
 
-        if (!_confirm(T("Vérifier la vraie capacité de ce support ?"), Maus.Core.Reporting.ConfirmationText.Build(
-            T("MAUS va écrire {0} sur {1}, tout relire, puis retirer ses fichiers. Vos fichiers ne sont pas touchés. Cela peut durer longtemps sur une clé lente.", FormatSize(bytes), root),
-            T("Ne retirez pas la clé pendant le test."))))
+        var (title, question) = UsbConfirmation(root, bytes, RealCapacityTest.ExistingEntries(root), RealCapacityTest.Leftovers(root).Count);
+        if (!_confirm(title, question))
         {
             return;
         }
@@ -283,13 +282,9 @@ public sealed partial class WorkshopViewModel
                 UsbStatus = p.Writing ? T("Écriture : {0} sur {1}", FormatSize(p.Bytes), FormatSize(p.Total)) : T("Relecture : {0} sur {1}", FormatSize(p.Bytes), FormatSize(p.Total));
             });
             var result = await RealCapacityTest.RunAsync(root, bytes, progress, cancellation.Token);
-            var whole = result.GoodBytes == result.TestedBytes && result.TestedBytes == bytes;
-            Report(result.Aborted ? TestOutcome.Stopped : whole ? TestOutcome.Good : TestOutcome.Problem);
-            UsbStatus = result.Aborted
-                ? T("Test interrompu : {0} relus correctement.", FormatSize(result.GoodBytes))
-                : whole
-                    ? T("Capacité vérifiée : les {0} testés se relisent correctement.", FormatSize(bytes))
-                    : T("ATTENTION : seuls {0} sur {1} se relisent correctement. Ce support est abîmé, ou annonce plus qu'il ne contient.", FormatSize(result.GoodBytes), FormatSize(bytes));
+            var (outcome, text) = UsbVerdict(result, bytes);
+            Report(outcome);
+            UsbStatus = text;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -299,5 +294,54 @@ public sealed partial class WorkshopViewModel
         {
             await StopTestAsync();
         }
+    }
+
+    /// <summary>
+    /// Confirmation du test de la clé (0.8.7.1) : il ne touche pas aux fichiers présents, mais sur une clé contrefaite, remplir la place libre
+    /// peut les abîmer. Elle le dit toujours, et, si la clé contient déjà des fichiers, la question porte sur eux.
+    /// </summary>
+    /// <param name="existing">Fichiers et dossiers déjà sur la clé ; <c>-1</c> si la racine n'a pas pu être lue.</param>
+    /// <param name="leftovers">Fichiers laissés par un test interrompu, retirés au début du test.</param>
+    internal static (string Title, string Text) UsbConfirmation(string root, long bytes, int existing, int leftovers)
+    {
+        var what = T("MAUS va écrire {0} sur {1}, tout relire, puis retirer ses fichiers. Cela peut durer longtemps sur une clé lente.", FormatSize(bytes), root);
+        if (leftovers > 0)
+        {
+            what += " " + T("Les fichiers MAUS-capacite laissés par un test interrompu seront retirés d'abord.");
+        }
+
+        var risk = T("MAUS n'ouvre pas vos fichiers, mais une clé contrefaite peut écrire par-dessus ce qu'elle contient déjà quand on remplit sa place libre : ses fichiers peuvent devenir illisibles. Utilisez une clé vide, ou copiez d'abord ses fichiers ailleurs. Ne retirez pas la clé pendant le test.");
+        if (existing == 0)
+        {
+            return (T("Vérifier la vraie capacité de ce support ?"), Maus.Core.Reporting.ConfirmationText.Build(what, risk));
+        }
+
+        var files = existing > 0
+            ? T("La clé {0} contient déjà {1} fichier(s) ou dossier(s). Si cette clé est contrefaite, ils peuvent être abîmés par le test.", root, existing)
+            : T("MAUS n'a pas pu lire le contenu de la clé {0} : elle contient peut-être des fichiers. Si cette clé est contrefaite, ils peuvent être abîmés par le test.", root);
+        return (T("Cette clé contient des fichiers : lancer le test quand même ?"),
+            Maus.Core.Reporting.ConfirmationText.Build(files + Environment.NewLine + Environment.NewLine + what, risk,
+                T("aucun : un fichier abîmé par une clé contrefaite ne se récupère pas. Répondez Non si vous n'avez pas de copie de ces fichiers.")));
+    }
+
+    /// <summary>
+    /// Verdict du test de la clé (0.8.7.1). Une erreur du support compte aussi : sur une clé qui annonce plus qu'elle n'a, c'est souvent ainsi
+    /// que se montre la fausse capacité. MAUS dit ce qu'il a mesuré, et que l'erreur peut aussi venir d'une clé retirée pendant le test.
+    /// </summary>
+    internal static (TestOutcome Outcome, string Text) UsbVerdict(CapacityResult result, long bytes)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var whole = result.GoodBytes == result.TestedBytes && result.TestedBytes == bytes && !result.ReadFailed;
+        var (outcome, text) = result switch
+        {
+            { Aborted: true } => (TestOutcome.Stopped, T("Test interrompu : {0} relus correctement.", FormatSize(result.GoodBytes))),
+            _ when whole => (TestOutcome.Good, T("Capacité vérifiée : les {0} testés se relisent correctement.", FormatSize(bytes))),
+            { ReadFailed: true } => (TestOutcome.Problem, T("ATTENTION : la clé a répondu par une erreur à la relecture, après {0} relus correctement sur {1} écrits. Si elle n'a pas été retirée pendant le test, elle est abîmée, ou annonce plus qu'elle ne contient.", FormatSize(result.GoodBytes), FormatSize(result.TestedBytes))),
+            { WriteFailed: true } when result.GoodBytes == result.TestedBytes => (TestOutcome.Problem, T("ATTENTION : la clé a refusé d'écrire au-delà de {0}, alors qu'elle annonçait {1} de libre ; ce qui a été écrit se relit correctement. Si elle n'a pas été retirée pendant le test, elle annonce peut-être plus qu'elle ne contient : relancez le test pour confirmer.", FormatSize(result.TestedBytes), FormatSize(bytes))),
+            _ => (TestOutcome.Problem, T("ATTENTION : seuls {0} sur {1} se relisent correctement. Ce support est abîmé, ou annonce plus qu'il ne contient.", FormatSize(result.GoodBytes), FormatSize(bytes))),
+        };
+        return result.LeftFiles > 0
+            ? (outcome, text + " " + T("{0} fichier(s) MAUS-capacite sont restés sur la clé : supprimez-les, ou relancez ce test, qui les retire d'abord.", result.LeftFiles))
+            : (outcome, text);
     }
 }

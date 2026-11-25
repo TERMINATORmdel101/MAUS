@@ -22,7 +22,7 @@ public sealed record FixProfile(string Id, Func<string> NameSource, Func<string>
     public static FixProfile Recommended { get; } = new(
         "recommended",
         () => T("Recommandé"),
-        () => T("Les corrections pré-cochées par MAUS : sans risque connu, réversibles."),
+        () => T("Les corrections pré-cochées par MAUS : réversibles, sans danger connu pour Windows ; ce qu'elles changent de visible est dit sur chaque ligne."),
         c => c.Recommended && !c.Advanced);
 
     public static FixProfile Gamer { get; } = new(

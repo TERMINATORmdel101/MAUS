@@ -20,6 +20,7 @@ namespace Maus.App.ViewModels;
 public sealed partial class MainViewModel
 {
     private string? _blockingReason;
+    private string? _otherAccountNotice;
     private bool _showMoreChanges;
     private bool _createRestorePoint = true;
     private bool _enableProtection;
@@ -67,6 +68,8 @@ public sealed partial class MainViewModel
 
     public string ChangesSummary => _lastContext is null
         ? T("Lancez d'abord l'audit : les corrections proposées apparaîtront ici.")
+        : RightsOpenedSinceLimitedAudit
+        ? LimitedAuditRightsOpen
         : IsPlainLimitedAudit
         ? T("Cet audit s'est fait sans droits administrateur : MAUS n'a préparé aucune correction. Cliquez sur « Toutes les fonctionnalités », puis relancez l'audit pour les voir.")
         : IsLimitedAudit
@@ -92,6 +95,24 @@ public sealed partial class MainViewModel
     }
 
     public bool IsBlocked => BlockingReason is not null;
+
+    /// <summary>
+    /// MAUS tourne sous un autre compte administrateur que la personne de la session : un avertissement, pas un blocage. Les
+    /// corrections communes au PC restent applicables ; celles du profil ne sont pas proposées.
+    /// </summary>
+    public string? OtherAccountNotice
+    {
+        get => _otherAccountNotice;
+        private set
+        {
+            if (SetProperty(ref _otherAccountNotice, value))
+            {
+                OnPropertyChanged(nameof(HasOtherAccountNotice));
+            }
+        }
+    }
+
+    public bool HasOtherAccountNotice => OtherAccountNotice is not null;
 
     /// <summary>Audit sans droits sur un PC qui n'est pas géré par une organisation : le mode limité, qui n'est pas une anomalie.</summary>
     private bool IsPlainLimitedAudit => IsLimitedAudit && _lastContext?.Hardware is not ({ IsManaged: true } or { ManagementUnknown: true });
@@ -273,6 +294,12 @@ public sealed partial class MainViewModel
         if (warnings.Count > 0)
         {
             message.AppendLine().AppendLine(T("À lire avant de continuer :")).AppendLine(string.Join(Environment.NewLine, warnings));
+        }
+
+        // Un PC personnel qui parle ensuite d'« organisation » : dit avant d'appliquer, pas découvert après dans Paramètres.
+        if (selected.Any(c => c.SetsPolicy))
+        {
+            message.AppendLine().AppendLine(PlannedChange.PolicyNotice);
         }
 
         if (!Confirm(T("Appliquer les corrections ?"), Maus.Core.Reporting.ConfirmationText.Build(message.ToString(),

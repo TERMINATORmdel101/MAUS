@@ -387,6 +387,35 @@ public class GpuDriverModuleTests
     }
 
     [Fact]
+    public async Task Recent_driver_without_comparison_is_never_called_up_to_date()
+    {
+        // Carte sans branche au catalogue, pilote de quelques semaines : rien n'a été comparé, donc ni vert ni « à jour ».
+        var cim = new FakeCim().Answer(VideoControllerQuery, Controller("Matrox G200eW", @"PCI\VEN_102B&DEV_0532&SUBSYS_00000000&REV_0A\4&1", "9.15.1.224", Recent, "oem9.inf"));
+
+        var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
+
+        var driver = Get(findings, "M09.driver.gpu");
+        Assert.Equal(FindingStatus.Info, driver.Status);
+        Assert.Equal("Pilote : Matrox G200eW", driver.Title);
+        Assert.Contains("page officielle du fabricant", driver.Explanation, StringComparison.Ordinal);
+        Assert.DoesNotContain("à jour", Maus.Core.Reporting.HealthScore.DriverLine(findings), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Driver_without_comparison_nor_date_is_unknown()
+    {
+        var row = Controller("Matrox G200eW", @"PCI\VEN_102B&DEV_0532&SUBSYS_00000000&REV_0A\4&1", "9.15.1.224", Recent, "oem9.inf");
+        row["DriverDate"] = null;
+        var cim = new FakeCim().Answer(VideoControllerQuery, row);
+
+        var findings = await Detect(TestContext.Create(cim: cim), new FakeScheduling());
+
+        var driver = Get(findings, "M09.driver.gpu");
+        Assert.Equal(FindingStatus.Unknown, driver.Status);
+        Assert.Contains("date du pilote est illisible", driver.Explanation, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Two_nvidia_cards_get_distinct_identifiers()
     {
         var cim = new FakeCim().Answer(

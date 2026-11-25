@@ -23,7 +23,7 @@ public sealed class ChoiceWindow : MausDialog
 
         var ok = new Button { Content = T("Choisir"), IsDefault = true, MinWidth = 110, Margin = new Thickness(0, 0, 8, 0) };
         ok.Click += (_, _) => DialogResult = _list.SelectedItem is not null;
-        var cancel = new Button { Content = T("Annuler"), IsCancel = true, MinWidth = 110 };
+        var cancel = new Button { Content = Ui.Cancel, IsCancel = true, MinWidth = 110 };
         var buttons = ButtonRow(ok, cancel);
 
         var panel = new StackPanel { Margin = new Thickness(18) };

@@ -33,6 +33,27 @@ public class LanguageSwitchTests
         }
     }
 
+    /// <summary>
+    /// 0.8.7.1 : « Annuler » seul est le bouton qui renonce (fenêtres de choix) : « Cancel », « Cancelar ». Défaire une correction s'écrit
+    /// « Annuler cette correction » : « Undo », « Deshacer ».
+    /// </summary>
+    [Theory]
+    [InlineData("en", "Cancel", "Undo this fix")]
+    [InlineData("es", "Cancelar", "Deshacer esta corrección")]
+    public void Cancel_gives_up_and_undo_takes_back_a_fix(string language, string cancel, string undo)
+    {
+        try
+        {
+            Texts.Use(language);
+            Assert.Equal(cancel, Texts.T("Annuler"));
+            Assert.Equal(undo, Texts.T("Annuler cette correction"));
+        }
+        finally
+        {
+            Texts.Use("fr");
+        }
+    }
+
     [Fact]
     public void Zero_is_singular_in_french_only()
     {
@@ -63,8 +84,12 @@ public class LanguageSwitchTests
         Assert.Equal("Widgets désactivés", findings.Single(f => f.Id == "M06.widgets").Title);
     }
 
+    /// <summary>
+    /// Une marque posée en français ne se compare pas à un texte anglais : le constat est de nouveau signalé, avec la raison,
+    /// jusqu'à une nouvelle marque ; revenu au français, la marque vaut de nouveau, mot pour mot.
+    /// </summary>
     [Fact]
-    public void Acknowledgement_survives_a_language_change_then_is_rebound()
+    public void Acknowledgement_of_another_language_is_shown_again_with_the_reason_and_holds_again_in_its_language()
     {
         try
         {
@@ -73,13 +98,23 @@ public class LanguageSwitchTests
             var preferences = UserPreferences.Default.Acknowledge(finding, DateTimeOffset.Now);
 
             Texts.Use("en");
-            var english = finding with { Current = "on" };
-            Assert.NotNull(preferences.AcknowledgementFor(english));
+            var english = finding with { Current = "on", Advice = "Turn them off in Settings." };
+            Assert.Null(preferences.AcknowledgementFor(english));
+            Assert.NotNull(preferences.OtherLanguageMarkFor(english));
+            var shown = Assert.Single(Acknowledgements.Apply(new ModuleResult("M06", "M", [english], TimeSpan.Zero), preferences).Findings);
+            Assert.Equal(FindingStatus.Improvable, shown.Status);
+            Assert.Null(shown.AcknowledgedFrom);
+            Assert.EndsWith("Turn them off in Settings.", shown.Advice, StringComparison.Ordinal);
+            Assert.True(shown.Advice!.Length > english.Advice!.Length);
 
-            var rebound = preferences.RebindLanguage([english with { AcknowledgedFrom = FindingStatus.Improvable }]);
-            Assert.Equal("on", rebound.Acknowledged.Single().Current);
-            Assert.Equal("en", rebound.Acknowledged.Single().Language);
-            Assert.Null(rebound.AcknowledgementFor(english with { Current = "off" }));
+            var marked = preferences.Acknowledge(english, DateTimeOffset.Now);
+            Assert.Equal("en", Assert.Single(marked.Acknowledged).Language);
+            Assert.NotNull(marked.AcknowledgementFor(english));
+            Assert.Null(marked.AcknowledgementFor(english with { Current = "off" }));
+
+            Texts.Use("fr");
+            Assert.NotNull(preferences.AcknowledgementFor(finding));
+            Assert.Null(preferences.OtherLanguageMarkFor(finding));
         }
         finally
         {

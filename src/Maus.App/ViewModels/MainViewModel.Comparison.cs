@@ -30,8 +30,9 @@ public sealed record ReadinessRow(string Icon, Tone Tone, string Text, string? A
 }
 
 /// <summary>
-/// Comparaison entre deux audits et « ce que la mise à jour a changé » (0.8.6) : les constats de chaque audit sont gardés dans
-/// le profil de l'utilisateur, seuls les changements d'état sont montrés. Carte « Avant une mise à jour » et choix des modules.
+/// Comparaison entre deux audits (0.8.6) : les constats de chaque audit sont gardés dans le profil de l'utilisateur, seuls les
+/// changements d'état sont montrés. Un changement de build de Windows entre les deux est dit comme un fait, jamais comme la cause
+/// (0.8.7.1). Carte « Avant une mise à jour » et choix des modules.
 /// </summary>
 public sealed partial class MainViewModel
 {
@@ -89,7 +90,7 @@ public sealed partial class MainViewModel
             var build = WindowsInfo.Read(new WindowsRegistryReader()).FullBuild;
             if (!string.Equals(build, last.Build, StringComparison.Ordinal))
             {
-                BuildNotice = T("Windows a été mis à jour depuis votre dernier audit (build {0} → {1}). Relancez l'audit : MAUS montrera ce que la mise à jour a changé dans vos réglages.", last.Build, build);
+                BuildNotice = T("Windows a été mis à jour depuis votre dernier audit (build {0} → {1}). Relancez l'audit : MAUS montrera ce qui a changé depuis.", last.Build, build);
             }
         }
         catch (Exception ex) when (ex is MausAccessDeniedException or System.IO.IOException or UnauthorizedAccessException or DataSourceUnavailableException)
@@ -172,8 +173,9 @@ public sealed partial class MainViewModel
         {
             foreach (var change in AuditComparison.Compare(older, current))
             {
+                // Verdict changé en même temps que MAUS : en gris, ni aggravé ni amélioré (la règle a pu changer avec MAUS).
                 var bad = change.Kind is AuditChangeKind.Worse or AuditChangeKind.New;
-                AuditChanges.Add(change.Kind == AuditChangeKind.NotComparable
+                AuditChanges.Add(change.Kind == AuditChangeKind.NotComparable || change.MausVersionChanged
                     ? new AuditChangeRow("\uE9CE", Tone.Grey, T(change.Title), Describe(change))
                     : new AuditChangeRow(bad ? "\uE74B" : "\uE74A", bad ? Tone.Rose : Tone.Mint, T(change.Title), Describe(change)));
             }
@@ -182,7 +184,7 @@ public sealed partial class MainViewModel
             var better = AuditChanges.Count(c => c.Tone == Tone.Mint);
             var when = older.At.LocalDateTime;
             ComparisonTitle = !string.Equals(older.Build, current.Build, StringComparison.Ordinal)
-                ? T("Ce que la mise à jour de Windows a changé (build {0} → {1}) : {2}, {3}", older.Build, current.Build, Plural(worse, T("{0} aggravé"), T("{0} aggravés")), Plural(better, T("{0} amélioré"), T("{0} améliorés")))
+                ? T("Ce qui a changé depuis l'audit du {0:g} (entre-temps, Windows est passé du build {1} au build {2}) : {3}, {4}", when, older.Build, current.Build, Plural(worse, T("{0} aggravé"), T("{0} aggravés")), Plural(better, T("{0} amélioré"), T("{0} améliorés")))
                 : AuditChanges.Count == 0
                     ? T("Aucun changement d'état depuis l'audit du {0:g}", when)
                     : T("Depuis l'audit du {0:g} : {1}, {2}", when, Plural(worse, T("{0} aggravé"), T("{0} aggravés")), Plural(better, T("{0} amélioré"), T("{0} améliorés")));
@@ -198,8 +200,10 @@ public sealed partial class MainViewModel
     {
         AuditChangeKind.New => T("Nouveau : {0} · {1}", Labels.Of(change.After!.Value), change.ModuleId),
         AuditChangeKind.Gone => T("Plus signalé (était : {0}) · {1}", Labels.Of(change.Before!.Value), change.ModuleId),
+        AuditChangeKind.NotComparable when change.OtherDevice => T("Ce n'est plus le même appareil à cette place qu'à l'audit précédent : son verdict ({0}) n'est pas comparé à celui d'avant · {1}", Labels.Of(change.After!.Value), change.ModuleId),
         AuditChangeKind.NotComparable when change.After is { } after => T("Seulement dans cet audit ({0}) : c'est peut-être un contrôle ajouté par une nouvelle version de MAUS, pas un changement du PC · {1}", Labels.Of(after), change.ModuleId),
         AuditChangeKind.NotComparable => T("Plus dans cet audit (était : {0}) : le contrôle a peut-être changé avec MAUS, pas forcément votre PC · {1}", Labels.Of(change.Before!.Value), change.ModuleId),
+        _ when change.MausVersionChanged => T("{0} → {1} : MAUS a changé de version entre ces audits, ce verdict a pu changer avec lui, pas forcément votre PC · {2}", Labels.Of(change.Before!.Value), Labels.Of(change.After!.Value), change.ModuleId),
         _ => T("{0} → {1} · {2}", Labels.Of(change.Before!.Value), Labels.Of(change.After!.Value), change.ModuleId),
     };
 

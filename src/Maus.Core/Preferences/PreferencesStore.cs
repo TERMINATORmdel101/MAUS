@@ -227,7 +227,7 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
 
         var clean = read with
         {
-            Acknowledged = BoundedMarks(Clean(read.Acknowledged, IsPossible)),
+            Acknowledged = UpgradedMarks(BoundedMarks(Clean(read.Acknowledged, IsPossible))),
             SkippedModules = Clean(read.SkippedModules),
             KeptRefreshRates = Clean(read.KeptRefreshRates, IsPossible),
         };
@@ -238,6 +238,15 @@ public sealed class FilePreferencesStore(string directory, IDirectoryProtector p
     /// La 0.8.5 gardait la valeur d'une marque sans limite, et le moteur refuse tout le fichier au-delà de sa borne : une seule
     /// marque longue bloquerait tous les choix. Bornée ici, elle vaut toujours pour la même valeur. Ce n'est pas un fichier abîmé.
     /// </summary>
+    /// <summary>
+    /// Avant la 0.8.7.1, l'identifiant d'un appareil en erreur (Module 17) contenait son numéro de série : une marque posée alors
+    /// prend le nouvel identifiant et vaut toujours pour le même appareil. Ce n'est pas un fichier abîmé.
+    /// </summary>
+    private static IReadOnlyList<Acknowledgement> UpgradedMarks(IReadOnlyList<Acknowledgement> marks) =>
+        marks.Any(mark => Modules.M17Devices.DeviceFindingId.Upgrade(mark.FindingId) != mark.FindingId)
+            ? [.. marks.Select(mark => mark with { FindingId = Modules.M17Devices.DeviceFindingId.Upgrade(mark.FindingId) })]
+            : marks;
+
     private static IReadOnlyList<Acknowledgement> BoundedMarks(IReadOnlyList<Acknowledgement> marks) =>
         marks.Any(mark => mark.Current?.Length > Acknowledgement.MaxCurrentLength)
             ? [.. marks.Select(mark => mark with { Current = Acknowledgement.Bounded(mark.Current) })]
@@ -364,16 +373,32 @@ public static class Acknowledgements
         }
 
         var findings = result.Findings.Select(finding =>
-            finding.Status is FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem
-            && preferences.AcknowledgementFor(finding) is { } mark
-                ? finding with
+        {
+            if (finding.Status is not (FindingStatus.Improvable or FindingStatus.Warning or FindingStatus.Problem))
+            {
+                return finding;
+            }
+
+            if (preferences.AcknowledgementFor(finding) is { } mark)
+            {
+                return finding with
                 {
                     Status = FindingStatus.Info,
                     AcknowledgedFrom = finding.Status,
                     Fixable = false,
                     Advice = T("Marqué « voulu » par vous le {0:d}. MAUS le signalera de nouveau si la situation change.", mark.At.ToLocalTime()),
-                }
-                : finding).ToList();
+                };
+            }
+
+            // Marque posée dans une autre langue : la valeur ne peut pas être comparée, le constat reste signalé et le dit.
+            if (preferences.OtherLanguageMarkFor(finding) is { } other)
+            {
+                var note = T("Vous l'aviez marqué « voulu » le {0:d}, quand MAUS était dans une autre langue : MAUS ne peut pas vérifier que la situation est restée la même. Si c'est toujours voulu, marquez-le de nouveau.", other.At.ToLocalTime());
+                return finding with { Advice = finding.Advice is { } advice ? note + " " + advice : note };
+            }
+
+            return finding;
+        }).ToList();
         return result with { Findings = findings };
     }
 }

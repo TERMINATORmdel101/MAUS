@@ -8,7 +8,12 @@ namespace Maus.Core.Reporting;
 /// <summary>Un constat tel qu'il était lors d'un audit passé (l'état et la valeur lue, sans les explications).</summary>
 /// <param name="Acknowledged">Marqué « voulu » à cet audit : <paramref name="Status"/> reste son état d'origine, pour la comparaison, mais la carte « Dernier audit » ne le signale pas.</param>
 /// <param name="Enabled">Entrée de démarrage : activée ou désactivée ; <c>null</c> pour un autre constat, ou un résumé écrit avant ce champ.</param>
-public sealed record SnapshotFinding(string Id, string ModuleId, string Title, FindingStatus Status, [property: JsonIgnore] string? Current = null, bool Acknowledged = false, bool? Enabled = null);
+/// <param name="Item">
+/// Appareil que le constat désigne, tel que le matériel se nomme (<see cref="Finding.MeasuredItem"/> : écran, disque, carte graphique),
+/// quand son identifiant ne dit que sa place (« écran 1 », « disque 0 ») ; <c>null</c> pour un autre constat, ou un résumé écrit avant ce
+/// champ (0.8.7.1).
+/// </param>
+public sealed record SnapshotFinding(string Id, string ModuleId, string Title, FindingStatus Status, [property: JsonIgnore] string? Current = null, bool Acknowledged = false, bool? Enabled = null, string? Item = null);
 
 /// <summary>Résumé d'un audit gardé sur ce PC, pour le comparer aux suivants et le retrouver à l'ouverture (0.8.6).</summary>
 /// <param name="Score">Score sur 100, ou <see cref="NoScore"/> pour un audit de la semaine sans droits.</param>
@@ -37,7 +42,7 @@ public sealed record AuditSnapshot(DateTimeOffset At, string Build, int Score, I
     {
         ArgumentNullException.ThrowIfNull(results);
         return new(at, build, HealthScore.Compute(results),
-            [.. results.SelectMany(r => r.Findings.Select(f => new SnapshotFinding(f.Id, r.ModuleId, f.Title, f.AcknowledgedFrom ?? f.Status, f.Current, f.AcknowledgedFrom is not null, f.Enabled)))],
+            [.. results.SelectMany(r => r.Findings.Select(f => new SnapshotFinding(f.Id, r.ModuleId, f.Title, f.AcknowledgedFrom ?? f.Status, f.Current, f.AcknowledgedFrom is not null, f.Enabled, f.MeasuredItem)))],
             HealthScore.Explain([.. results]).IsPartial,
             MausVersion: AppVersion.Display,
             Tasks: Followed(results, Follow.WhatChanged.TasksFindingId),
@@ -74,14 +79,26 @@ public enum AuditChangeKind
 }
 
 /// <summary>Un constat dont l'état a changé entre deux audits.</summary>
-public sealed record AuditChange(AuditChangeKind Kind, string Title, string ModuleId, FindingStatus? Before, FindingStatus? After, string? CurrentBefore = null, string? CurrentAfter = null, string? FindingId = null);
+/// <param name="MausVersionChanged">
+/// Verdict changé (<see cref="AuditChangeKind.Worse"/> ou <see cref="AuditChangeKind.Better"/>) entre deux audits faits par des versions
+/// différentes de MAUS, ou dont l'une n'est pas connue : la règle a pu changer avec MAUS, sans que le PC bouge (0.8.7.1).
+/// </param>
+/// <param name="OtherDevice">
+/// <see cref="AuditChangeKind.NotComparable"/> parce qu'un autre appareil occupe la même place d'un audit à l'autre (écran débranché, disques
+/// renumérotés) : le verdict d'un appareil ne se compare pas à celui d'un autre (0.8.7.1).
+/// </param>
+public sealed record AuditChange(AuditChangeKind Kind, string Title, string ModuleId, FindingStatus? Before, FindingStatus? After, string? CurrentBefore = null, string? CurrentAfter = null, string? FindingId = null, bool MausVersionChanged = false, bool OtherDevice = false);
 
 /// <summary>
 /// Ce qui a changé entre deux audits : seulement les changements d'état, car une valeur lue (température, espace libre) bouge
 /// tout le temps. Un module absent de l'un des deux audits (non choisi, en erreur) n'est pas comparé : rien n'y a été lu, ce
 /// n'est ni une amélioration ni une aggravation. Un état indéterminé ne se compare pas non plus. Un constat présent d'un seul
 /// côté n'est dit « nouveau » ou « disparu » que si la même version de MAUS a fait les deux audits, avec le même compte, et que
-/// l'audit qui ne le montre pas lit au moins autant que l'autre : sinon, <see cref="AuditChangeKind.NotComparable"/>.
+/// l'audit qui ne le montre pas lit au moins autant que l'autre : sinon, <see cref="AuditChangeKind.NotComparable"/>. Un verdict
+/// changé entre deux versions de MAUS reste un changement, marqué <see cref="AuditChange.MausVersionChanged"/> : ceux qui l'affichent
+/// ne le comptent ni comme une aggravation ni comme un progrès du PC. Un constat dont l'identifiant ne dit que la place d'un appareil
+/// n'est comparé que si c'est le même appareil des deux côtés (<see cref="SnapshotFinding.Item"/>) ; sinon,
+/// <see cref="AuditChangeKind.NotComparable"/> marqué <see cref="AuditChange.OtherDevice"/>.
 /// </summary>
 public static class AuditComparison
 {
@@ -110,11 +127,24 @@ public static class AuditComparison
         {
             if (before.TryGetValue(id, out var then))
             {
+                // Même place, autre appareil (un écran branché ou débranché change l'ordre, Windows renumérote un disque) : ce n'est ni
+                // une aggravation ni un progrès, seulement un appareil que l'audit d'avant ne montrait pas à cette place.
+                if (then.Item is { } itemBefore && now.Item is { } itemAfter && !string.Equals(itemBefore, itemAfter, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (NeedsAction(now.Status) || NeedsAction(then.Status))
+                    {
+                        changes.Add(new(AuditChangeKind.NotComparable, now.Title, now.ModuleId, then.Status, now.Status, then.Current, now.Current, id, OtherDevice: true));
+                    }
+
+                    continue;
+                }
+
                 // Conforme et Info ne demandent rien : passer de l'un à l'autre n'est ni une aggravation ni un progrès.
                 if (now.Status != FindingStatus.Unknown && then.Status != FindingStatus.Unknown && now.Status.Rank() != then.Status.Rank()
                     && (NeedsAction(now.Status) || NeedsAction(then.Status)))
                 {
-                    changes.Add(new(now.Status.Rank() > then.Status.Rank() ? AuditChangeKind.Worse : AuditChangeKind.Better, now.Title, now.ModuleId, then.Status, now.Status, then.Current, now.Current, id));
+                    changes.Add(new(now.Status.Rank() > then.Status.Rank() ? AuditChangeKind.Worse : AuditChangeKind.Better, now.Title, now.ModuleId, then.Status, now.Status, then.Current, now.Current, id,
+                        !SameMausVersion(older, newer)));
                 }
             }
             else if (modulesBefore.Contains(now.ModuleId) && NeedsAction(now.Status))
@@ -188,7 +218,7 @@ public sealed class AuditSnapshotStore(string path, Action<TimeSpan>? wait = nul
     {
         Build = StoredValues.Text(snapshot.Build, LongestText),
         Score = snapshot.Score is >= 0 and <= 100 ? snapshot.Score : AuditSnapshot.NoScore,
-        Findings = [.. snapshot.Findings.Take(MostFindings).Select(f => f with { Title = StoredValues.Text(f.Title ?? f.Id, LongestText) })],
+        Findings = [.. snapshot.Findings.Take(MostFindings).Select(f => f with { Title = StoredValues.Text(f.Title ?? f.Id, LongestText), Item = f.Item is null ? null : StoredValues.Text(f.Item, LongestText) })],
         MausVersion = snapshot.MausVersion is null ? null : StoredValues.Text(snapshot.MausVersion, LongestText),
         Tasks = CleanItems(snapshot.Tasks),
         Drivers = CleanItems(snapshot.Drivers),

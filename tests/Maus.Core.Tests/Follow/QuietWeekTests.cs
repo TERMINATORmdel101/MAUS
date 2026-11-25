@@ -91,6 +91,28 @@ public class QuietWeekTests
         Assert.Equal(Now.AddDays(-7), summary.Points[1].At);
     }
 
+    /// <summary>0.8.7.1 : un verdict aggravé quand MAUS a changé de version n'est pas une alerte sur le PC ; il est dit à part.</summary>
+    [Fact]
+    public void A_verdict_changed_with_a_new_maus_is_set_aside_not_counted()
+    {
+        var kept = new[]
+        {
+            Weekly(14, Finding("a"), Finding("b")),
+            Weekly(7, Finding("a", FindingStatus.Warning), Finding("b")) with { MausVersion = "0.8.7.1" },
+            Weekly(1, Finding("a", FindingStatus.Warning), Finding("b", FindingStatus.Problem)) with { MausVersion = "0.8.7.1" },
+        };
+
+        var summary = QuietWeek.Build(kept, Now.AddDays(-20), On, Now);
+
+        Assert.Equal(["Titre b"], summary.Points.Select(p => p.Title));
+        Assert.Contains("1 constat nouveau ou aggravé", summary.Headline, StringComparison.Ordinal);
+        Assert.Contains(summary.Notes, n => n.Contains("en même temps que la version de MAUS", StringComparison.Ordinal) && n.Contains("Titre a", StringComparison.Ordinal));
+
+        var onlyMaus = QuietWeek.Build(kept[..2], Now.AddDays(-20), On, Now);
+        Assert.Equal(QuietWeekState.Quiet, onlyMaus.State);
+        Assert.Empty(onlyMaus.Points);
+    }
+
     [Fact]
     public void What_came_and_went_between_two_visits_is_still_told_once()
     {

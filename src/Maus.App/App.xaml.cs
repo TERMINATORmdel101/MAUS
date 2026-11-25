@@ -607,11 +607,23 @@ public partial class App : Application
     /// <summary>Active la langue choisie (ou celle de Windows), y compris pour les dates et les nombres.</summary>
     public static void UseLanguage(string? code) => Texts.UseWithCulture(code);
 
-    /// <summary>Change de langue : la fenêtre est recréée dans la nouvelle langue, puis l'audit est relancé s'il avait été fait.</summary>
-    public static void SwitchLanguage(string code, bool rerunAudit)
+    /// <summary>
+    /// Change de langue : la fenêtre est recréée dans la nouvelle langue, puis l'audit est relancé s'il avait été fait.
+    /// Renvoie <c>false</c>, sans rien changer, si l'ancienne fenêtre ne doit pas ou n'a pas pu se fermer : jamais deux fenêtres.
+    /// </summary>
+    public static bool SwitchLanguage(string code, bool rerunAudit)
     {
-        UseLanguage(code);
         var old = Current.MainWindow;
+
+        // Une opération suivie dans cette fenêtre (réparation, annulation, point de restauration…) : elle n'est pas remplacée.
+        if (old is MainWindow { DataContext: ViewModels.MainViewModel { IsBusyForLanguageChange: true } })
+        {
+            return false;
+        }
+
+        var previous = Texts.Language;
+        var cultures = (CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture, CultureInfo.DefaultThreadCurrentCulture, CultureInfo.DefaultThreadCurrentUICulture);
+        UseLanguage(code);
 
         // La nouvelle fenêtre reprend la place et l'onglet de celle qu'elle remplace.
         if (old is MainWindow { DataContext: ViewModels.MainViewModel view } oldWindow)
@@ -627,12 +639,32 @@ public partial class App : Application
         var window = new MainWindow();
         Current.MainWindow = window;
         window.Show();
-        old?.Close();
+        if (old is not null && !Closes(old))
+        {
+            // Fermeture refusée : l'ancienne fenêtre reste seule, dans sa langue.
+            Current.MainWindow = old;
+            window.Close();
+            UseLanguage(previous);
+            (CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture, CultureInfo.DefaultThreadCurrentCulture, CultureInfo.DefaultThreadCurrentUICulture) = cultures;
+            return false;
+        }
+
         // Moteur arrêté : cet audit se fait sans droits, il ne demande aucune autorisation.
         if (rerunAudit && window.DataContext is ViewModels.MainViewModel model && model.RerunAuditForLanguageCommand.CanExecute(null))
         {
             model.RerunAuditForLanguageCommand.Execute(null);
         }
+
+        return true;
+    }
+
+    /// <summary>Ferme une fenêtre et dit si elle s'est vraiment fermée (sa question de fermeture a pu recevoir « Non »).</summary>
+    private static bool Closes(Window window)
+    {
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.Close();
+        return closed;
     }
 
     /// <summary>
